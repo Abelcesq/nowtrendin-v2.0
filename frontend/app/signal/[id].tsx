@@ -1,24 +1,29 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, ChevronDown, ChevronUp, Bell } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
-import {
-  getSignalById,
-  ageLabel,
-  stageColor,
-  scoreGap,
-  actionFor,
-  breakdownGroups,
-} from '../../lib/signals';
+import { useSignal } from '../../hooks/useSignals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups } from '../../lib/signals';
 
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const signal = getSignalById(String(id));
+  const { signal, isLoading } = useSignal(String(id));
   const [open, setOpen] = useState<string | null>('Signal Quality');
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
+          <ChevronLeft size={24} color="#5B6472" />
+        </TouchableOpacity>
+        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
+      </Screen>
+    );
+  }
 
   if (!signal) {
     return (
@@ -45,9 +50,20 @@ export default function SignalDetail() {
       </TouchableOpacity>
 
       <Text className="text-textPrimary text-3xl font-bold">{signal.topic}</Text>
-      <Text className="text-textMuted text-sm mb-5">
+      <Text className="text-textMuted text-sm mb-2">
         {signal.category} · {ageLabel(signal.createdAt)}
       </Text>
+
+      {/* Platform chips */}
+      {!!signal.platforms?.length && (
+        <View className="flex-row flex-wrap gap-2 mb-4">
+          {signal.platforms.map((p) => (
+            <View key={p} className="px-2.5 py-1 rounded-full bg-surface border border-border">
+              <Text className="text-textSecondary text-[11px]">{p}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Dual Gradient Score */}
       <View className="bg-surface rounded-2xl p-5 border border-border mb-5" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
@@ -58,6 +74,9 @@ export default function SignalDetail() {
         <Text className="text-textSecondary text-sm text-center mt-4">
           {gap}-point gap — {agree ? 'both models agree' : 'very early, models diverging'}
         </Text>
+        {!!signal.gapMeaning && (
+          <Text className="text-textMuted text-xs text-center mt-1 leading-5">{signal.gapMeaning}</Text>
+        )}
       </View>
 
       {/* WHAT TO DO */}
@@ -66,16 +85,27 @@ export default function SignalDetail() {
         <Text className="text-2xl font-black mb-1" style={{ color }}>
           {action.title}
         </Text>
-        <Text className="text-textSecondary text-base leading-6">{action.body}</Text>
+        {!!action.body && <Text className="text-textSecondary text-base leading-6">{action.body}</Text>}
+        {!!signal.whatToDo?.detail && signal.whatToDo.detail !== action.body && (
+          <Text className="text-textMuted text-sm leading-5 mt-2">{signal.whatToDo.detail}</Text>
+        )}
       </View>
 
       {/* WHY THIS MATTERS */}
-      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Why this matters</Text>
-      <Text className="text-textSecondary text-base leading-6 mb-5">
-        "{signal.topic}" is registering a <Text className="font-semibold" style={{ color }}>{signal.stage.toLowerCase()}</Text> signal
-        with a Gradient Score of {signal.score}. Detection ({signal.detection}) leads confidence ({signal.confidence}),
-        indicating attention is moving {agree ? 'with conviction' : 'ahead of consensus'} in {signal.category.toLowerCase()}.
-      </Text>
+      {!!signal.why && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Why this matters</Text>
+          <Text className="text-textSecondary text-base leading-6 mb-5">{signal.why}</Text>
+        </>
+      )}
+
+      {/* WHAT TO WATCH */}
+      {!!signal.whatToWatch && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to watch</Text>
+          <Text className="text-textSecondary text-base leading-6 mb-5">{signal.whatToWatch}</Text>
+        </>
+      )}
 
       {/* SCORE BREAKDOWN */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Score breakdown</Text>
@@ -88,7 +118,10 @@ export default function SignalDetail() {
               className="flex-row items-center justify-between px-4 py-3.5"
               activeOpacity={0.8}
             >
-              <Text className="text-textPrimary font-semibold">{g.title}</Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-textPrimary font-semibold">{g.title}</Text>
+                {!!g.status && <Text className="text-textMuted text-[10px] font-bold">{g.status}</Text>}
+              </View>
               {isOpen ? <ChevronUp size={18} color="#9AA3B0" /> : <ChevronDown size={18} color="#9AA3B0" />}
             </TouchableOpacity>
             {isOpen && (
@@ -96,12 +129,16 @@ export default function SignalDetail() {
                 {g.items.map((it) => (
                   <View key={it.label}>
                     <View className="flex-row justify-between mb-1">
-                      <Text className="text-textSecondary text-sm">{it.label}</Text>
-                      <Text className="text-textPrimary text-sm font-semibold">{it.value}</Text>
+                      <Text className="text-textSecondary text-sm flex-1 pr-2">{it.label}</Text>
+                      <Text className="text-textPrimary text-sm font-semibold">
+                        {it.value}
+                        {it.conf != null ? <Text className="text-textMuted"> / {it.conf}</Text> : null}
+                      </Text>
                     </View>
                     <View className="h-1.5 rounded-full bg-border overflow-hidden">
-                      <View style={{ width: `${it.value}%`, backgroundColor: color }} className="h-full rounded-full" />
+                      <View style={{ width: `${Math.max(0, Math.min(100, it.value))}%`, backgroundColor: color }} className="h-full rounded-full" />
                     </View>
+                    {!!it.desc && <Text className="text-textMuted text-[11px] mt-1">{it.desc}</Text>}
                   </View>
                 ))}
               </View>

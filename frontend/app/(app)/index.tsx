@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Bell, Zap, Briefcase, Building2 } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
@@ -8,7 +8,8 @@ import { SignalCard } from '../../components/trends/SignalCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID } from '../../constants/tiers';
-import { getSignals, dataWindowLabel, stageColor } from '../../lib/signals';
+import { dataWindowLabel, stageColor } from '../../lib/signals';
+import { useTierFeed } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 
@@ -19,7 +20,7 @@ export default function Dashboard() {
   const cfg = TIERS[tier];
   const Icon = TIER_ICONS[tier];
 
-  const { accessible, lockedCount } = getSignals(tier);
+  const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
   const hero = accessible[0];
   const recent = accessible.slice(1, 5);
 
@@ -53,6 +54,16 @@ export default function Dashboard() {
         </View>
       </View>
 
+      {isSample && (
+        <View className="rounded-lg px-3 py-2 mb-4 border border-border bg-surface">
+          <Text className="text-textMuted text-[11px]">Showing sample data — live engine unreachable.</Text>
+        </View>
+      )}
+
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 60 }} />
+      ) : (
+      <>
       {hero && (
         <TouchableOpacity
           activeOpacity={0.9}
@@ -89,6 +100,8 @@ export default function Dashboard() {
       <View className="mt-2">
         <LockedSignalsBanner tier={tier} lockedCount={lockedCount} />
       </View>
+      </>
+      )}
     </Screen>
   );
 }

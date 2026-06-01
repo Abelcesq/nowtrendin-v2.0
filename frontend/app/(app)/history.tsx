@@ -1,18 +1,19 @@
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Clock } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { SignalCard } from '../../components/trends/SignalCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TierID } from '../../constants/tiers';
-import { getSignals, dataWindowLabel } from '../../lib/signals';
+import { dataWindowLabel } from '../../lib/signals';
+import { useTierFeed } from '../../hooks/useSignals';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 export default function History() {
   const user = useAuthStore((s) => s.user);
   const tier = (user?.tier ?? 'consumer') as TierID;
-  const { accessible, lockedCount } = getSignals(tier);
+  const { accessible, lockedCount, isLoading } = useTierFeed(tier);
 
   const t = Date.now();
   const today = accessible.filter((s) => t - s.createdAt < DAY);
@@ -28,7 +29,9 @@ export default function History() {
         </View>
       </View>
 
-      {accessible.length === 0 && lockedCount === 0 && (
+      {isLoading && <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 60 }} />}
+
+      {!isLoading && accessible.length === 0 && lockedCount === 0 && (
         <Text className="text-textMuted text-center mt-16">No signals yet.</Text>
       )}
 
