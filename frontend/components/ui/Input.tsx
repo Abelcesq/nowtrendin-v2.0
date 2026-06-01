@@ -36,18 +36,19 @@ export function Input({
         className={`flex-row items-center bg-surface rounded-xl px-4 py-3.5 border ${
           error ? 'border-error' : 'border-border'
         }`}
+        style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 }}
       >
         {icon && <View className="mr-3 opacity-60">{icon}</View>}
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor="#475569"
+          placeholderTextColor="#9AA3B0"
           secureTextEntry={secureText && !showPw}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           className="flex-1 text-base"
-          style={{ color: '#F0F2FF' }}
+          style={{ color: '#1A1A2E' }}
         />
         {secureText && (
           <TouchableOpacity onPress={() => setShowPw(!showPw)} className="ml-2">

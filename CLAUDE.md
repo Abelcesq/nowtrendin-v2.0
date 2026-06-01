@@ -60,13 +60,15 @@ Push alerts: expo-notifications
 colors: {
   primary:   '#00C896',   // Now TrendIn green — buttons, accents, active states
   primaryDk: '#009970',
-  bg:        '#07080C',   // Page background
-  surface:   '#111827',   // Cards, panels
-  elevated:  '#1A2332',   // Modals, drawers
-  border:    '#1E2D3D',
-  textPrimary:   '#F0F2FF',
-  textSecondary: '#94A3B8',
-  textMuted:     '#475569',
+  brandOrange: '#EE6A2A',  // Wordmark "Now"
+  brandMaroon: '#B5341B',  // Wordmark "TrendIn" (maroon-orange, matches logo N)
+  bg:        '#F4F5F7',   // Page background (light grey — matches v1.0)
+  surface:   '#FFFFFF',   // Cards, panels
+  elevated:  '#FFFFFF',   // Modals, drawers
+  border:    '#E4E7EC',
+  textPrimary:   '#1A1A2E',
+  textSecondary: '#5B6472',
+  textMuted:     '#9AA3B0',
   consumer:    '#2D7EEF',   // Blue
   business:    '#00C896',   // Green
   enterprise:  '#D4A017',   // Gold
@@ -187,6 +189,9 @@ If any answer is NO — stop and fix.
 
 ---
 
-## 11. THEME — dark-first. bg #07080C, surface #111827. Green #00C896 + flame logo preserved from v1.0.
+## 11. THEME — light (matches v1.0). bg #F4F5F7, surface #FFFFFF (white cards w/ soft shadow),
+dark text #1A1A2E. Green #00C896 = accents/active states. Wordmark: "Now" brandOrange + "TrendIn"
+brandMaroon. Flame logo preserved from v1.0 — rendered via components/ui/Logo.tsx (SVG stand-in;
+swap for the original logo.png in assets/ when available). StatusBar = dark-content.
 
 *Last updated: Now TrendIn 2.0 — Phase 1 (SDK 54, mock auth)*

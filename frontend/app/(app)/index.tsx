@@ -1,5 +1,6 @@
 import { View, Text } from 'react-native';
 import { Bell, Zap, Briefcase, Building2 } from 'lucide-react-native';
+import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { TierGate } from '../../components/trends/TierGate';
 import { useAuthStore } from '../../store/auth.store';
@@ -31,14 +32,15 @@ export default function Dashboard() {
   return (
     <Screen scroll>
       <View className="flex-row items-center justify-between pt-4 mb-1">
-        <View>
-          <Text className="text-textPrimary text-xl font-black">
-            Now <Text className="text-primary">TrendIn</Text>
-          </Text>
-          <Text className="text-textMuted text-[10px] tracking-widest uppercase">Attention Intelligence</Text>
+        <View className="flex-row items-center gap-2">
+          <Logo size={34} />
+          <View>
+            <Wordmark size="text-xl" />
+            <Text className="text-textMuted text-[10px] tracking-widest uppercase">Attention Intelligence</Text>
+          </View>
         </View>
         <View className="w-9 h-9 rounded-full bg-surface items-center justify-center border border-border">
-          <Bell size={18} color="#94A3B8" />
+          <Bell size={18} color="#5B6472" />
         </View>
       </View>
 

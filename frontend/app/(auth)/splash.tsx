@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Flame } from 'lucide-react-native';
+import { Logo, Wordmark } from '../../components/ui/Logo';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -47,15 +47,11 @@ export default function Splash() {
   return (
     <View className="flex-1 bg-bg items-center justify-center">
       <Animated.View style={logoStyle} className="items-center">
-        <View className="w-24 h-24 rounded-3xl bg-surface items-center justify-center border border-border">
-          <Flame size={48} color="#00C896" />
-        </View>
+        <Logo size={120} />
       </Animated.View>
 
-      <Animated.View style={textStyle} className="mt-6 items-center">
-        <Text className="text-textPrimary text-3xl font-black">
-          Now <Text className="text-primary">TrendIn</Text>
-        </Text>
+      <Animated.View style={textStyle} className="mt-5 items-center">
+        <Wordmark size="text-4xl" />
       </Animated.View>
 
       <Animated.View style={tagStyle} className="mt-2">

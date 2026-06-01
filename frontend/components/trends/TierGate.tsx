@@ -36,7 +36,7 @@ export function TierGate({ children, requiredTier, feature, message }: TierGateP
       <View className="opacity-30" pointerEvents="none">
         {children}
       </View>
-      <View className="absolute inset-0 items-center justify-center rounded-xl p-6" style={{ backgroundColor: 'rgba(7,8,12,0.8)' }}>
+      <View className="absolute inset-0 items-center justify-center rounded-xl p-6" style={{ backgroundColor: 'rgba(244,245,247,0.88)' }}>
         <View className="w-12 h-12 rounded-full items-center justify-center mb-4" style={{ backgroundColor: `${cfg.colour}20` }}>
           <Lock size={22} color={cfg.colour} />
         </View>

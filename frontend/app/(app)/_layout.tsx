@@ -13,15 +13,15 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#111827',
-          borderTopColor: '#1E2D3D',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E4E7EC',
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarActiveTintColor: '#00C896',
-        tabBarInactiveTintColor: '#475569',
+        tabBarInactiveTintColor: '#9AA3B0',
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
       }}
     >

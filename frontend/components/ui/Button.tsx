@@ -27,12 +27,12 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const TEXT_VARIANTS: Record<Variant, string> = {
-  primary: 'text-bg font-bold',
+  primary: 'text-white font-bold',
   secondary: 'text-primary font-semibold',
   ghost: 'text-textSecondary font-medium',
   danger: 'text-white font-bold',
   consumer: 'text-consumer font-semibold',
-  business: 'text-bg font-bold',
+  business: 'text-white font-bold',
   enterprise: 'text-enterprise font-semibold',
 };
 
@@ -61,7 +61,7 @@ export function Button({
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const spinnerColor =
-    variant === 'primary' || variant === 'business' || variant === 'danger' ? '#07080C' : '#00C896';
+    variant === 'primary' || variant === 'business' || variant === 'danger' ? '#FFFFFF' : '#00C896';
 
   return (
     <TouchableOpacity

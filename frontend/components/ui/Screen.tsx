@@ -13,7 +13,7 @@ export function Screen({ children, scroll = false, className = '', padded = true
   const padding = padded ? 'px-5' : '';
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor="#07080C" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F4F5F7" />
       {scroll ? (
         <ScrollView
           className={`flex-1 ${padding} ${className}`}

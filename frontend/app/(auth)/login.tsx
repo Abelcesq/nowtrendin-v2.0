@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, KeyRound, ChevronLeft, Flame } from 'lucide-react-native';
+import { Mail, KeyRound, ChevronLeft } from 'lucide-react-native';
+import { Logo } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -42,8 +43,8 @@ export default function Login() {
         <ChevronLeft size={24} color="#94A3B8" />
       </TouchableOpacity>
 
-      <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
-        <Flame size={28} color="#00C896" />
+      <View className="mb-6">
+        <Logo size={56} />
       </View>
 
       <Text className="text-textPrimary text-3xl font-bold mb-1">Welcome back</Text>
