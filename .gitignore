@@ -1,0 +1,7 @@
+# Archives / binaries — keep locally, don't commit
+*.zip
+Gradient Score info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
