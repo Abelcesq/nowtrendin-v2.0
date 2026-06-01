@@ -1,0 +1,125 @@
+import { useState } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { User, Mail, KeyRound, ChevronLeft, Check } from 'lucide-react-native';
+import { Screen } from '../../components/ui/Screen';
+import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
+import { useAuthStore } from '../../store/auth.store';
+import { mockSignup } from '../../lib/auth';
+
+const schema = z
+  .object({
+    name: z.string().min(2, 'Name is required'),
+    email: z.string().email('Enter a valid email'),
+    password: z
+      .string()
+      .min(8, 'Min 8 characters')
+      .regex(/[A-Z]/, 'Must include an uppercase letter')
+      .regex(/[0-9]/, 'Must include a number'),
+    confirmPassword: z.string(),
+    acceptedTerms: z.literal(true, { message: 'You must accept the Terms & Conditions' }),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
+type FormData = z.infer<typeof schema>;
+
+export default function Signup() {
+  const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
+  const [terms, setTerms] = useState(false);
+
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      const { user, token } = await mockSignup(data.name, data.email, data.password);
+      setUser(user, token);
+      router.replace('/membership');
+    } catch {
+      setError('root', { message: 'Something went wrong. Please try again.' });
+    }
+  };
+
+  const toggleTerms = () => {
+    const next = !terms;
+    setTerms(next);
+    setValue('acceptedTerms', next as true, { shouldValidate: true });
+  };
+
+  return (
+    <Screen scroll>
+      <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-6 self-start">
+        <ChevronLeft size={24} color="#94A3B8" />
+      </TouchableOpacity>
+
+      <Text className="text-textPrimary text-3xl font-bold mb-1">Create account</Text>
+      <Text className="text-textMuted text-base mb-8">Join the attention intelligence platform.</Text>
+
+      <Controller
+        control={control}
+        name="name"
+        render={({ field: { onChange, value } }) => (
+          <Input placeholder="Full name" value={value} onChangeText={onChange} error={errors.name?.message} icon={<User size={18} color="#94A3B8" />} autoCapitalize="words" />
+        )}
+      />
+      <Controller
+        control={control}
+        name="email"
+        render={({ field: { onChange, value } }) => (
+          <Input placeholder="Email address" value={value} onChangeText={onChange} error={errors.email?.message} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
+        )}
+      />
+      <Controller
+        control={control}
+        name="password"
+        render={({ field: { onChange, value } }) => (
+          <Input placeholder="Password" value={value} onChangeText={onChange} error={errors.password?.message} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
+        )}
+      />
+      <Controller
+        control={control}
+        name="confirmPassword"
+        render={({ field: { onChange, value } }) => (
+          <Input placeholder="Confirm password" value={value} onChangeText={onChange} error={errors.confirmPassword?.message} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
+        )}
+      />
+
+      <TouchableOpacity onPress={toggleTerms} className="flex-row items-start gap-3 mb-6" activeOpacity={0.8}>
+        <View className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${terms ? 'bg-primary border-primary' : 'border-border bg-surface'}`}>
+          {terms && <Check size={12} color="#07080C" />}
+        </View>
+        <View className="flex-1">
+          <Text className="text-textSecondary text-sm leading-5">
+            I agree to the <Text className="text-primary" onPress={() => router.push('/membership')}>Terms & Conditions</Text> and <Text className="text-primary">Privacy Policy</Text>
+          </Text>
+          {errors.acceptedTerms && <Text className="text-error text-xs mt-1">{errors.acceptedTerms.message as string}</Text>}
+        </View>
+      </TouchableOpacity>
+
+      {errors.root && <Text className="text-error text-sm text-center mb-4">{errors.root.message}</Text>}
+
+      <Button onPress={handleSubmit(onSubmit)} loading={isSubmitting} size="lg">
+        Create Account
+      </Button>
+
+      <View className="flex-row justify-center mt-8 mb-4">
+        <Text className="text-textMuted text-sm">Already have an account? </Text>
+        <TouchableOpacity onPress={() => router.push('/login')}>
+          <Text className="text-primary text-sm font-semibold">Sign in</Text>
+        </TouchableOpacity>
+      </View>
+    </Screen>
+  );
+}

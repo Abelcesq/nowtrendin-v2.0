@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "Now TrendIn",
     "slug": "now-trendin-20",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "scheme": "nowtrendin",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
@@ -26,6 +27,10 @@
         "projectId": "ef045a1d-05df-4ab5-b474-508c412ae420"
       }
     },
-    "owner": "now-trendin"
+    "owner": "now-trendin",
+    "plugins": [
+      "expo-secure-store",
+      "expo-router"
+    ]
   }
 }
