@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Logo, Wordmark } from '../../components/ui/Logo';
+import { FullLogo } from '../../components/ui/Logo';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -47,14 +47,10 @@ export default function Splash() {
   return (
     <View className="flex-1 bg-bg items-center justify-center">
       <Animated.View style={logoStyle} className="items-center">
-        <Logo size={120} />
+        <FullLogo width={260} />
       </Animated.View>
 
-      <Animated.View style={textStyle} className="mt-5 items-center">
-        <Wordmark size="text-4xl" />
-      </Animated.View>
-
-      <Animated.View style={tagStyle} className="mt-2">
+      <Animated.View style={tagStyle} className="mt-1">
         <Text className="text-textMuted text-xs tracking-widest uppercase">
           Attention Intelligence
         </Text>
