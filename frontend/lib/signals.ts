@@ -69,6 +69,62 @@ const STAGE_COLORS: Record<Stage, string> = {
 export const stageColor = (s: Stage) => STAGE_COLORS[s];
 
 // Tier whose data window the user should upgrade to next (for locked prompts).
+export function getSignalById(id: string): Signal | undefined {
+  return RAW.find((s) => s.id === id);
+}
+
+export function scoreGap(s: Signal): number {
+  return Math.abs(s.detection - s.confidence);
+}
+
+// Prominent "what to do" guidance, derived from stage.
+const ACTIONS: Record<Stage, { title: string; body: string }> = {
+  VIRAL: { title: 'Act now.', body: 'Tier 1 viral topic across platforms. The window is open — move before it goes fully mainstream.' },
+  BREAKOUT: { title: 'Move fast.', body: 'Breakout in progress with strong multi-platform momentum. High-conviction entry.' },
+  STRONG: { title: 'Lean in.', body: 'Established strength and steady momentum. Solid entry with manageable risk.' },
+  EMERGING: { title: 'Position early.', body: 'Early momentum forming. Get ahead of confirmation while attention is still cheap.' },
+  WATCHING: { title: 'Keep on radar.', body: 'Signal is building but not yet confirmed. Set an alert and wait for acceleration.' },
+  MONITORING: { title: 'Note it.', body: 'Low-intensity background signal. Worth tracking, not yet actionable.' },
+};
+export function actionFor(s: Signal) {
+  return ACTIONS[s.stage];
+}
+
+export interface BreakdownItem { label: string; value: number }
+export interface BreakdownGroup { title: string; items: BreakdownItem[] }
+
+// Deterministic sub-metrics derived from the signal's core numbers so the
+// breakdown reads as real. Replace with API-provided breakdown later.
+export function breakdownGroups(s: Signal): BreakdownGroup[] {
+  const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+  return [
+    {
+      title: 'Signal Quality',
+      items: [
+        { label: 'Detection', value: s.detection },
+        { label: 'Confidence', value: s.confidence },
+        { label: 'Source spread', value: clamp((s.detection + s.confidence) / 2 - 4) },
+      ],
+    },
+    {
+      title: 'Signal Momentum',
+      items: [
+        { label: 'Velocity', value: clamp(s.score + 6) },
+        { label: 'Acceleration', value: clamp(s.score - 8) },
+        { label: 'Volume', value: clamp(s.detection - 3) },
+      ],
+    },
+    {
+      title: 'Signal Context',
+      items: [
+        { label: 'Cross-platform', value: clamp(s.confidence + 5) },
+        { label: 'Novelty', value: clamp(100 - s.score + 20) },
+        { label: 'Saturation', value: clamp(s.score - 15) },
+      ],
+    },
+  ];
+}
+
 export function nextTier(tier: TierID): TierID | null {
   if (tier === 'consumer') return 'business';
   if (tier === 'business') return 'enterprise';

@@ -1,0 +1,1 @@
+web: python gravitational_anomaly_detector.py --mode=api

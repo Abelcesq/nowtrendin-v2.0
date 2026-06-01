@@ -1,14 +1,17 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { ArrowUpRight } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { Signal, ageLabel, stageColor } from '../../lib/signals';
 
 export function SignalCard({ signal, onPress }: { signal: Signal; onPress?: () => void }) {
+  const router = useRouter();
   const color = stageColor(signal.stage);
+  const handlePress = onPress ?? (() => router.push(`/signal/${signal.id}`));
   return (
     <TouchableOpacity
-      activeOpacity={onPress ? 0.85 : 1}
-      onPress={onPress}
+      activeOpacity={0.85}
+      onPress={handlePress}
       className="bg-surface rounded-xl p-4 mb-3 border border-border"
       style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
     >

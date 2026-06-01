@@ -1,0 +1,241 @@
+================================================================
+NOW TRENDIN — GRADIENT SCORE ENGINE
+TRANSFER BRIEF FOR V2.0 IMPLEMENTATION
+================================================================
+
+WHAT THIS IS
+------------
+A predictive trend intelligence engine that detects topics accelerating
+in niche/expert communities 3–14 days before they appear on Google Trends.
+
+Two outputs from one engine (the "Heisenberg split"):
+  Detection Score  — optimized for earliness (~22% false positive)
+  Confidence Score — optimized for precision (<9% false positive)
+The GAP between them tells you HOW EARLY the signal is.
+
+Score thresholds:
+  85+    BREAKOUT
+  70–84  STRONG
+  55–69  EMERGING
+  35–54  WATCH
+  <20    DECAY (falling)
+
+
+================================================================
+FILES IN THIS PACKAGE
+================================================================
+
+BACKEND (Python / FastAPI)
+--------------------------
+gravitational_anomaly_detector.py  [~3200 lines]
+  THE MAIN ENGINE. FastAPI app, SQLite DB, all collectors, all scoring.
+  Runs on port 8000. Deployed to Heroku.
+  Key endpoints:
+    GET /scores              — all scored topics
+    GET /scores/{topic_key}  — topic detail with full signal breakdown
+    GET /scores/{topic_key}/history — research history (how long in circulation)
+    POST /collect            — trigger signal collection
+    GET /platforms/status    — which sources are active
+
+blog_collectors.py  [~930 lines]
+  10 additional data source collectors (DEV.to, Hashnode, Discourse,
+  WordPress, Ghost/Substack newsletters, Blogger).
+  Called from gravitational_anomaly_detector.py during collection.
+
+calibration_engine.py  [~1540 lines]
+  Applies maturity-aware score multipliers to raw G·I·M·D·C scores.
+  Maturity classes: NEW (0.80×), MONITORING (0.60×),
+  ESTABLISHED mild (0.45×), ESTABLISHED stable (0.40×).
+  Also computes heisenberg_gap, signal_stage, anomaly labels.
+
+signal_calibration_integration.py  [~1430 lines]
+  Seeds KNOWN_TOPICS with pre-computed calibration data.
+  Runs on startup to pre-calibrate ~30 well-known AI/tech terms.
+
+ai_topic_intelligence.py  [~1240 lines]
+  4-tier AI taxonomy engine. Explains why "AI (generic)" scores 26
+  while "agentic coding" scores 97.
+  Tier 1 VIRAL:       floor 88/85  (agentic coding, context engineering)
+  Tier 2 STRONG:      floor 65/58  (MCP, Claude Code, vibe coding)
+  Tier 3 ESTABLISHED: floor 18/12  (LLM, RAG, agentic AI, AI agent)
+  Tier 4 MAINSTREAM:  ceiling 40/48 (AI generic, ChatGPT)
+  Adds ai_tier, ai_tier_label, score_explanation, variations[] to every
+  API response for known AI topics.
+
+calibration_parameter_corrections.py  [~600 lines]
+  4 targeted fixes applied at serve time:
+  1. ESTABLISHED multiplier 0.40 — stops generic "agentic ai" from
+     scoring DET:10 while niche variants score 97
+  2. Bigram noise filter — blocks "actually costs", "advice almost" etc.
+     from consuming display slots
+  3. Signal count modifier (sigmoid) — 3 signals=0.60×, 15=1.00×, 20+=1.10×
+  4. AI topic minimum score floor — "mcp" (≥3 signals) floor 22/11 etc.
+  Key exports: is_meaningful_topic(), filter_topics_batch(),
+               apply_signal_count_modifier(), apply_ai_floor()
+
+research_history.py  [~990 lines]
+  Looks up how long a topic has been discussed online.
+  Sources: HN Algolia (free), Wikipedia REST API, GitHub Search API,
+           pytrends, internal DB. 7-day SQLite cache.
+  Returns: trajectory (emerging/established/mainstream),
+           first_seen_year, gradient_implication (plain English),
+           milestones[], sources[]
+
+
+FRONTEND (React / Vite)
+-----------------------
+GradientScoreDashboard.jsx  [~2740 lines]
+  THE MAIN DASHBOARD. Single-page React app.
+  Components: TopicCard, TopicDetailCard, GapAnalysisPanel,
+              MaturityBadge, SignalDetailPanel, PlatformStatus, etc.
+  Light theme (#F1F5F9 background, #0F172A text).
+  Mobile-first with slide-in detail overlay.
+
+AIVariationMap.jsx  [~630 lines]
+  Shows the full AI topic spectrum — why scores differ across AI variants.
+  Exports: AIVariationMap, AIResearchSection, AITierBadge, AIScoreWithContext
+  Shown inside TopicDetailCard for any AI-related topic.
+
+ResearchHistoryPanel.jsx  [~430 lines]
+  Lazy-fetched panel showing topic research history.
+  Fetches GET /scores/{topicKey}/history on expand.
+  Shows: trajectory badge, gradient_implication, milestones, timeline.
+
+requirements.txt
+  Python dependencies. Key: fastapi, uvicorn, praw, requests,
+  vaderSentiment, feedparser, pytrends, apscheduler, scipy, numpy.
+
+Procfile
+  Heroku process: web: uvicorn gravitational_anomaly_detector:app
+
+
+================================================================
+SCORING FORMULA
+================================================================
+
+Raw score:
+  Overall  = G×0.30 + I×0.25 + M×0.20 + D×0.15 + C×0.10
+  Detection  = G×0.40 + D×0.25 + I×0.20 + M×0.10 + C×0.05
+  Confidence = I×0.35 + M×0.30 + G×0.20 + C×0.10 + D×0.05
+
+Components:
+  G — Gradient Strength  (30%) Where is conversation? Niche=high, mainstream=low
+  I — Inertia            (25%) Sustained multi-window acceleration vs one-day spike
+  M — Medium Sequence    (20%) Cross-platform diffusion order (Pattern A/B/C)
+  D — Dark Matter        (15%) First-timer ratio + engagement anomalies
+  C — Confidence Decay   (10%) Freshness + directional momentum
+
+After raw scoring, _format_score_rows() applies in this order:
+  1. apply_calibration()         — maturity multiplier from calibration_engine.py
+  2. _apply_ai_intelligence()    — tier-aware AI scores from ai_topic_intelligence.py
+  3. apply_ai_floor()            — minimum visibility guard for known AI terms
+  4. filter_topics_batch()       — noise filter removes sentence fragments
+
+
+================================================================
+DATA SOURCES (10 platforms)
+================================================================
+
+ACTIVE (no credentials needed):
+  GitHub          — REST API, topic repos + trending
+  Hacker News     — Algolia API, stories + Ask HN
+  DEV.to          — Forem REST API
+  Hashnode        — GraphQL tag feeds (public)
+  Discourse       — HuggingFace, PyTorch, FastAI, Python forums
+  WordPress.com   — REST API tag search
+  Ghost/Newsletters — 10 RSS: Ben's Bites, The Batch, Latent Space,
+                     AI Snake Oil, Last Week in AI, VentureBeat AI,
+                     MIT Tech Review, The Sequence, Ars Technica, Wired AI
+
+NEEDS CREDENTIALS:
+  Reddit          — PRAW: set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET
+                    (reddit.com/prefs/apps → create "script" app)
+  Hashnode search — set HASHNODE_TOKEN for searchPosts queries
+                    (hashnode.com/settings/developer — free)
+  Blogger         — set BLOGGER_API_KEY
+                    (console.cloud.google.com → Blogger API v3 — free)
+
+
+================================================================
+ENVIRONMENT VARIABLES
+================================================================
+
+Required for full operation:
+  REDDIT_CLIENT_ID       reddit.com/prefs/apps
+  REDDIT_CLIENT_SECRET
+  GITHUB_TOKEN           github.com/settings/tokens (no permissions needed)
+  GAD_DB_PATH            anomaly_detector.db (default)
+
+Optional:
+  DEVTO_API_KEY          raises DEV.to rate limit
+  HASHNODE_TOKEN         enables Hashnode search queries
+  BLOGGER_API_KEY        enables Google Blogger collector
+  ADMIN_API_KEY          required for /institutional/* endpoints
+  API_PORT               default 8000
+
+
+================================================================
+KNOWN ISSUES / TECH DEBT FOR V2.0
+================================================================
+
+1. SQLite loses data on every Heroku dyno restart
+   → Migrate to Postgres (heroku addons:create heroku-postgresql)
+   → All CREATE TABLE statements are in gravitational_anomaly_detector.py
+
+2. No Heroku Scheduler set up
+   → Collection runs manually or on first request
+   → Set up Heroku Scheduler to hit /collect every 30 minutes
+   → Or use the APScheduler already wired in the app (scheduler.start())
+
+3. Reddit credentials not set on Heroku
+   → heroku config:set REDDIT_CLIENT_ID=x REDDIT_CLIENT_SECRET=y
+
+4. Anomaly label text minor bug
+   → TopicDetailCard uses data.anomaly_reason directly
+   → Should prefer data.anomaly_label (from calibration) with fallback
+
+5. Research history Wikipedia/pytrends calls are slow (~3-5s)
+   → Already cached 7 days in SQLite
+   → Consider pre-warming cache for top 50 topics on startup
+
+
+================================================================
+LIVE DEPLOYMENT
+================================================================
+
+Heroku app:   nowtrendin-e62dcb9ecb69.herokuapp.com
+Current:      v38
+GitHub repo:  github.com/Abelcesq/nowtrendin-score-prototype
+Deploy cmd:   git push heroku main
+
+
+================================================================
+HOW TO IMPLEMENT IN V2.0
+================================================================
+
+Suggested approach for a clean v2.0 build:
+
+1. Start with gravitational_anomaly_detector.py as the backend core
+   — it contains the DB schema, all scoring logic, and FastAPI routes
+
+2. Add blog_collectors.py alongside it — import collect_* functions
+   into the main collection cycle
+
+3. Add the 5 calibration/intelligence modules in this order:
+   a. calibration_engine.py
+   b. signal_calibration_integration.py
+   c. calibration_parameter_corrections.py
+   d. ai_topic_intelligence.py
+   e. research_history.py
+
+4. Wire them into _format_score_rows() in the order described above
+
+5. For the frontend, GradientScoreDashboard.jsx is self-contained
+   — just update the API base URL if the backend moves
+
+6. Replace SQLite with Postgres for v2.0 persistence
+   — swap get_db() to use psycopg2 / asyncpg
+
+================================================================
+END OF TRANSFER BRIEF
+================================================================

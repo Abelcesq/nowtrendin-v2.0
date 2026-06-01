@@ -1,0 +1,26 @@
+# ── Core (required) ───────────────────────────────────────────────
+praw>=7.7.1
+requests>=2.31.0
+vaderSentiment>=3.3.2
+fastapi>=0.108.0
+uvicorn>=0.25.0
+aiofiles>=23.2.1
+pydantic>=2.5.3
+python-dotenv>=1.0.0
+nltk>=3.8.1
+
+# ── Blog collectors (blog_collectors.py) ──────────────────────────
+feedparser>=6.0.10         # RSS/Atom parsing for Medium, Ghost, and fallback feeds
+
+# ── Scoring & statistics ──────────────────────────────────────────
+numpy>=1.24.0
+scipy>=1.11.0
+
+# ── Validation & scheduling ───────────────────────────────────────
+pytrends>=4.9.0          # used in validation_test.py to compare vs Google Trends
+apscheduler>=3.10.4      # collection scheduler (not yet wired — planned)
+tenacity>=8.2.3          # retry logic for collectors (not yet wired — planned)
+
+# ── Optional: Snowflake Marketplace publishing ────────────────────
+# Uncomment when you're ready to publish to Snowflake Marketplace
+# snowflake-connector-python>=3.0.0

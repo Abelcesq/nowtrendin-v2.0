@@ -1,23 +1,27 @@
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Bell, Zap, Briefcase, Building2 } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
+import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
 import { SignalCard } from '../../components/trends/SignalCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID } from '../../constants/tiers';
-import { getSignals, dataWindowLabel } from '../../lib/signals';
+import { getSignals, dataWindowLabel, stageColor } from '../../lib/signals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 
 export default function Dashboard() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tier = (user?.tier ?? 'consumer') as TierID;
   const cfg = TIERS[tier];
   const Icon = TIER_ICONS[tier];
 
   const { accessible, lockedCount } = getSignals(tier);
-  const recent = accessible.slice(0, 4);
+  const hero = accessible[0];
+  const recent = accessible.slice(1, 5);
 
   return (
     <Screen scroll>
@@ -49,9 +53,31 @@ export default function Dashboard() {
         </View>
       </View>
 
+      {hero && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push(`/signal/${hero.id}`)}
+          className="bg-surface rounded-2xl p-5 border border-border mb-5 items-center"
+          style={{ shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 }}
+        >
+          {tier === 'enterprise' && (
+            <View className="flex-row items-center gap-1.5 mb-3 self-start">
+              <View className="w-2 h-2 rounded-full bg-primary" />
+              <Text className="text-primary text-[10px] font-bold tracking-widest">LIVE</Text>
+            </View>
+          )}
+          <Text className="text-textPrimary font-bold text-lg mb-3">{hero.topic}</Text>
+          <GradientScoreRing score={hero.score} color={stageColor(hero.stage)} size="xl" label={hero.stage} />
+          <View className="flex-row gap-6 mt-3">
+            <Text className="text-textMuted text-xs">DET <Text className="text-textPrimary font-bold">{hero.detection}</Text></Text>
+            <Text className="text-textMuted text-xs">CONF <Text className="text-textPrimary font-bold">{hero.confidence}</Text></Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       <View className="flex-row items-center justify-between mb-3">
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
-          {tier === 'enterprise' ? 'Live Signals' : 'Recent Signals'}
+          {tier === 'enterprise' ? 'Trending Now' : 'Recent Signals'}
         </Text>
         <Text className="text-textMuted text-[10px]">{dataWindowLabel(tier)}</Text>
       </View>
