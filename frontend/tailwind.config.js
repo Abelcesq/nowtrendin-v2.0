@@ -7,9 +7,14 @@ module.exports = {
       colors: {
         primary:   '#00C896',
         primaryDk: '#009970',
-        // Brand wordmark (maroon-orange flame palette)
-        brandOrange: '#EE6A2A',
-        brandMaroon: '#B5341B',
+        // Brand wordmark (matches logo PNG): "Now" maroon, "TrendIn" orange-red
+        brandMaroon: '#6E1A17',
+        brandOrange: '#E8551C',
+        // Flame gradient stops
+        flameGold: '#F7A41C',
+        flameOrange: '#F26522',
+        flameRed: '#CF2A1B',
+        flameDeep: '#6E1410',
         // Light theme (matches v1.0)
         bg:        '#F4F5F7',
         surface:   '#FFFFFF',

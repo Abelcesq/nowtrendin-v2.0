@@ -2,12 +2,12 @@ import React from 'react';
 import { Text } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-// "Now TrendIn" wordmark — "Now" orange, "TrendIn" maroon-orange (matches the logo's N).
+// "Now TrendIn" wordmark — matches logo PNG: "Now" dark maroon, "TrendIn" orange-red.
 export function Wordmark({ size = 'text-3xl' }: { size?: string }) {
   return (
     <Text className={`${size} font-black`}>
-      <Text className="text-brandOrange">Now </Text>
-      <Text className="text-brandMaroon">TrendIn</Text>
+      <Text className="text-brandMaroon">Now</Text>
+      <Text className="text-brandOrange">TrendIn</Text>
     </Text>
   );
 }
@@ -19,10 +19,10 @@ export function Logo({ size = 48 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
         <LinearGradient id="ntFlame" x1="0" y1="0" x2="0.2" y2="1">
-          <Stop offset="0" stopColor="#FDB813" />
+          <Stop offset="0" stopColor="#F7A41C" />
           <Stop offset="0.4" stopColor="#F26522" />
-          <Stop offset="0.75" stopColor="#D62E1F" />
-          <Stop offset="1" stopColor="#7B1E10" />
+          <Stop offset="0.75" stopColor="#CF2A1B" />
+          <Stop offset="1" stopColor="#6E1410" />
         </LinearGradient>
       </Defs>
 
