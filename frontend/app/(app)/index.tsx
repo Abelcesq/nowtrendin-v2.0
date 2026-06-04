@@ -24,6 +24,15 @@ export default function Dashboard() {
   const hero = accessible[0];
   const recent = accessible.slice(1, 5);
 
+  const firstName = (user?.name ?? 'there').split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 5 ? 'Good night'
+      : hour < 12 ? 'Good morning'
+      : hour < 17 ? 'Good afternoon'
+      : hour < 21 ? 'Good evening'
+      : 'Good night';
+
   return (
     <Screen scroll>
       <View className="flex-row items-center justify-between pt-4 mb-1">
@@ -40,8 +49,11 @@ export default function Dashboard() {
       </View>
 
       <View className="bg-surface rounded-2xl p-5 border border-border my-4">
-        <Text className="text-textPrimary text-lg font-bold mb-3">
-          Good day, {user?.name ?? 'there'} 👋
+        <Text className="text-textPrimary text-2xl font-bold">
+          {greeting}, {firstName}!
+        </Text>
+        <Text className="text-textSecondary text-sm mt-1 mb-3">
+          Let me show you what's trending.
         </Text>
         <View className="flex-row items-center gap-2">
           <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${cfg.colour}20` }}>
