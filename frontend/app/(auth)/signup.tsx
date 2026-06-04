@@ -9,7 +9,7 @@ import { Screen } from '../../components/ui/Screen';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/auth.store';
-import { mockSignup } from '../../lib/auth';
+import { signup as apiSignup } from '../../lib/auth';
 
 const schema = z
   .object({
@@ -44,11 +44,16 @@ export default function Signup() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const { user, token } = await mockSignup(data.name, data.email, data.password);
+      const { user, token } = await apiSignup(data.name, data.email, data.password);
       setUser(user, token);
       router.replace('/membership');
-    } catch {
-      setError('root', { message: 'Something went wrong. Please try again.' });
+    } catch (err: any) {
+      const emailErr = err?.data?.email?.[0];
+      if (emailErr) {
+        setError('email', { message: emailErr });
+      } else {
+        setError('root', { message: 'Something went wrong. Please try again.' });
+      }
     }
   };
 

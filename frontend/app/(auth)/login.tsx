@@ -9,7 +9,7 @@ import { Screen } from '../../components/ui/Screen';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/auth.store';
-import { mockLogin } from '../../lib/auth';
+import { login as apiLogin } from '../../lib/auth';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -29,11 +29,12 @@ export default function Login() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const { user, token } = await mockLogin(data.email, data.password);
+      const { user, token } = await apiLogin(data.email, data.password);
       setUser(user, token);
       router.replace(user.tier ? '/(app)' : '/membership');
-    } catch {
-      setError('root', { message: 'Incorrect email or password' });
+    } catch (err: any) {
+      const msg = err?.data?.detail ?? 'Incorrect email or password';
+      setError('root', { message: msg });
     }
   };
 
@@ -95,7 +96,11 @@ export default function Login() {
         <View className="flex-1 h-px bg-border" />
       </View>
 
-      <Button variant="secondary" size="lg" onPress={() => onSubmit({ email: 'google@demo.com', password: 'oauthmock' })}>
+      <Button
+        variant="secondary"
+        size="lg"
+        onPress={() => setError('root', { message: 'Google sign-in is coming soon.' })}
+      >
         Continue with Google
       </Button>
 

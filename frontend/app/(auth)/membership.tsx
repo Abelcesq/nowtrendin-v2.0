@@ -6,7 +6,7 @@ import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { TIERS, TierID } from '../../constants/tiers';
 import { useAuthStore } from '../../store/auth.store';
-import { tierDefaults } from '../../lib/auth';
+import { setTier as apiSetTier } from '../../lib/auth';
 
 const TIER_ICONS: Record<TierID, any> = {
   consumer: Zap,
@@ -89,17 +89,22 @@ function TierCard({
 export default function Membership() {
   const router = useRouter();
   const updateTier = useAuthStore((s) => s.updateTier);
-  const decrementTokens = useAuthStore((s) => s.decrementTokens);
   const [selected, setSelected] = useState<TierID>('business');
+
+  const applyTier = async (tierId: TierID) => {
+    // Persist server-side, then update local state and enter the app.
+    updateTier(tierId);
+    await apiSetTier(tierId);
+    router.replace('/(app)');
+  };
 
   const choose = (tierId: TierID) => {
     if (tierId === 'enterprise') {
       Linking.openURL('mailto:enterprise@nowtrendin.com?subject=Enterprise%20Access');
       return;
     }
-    // Phase 1: skip Stripe — just set the tier and enter the app.
-    updateTier(tierId);
-    router.replace('/(app)');
+    // No Stripe yet — set the tier and enter the app.
+    applyTier(tierId);
   };
 
   return (
@@ -128,10 +133,7 @@ export default function Membership() {
           size="sm"
           fullWidth={false}
           className="self-center"
-          onPress={() => {
-            updateTier('consumer');
-            router.replace('/(app)');
-          }}
+          onPress={() => applyTier('consumer')}
         >
           Continue with free trial
         </Button>

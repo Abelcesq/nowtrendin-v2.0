@@ -33,6 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearAuth: () => {
     SecureStore.deleteItemAsync('access_token').catch(() => {});
+    SecureStore.deleteItemAsync('refresh_token').catch(() => {});
     set({ user: null, accessToken: null, isAuthenticated: false });
   },
 

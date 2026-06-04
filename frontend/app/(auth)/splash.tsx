@@ -9,9 +9,12 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import * as SecureStore from 'expo-secure-store';
+import { fetchMe, logout } from '../../lib/auth';
+import { useAuthStore } from '../../store/auth.store';
 
 export default function Splash() {
   const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
 
   const logoScale = useSharedValue(0.7);
   const logoOpacity = useSharedValue(0);
@@ -35,8 +38,14 @@ export default function Splash() {
       await new Promise((r) => setTimeout(r, 2000));
       const token = await SecureStore.getItemAsync('access_token');
       if (token) {
-        router.replace('/(app)');
-        return;
+        // Validate the token against the backend and hydrate the user.
+        const user = await fetchMe();
+        if (user) {
+          setUser(user, token);
+          router.replace(user.tier ? '/(app)' : '/membership');
+          return;
+        }
+        await logout(); // token expired/invalid
       }
       const seen = await SecureStore.getItemAsync('onboarding_seen');
       router.replace(seen ? '/login' : '/onboarding');
