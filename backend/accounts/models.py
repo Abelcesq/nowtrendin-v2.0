@@ -11,6 +11,8 @@ class Profile(models.Model):
     phone_verified = models.BooleanField(default=False)
     otp_code = models.CharField(max_length=6, null=True, blank=True)
     otp_expires = models.DateTimeField(null=True, blank=True)
+    reset_code = models.CharField(max_length=6, null=True, blank=True)
+    reset_expires = models.DateTimeField(null=True, blank=True)
     notify_email = models.BooleanField(default=True)
     notify_push = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

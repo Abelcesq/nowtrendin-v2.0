@@ -243,6 +243,61 @@ class AlertDetail(generics.RetrieveUpdateDestroyAPIView):
         return Alert.objects.filter(user=self.request.user)
 
 
+class ForgotPasswordView(APIView):
+    """Email a 6-digit password-reset code. Always 200 (don't leak account existence)."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = (str(request.data.get('email') or '')).lower().strip()
+        if email:
+            user = User.objects.filter(email__iexact=email).first() or User.objects.filter(username__iexact=email).first()
+            if user:
+                profile, _ = Profile.objects.get_or_create(user=user)
+                code = f'{secrets.randbelow(900000) + 100000}'
+                profile.reset_code = code
+                profile.reset_expires = timezone.now() + timedelta(minutes=15)
+                profile.save()
+                try:
+                    send_mail(
+                        subject='Your Now TrendIn password reset code',
+                        message=f'Your password reset code is {code}. It expires in 15 minutes.',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email or email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+        return Response({'detail': 'If that email exists, a reset code is on its way.'})
+
+
+class ResetPasswordView(APIView):
+    """Confirm the reset code and set a new password."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = (str(request.data.get('email') or '')).lower().strip()
+        code = (str(request.data.get('code') or '')).strip()
+        new = request.data.get('password') or ''
+        user = User.objects.filter(email__iexact=email).first() or User.objects.filter(username__iexact=email).first()
+        if not user:
+            return Response({'detail': 'Invalid email or code.'}, status=400)
+        profile, _ = Profile.objects.get_or_create(user=user)
+        if not profile.reset_code or not profile.reset_expires:
+            return Response({'detail': 'Request a reset code first.'}, status=400)
+        if timezone.now() > profile.reset_expires:
+            return Response({'detail': 'Code expired. Request a new one.'}, status=400)
+        if code != profile.reset_code:
+            return Response({'detail': 'Incorrect code.'}, status=400)
+        if len(new) < 8:
+            return Response({'detail': 'Password must be at least 8 characters.'}, status=400)
+        user.set_password(new)
+        user.save()
+        profile.reset_code = None
+        profile.reset_expires = None
+        profile.save()
+        return Response({'detail': 'Password updated. You can sign in now.'})
+
+
 class SendPhoneCodeView(APIView):
     """Send a 6-digit SMS verification code to the user's phone (2FA)."""
     permission_classes = [permissions.IsAuthenticated]
