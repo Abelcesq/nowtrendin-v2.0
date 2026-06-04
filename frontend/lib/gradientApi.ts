@@ -66,6 +66,9 @@ export function mapSignal(r: any): Signal {
     platforms: Array.isArray(r.platforms_active) ? r.platforms_active : [],
     groups: mapGroups(r.component_groups),
     aiTierLabel: r.ai_tier_label || undefined,
+    totalMentions: r.total_mentions != null ? Number(r.total_mentions) : undefined,
+    timesScored: r.times_scored != null ? Number(r.times_scored) : undefined,
+    isAnomaly: Boolean(r.is_anomaly ?? r.is_gravitational_anomaly),
   };
 }
 

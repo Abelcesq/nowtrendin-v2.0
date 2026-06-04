@@ -1,28 +1,42 @@
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Bell, Zap, Briefcase, Building2 } from 'lucide-react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { Bell, Zap, Briefcase, Building2, Search, RotateCcw } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
-import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
-import { SignalCard } from '../../components/trends/SignalCard';
+import { TrendCard } from '../../components/trends/TrendCard';
+import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID } from '../../constants/tiers';
-import { dataWindowLabel, stageColor } from '../../lib/signals';
+import { dataWindowLabel, scoreGap } from '../../lib/signals';
 import { useTierFeed } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 
+const FILTERS = [
+  { k: 'all', label: 'All Signals' },
+  { k: 'breakout', label: 'Breakout ≥85' },
+  { k: 'strong', label: 'Strong ≥70' },
+  { k: 'emerging', label: 'Emerging' },
+  { k: 'lowrisk', label: 'Low Risk' },
+] as const;
+
+const STATS = [
+  { k: 'breakout', label: 'BREAKOUT', color: '#00C896' },
+  { k: 'strong', label: 'STRONG', color: '#2D7EEF' },
+  { k: 'emerging', label: 'EMERGING', color: '#D4A017' },
+  { k: 'anomalies', label: 'ANOMALIES', color: '#8B5CF6' },
+] as const;
+
 export default function Dashboard() {
-  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tier = (user?.tier ?? 'consumer') as TierID;
   const cfg = TIERS[tier];
   const Icon = TIER_ICONS[tier];
 
-  const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
-  const hero = accessible[0];
-  const recent = accessible.slice(1, 5);
+  const { accessible, lockedCount, isLoading, isSample, refetch } = useTierFeed(tier);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<string>('all');
 
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
@@ -33,8 +47,25 @@ export default function Dashboard() {
       : hour < 21 ? 'Good evening'
       : 'Good night';
 
+  const counts = {
+    breakout: accessible.filter((s) => s.stage === 'BREAKOUT' || s.score >= 85).length,
+    strong: accessible.filter((s) => s.stage === 'STRONG').length,
+    emerging: accessible.filter((s) => s.stage === 'EMERGING').length,
+    anomalies: accessible.filter((s) => s.isAnomaly).length,
+  } as Record<string, number>;
+
+  const filtered = accessible.filter((s) => {
+    if (query && !s.topic.toLowerCase().includes(query.toLowerCase())) return false;
+    if (filter === 'breakout') return s.score >= 85;
+    if (filter === 'strong') return s.score >= 70;
+    if (filter === 'emerging') return s.score >= 55 && s.score < 70;
+    if (filter === 'lowrisk') return scoreGap(s) <= 6;
+    return true;
+  });
+
   return (
     <Screen scroll>
+      {/* Brand header */}
       <View className="flex-row items-center justify-between pt-4 mb-1">
         <View className="flex-row items-center gap-2">
           <Logo size={34} />
@@ -48,23 +79,85 @@ export default function Dashboard() {
         </View>
       </View>
 
+      {/* Greeting */}
       <View className="bg-surface rounded-2xl p-5 border border-border my-4">
-        <Text className="text-textPrimary text-2xl font-bold">
-          {greeting}, {firstName}!
-        </Text>
-        <Text className="text-textSecondary text-sm mt-1 mb-3">
-          Let me show you what's trending.
-        </Text>
+        <Text className="text-textPrimary text-2xl font-bold">{greeting}, {firstName}!</Text>
+        <Text className="text-textSecondary text-sm mt-1 mb-3">Let me show you what's trending.</Text>
         <View className="flex-row items-center gap-2">
           <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${cfg.colour}20` }}>
             <Icon size={14} color={cfg.colour} />
-            <Text style={{ color: cfg.colour }} className="text-xs font-bold uppercase">
-              {cfg.name} Plan
-            </Text>
+            <Text style={{ color: cfg.colour }} className="text-xs font-bold uppercase">{cfg.name} Plan</Text>
           </View>
           <Text className="text-textMuted text-xs">{dataWindowLabel(tier)}</Text>
         </View>
       </View>
+
+      {/* Search bar */}
+      <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
+        <Search size={18} color="#9AA3B0" />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search trends..."
+          placeholderTextColor="#9AA3B0"
+          className="flex-1 ml-3 text-textPrimary text-base"
+          style={{ color: '#1A1A2E' }}
+        />
+      </View>
+
+      {/* Filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 8 }}>
+        {FILTERS.map((f) => {
+          const active = filter === f.k;
+          return (
+            <TouchableOpacity
+              key={f.k}
+              onPress={() => setFilter(f.k)}
+              className="px-4 py-2 rounded-full border"
+              style={{
+                backgroundColor: active ? '#00C896' : '#FFFFFF',
+                borderColor: active ? '#00C896' : '#E4E7EC',
+              }}
+            >
+              <Text className="text-xs font-semibold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Trends header */}
+      <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-row items-center gap-2">
+          <View className="w-1 h-5 rounded-full bg-brandMaroon" />
+          <Text className="text-textPrimary text-xl font-black">Trends</Text>
+          <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
+            <Text className="text-textMuted text-[11px] font-bold">{filtered.length}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => refetch()}
+          className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border"
+          style={{ borderColor: '#E8551C' }}
+        >
+          <RotateCcw size={13} color="#E8551C" />
+          <Text className="text-xs font-bold" style={{ color: '#E8551C' }}>Pull Trends</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stat row */}
+      <View className="flex-row gap-2 mb-4">
+        {STATS.map((st) => (
+          <View key={st.k} className="flex-1 bg-surface rounded-xl border border-border py-3 items-center">
+            <Text className="text-2xl font-black" style={{ color: st.color }}>{counts[st.k] ?? 0}</Text>
+            <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">{st.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Legend */}
+      <ScoreLegend />
 
       {isSample && (
         <View className="rounded-lg px-3 py-2 mb-4 border border-border bg-surface">
@@ -72,47 +165,21 @@ export default function Dashboard() {
         </View>
       )}
 
+      {/* Trend list */}
       {isLoading ? (
-        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 60 }} />
+        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
       ) : (
-      <>
-      {hero && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => router.push(`/signal/${hero.id}`)}
-          className="bg-surface rounded-2xl p-5 border border-border mb-5 items-center"
-          style={{ shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 }}
-        >
-          {tier === 'enterprise' && (
-            <View className="flex-row items-center gap-1.5 mb-3 self-start">
-              <View className="w-2 h-2 rounded-full bg-primary" />
-              <Text className="text-primary text-[10px] font-bold tracking-widest">LIVE</Text>
-            </View>
+        <>
+          {filtered.map((s) => (
+            <TrendCard key={s.id} signal={s} />
+          ))}
+          {filtered.length === 0 && (
+            <Text className="text-textMuted text-center mt-8 mb-4">No trends match your search.</Text>
           )}
-          <Text className="text-textPrimary font-bold text-lg mb-3">{hero.topic}</Text>
-          <GradientScoreRing score={hero.score} color={stageColor(hero.stage)} size="xl" label={hero.stage} />
-          <View className="flex-row gap-6 mt-3">
-            <Text className="text-textMuted text-xs">DET <Text className="text-textPrimary font-bold">{hero.detection}</Text></Text>
-            <Text className="text-textMuted text-xs">CONF <Text className="text-textPrimary font-bold">{hero.confidence}</Text></Text>
+          <View className="mt-1">
+            <LockedSignalsBanner tier={tier} lockedCount={lockedCount} />
           </View>
-        </TouchableOpacity>
-      )}
-
-      <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-textSecondary text-xs uppercase tracking-wider">
-          {tier === 'enterprise' ? 'Trending Now' : 'Recent Signals'}
-        </Text>
-        <Text className="text-textMuted text-[10px]">{dataWindowLabel(tier)}</Text>
-      </View>
-
-      {recent.map((s) => (
-        <SignalCard key={s.id} signal={s} />
-      ))}
-
-      <View className="mt-2">
-        <LockedSignalsBanner tier={tier} lockedCount={lockedCount} />
-      </View>
-      </>
+        </>
       )}
     </Screen>
   );

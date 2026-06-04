@@ -52,6 +52,37 @@ export interface Signal {
   platforms?: string[];
   groups?: BreakdownGroup[];
   aiTierLabel?: string;
+  totalMentions?: number;
+  timesScored?: number;
+  isAnomaly?: boolean;
+}
+
+// Legend shown on the home page ("what do these scores mean").
+export const STAGE_META = [
+  { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', action: 'Act now', color: '#00C896' },
+  { key: 'STRONG', label: 'STRONG', range: '70–84', action: 'Window open', color: '#2D7EEF' },
+  { key: 'EMERGING', label: 'EMERGING', range: '55–69', action: 'Begin planning', color: '#D4A017' },
+  { key: 'WATCHING', label: 'WATCHING', range: '35–54', action: 'Too early to act', color: '#E85A1E' },
+] as const;
+
+// Short action line per stage (shown on each trend card).
+const ACTION_LINE: Record<Stage, string> = {
+  VIRAL: 'Act now — viral signal. Window open.',
+  BREAKOUT: 'Act now — breakout in progress.',
+  STRONG: 'Window open — strong momentum.',
+  EMERGING: 'Begin planning — momentum forming.',
+  WATCHING: 'Too early to act — keep watching.',
+  WATCH: 'Too early to act — keep watching.',
+  MONITORING: 'Monitoring — wait for stronger signal.',
+  DECAY: 'Standing down — attention falling.',
+};
+export const actionLine = (s: Stage) => ACTION_LINE[s] ?? ACTION_LINE.MONITORING;
+
+// One-line gap meaning + tone for the card footer.
+export function gapInsight(gap: number): { text: string; agree: boolean } {
+  return gap <= 6
+    ? { text: 'Both scores agree — high conviction signal', agree: true }
+    : { text: 'Confirmation building — 24–72h to alignment', agree: false };
 }
 
 const MIN = 60 * 1000;

@@ -1,0 +1,114 @@
+import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Signal, ageLabel, stageColor, scoreGap, actionLine, gapInsight } from '../../lib/signals';
+
+const DET_COLOR = '#2D7EEF';
+const CONF_COLOR = '#00C896';
+
+function barColor(v: number) {
+  if (v >= 70) return '#00C896';
+  if (v >= 40) return '#2D7EEF';
+  return '#C7CDD6';
+}
+
+// Web-prototype-style trend card: source header, dual score, component bars,
+// gap pill, and a coloured gap-insight footer.
+export function TrendCard({ signal }: { signal: Signal }) {
+  const router = useRouter();
+  const stageCol = stageColor(signal.stage);
+  const gap = scoreGap(signal);
+  const insight = gapInsight(gap);
+  const platform = signal.platforms?.[0] ?? 'Multi-Platform';
+  const multi = (signal.platforms?.length ?? 0) > 1;
+  const isNew = (signal.timesScored ?? 0) <= 1;
+
+  const bars = (signal.groups?.flatMap((g) => g.items.map((i) => i.value)) ?? [
+    signal.detection,
+    signal.confidence,
+    signal.score,
+  ]).slice(0, 6);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => router.push(`/signal/${signal.id}`)}
+      className="bg-surface rounded-2xl border border-border p-4 mb-3"
+      style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+    >
+      {/* header row */}
+      <View className="flex-row items-start justify-between">
+        <Text className="text-textMuted text-[11px]">
+          {platform} · {signal.totalMentions ?? 0} signals · {ageLabel(signal.createdAt)}
+        </Text>
+        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${stageCol}1A` }}>
+          <Text style={{ color: stageCol }} className="text-[10px] font-bold tracking-wide">
+            {signal.stage}
+          </Text>
+        </View>
+      </View>
+
+      {/* title + scores */}
+      <View className="flex-row items-start justify-between mt-1">
+        <View className="flex-1 pr-3">
+          <Text className="text-textPrimary text-2xl font-bold">{signal.topic}</Text>
+          <Text className="text-textMuted text-xs mt-0.5">
+            {multi ? 'Multi-Platform' : platform}
+          </Text>
+        </View>
+        <View className="flex-row gap-3">
+          <View className="items-center">
+            <Text className="text-textMuted text-[9px] font-bold">DET</Text>
+            <Text style={{ color: DET_COLOR }} className="text-xl font-black">{signal.detection}</Text>
+          </View>
+          <View className="items-center">
+            <Text className="text-textMuted text-[9px] font-bold">CONF</Text>
+            <Text style={{ color: CONF_COLOR }} className="text-xl font-black">{signal.confidence}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* action line */}
+      <Text className="text-textSecondary text-[13px] mt-2">→ {actionLine(signal.stage)}</Text>
+
+      {/* component bars + gap pill row */}
+      <View className="flex-row items-center justify-between mt-3">
+        <View className="flex-row items-center gap-1.5 flex-1 mr-3">
+          {bars.map((v, i) => (
+            <View key={i} className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
+              <View style={{ width: `${Math.max(6, Math.min(100, v))}%`, backgroundColor: barColor(v) }} className="h-full rounded-full" />
+            </View>
+          ))}
+        </View>
+        <View
+          className="px-2.5 py-1 rounded-full"
+          style={{ backgroundColor: insight.agree ? '#00C8961A' : '#D4A0171A' }}
+        >
+          <Text style={{ color: insight.agree ? '#009970' : '#9A7B16' }} className="text-[10px] font-bold">
+            {gap}pt gap
+          </Text>
+        </View>
+      </View>
+
+      {isNew && (
+        <View className="flex-row items-center gap-1 mt-2">
+          <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: DET_COLOR }} />
+          <Text className="text-textMuted text-[10px]">New</Text>
+        </View>
+      )}
+
+      {/* gap insight footer */}
+      <View
+        className="rounded-xl px-3 py-2 mt-3 border"
+        style={{
+          borderColor: insight.agree ? '#00C89655' : '#D4A01755',
+          backgroundColor: insight.agree ? '#00C8960F' : '#D4A0170F',
+        }}
+      >
+        <Text className="text-[11px]" style={{ color: insight.agree ? '#009970' : '#9A7B16' }}>
+          {gap}-point gap: {insight.text}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
