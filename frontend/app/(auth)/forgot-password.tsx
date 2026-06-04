@@ -1,28 +1,22 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Mail, ChevronLeft, CheckCircle } from 'lucide-react-native';
+import { Mail, ChevronLeft, CheckCircle, KeyRound } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-
-const schema = z.object({ email: z.string().email('Enter a valid email address') });
-type FormData = z.infer<typeof schema>;
+import { requestPasswordReset, resetPassword } from '../../lib/auth';
 
 export default function ForgotPassword() {
   const router = useRouter();
-  const [sent, setSent] = useState(false);
-  const [sentEmail, setSentEmail] = useState('');
+  const [step, setStep] = useState<'email' | 'reset' | 'done'>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
-
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -30,11 +24,34 @@ export default function ForgotPassword() {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const onSubmit = async (data: FormData) => {
-    await new Promise((r) => setTimeout(r, 600)); // mock send
-    setSentEmail(data.email);
-    setSent(true);
-    setCooldown(45);
+  const sendCode = async () => {
+    setMsg(null);
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setMsg('Enter a valid email address.');
+    setBusy(true);
+    try {
+      await requestPasswordReset(email.trim());
+      setStep('reset');
+      setCooldown(45);
+    } catch {
+      setMsg('Could not send the code. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReset = async () => {
+    setMsg(null);
+    if (password.length < 8) return setMsg('Password must be at least 8 characters.');
+    if (password !== confirm) return setMsg("Passwords don't match.");
+    setBusy(true);
+    try {
+      await resetPassword(email.trim(), code.trim(), password);
+      setStep('done');
+    } catch (err: any) {
+      setMsg(err?.data?.detail ?? 'Could not reset password.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -43,67 +60,58 @@ export default function ForgotPassword() {
         <ChevronLeft size={24} color="#94A3B8" />
       </TouchableOpacity>
 
-      {!sent ? (
+      {step === 'email' && (
         <View>
           <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
             <Mail size={26} color="#00C896" />
           </View>
           <Text className="text-textPrimary text-2xl font-bold mb-2">Forgot your password?</Text>
           <Text className="text-textMuted text-sm mb-8 leading-5">
-            No problem. Enter your email and we'll send you a reset link.
+            Enter your email and we'll send you a 6-digit reset code.
           </Text>
-
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, value } }) => (
-              <Input placeholder="Email address" value={value} onChangeText={onChange} error={errors.email?.message} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
-            )}
-          />
-
-          <Button onPress={handleSubmit(onSubmit)} loading={isSubmitting} size="lg" className="mt-2">
-            Send Reset Link
-          </Button>
-
-          <View className="flex-row justify-center mt-8">
-            <Text className="text-textMuted text-sm">Back to </Text>
-            <TouchableOpacity onPress={() => router.replace('/login')}>
-              <Text className="text-primary text-sm font-semibold">Sign In</Text>
-            </TouchableOpacity>
-          </View>
+          <Input placeholder="Email address" value={email} onChangeText={setEmail} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
+          {msg && <Text className="text-error text-sm mb-3">{msg}</Text>}
+          <Button onPress={sendCode} loading={busy} size="lg" className="mt-2">Send Reset Code</Button>
         </View>
-      ) : (
+      )}
+
+      {step === 'reset' && (
+        <View>
+          <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
+            <KeyRound size={26} color="#00C896" />
+          </View>
+          <Text className="text-textPrimary text-2xl font-bold mb-2">Enter your code</Text>
+          <Text className="text-textMuted text-sm mb-6 leading-5">
+            We sent a 6-digit code to {email}. Enter it with your new password.
+          </Text>
+          <Input placeholder="6-digit code" value={code} onChangeText={setCode} keyboardType="numeric" icon={<KeyRound size={18} color="#94A3B8" />} />
+          <Input placeholder="New password" value={password} onChangeText={setPassword} secureText icon={<KeyRound size={18} color="#94A3B8" />} />
+          <Input placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} secureText icon={<KeyRound size={18} color="#94A3B8" />} />
+          {msg && <Text className="text-error text-sm mb-3">{msg}</Text>}
+          <Button onPress={submitReset} loading={busy} size="lg">Reset Password</Button>
+          <Button variant="secondary" size="lg" className="mt-3" disabled={cooldown > 0} onPress={sendCode}>
+            {cooldown > 0 ? `Resend code (0:${cooldown.toString().padStart(2, '0')})` : 'Resend code'}
+          </Button>
+        </View>
+      )}
+
+      {step === 'done' && (
         <View>
           <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
             <CheckCircle size={26} color="#00C896" />
           </View>
-          <Text className="text-primary text-2xl font-bold mb-2">Email sent!</Text>
-          <Text className="text-textMuted text-sm mb-8 leading-5">
-            We sent a reset link to {sentEmail}. Check your inbox.
-          </Text>
-
-          <Button size="lg" onPress={() => Linking.openURL('mailto:')}>
-            Open Email App
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="lg"
-            className="mt-3"
-            disabled={cooldown > 0}
-            onPress={() => setCooldown(45)}
-          >
-            {cooldown > 0 ? `Resend (in 0:${cooldown.toString().padStart(2, '0')})` : 'Resend link'}
-          </Button>
-
-          <View className="flex-row justify-center mt-8">
-            <Text className="text-textMuted text-sm">Back to </Text>
-            <TouchableOpacity onPress={() => router.replace('/login')}>
-              <Text className="text-primary text-sm font-semibold">Sign In</Text>
-            </TouchableOpacity>
-          </View>
+          <Text className="text-primary text-2xl font-bold mb-2">Password updated</Text>
+          <Text className="text-textMuted text-sm mb-8 leading-5">You can now sign in with your new password.</Text>
+          <Button size="lg" onPress={() => router.replace('/login')}>Back to Sign In</Button>
         </View>
       )}
+
+      <View className="flex-row justify-center mt-8">
+        <Text className="text-textMuted text-sm">Back to </Text>
+        <TouchableOpacity onPress={() => router.replace('/login')}>
+          <Text className="text-primary text-sm font-semibold">Sign In</Text>
+        </TouchableOpacity>
+      </View>
     </Screen>
   );
 }

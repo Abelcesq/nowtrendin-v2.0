@@ -7,6 +7,7 @@ import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { alertsApi } from '../../lib/api';
 import { useSignals } from '../../hooks/useSignals';
+import { ageLabel } from '../../lib/signals';
 
 const SCORE_TYPES = ['detection', 'confidence', 'overall'] as const;
 
@@ -72,6 +73,11 @@ export default function Alerts() {
               <Text className="text-textMuted text-xs mt-0.5">
                 When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
+              {a.last_triggered_at && (
+                <Text className="text-[11px] font-bold mt-1" style={{ color: '#009970' }}>
+                  🔔 Triggered {ageLabel(Date.parse(a.last_triggered_at))}
+                </Text>
+              )}
             </View>
             <Switch value={a.active} onValueChange={() => toggle(a)} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
             <TouchableOpacity onPress={() => remove(a)} className="ml-2 p-1">

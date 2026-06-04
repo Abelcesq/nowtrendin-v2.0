@@ -41,7 +41,8 @@ export interface Signal {
   detection: number;
   confidence: number;
   stage: Stage;
-  createdAt: number; // epoch ms
+  createdAt: number; // epoch ms — latest score time (for "Xm ago" + sorting)
+  firstSeenAt?: number; // epoch ms — earliest score time (for tier data-aging)
   // Rich fields (present for live engine data; optional for mock)
   overall?: number;
   gap?: number;
@@ -137,10 +138,12 @@ export interface SignalFeed {
 }
 
 // Tier-gated feed from a signal list (live or mock), newest first.
+// Gating uses the topic's first-seen age (a new score ages into lower tiers);
+// display/sort still use the latest score time.
 export function filterFeed(list: Signal[], tier: TierID): SignalFeed {
   const t = Date.now();
   const accessible = list
-    .filter((s) => isDataAccessible(tier, t - s.createdAt))
+    .filter((s) => isDataAccessible(tier, t - (s.firstSeenAt ?? s.createdAt)))
     .sort((a, b) => b.createdAt - a.createdAt);
   return { accessible, lockedCount: list.length - accessible.length, total: list.length };
 }

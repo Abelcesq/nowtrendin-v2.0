@@ -94,6 +94,16 @@ export async function updateNotifyPrefs(prefs: { notifyEmail?: boolean; notifyPu
   return normalizeUser(data.user);
 }
 
+// Request a password-reset code by email (always succeeds — no account leak).
+export async function requestPasswordReset(email: string) {
+  return api.post('/api/auth/forgot-password/', { email });
+}
+
+// Confirm the reset code and set a new password.
+export async function resetPassword(email: string, code: string, password: string) {
+  return api.post('/api/auth/reset-password/', { email, code, password });
+}
+
 export async function logout() {
   await SecureStore.deleteItemAsync('access_token').catch(() => {});
   await SecureStore.deleteItemAsync('refresh_token').catch(() => {});

@@ -50,6 +50,9 @@ export function mapSignal(r: any): Signal {
     confidence: conf,
     stage: normalizeStage(r.signal_stage),
     createdAt: Date.parse(r.scored_at) || Date.now(),
+    // Earliest time this topic was scored — used for tier data-aging gating
+    // (the latest scored_at is always recent because topics are re-scored each cycle).
+    firstSeenAt: Date.parse(r.first_scored_at) || Date.parse(r.scored_at) || Date.now(),
     overall: r.overall_score != null ? Math.round(Number(r.overall_score)) : undefined,
     // Gap is the difference of the displayed (rounded) scores so it always
     // reconciles with DET/CONF. (The engine's stored heisenberg_gap can be
