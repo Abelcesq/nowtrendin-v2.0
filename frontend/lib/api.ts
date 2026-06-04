@@ -32,6 +32,11 @@ export const api = {
   delete: (path: string) => request(path, { method: 'DELETE' }),
 };
 
+export const queryApi = {
+  // Enterprise direct topic query (token-metered) → { found, result, tokensRemaining, detail }
+  run: (topic: string) => api.post('/api/query/', { topic }),
+};
+
 export const alertsApi = {
   list: () => api.get('/api/alerts/'),
   create: (data: object) => api.post('/api/alerts/', data),
