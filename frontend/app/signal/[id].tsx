@@ -5,8 +5,9 @@ import { ChevronLeft, ChevronDown, ChevronUp, Bell } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
+import { DualScoreAnalysis } from '../../components/trends/DualScoreAnalysis';
 import { useSignal } from '../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups } from '../../lib/signals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES } from '../../lib/signals';
 
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,35 +50,52 @@ export default function SignalDetail() {
         <Text className="text-textSecondary text-sm">Signal Intel</Text>
       </TouchableOpacity>
 
-      <Text className="text-textPrimary text-3xl font-bold">{signal.topic}</Text>
-      <Text className="text-textMuted text-sm mb-2">
-        {signal.category} · {ageLabel(signal.createdAt)}
+      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>
+      <Text className="text-textPrimary text-3xl font-bold mt-0.5">{signal.topic}</Text>
+      <Text className="text-textMuted text-sm mb-4">
+        {signal.totalMentions ?? 0} signals · {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
       </Text>
 
-      {/* Platform chips */}
-      {!!signal.platforms?.length && (
-        <View className="flex-row flex-wrap gap-2 mb-4">
-          {signal.platforms.map((p) => (
-            <View key={p} className="px-2.5 py-1 rounded-full bg-surface border border-border">
-              <Text className="text-textSecondary text-[11px]">{p}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Dual Gradient Score */}
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-5" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-        <View className="flex-row justify-around items-center">
-          <GradientScoreRing score={signal.detection} color={color} size="lg" label="DETECTION" caption="/100" />
-          <GradientScoreRing score={signal.confidence} color="#2D7EEF" size="lg" label="CONFIDENCE" caption="/100" />
-        </View>
-        <Text className="text-textSecondary text-sm text-center mt-4">
-          {gap}-point gap — {agree ? 'both models agree' : 'very early, models diverging'}
+      {/* Tagline */}
+      <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
+        <Text className="text-textSecondary text-sm">
+          Two scores, one engine. Earlier detection = lower certainty. You choose.
         </Text>
-        {!!signal.gapMeaning && (
-          <Text className="text-textMuted text-xs text-center mt-1 leading-5">{signal.gapMeaning}</Text>
-        )}
       </View>
+
+      {/* Dual Gradient Score — Detection (blue) vs Confidence (green) */}
+      <View className="bg-surface rounded-2xl p-5 border border-border mb-5" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+        <View className="flex-row justify-around items-start">
+          <View className="items-center">
+            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
+              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+            </View>
+            <GradientScoreRing score={signal.detection} color={SCORE_ROLES.detection.color} size="lg" caption="/100" />
+            <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
+            <Text className="text-textMuted text-[10px]">{SCORE_ROLES.detection.falsePositive}</Text>
+          </View>
+          <View className="items-center">
+            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
+              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+            </View>
+            <GradientScoreRing score={signal.confidence} color={SCORE_ROLES.confidence.color} size="lg" caption="/100" />
+            <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
+            <Text className="text-textMuted text-[10px]">{SCORE_ROLES.confidence.falsePositive}</Text>
+          </View>
+        </View>
+        <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: agree ? '#00C89655' : '#2D7EEF55', backgroundColor: agree ? '#00C8960F' : '#2D7EEF0F' }}>
+          <Text className="text-sm font-bold" style={{ color: agree ? '#009970' : '#2D7EEF' }}>
+            {gap}-point gap — {agree ? 'both models agree' : 'early stage, confirmation building'}
+          </Text>
+          {!!signal.gapMeaning && (
+            <Text className="text-textMuted text-xs mt-1 leading-5">{signal.gapMeaning}</Text>
+          )}
+        </View>
+      </View>
+
+      {/* Dual Score Analysis (gap bands + who uses which score) */}
+      <DualScoreAnalysis signal={signal} />
+      <View className="h-5" />
 
       {/* WHAT TO DO */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to do</Text>
