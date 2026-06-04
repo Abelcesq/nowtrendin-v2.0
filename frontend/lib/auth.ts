@@ -16,6 +16,8 @@ function normalizeUser(u: any): User {
     email: u.email,
     tier: (u.tier ?? null) as TierID | null,
     tokensRemaining: u.tokensRemaining ?? 0,
+    phone: u.phone ?? null,
+    phoneVerified: !!u.phoneVerified,
   };
 }
 
@@ -55,6 +57,24 @@ export async function setTier(tier: TierID): Promise<User | null> {
   } catch {
     return null;
   }
+}
+
+// Update name / email / phone. Returns the updated user; throws { data } on validation error.
+export async function updateProfile(fields: {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+}): Promise<User> {
+  const data = await api.patch('/api/auth/me/', fields);
+  return normalizeUser(data.user);
+}
+
+// Change password. Throws { data: { detail } } on error (e.g. wrong current password).
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return api.post('/api/auth/change-password/', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
 }
 
 export async function logout() {

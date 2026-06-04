@@ -9,6 +9,8 @@ export interface User {
   tier: TierID | null;
   avatar?: string;
   tokensRemaining?: number;
+  phone?: string | null;
+  phoneVerified?: boolean;
 }
 
 interface AuthState {
@@ -16,6 +18,7 @@ interface AuthState {
   accessToken: string | null;
   isAuthenticated: boolean;
   setUser: (user: User, token: string) => void;
+  updateUser: (user: User) => void;
   clearAuth: () => void;
   updateTier: (tier: TierID) => void;
   decrementTokens: (count?: number) => void;
@@ -30,6 +33,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     SecureStore.setItemAsync('access_token', token).catch(() => {});
     set({ user, accessToken: token, isAuthenticated: true });
   },
+
+  updateUser: (user) => set({ user }),
 
   clearAuth: () => {
     SecureStore.deleteItemAsync('access_token').catch(() => {});
