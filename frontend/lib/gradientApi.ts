@@ -81,6 +81,31 @@ export async function fetchScores(): Promise<Signal[]> {
   return results.map(mapSignal);
 }
 
+export interface ScoreHistoryRow {
+  scoredAt: number;
+  detection: number;
+  confidence: number;
+  overall: number;
+  gap: number;
+}
+
+// Per-collection-run scoring events for a topic (newest first).
+export async function fetchScoreHistory(topicKey: string): Promise<ScoreHistoryRow[]> {
+  const res = await fetch(`${GRADIENT_API}/scores/${encodeURIComponent(topicKey)}/score-history`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Gradient API ${res.status}`);
+  const d = await res.json();
+  const rows = Array.isArray(d?.rows) ? d.rows : [];
+  return rows.map((r: any) => ({
+    scoredAt: Date.parse(r.scored_at) || Date.now(),
+    detection: Math.round(Number(r.detection ?? 0)),
+    confidence: Math.round(Number(r.confidence ?? 0)),
+    overall: Math.round(Number(r.overall ?? 0)),
+    gap: Math.round(Number(r.gap ?? 0)),
+  }));
+}
+
 export interface ResearchHistory {
   trajectoryLabel?: string;
   summaryShort?: string;

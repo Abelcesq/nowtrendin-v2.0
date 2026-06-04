@@ -20,6 +20,10 @@ export function Screen({ children, scroll = false, className = '', padded = true
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          minimumZoomScale={1}
+          maximumZoomScale={3}
+          bouncesZoom
+          pinchGestureEnabled
         >
           {children}
         </ScrollView>

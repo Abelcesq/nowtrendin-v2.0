@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -38,6 +38,17 @@ export function useTierFeed(tier: TierID) {
 export function useSignal(id: string) {
   const { signals, isLoading, isError, isSample } = useSignals();
   return { signal: findSignal(signals, id), isLoading, isError, isSample };
+}
+
+export function useScoreHistory(topicKey: string | undefined) {
+  const q = useQuery({
+    queryKey: ['score-history', topicKey],
+    queryFn: () => fetchScoreHistory(topicKey as string),
+    enabled: !!topicKey,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+  return { rows: q.data ?? [], isLoading: q.isLoading };
 }
 
 export function useResearch(topicKey: string | undefined) {
