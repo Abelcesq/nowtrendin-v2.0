@@ -8,10 +8,12 @@ class UserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     tier = serializers.SerializerMethodField()
     tokensRemaining = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    phoneVerified = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining']
+        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'phone', 'phoneVerified']
 
     def get_name(self, u):
         return u.first_name or u.username
@@ -23,6 +25,14 @@ class UserSerializer(serializers.ModelSerializer):
     def get_tokensRemaining(self, u):
         p = getattr(u, 'profile', None)
         return p.tokens_remaining if p else 0
+
+    def get_phone(self, u):
+        p = getattr(u, 'profile', None)
+        return p.phone if p else None
+
+    def get_phoneVerified(self, u):
+        p = getattr(u, 'profile', None)
+        return bool(p.phone_verified) if p else False
 
 
 class SignupSerializer(serializers.Serializer):
