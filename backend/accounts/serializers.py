@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Profile
+from .models import Profile, Alert
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,10 +10,20 @@ class UserSerializer(serializers.ModelSerializer):
     tokensRemaining = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
     phoneVerified = serializers.SerializerMethodField()
+    notifyEmail = serializers.SerializerMethodField()
+    notifyPush = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'phone', 'phoneVerified']
+        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'phone', 'phoneVerified', 'notifyEmail', 'notifyPush']
+
+    def get_notifyEmail(self, u):
+        p = getattr(u, 'profile', None)
+        return bool(p.notify_email) if p else True
+
+    def get_notifyPush(self, u):
+        p = getattr(u, 'profile', None)
+        return bool(p.notify_push) if p else True
 
     def get_name(self, u):
         return u.first_name or u.username
@@ -55,3 +65,13 @@ class SignupSerializer(serializers.Serializer):
         )
         Profile.objects.create(user=user, tier=None)
         return user
+
+
+class AlertSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Alert
+        fields = [
+            'id', 'topic_key', 'topic_display', 'score_type', 'threshold',
+            'notify_email', 'notify_push', 'active', 'last_triggered_at', 'created_at',
+        ]
+        read_only_fields = ['id', 'last_triggered_at', 'created_at']

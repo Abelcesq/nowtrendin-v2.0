@@ -5,13 +5,13 @@ from datetime import timedelta
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.utils import timezone
-from rest_framework import permissions
+from rest_framework import permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile
-from .serializers import SignupSerializer, UserSerializer
+from .models import Profile, Alert
+from .serializers import SignupSerializer, UserSerializer, AlertSerializer
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 1000}
 
@@ -104,6 +104,10 @@ class MeView(APIView):
             if new_phone != profile.phone:
                 profile.phone = new_phone
                 profile.phone_verified = False  # re-verification required (SMS OTP TBD)
+        if 'notifyEmail' in data:
+            profile.notify_email = bool(data['notifyEmail'])
+        if 'notifyPush' in data:
+            profile.notify_push = bool(data['notifyPush'])
         profile.save()
 
         return Response({'user': UserSerializer(user).data})
@@ -122,6 +126,25 @@ class ChangePasswordView(APIView):
         request.user.set_password(new)
         request.user.save()
         return Response({'detail': 'Password updated'})
+
+
+class AlertListCreate(generics.ListCreateAPIView):
+    serializer_class = AlertSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Alert.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class AlertDetail(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = AlertSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Alert.objects.filter(user=self.request.user)
 
 
 class SendPhoneCodeView(APIView):
