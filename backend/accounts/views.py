@@ -1,5 +1,10 @@
+import os
+import secrets
+from datetime import timedelta
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,6 +14,21 @@ from .models import Profile
 from .serializers import SignupSerializer, UserSerializer
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 1000}
+
+
+def _send_sms(to, body):
+    """Send an SMS via Twilio. Returns (ok, error_message)."""
+    sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    token = os.environ.get('TWILIO_AUTH_TOKEN')
+    from_number = os.environ.get('TWILIO_FROM_NUMBER')
+    if not (sid and token and from_number):
+        return False, 'SMS is not configured yet.'
+    try:
+        from twilio.rest import Client
+        Client(sid, token).messages.create(to=to, from_=from_number, body=body)
+        return True, None
+    except Exception as exc:
+        return False, f'Could not send SMS: {exc}'
 
 
 def _tokens_for(user):
@@ -102,3 +122,46 @@ class ChangePasswordView(APIView):
         request.user.set_password(new)
         request.user.save()
         return Response({'detail': 'Password updated'})
+
+
+class SendPhoneCodeView(APIView):
+    """Send a 6-digit SMS verification code to the user's phone (2FA)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        phone = (str(request.data.get('phone') or profile.phone or '')).strip()
+        if not phone:
+            return Response({'detail': 'Add a phone number first.'}, status=400)
+
+        code = f'{secrets.randbelow(900000) + 100000}'
+        profile.phone = phone
+        profile.otp_code = code
+        profile.otp_expires = timezone.now() + timedelta(minutes=10)
+        profile.phone_verified = False
+        profile.save()
+
+        ok, err = _send_sms(phone, f'Your Now TrendIn verification code is {code}. It expires in 10 minutes.')
+        if not ok:
+            return Response({'detail': err}, status=503)
+        return Response({'detail': 'Verification code sent.'})
+
+
+class VerifyPhoneView(APIView):
+    """Confirm the SMS code and mark the phone verified."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        code = (str(request.data.get('code') or '')).strip()
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        if not profile.otp_code or not profile.otp_expires:
+            return Response({'detail': 'Request a code first.'}, status=400)
+        if timezone.now() > profile.otp_expires:
+            return Response({'detail': 'Code expired. Request a new one.'}, status=400)
+        if code != profile.otp_code:
+            return Response({'detail': 'Incorrect code.'}, status=400)
+        profile.phone_verified = True
+        profile.otp_code = None
+        profile.otp_expires = None
+        profile.save()
+        return Response({'user': UserSerializer(request.user).data})

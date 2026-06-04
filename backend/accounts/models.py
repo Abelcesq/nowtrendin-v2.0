@@ -9,6 +9,8 @@ class Profile(models.Model):
     tokens_remaining = models.IntegerField(default=0)
     phone = models.CharField(max_length=20, null=True, blank=True)
     phone_verified = models.BooleanField(default=False)
+    otp_code = models.CharField(max_length=6, null=True, blank=True)
+    otp_expires = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
