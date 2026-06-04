@@ -134,6 +134,21 @@ export function ageLabel(createdAt: number): string {
   return `${Math.round(ms / (24 * HOUR))}d ago`;
 }
 
+export function timeLabel(createdAt: number): string {
+  const d = new Date(createdAt);
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ap}`;
+}
+
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+export function dayLabel(createdAt: number): string {
+  const d = new Date(createdAt);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 const STAGE_COLORS: Record<Stage, string> = {
   VIRAL: '#CF2A1B',
   BREAKOUT: '#00C896',
