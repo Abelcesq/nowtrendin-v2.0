@@ -6,6 +6,9 @@ import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
 import { DualScoreAnalysis } from '../../components/trends/DualScoreAnalysis';
+import { WhyScoresDiverge } from '../../components/trends/WhyScoresDiverge';
+import { ScoringHistory } from '../../components/trends/ScoringHistory';
+import { ResearchHistory } from '../../components/trends/ResearchHistory';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES } from '../../lib/signals';
 
@@ -97,6 +100,10 @@ export default function SignalDetail() {
       <DualScoreAnalysis signal={signal} />
       <View className="h-5" />
 
+      {/* Research history (lazy) */}
+      <ResearchHistory topicKey={signal.id} />
+      <View className="h-4" />
+
       {/* WHAT TO DO */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to do</Text>
       <View className="rounded-2xl p-5 mb-5 border" style={{ borderColor: color, backgroundColor: `${color}10` }}>
@@ -165,7 +172,17 @@ export default function SignalDetail() {
         );
       })}
 
-      <View className="mt-3 mb-2">
+      {/* Why the scores diverge */}
+      <View className="mt-5">
+        <WhyScoresDiverge />
+      </View>
+
+      {/* Actual scoring history */}
+      <View className="mt-5">
+        <ScoringHistory signal={signal} />
+      </View>
+
+      <View className="mt-5 mb-2">
         <Button size="lg" icon={<Bell size={18} color="#FFFFFF" />} onPress={() => router.push('/alerts')}>
           Set Alert for this topic
         </Button>

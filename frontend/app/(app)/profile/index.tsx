@@ -52,7 +52,7 @@ export default function Profile() {
       <Row icon={<User size={18} color="#94A3B8" />} label="Edit Profile" />
       <Row icon={<Bell size={18} color="#94A3B8" />} label="Notifications" />
       <Row icon={<CreditCard size={18} color="#94A3B8" />} label="Billing" />
-      <Row icon={<Shield size={18} color="#94A3B8" />} label="Membership" onPress={() => router.push('/membership')} />
+      <Row icon={<Shield size={18} color="#94A3B8" />} label="Membership" onPress={() => router.push('/profile/membership')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
       <Row icon={<FileText size={18} color="#94A3B8" />} label="Terms & Conditions" />

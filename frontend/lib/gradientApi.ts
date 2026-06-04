@@ -80,3 +80,31 @@ export async function fetchScores(): Promise<Signal[]> {
   const results = Array.isArray(data?.results) ? data.results : [];
   return results.map(mapSignal);
 }
+
+export interface ResearchHistory {
+  trajectoryLabel?: string;
+  summaryShort?: string;
+  summaryLong?: string;
+  yearsDiscussed?: number;
+  firstKnownDate?: string;
+  gradientImplication?: string;
+  milestones?: { year?: string | number; label?: string }[];
+}
+
+// Research history for a topic ("how long has this been discussed").
+export async function fetchResearch(topicKey: string): Promise<ResearchHistory> {
+  const res = await fetch(`${GRADIENT_API}/scores/${encodeURIComponent(topicKey)}/history`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Gradient API ${res.status}`);
+  const d = await res.json();
+  return {
+    trajectoryLabel: d.trajectory_label || undefined,
+    summaryShort: d.summary_short || undefined,
+    summaryLong: d.summary_long || undefined,
+    yearsDiscussed: d.years_discussed != null ? Number(d.years_discussed) : undefined,
+    firstKnownDate: d.first_known_date || undefined,
+    gradientImplication: d.gradient_implication || undefined,
+    milestones: Array.isArray(d.milestones) ? d.milestones : [],
+  };
+}
