@@ -32,6 +32,13 @@ export const api = {
   delete: (path: string) => request(path, { method: 'DELETE' }),
 };
 
+export const alertsApi = {
+  list: () => api.get('/api/alerts/'),
+  create: (data: object) => api.post('/api/alerts/', data),
+  update: (id: number, data: object) => api.patch(`/api/alerts/${id}/`, data),
+  remove: (id: number) => api.delete(`/api/alerts/${id}/`),
+};
+
 export const signalsApi = {
   list: (params?: Record<string, string>) => {
     const q = params ? `?${new URLSearchParams(params).toString()}` : '';

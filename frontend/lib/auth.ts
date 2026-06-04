@@ -88,6 +88,12 @@ export async function verifyPhoneCode(code: string): Promise<User> {
   return normalizeUser(data.user);
 }
 
+// Update notification preferences (email/push). Returns the updated user.
+export async function updateNotifyPrefs(prefs: { notifyEmail?: boolean; notifyPush?: boolean }): Promise<User> {
+  const data = await api.patch('/api/auth/me/', prefs);
+  return normalizeUser(data.user);
+}
+
 export async function logout() {
   await SecureStore.deleteItemAsync('access_token').catch(() => {});
   await SecureStore.deleteItemAsync('refresh_token').catch(() => {});

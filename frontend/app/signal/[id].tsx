@@ -183,7 +183,7 @@ export default function SignalDetail() {
       </View>
 
       <View className="mt-5 mb-2">
-        <Button size="lg" icon={<Bell size={18} color="#FFFFFF" />} onPress={() => router.push('/alerts')}>
+        <Button size="lg" icon={<Bell size={18} color="#FFFFFF" />} onPress={() => router.push({ pathname: '/alerts', params: { topic: signal.topic, key: signal.id } })}>
           Set Alert for this topic
         </Button>
       </View>
