@@ -241,5 +241,6 @@ export function nextTier(tier: TierID): TierID | null {
 
 export function dataWindowLabel(tier: TierID): string {
   if (tier === 'enterprise') return 'Live + full history';
-  return `${TIERS[tier].name === 'Consumer' ? '12h' : '1h'}+ data`;
+  if (tier === 'business') return '30m+ data';
+  return '1h+ data';
 }

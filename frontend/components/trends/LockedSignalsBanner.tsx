@@ -15,7 +15,7 @@ export function LockedSignalsBanner({ tier, lockedCount }: { tier: TierID; locke
   if (!next) return null;
 
   const cfg = TIERS[next];
-  const window = next === 'enterprise' ? 'real-time live' : '1h+';
+  const window = next === 'enterprise' ? 'real-time live' : '30m+';
 
   return (
     <View

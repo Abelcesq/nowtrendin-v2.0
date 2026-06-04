@@ -7,7 +7,7 @@ export const TIERS = {
     name: 'Consumer',
     price: 49,
     colour: '#2D7EEF',
-    dataFreshness: 12 * 60 * 60 * 1000, // 12h in ms — can only see data >= 12h old
+    dataFreshness: 1 * 60 * 60 * 1000, // 1h in ms — can only see data >= 1h old
     canSearch: false,
     canQueryNew: false,
     canAccessGradientScore: true,
@@ -15,15 +15,15 @@ export const TIERS = {
     canEditSources: false,
     canDirectSearch: false,
     apiTokens: 0,
-    description: 'Trend history access (12h+).',
+    description: 'Trend history access (1h+).',
     features: [
-      'Gradient Score history (12h+)',
+      'Gradient Score history (1h+)',
       'Trend monitoring feed',
       'Email + push alerts',
       'All signal categories',
     ],
     restrictions: [
-      'Cannot access signals less than 12 hours old',
+      'Cannot access signals less than 1 hour old',
       'Cannot query new trend topics',
     ],
   },
@@ -32,7 +32,7 @@ export const TIERS = {
     name: 'Business',
     price: 499,
     colour: '#00C896',
-    dataFreshness: 1 * 60 * 60 * 1000, // 1h in ms
+    dataFreshness: 30 * 60 * 1000, // 30m in ms
     canSearch: true,
     canQueryNew: false,
     canAccessGradientScore: true,
@@ -43,13 +43,13 @@ export const TIERS = {
     description: 'Near-real-time trend intelligence for teams.',
     features: [
       'Everything in Consumer',
-      'Gradient Score history (1h+)',
+      'Gradient Score history (30m+)',
       'Full signal search + filter',
       'Business analytics',
       'Team sharing',
     ],
     restrictions: [
-      'Cannot access signals less than 1 hour old',
+      'Cannot access signals less than 30 minutes old',
       'Cannot query new trend topics',
     ],
   },
