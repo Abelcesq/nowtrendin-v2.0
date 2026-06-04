@@ -12,9 +12,12 @@ export default function ProfileMembership() {
   const updateTier = useAuthStore((s) => s.updateTier);
 
   const apply = async (tier: TierID) => {
-    updateTier(tier);
+    // Persist first, then change local tier. Changing the tier rebuilds the
+    // tab navigator (Business/Enterprise add the Search tab), which clears the
+    // back stack — so navigate with replace() instead of back().
     await apiSetTier(tier);
-    router.back();
+    updateTier(tier);
+    router.replace('/(app)');
   };
 
   return (

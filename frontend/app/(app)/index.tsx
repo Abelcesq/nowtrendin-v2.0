@@ -140,14 +140,16 @@ export default function Dashboard() {
             <Text className="text-textMuted text-[11px] font-bold">{filtered.length}</Text>
           </View>
         </View>
-        <TouchableOpacity
-          onPress={() => refetch()}
-          className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border"
-          style={{ borderColor: '#E8551C' }}
-        >
-          <RotateCcw size={13} color="#E8551C" />
-          <Text className="text-xs font-bold" style={{ color: '#E8551C' }}>Pull Trends</Text>
-        </TouchableOpacity>
+        {tier !== 'consumer' && (
+          <TouchableOpacity
+            onPress={() => refetch()}
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border"
+            style={{ borderColor: '#E8551C' }}
+          >
+            <RotateCcw size={13} color="#E8551C" />
+            <Text className="text-xs font-bold" style={{ color: '#E8551C' }}>Pull Trends</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Stat row */}
