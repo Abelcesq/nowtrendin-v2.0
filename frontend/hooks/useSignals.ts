@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -49,6 +49,16 @@ export function useScoreHistory(topicKey: string | undefined) {
     retry: 1,
   });
   return { rows: q.data ?? [], isLoading: q.isLoading };
+}
+
+export function useRiskScores() {
+  const q = useQuery({
+    queryKey: ['risk-scores'],
+    queryFn: fetchRiskScores,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+  return { risks: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
 }
 
 export function useResearch(topicKey: string | undefined) {

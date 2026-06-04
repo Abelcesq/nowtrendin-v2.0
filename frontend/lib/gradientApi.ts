@@ -112,6 +112,42 @@ export async function fetchScoreHistory(topicKey: string): Promise<ScoreHistoryR
   }));
 }
 
+export interface RiskScore {
+  key: string;
+  display: string;
+  detection: number;
+  confidence: number;
+  stage: string;
+  action: string;
+  interpretation: string;
+  diffusion: { dark: number; expert: number; consumer: number; media: number; retail: number };
+  totalSignals: number;
+}
+
+// Risk Gradient Scores — emerging financial risks scored by diffusion stage.
+export async function fetchRiskScores(): Promise<RiskScore[]> {
+  const res = await fetch(`${GRADIENT_API}/risk/scores`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Risk API ${res.status}`);
+  const d = await res.json();
+  return (Array.isArray(d?.results) ? d.results : []).map((r: any) => ({
+    key: String(r.risk_topic),
+    display: r.risk_display || r.risk_topic,
+    detection: Math.round(Number(r.detection_score ?? 0)),
+    confidence: Math.round(Number(r.confidence_score ?? 0)),
+    stage: r.risk_stage || 'BACKGROUND',
+    action: r.risk_action || '',
+    interpretation: r.interpretation || '',
+    diffusion: {
+      dark: r.diffusion?.stage_1_dark_positioning ?? 0,
+      expert: r.diffusion?.stage_2_expert_warning ?? 0,
+      consumer: r.diffusion?.stage_3_consumer_concern ?? 0,
+      media: r.diffusion?.stage_4_media_coverage ?? 0,
+      retail: r.diffusion?.stage_5_retail_amplify ?? 0,
+    },
+    totalSignals: r.total_signals ?? 0,
+  }));
+}
+
 export interface ResearchHistory {
   trajectoryLabel?: string;
   summaryShort?: string;

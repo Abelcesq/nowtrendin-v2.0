@@ -4,12 +4,13 @@ import { Bell, Zap, Briefcase, Building2, Search, RotateCcw } from 'lucide-react
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
+import { RiskCard } from '../../components/trends/RiskCard';
 import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID } from '../../constants/tiers';
 import { dataWindowLabel, scoreGap } from '../../lib/signals';
-import { useTierFeed } from '../../hooks/useSignals';
+import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 
@@ -35,6 +36,8 @@ export default function Dashboard() {
   const Icon = TIER_ICONS[tier];
 
   const { accessible, lockedCount, isLoading, isSample, refetch } = useTierFeed(tier);
+  const { risks, isLoading: riskLoading } = useRiskScores();
+  const [mode, setMode] = useState<'attention' | 'risk'>('attention');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
 
@@ -92,6 +95,27 @@ export default function Dashboard() {
         </View>
       </View>
 
+      {/* Attention | Risk toggle */}
+      <View className="flex-row bg-surface rounded-xl border border-border p-1 mb-4">
+        {(['attention', 'risk'] as const).map((m) => {
+          const on = mode === m;
+          return (
+            <TouchableOpacity
+              key={m}
+              onPress={() => setMode(m)}
+              className="flex-1 rounded-lg py-2 items-center"
+              style={{ backgroundColor: on ? (m === 'risk' ? '#CF2A1B' : '#00C896') : 'transparent' }}
+            >
+              <Text className="text-xs font-bold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
+                {m === 'attention' ? 'Attention' : 'Risk'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {mode === 'attention' && (
+        <>
       {/* Search bar */}
       <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
         <Search size={18} color="#9AA3B0" />
@@ -185,6 +209,30 @@ export default function Dashboard() {
           <View className="mt-1">
             <LockedSignalsBanner tier={tier} lockedCount={lockedCount} />
           </View>
+        </>
+      )}
+        </>
+      )}
+
+      {mode === 'risk' && (
+        <>
+          <View className="flex-row items-center gap-2 mb-2">
+            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#CF2A1B' }} />
+            <Text className="text-textPrimary text-xl font-black">Risk Signals</Text>
+            <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
+              <Text className="text-textMuted text-[11px] font-bold">{risks.length}</Text>
+            </View>
+          </View>
+          <Text className="text-textMuted text-[11px] mb-3">
+            Emerging financial risks scored by diffusion stage — early smart-money positioning ranks highest.
+          </Text>
+          {riskLoading ? (
+            <ActivityIndicator size="large" color="#CF2A1B" style={{ marginTop: 40 }} />
+          ) : risks.length === 0 ? (
+            <Text className="text-textMuted text-center mt-8">No risk signals yet.</Text>
+          ) : (
+            risks.map((r) => <RiskCard key={r.key} risk={r} />)
+          )}
         </>
       )}
     </Screen>
