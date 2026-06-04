@@ -12,6 +12,15 @@ const ROWS = [
   { label: 'MAINSTREAM PENALTY', det: 'Gradual', conf: 'Strict' },
 ];
 
+function ValueLine({ color, value }: { color: string; value: string }) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ color }} className="text-sm font-bold flex-1">{value}</Text>
+    </View>
+  );
+}
+
 export function WhyScoresDiverge() {
   return (
     <View>
@@ -19,12 +28,10 @@ export function WhyScoresDiverge() {
       <View className="flex-row flex-wrap gap-2">
         {ROWS.map((r) => (
           <View key={r.label} className="flex-1 min-w-[46%] bg-surface rounded-xl border border-border p-3">
-            <Text className="text-textMuted text-[9px] font-bold tracking-wider mb-1">{r.label}</Text>
-            <View className="flex-row items-center">
-              <Text style={{ color: DET }} className="text-sm font-bold">{r.det}</Text>
-              <Text className="text-textMuted text-xs mx-1.5">/</Text>
-              <Text style={{ color: CONF }} className="text-sm font-bold">{r.conf}</Text>
-            </View>
+            <Text className="text-textMuted text-[9px] font-bold tracking-wider mb-2">{r.label}</Text>
+            <ValueLine color={DET} value={r.det} />
+            <View className="h-1" />
+            <ValueLine color={CONF} value={r.conf} />
           </View>
         ))}
       </View>

@@ -51,7 +51,10 @@ export function mapSignal(r: any): Signal {
     stage: normalizeStage(r.signal_stage),
     createdAt: Date.parse(r.scored_at) || Date.now(),
     overall: r.overall_score != null ? Math.round(Number(r.overall_score)) : undefined,
-    gap: r.heisenberg_gap != null ? Math.round(Number(r.heisenberg_gap)) : undefined,
+    // Gap is the difference of the displayed (rounded) scores so it always
+    // reconciles with DET/CONF. (The engine's stored heisenberg_gap can be
+    // stale relative to floored/calibrated scores.)
+    gap: Math.abs(det - conf),
     gapMeaning: r.gap_meaning || r.gap_label || undefined,
     whatToDo: r.what_to_do_action
       ? {
