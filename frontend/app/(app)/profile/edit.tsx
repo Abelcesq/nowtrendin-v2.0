@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, User as UserIcon, Mail, Phone, KeyRound, ShieldCheck, CheckCircle } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { CountryCodePicker } from '../../../components/ui/CountryCodePicker';
+import { splitPhone } from '../../../constants/countries';
 import { useAuthStore } from '../../../store/auth.store';
 import { updateProfile, changePassword, sendPhoneCode, verifyPhoneCode } from '../../../lib/auth';
 
@@ -13,11 +15,19 @@ export default function EditProfile() {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
 
+  const initialPhone = splitPhone(user?.phone);
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
-  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [countryDial, setCountryDial] = useState(initialPhone.dial);
+  const [localPhone, setLocalPhone] = useState(initialPhone.local);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Full E.164 number (country code + digits), or null if no number entered.
+  const fullPhone = () => {
+    const digits = localPhone.replace(/[^0-9]/g, '');
+    return digits ? `${countryDial}${digits}` : null;
+  };
 
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState('');
@@ -35,7 +45,7 @@ export default function EditProfile() {
     setProfileMsg(null);
     setSavingProfile(true);
     try {
-      const updated = await updateProfile({ name: name.trim(), email: email.trim(), phone: phone.trim() || null });
+      const updated = await updateProfile({ name: name.trim(), email: email.trim(), phone: fullPhone() });
       updateUser(updated);
       setProfileMsg({ ok: true, text: 'Profile updated.' });
     } catch (err: any) {
@@ -48,10 +58,11 @@ export default function EditProfile() {
 
   const requestCode = async () => {
     setTwoFAMsg(null);
-    if (!phone.trim()) return setTwoFAMsg({ ok: false, text: 'Enter a phone number first.' });
+    const full = fullPhone();
+    if (!full) return setTwoFAMsg({ ok: false, text: 'Enter a phone number first.' });
     setSending2fa(true);
     try {
-      await sendPhoneCode(phone.trim());
+      await sendPhoneCode(full);
       setCodeSent(true);
       setTwoFAMsg({ ok: true, text: 'Code sent — check your phone.' });
     } catch (err: any) {
@@ -116,9 +127,23 @@ export default function EditProfile() {
           </Text>
         ) : null}
       </View>
-      <Input placeholder="Phone number (e.g. +1 555 123 4567)" value={phone ?? ''} onChangeText={setPhone} icon={<Phone size={18} color="#94A3B8" />} keyboardType="default" />
-      <Text className="text-textMuted text-[11px] -mt-2 mb-3">
-        Used for two-factor authentication. SMS verification is coming soon — until then your number is stored for account recovery.
+      <View className="flex-row gap-2 mb-1">
+        <CountryCodePicker dial={countryDial} onSelect={setCountryDial} />
+        <View className="flex-1 flex-row items-center bg-surface rounded-xl px-4 border border-border" style={{ height: 50 }}>
+          <Phone size={18} color="#94A3B8" />
+          <TextInput
+            value={localPhone}
+            onChangeText={setLocalPhone}
+            placeholder="555 123 4567"
+            placeholderTextColor="#9AA3B0"
+            keyboardType="phone-pad"
+            className="flex-1 ml-3 text-base"
+            style={{ color: '#1A1A2E' }}
+          />
+        </View>
+      </View>
+      <Text className="text-textMuted text-[11px] mb-3 mt-1">
+        Pick your country code and enter your number, then verify it below for two-factor security.
       </Text>
 
       {profileMsg && (
