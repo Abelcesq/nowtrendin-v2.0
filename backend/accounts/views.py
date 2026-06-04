@@ -2,6 +2,8 @@ import os
 import secrets
 from datetime import timedelta
 
+import requests
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -126,6 +128,37 @@ class ChangePasswordView(APIView):
         request.user.set_password(new)
         request.user.save()
         return Response({'detail': 'Password updated'})
+
+
+GRADIENT_API = os.environ.get('GRADIENT_API', 'https://nowtrendin-e62dcb9ecb69.herokuapp.com')
+
+
+class DirectQueryView(APIView):
+    """Enterprise-only: score an arbitrary topic, deducting one query token."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        if profile.tier != 'enterprise':
+            return Response({'detail': 'Direct topic queries are an Enterprise feature.'}, status=403)
+        if (profile.tokens_remaining or 0) <= 0:
+            return Response({'detail': 'No query tokens remaining this month.'}, status=402)
+        topic = (str(request.data.get('topic') or '')).strip()
+        if not topic:
+            return Response({'detail': 'A topic is required.'}, status=400)
+
+        try:
+            r = requests.post(f'{GRADIENT_API}/query', json={'topic': topic}, timeout=110)
+            data = r.json()
+        except Exception as exc:
+            return Response({'detail': f'Scoring engine unavailable: {exc}'}, status=503)
+
+        # Charge a token only when the engine actually returned a score.
+        if data.get('found'):
+            profile.tokens_remaining = max(0, (profile.tokens_remaining or 0) - 1)
+            profile.save()
+        data['tokensRemaining'] = profile.tokens_remaining
+        return Response(data, status=200)
 
 
 class AlertListCreate(generics.ListCreateAPIView):
