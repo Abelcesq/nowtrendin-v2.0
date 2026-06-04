@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ShieldAlert, Globe } from 'lucide-react-native';
 import { RiskScore } from '../../lib/gradientApi';
 
@@ -22,11 +23,14 @@ const STAGES = [
 ] as const;
 
 export function RiskCard({ risk }: { risk: RiskScore }) {
+  const router = useRouter();
   const color = STAGE_COLOR[risk.stage] ?? '#9AA3B0';
   const maxStage = Math.max(1, ...STAGES.map((s) => (risk.diffusion as any)[s.key] as number));
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => router.push(`/risk/${risk.key}`)}
       className="bg-surface rounded-2xl p-4 mb-3 border border-border"
       style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
     >
@@ -89,6 +93,6 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           </Text>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }

@@ -124,6 +124,9 @@ export interface RiskScore {
   totalSignals: number;
   sources: string[];
   firstSeenAt: number;
+  maturity: string;
+  maturityNote: string;
+  components: Record<string, number>;
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -152,6 +155,9 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       .map((s: string) => s.trim())
       .filter(Boolean),
     firstSeenAt: Date.parse(r.first_scored_at) || Date.parse(r.scored_at) || Date.now(),
+    maturity: r.maturity || '',
+    maturityNote: r.maturity_note || '',
+    components: r.components && typeof r.components === 'object' ? r.components : {},
   }));
 }
 

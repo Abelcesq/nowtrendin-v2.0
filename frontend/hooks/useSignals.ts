@@ -61,6 +61,11 @@ export function useRiskScores() {
   return { risks: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
 }
 
+export function useRisk(key: string | undefined) {
+  const { risks, isLoading } = useRiskScores();
+  return { risk: risks.find((r) => r.key === key), isLoading };
+}
+
 export function useResearch(topicKey: string | undefined) {
   const q = useQuery({
     queryKey: ['research', topicKey],

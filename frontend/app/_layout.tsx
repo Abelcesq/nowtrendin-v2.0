@@ -16,6 +16,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(app)" />
             <Stack.Screen name="signal/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="risk/[key]" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </SafeAreaProvider>
       </QueryClientProvider>
