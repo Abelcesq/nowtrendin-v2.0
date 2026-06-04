@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { ShieldAlert } from 'lucide-react-native';
+import { ShieldAlert, Globe } from 'lucide-react-native';
 import { RiskScore } from '../../lib/gradientApi';
 
 const STAGE_COLOR: Record<string, string> = {
@@ -11,6 +11,8 @@ const STAGE_COLOR: Record<string, string> = {
   BACKGROUND: '#9AA3B0',
 };
 
+// Stage 1 (Dark Positioning) is where the risk engine detects — the alpha.
+const DETECT_STAGE = 'dark';
 const STAGES = [
   { key: 'dark', label: 'Dark' },
   { key: 'expert', label: 'Expert' },
@@ -56,6 +58,7 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           const v = (risk.diffusion as any)[s.key] as number;
           const h = 4 + Math.round((v / maxStage) * 18);
           const on = v > 0;
+          const isDetect = s.key === DETECT_STAGE;
           return (
             <View key={s.key} className="flex-1 items-center">
               <View className="w-full justify-end" style={{ height: 22 }}>
@@ -63,6 +66,11 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
               </View>
               <Text className="text-textMuted text-[8px] mt-1">{s.label}</Text>
               <Text className="text-textSecondary text-[9px] font-bold">{v}</Text>
+              {isDetect && (
+                <View className="px-1 rounded mt-0.5" style={{ backgroundColor: color }}>
+                  <Text style={{ fontSize: 6, color: '#FFFFFF', fontWeight: '700' }}>DETECT</Text>
+                </View>
+              )}
             </View>
           );
         })}
@@ -70,6 +78,16 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
 
       {!!risk.interpretation && (
         <Text className="text-textSecondary text-[12px] leading-5 mt-3">{risk.interpretation}</Text>
+      )}
+
+      {/* Source provenance — the audit trail (institutional trust) */}
+      {risk.sources.length > 0 && (
+        <View className="flex-row items-center gap-1 mt-3 pt-2 border-t border-border">
+          <Globe size={10} color="#9AA3B0" />
+          <Text className="text-textMuted text-[10px] flex-1" numberOfLines={1}>
+            Sources: {risk.sources.join(' · ')}
+          </Text>
+        </View>
       )}
     </View>
   );

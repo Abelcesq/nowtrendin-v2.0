@@ -122,6 +122,8 @@ export interface RiskScore {
   interpretation: string;
   diffusion: { dark: number; expert: number; consumer: number; media: number; retail: number };
   totalSignals: number;
+  sources: string[];
+  firstSeenAt: number;
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -145,6 +147,11 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       retail: r.diffusion?.stage_5_retail_amplify ?? 0,
     },
     totalSignals: r.total_signals ?? 0,
+    sources: String(r.source_provenance || '')
+      .split('·')
+      .map((s: string) => s.trim())
+      .filter(Boolean),
+    firstSeenAt: Date.parse(r.first_scored_at) || Date.parse(r.scored_at) || Date.now(),
   }));
 }
 

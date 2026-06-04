@@ -5,10 +5,11 @@ import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
+import { RiskExplainer } from '../../components/trends/RiskExplainer';
 import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
-import { TIERS, TierID } from '../../constants/tiers';
+import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, scoreGap } from '../../lib/signals';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
@@ -38,8 +39,13 @@ export default function Dashboard() {
   const { accessible, lockedCount, isLoading, isSample, refetch } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
   const [mode, setMode] = useState<'attention' | 'risk'>('attention');
+  const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
+
+  // Risk obeys the same data-aging waterfall as Attention.
+  const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
+  const lockedRiskCount = risks.length - accessibleRisks.length;
 
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
@@ -216,22 +222,32 @@ export default function Dashboard() {
 
       {mode === 'risk' && (
         <>
+          {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
+
           <View className="flex-row items-center gap-2 mb-2">
-            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#CF2A1B' }} />
+            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />
             <Text className="text-textPrimary text-xl font-black">Risk Signals</Text>
             <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
-              <Text className="text-textMuted text-[11px] font-bold">{risks.length}</Text>
+              <Text className="text-textMuted text-[11px] font-bold">{accessibleRisks.length}</Text>
             </View>
+            <Text className="text-textMuted text-[10px] ml-auto">{dataWindowLabel(tier)}</Text>
           </View>
           <Text className="text-textMuted text-[11px] mb-3">
             Emerging financial risks scored by diffusion stage — early smart-money positioning ranks highest.
           </Text>
           {riskLoading ? (
-            <ActivityIndicator size="large" color="#CF2A1B" style={{ marginTop: 40 }} />
-          ) : risks.length === 0 ? (
-            <Text className="text-textMuted text-center mt-8">No risk signals yet.</Text>
+            <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />
+          ) : accessibleRisks.length === 0 ? (
+            <Text className="text-textMuted text-center mt-8">
+              {lockedRiskCount > 0 ? 'Newer risk signals are still aging into your tier.' : 'No risk signals yet.'}
+            </Text>
           ) : (
-            risks.map((r) => <RiskCard key={r.key} risk={r} />)
+            accessibleRisks.map((r) => <RiskCard key={r.key} risk={r} />)
+          )}
+          {lockedRiskCount > 0 && accessibleRisks.length > 0 && (
+            <View className="mt-1">
+              <LockedSignalsBanner tier={tier} lockedCount={lockedRiskCount} />
+            </View>
           )}
         </>
       )}
