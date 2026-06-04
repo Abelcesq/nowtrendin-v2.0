@@ -41,11 +41,11 @@ export default function Dashboard() {
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
   const greeting =
-    hour < 5 ? 'Good night'
-      : hour < 12 ? 'Good morning'
-      : hour < 17 ? 'Good afternoon'
-      : hour < 21 ? 'Good evening'
-      : 'Good night';
+    hour >= 1 && hour < 11 ? 'Good morning'      // 1:00am – 10:59am
+      : hour >= 11 && hour < 15 ? 'Good day'      // 11:00am – 2:59pm
+      : hour >= 15 && hour < 18 ? 'Good afternoon' // 3:00pm – 5:59pm
+      : hour >= 18 && hour < 21 ? 'Good evening'   // 6:00pm – 8:59pm
+      : 'Good night';                              // 9:00pm – 12:59am
 
   const counts = {
     breakout: accessible.filter((s) => s.stage === 'BREAKOUT' || s.score >= 85).length,
@@ -105,27 +105,31 @@ export default function Dashboard() {
         />
       </View>
 
-      {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 8 }}>
-        {FILTERS.map((f) => {
-          const active = filter === f.k;
-          return (
-            <TouchableOpacity
-              key={f.k}
-              onPress={() => setFilter(f.k)}
-              className="px-4 py-2 rounded-full border"
-              style={{
-                backgroundColor: active ? '#00C896' : '#FFFFFF',
-                borderColor: active ? '#00C896' : '#E4E7EC',
-              }}
-            >
-              <Text className="text-xs font-semibold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {/* Filter chips — fixed-height row so the pills can't stretch */}
+      <View style={{ height: 40 }} className="mb-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+          {FILTERS.map((f) => {
+            const active = filter === f.k;
+            return (
+              <TouchableOpacity
+                key={f.k}
+                onPress={() => setFilter(f.k)}
+                className="px-4 rounded-full items-center justify-center"
+                style={{
+                  height: 34,
+                  borderWidth: 1,
+                  backgroundColor: active ? '#00C896' : '#FFFFFF',
+                  borderColor: active ? '#00C896' : '#E4E7EC',
+                }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* Trends header */}
       <View className="flex-row items-center justify-between mb-3">

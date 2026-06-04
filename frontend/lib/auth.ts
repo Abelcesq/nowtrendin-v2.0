@@ -77,6 +77,17 @@ export async function changePassword(currentPassword: string, newPassword: strin
   });
 }
 
+// Send an SMS verification code (saves the phone too). Throws { data:{detail} } / 503 if SMS unconfigured.
+export async function sendPhoneCode(phone?: string) {
+  return api.post('/api/auth/phone/send-code/', phone ? { phone } : {});
+}
+
+// Verify the SMS code; returns the updated (phone-verified) user.
+export async function verifyPhoneCode(code: string): Promise<User> {
+  const data = await api.post('/api/auth/phone/verify/', { code });
+  return normalizeUser(data.user);
+}
+
 export async function logout() {
   await SecureStore.deleteItemAsync('access_token').catch(() => {});
   await SecureStore.deleteItemAsync('refresh_token').catch(() => {});

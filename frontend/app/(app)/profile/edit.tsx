@@ -6,7 +6,7 @@ import { Screen } from '../../../components/ui/Screen';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
 import { useAuthStore } from '../../../store/auth.store';
-import { updateProfile, changePassword } from '../../../lib/auth';
+import { updateProfile, changePassword, sendPhoneCode, verifyPhoneCode } from '../../../lib/auth';
 
 export default function EditProfile() {
   const router = useRouter();
@@ -18,6 +18,12 @@ export default function EditProfile() {
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
+  const [sending2fa, setSending2fa] = useState(false);
+  const [verifying2fa, setVerifying2fa] = useState(false);
+  const [twoFAMsg, setTwoFAMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -37,6 +43,37 @@ export default function EditProfile() {
       setProfileMsg({ ok: false, text: msg });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const requestCode = async () => {
+    setTwoFAMsg(null);
+    if (!phone.trim()) return setTwoFAMsg({ ok: false, text: 'Enter a phone number first.' });
+    setSending2fa(true);
+    try {
+      await sendPhoneCode(phone.trim());
+      setCodeSent(true);
+      setTwoFAMsg({ ok: true, text: 'Code sent — check your phone.' });
+    } catch (err: any) {
+      setTwoFAMsg({ ok: false, text: err?.data?.detail ?? 'Could not send code.' });
+    } finally {
+      setSending2fa(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    setTwoFAMsg(null);
+    setVerifying2fa(true);
+    try {
+      const updated = await verifyPhoneCode(code.trim());
+      updateUser(updated);
+      setCodeSent(false);
+      setCode('');
+      setTwoFAMsg({ ok: true, text: 'Phone verified ✓' });
+    } catch (err: any) {
+      setTwoFAMsg({ ok: false, text: err?.data?.detail ?? 'Could not verify code.' });
+    } finally {
+      setVerifying2fa(false);
     }
   };
 
@@ -92,6 +129,44 @@ export default function EditProfile() {
       )}
 
       <Button onPress={saveProfile} loading={savingProfile} size="lg">Save Changes</Button>
+
+      {/* Two-factor authentication */}
+      <View className="mt-6">
+        <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Two-factor authentication</Text>
+        {user?.phoneVerified ? (
+          <View className="flex-row items-center gap-2">
+            <CheckCircle size={16} color="#00C896" />
+            <Text className="text-textSecondary text-sm">Your phone is verified for two-factor security.</Text>
+          </View>
+        ) : (
+          <>
+            <Text className="text-textMuted text-[12px] mb-2">
+              Verify your number to protect your account with SMS codes at sign-in.
+            </Text>
+            <Button variant="secondary" size="md" onPress={requestCode} loading={sending2fa}>
+              {codeSent ? 'Resend code' : 'Send verification code'}
+            </Button>
+            {codeSent && (
+              <View className="mt-3">
+                <Input
+                  placeholder="6-digit code"
+                  value={code}
+                  onChangeText={setCode}
+                  keyboardType="numeric"
+                  icon={<KeyRound size={18} color="#94A3B8" />}
+                />
+                <Button size="md" onPress={verifyCode} loading={verifying2fa}>Verify code</Button>
+              </View>
+            )}
+          </>
+        )}
+        {twoFAMsg && (
+          <View className="flex-row items-center gap-2 mt-3">
+            {twoFAMsg.ok && <CheckCircle size={14} color="#00C896" />}
+            <Text className="text-sm" style={{ color: twoFAMsg.ok ? '#009970' : '#DC2626' }}>{twoFAMsg.text}</Text>
+          </View>
+        )}
+      </View>
 
       <View className="h-px bg-border my-7" />
 
