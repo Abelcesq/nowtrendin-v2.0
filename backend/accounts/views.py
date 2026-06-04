@@ -4,8 +4,10 @@ from datetime import timedelta
 
 import requests
 
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.utils import timezone
 from rest_framework import permissions, generics
 from rest_framework.response import Response
@@ -159,6 +161,67 @@ class DirectQueryView(APIView):
             profile.save()
         data['tokensRemaining'] = profile.tokens_remaining
         return Response(data, status=200)
+
+
+def _notify_alert(alert, current):
+    """Deliver a fired alert. Email now; push requires an Expo push token (dev build)."""
+    user = alert.user
+    label = alert.topic_display or alert.topic_key
+    if alert.notify_email and user.email:
+        try:
+            send_mail(
+                subject=f"Now TrendIn alert: {label} hit {current}",
+                message=(
+                    f"'{label}' just reached a {alert.score_type} Gradient Score of {current} "
+                    f"(your threshold was {alert.threshold}).\n\n"
+                    f"Open Now TrendIn to see the full signal."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+
+class EvaluateAlertsView(APIView):
+    """Internal: pull live scores and fire any active alert whose threshold is crossed."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if request.headers.get('X-Internal-Key') != settings.INTERNAL_API_KEY:
+            return Response({'detail': 'forbidden'}, status=403)
+        try:
+            r = requests.get(f'{GRADIENT_API}/scores', params={'limit': 200}, timeout=30)
+            results = r.json().get('results', [])
+        except Exception as exc:
+            return Response({'detail': f'engine unavailable: {exc}'}, status=503)
+
+        scores = {}
+        for row in results:
+            scores[row.get('topic_key')] = {
+                'detection': round(row.get('detection_score', 0) or 0),
+                'confidence': round(row.get('confidence_score', 0) or 0),
+                'overall': round(row.get('overall_score', 0) or 0),
+            }
+
+        now = timezone.now()
+        cooldown = now - timedelta(hours=6)
+        fired = 0
+        active = Alert.objects.filter(active=True)
+        for alert in active:
+            s = scores.get(alert.topic_key)
+            if not s:
+                continue
+            current = s.get(alert.score_type, s['detection'])
+            crossed = current >= alert.threshold
+            fresh = alert.last_triggered_at is None or alert.last_triggered_at < cooldown
+            if crossed and fresh:
+                alert.last_triggered_at = now
+                alert.save(update_fields=['last_triggered_at'])
+                _notify_alert(alert, current)
+                fired += 1
+        return Response({'fired': fired, 'checked': active.count()})
 
 
 class AlertListCreate(generics.ListCreateAPIView):
