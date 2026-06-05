@@ -43,21 +43,20 @@ _Last updated: 2026-06-05_
 ---
 
 ## 3. THE HEDGE-FUND QUESTION: 1 search every 5 minutes
-### (Enterprise = $250K/mo · 10,000 tokens · up to 5 users, shared pool)
+### (Enterprise = $250K/mo · 100,000 tokens · up to 5 users, shared pool)
 
 **Volume:** 1 / 5 min = 12/hr × 24 × 30.4 = **~8,755 searches / month** per user.
 
-### A. Does the 10,000-token allowance ALLOW it?  ✅ **Yes (for the account).**
-- 10,000 tokens ÷ 1 token/search = 10,000 searches.
-- At 1 every 5 min, 10,000 tokens lasts **~34.7 days** → covers a full month for **one** continuous 5-min poller (8,755 < 10,000).
-- **Caveat — 5 shared users:** if *all 5* independently grade *new* topics every 5 min, that's 5 × 8,755 = ~43,775 → exceeds the 10,000 pool. BUT:
-  - **Reads of already-scored topics are FREE** (the engine re-scores on its own 30-min schedule), and
-  - funds watch a **shared watchlist** that the **12h cache** collapses to a handful of real grades/day.
-  - Realistic shared usage stays well under 10,000. Heavy unique-grading across 5 users is the only case that hits the cap → meter overage if it occurs.
+### A. Does the 100,000-token allowance ALLOW it?  ✅ **Yes, with huge headroom.**
+- 100,000 tokens ÷ 1 token/search = 100,000 searches.
+- At 1 every 5 min, 100,000 tokens lasts **~347 days (~11.4 user-months)**.
+- **All 5 users** polling every 5 min = 5 × 8,755 = ~43,775 → still **well under 100,000.** The cap is no longer a practical constraint for any realistic hedge-fund workflow.
+- Reads of already-scored topics are **FREE**; the **12h cache** collapses shared watchlists further.
 
 ### B. Does $250K cover the COST of it?  ✅ **Yes — overwhelmingly.**
-- Full 10,000 tokens as *new* AI Grades (worst case, no cache): 10,000 × $0.0124 = **~$124/mo** per account.
-- 20-topic shared watchlist, cached: ~40 grades/day = **~$15/mo** per account.
+- Full 100,000 tokens as *new* AI Grades (absolute worst case, no cache): 100,000 × $0.0124 = **~$1,240/mo** per account.
+- 5 users polling 5-min (43,775 grades, no cache): ~$543/mo.
+- 20-topic shared watchlist, cached: **~$15/mo.**
 - Pure reads (likely real case): **$0 marginal.**
 
 ### C. Margin check at $250K / account
@@ -65,18 +64,19 @@ _Last updated: 2026-06-05_
 |---|---|---|
 | Reads of existing scores (5-min) | ~$0 | ~100% |
 | 20-topic watchlist, AI-graded, cached | ~$15 | 99.99% |
-| **Full 10,000 tokens, all unique grades** | **~$124** | **99.95%** |
-| All-in (10k grades + ~$374 fixed) | ~$500 | **99.80%** |
-| 100 accounts, worst case each | ~$12,400 AI + fixed | 99.99%+ |
+| 5 users × 5-min unique grades (~43,775) | ~$543 | 99.78% |
+| **Full 100,000 tokens, all unique grades** | **~$1,240** | **99.50%** |
+| All-in (100k grades + ~$374 fixed) | ~$1,614 | **99.35%** |
+| 100 accounts, worst case each | ~$124,000 AI / $25M rev | 99.50% |
 
-**80% margin target:** met by >1,000×. Costs would have to reach **$50,000/mo** to break the 80% floor; full-tilt usage of one account is ~$500/mo all-in. **At $250K/account the model is profitable at ~99.8% even if every included token is burned on the most expensive action.**
+**80% margin target:** met by >150×. To break the 80% floor a single account would have to cost **$50,000/mo** (~4M grades) — impossible within 100,000 tokens. **At $250K/account the model is profitable at ~99.4% even if every one of the 100,000 included tokens is burned on the most expensive action.**
 
 ---
 
 ## 4. Conclusion & recommendation
 
-1. **Resolved:** Enterprise is now **10,000 tokens/mo, 5 users (shared pool), reads unlimited.** This covers one continuous 5-min poller for a full month, at ~$124 worst-case cost → **99.95% margin**.
-2. **Only remaining risk:** 5 users *each* unique-grading every 5 min exceeds 10,000. Mitigated by free reads + 12h cache; if it ever bites, **meter overage** at a token price ≥ $1 (80× cost) to preserve margin.
+1. **Resolved:** Enterprise is now **100,000 tokens/mo, 5 users (shared pool), reads unlimited.** Covers ~11 user-months of 5-min polling — the cap is a non-issue for realistic use. Worst case (all 100k as unique grades) ~$1,240 → **99.50% margin**.
+2. **No remaining cap risk** for normal workflows; even 5 users polling 5-min stays under 100,000. The only cost that scales nonlinearly is **X data** (PPU), governed separately by the post-cap + 12h cache, not by tokens.
 3. **The real scaling cost is X data, not AI.** At hedge-fund concurrency, X PPU (~$0.005/read, 100/pull) is the one line that can grow — the 12h cache and velocity-trigger already contain it; revisit `X_SCAN_LIMIT` after the Jun-22 reset.
 4. **Watch weekly:** `GET /grade/costs` (AI split), Apify usage dashboard, X post-cap dashboard, Heroku metrics (dyno load → when to upsize).
 
