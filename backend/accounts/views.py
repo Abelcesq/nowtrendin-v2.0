@@ -17,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Profile, Alert
 from .serializers import SignupSerializer, UserSerializer, AlertSerializer
 
-TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 1000}
+TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 10000}
 
 
 def _send_sms(to, body):

@@ -146,7 +146,7 @@ constants/  tiers.ts          # ← THE authority on access control
 |------|----------|----------------|--------|-----------|---------|--------|
 | Consumer   | $49      | ≥ 24h  | ✗ | ✗ | ✗ | 0 |
 | Business   | $499     | ≥ 12h  | ✓ | ✗ | ✗ | 0 |
-| Enterprise | $250,000 | live   | ✓ | ✓ (1 token/search) | ✓ | 1000 |
+| Enterprise | $250,000 | live   | ✓ | ✓ (1 token/search) | ✓ | 10000 (5 users, shared) |
 
 Use `canAccess(tier, feature)` and `isDataAccessible(tier, dataAgeMs)` everywhere.
 Never hardcode a tier check anywhere else.
