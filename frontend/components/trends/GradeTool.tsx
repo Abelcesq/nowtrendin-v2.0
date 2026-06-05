@@ -6,15 +6,18 @@ import { GradientScoreRing } from '../ui/GradientScoreRing';
 import { useAuthStore } from '../../store/auth.store';
 import { TierID, canAccess } from '../../constants/tiers';
 import { queryApi } from '../../lib/api';
+import { GAP_BANDS, gapBandIndex } from '../../lib/signals';
 
 const STAGE_COLOR: Record<string, string> = {
   BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017', WATCHING: '#E85A1E', MONITORING: '#94A3B8',
 };
 
 interface Proposed {
-  detection_score: number; confidence_score: number; gradient_strength: number;
-  platform_diversity: number; inertia: number; stage: string; action: string;
-  reasoning: string; research: string; citations: string[];
+  detection_score: number; confidence_score: number; heisenberg_gap: number;
+  holistic_detection: number; holistic_confidence: number;
+  gradient_strength: number; platform_diversity: number; inertia: number;
+  dark_matter: number; persistence: number;
+  stage: string; action: string; reasoning: string; research: string; citations: string[];
 }
 
 // GRADE — AI internet-search a topic NOT in our data → PROPOSED Gradient Score
@@ -126,15 +129,35 @@ export function GradeTool() {
                 </View>
               </View>
 
+              {/* Gap interpretation — same bands as a regular signal */}
+              {(() => {
+                const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
+                const band = GAP_BANDS[gapBandIndex(gap)];
+                return (
+                  <View className="rounded-xl px-3 py-2 mb-3 border" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
+                    <Text className="text-sm font-bold" style={{ color: band.color }}>{gap}-point gap — {band.label}</Text>
+                  </View>
+                );
+              })()}
+
+              {/* Claude's holistic read, shown alongside the engine-calibrated score */}
+              <Text className="text-textMuted text-[11px] mb-3">
+                Engine-calibrated above · AI holistic estimate: DET {Math.round(result.holistic_detection)} · CONF {Math.round(result.holistic_confidence)}
+              </Text>
+
               {!!result.action && (
                 <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#1A1A2E' }}>{result.action}</Text>
               )}
               {!!result.reasoning && <Text className="text-textSecondary text-[13px] leading-5 mb-3">{result.reasoning}</Text>}
 
-              <View className="flex-row flex-wrap gap-x-5 gap-y-1 mb-3">
-                <Metric label="Niche concentration" value={result.gradient_strength} />
-                <Metric label="Platform diversity" value={result.platform_diversity} />
-                <Metric label="Momentum" value={result.inertia} />
+              {/* Signal Quality — component breakdown (same components as a signal) */}
+              <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal quality</Text>
+              <View className="gap-2 mb-3">
+                <Bar label="Niche Concentration" value={result.gradient_strength} />
+                <Bar label="Platform Diversity" value={result.platform_diversity} />
+                <Bar label="Momentum" value={result.inertia} />
+                <Bar label="Dark Matter" value={result.dark_matter} />
+                <Bar label="Persistence" value={result.persistence} />
               </View>
 
               {!!result.research && (
@@ -171,11 +194,17 @@ export function GradeTool() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Bar({ label, value }: { label: string; value: number }) {
+  const v = Math.max(0, Math.min(100, Math.round(value)));
   return (
     <View>
-      <Text className="text-textPrimary text-base font-black">{Math.round(value)}</Text>
-      <Text className="text-textMuted text-[9px] font-bold uppercase tracking-wide">{label}</Text>
+      <View className="flex-row justify-between mb-1">
+        <Text className="text-textSecondary text-sm">{label}</Text>
+        <Text className="text-textPrimary text-sm font-semibold">{v}</Text>
+      </View>
+      <View className="h-1.5 rounded-full bg-border overflow-hidden">
+        <View style={{ width: `${v}%`, backgroundColor: '#D4A017' }} className="h-full rounded-full" />
+      </View>
     </View>
   );
 }
