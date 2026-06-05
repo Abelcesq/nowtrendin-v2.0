@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Bell, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2 } from 'lucide-react-native';
+import { User, Bell, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2, Target } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { useAuthStore } from '../../../store/auth.store';
 import { TIERS, TierID } from '../../../constants/tiers';
@@ -53,6 +53,7 @@ export default function Profile() {
       <Row icon={<Bell size={18} color="#94A3B8" />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
       <Row icon={<CreditCard size={18} color="#94A3B8" />} label="Billing" />
       <Row icon={<Shield size={18} color="#94A3B8" />} label="Membership" onPress={() => router.push('/profile/membership')} />
+      <Row icon={<Target size={18} color="#94A3B8" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
       <Row icon={<FileText size={18} color="#94A3B8" />} label="Terms & Conditions" />

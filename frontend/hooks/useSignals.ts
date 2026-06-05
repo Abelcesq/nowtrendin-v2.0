@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -59,6 +59,22 @@ export function useRiskScores() {
     retry: 1,
   });
   return { risks: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
+}
+
+export function useAccuracy() {
+  const q = useQuery({ queryKey: ['accuracy'], queryFn: fetchAccuracy, staleTime: 5 * 60 * 1000, retry: 1 });
+  return { report: q.data, isLoading: q.isLoading, isError: q.isError };
+}
+
+export function useXSignal(topic: string | undefined, enabled: boolean) {
+  const q = useQuery({
+    queryKey: ['x-signal', topic],
+    queryFn: () => fetchXSignal(topic as string),
+    enabled: !!topic && enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  return { x: q.data, isLoading: q.isLoading };
 }
 
 export function useRisk(key: string | undefined) {

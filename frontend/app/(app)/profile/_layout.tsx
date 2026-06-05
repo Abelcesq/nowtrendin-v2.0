@@ -7,6 +7,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="membership" />
       <Stack.Screen name="edit" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="accuracy" />
     </Stack>
   );
 }

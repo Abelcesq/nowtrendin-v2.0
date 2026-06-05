@@ -161,6 +161,64 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
   }));
 }
 
+export interface AccuracyReport {
+  status: string;
+  total?: number;
+  led?: number;
+  lagged?: number;
+  hitRate?: number;
+  avgLead?: number;
+  medianLead?: number;
+  maxLead?: number;
+  best?: { topic: string; leadDays: number; multiple: number }[];
+}
+
+// The Accuracy Ledger — documented lead time vs Google Trends breakout.
+export async function fetchAccuracy(): Promise<AccuracyReport> {
+  const res = await fetch(`${GRADIENT_API}/accuracy/ledger`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Accuracy ${res.status}`);
+  const d = await res.json();
+  return {
+    status: d.status,
+    total: d.total_predictions,
+    led: d.led_count,
+    lagged: d.lagged_count,
+    hitRate: d.hit_rate_pct,
+    avgLead: d.avg_lead_time_days,
+    medianLead: d.median_lead_time_days,
+    maxLead: d.max_lead_time_days,
+    best: (d.best_predictions || []).map((b: any) => ({ topic: b.topic, leadDays: b.lead_days, multiple: b.multiple })),
+  };
+}
+
+export interface XSignal {
+  available: boolean;
+  role?: string;
+  stage?: string;
+  interpretation?: string;
+  intraGradient?: number;
+  velocity?: number;
+  xContribution?: number;
+}
+
+// Live X (Twitter) dual-role analysis for a topic (gated on X_BEARER_TOKEN).
+export async function fetchXSignal(topic: string): Promise<XSignal> {
+  const res = await fetch(`${GRADIENT_API}/signal-x/${encodeURIComponent(topic)}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) return { available: false };
+  const d = await res.json();
+  if (!d?.available) return { available: false };
+  const diff = d.diffusion || {};
+  return {
+    available: true,
+    role: d.x_role || diff.role,
+    stage: d.x_stage || diff.stage,
+    interpretation: diff.interpretation,
+    intraGradient: diff.intra_gradient,
+    velocity: diff.velocity,
+    xContribution: diff.x_contribution,
+  };
+}
+
 export interface ResearchHistory {
   trajectoryLabel?: string;
   summaryShort?: string;

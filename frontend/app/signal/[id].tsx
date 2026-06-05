@@ -9,6 +9,7 @@ import { DualScoreAnalysis } from '../../components/trends/DualScoreAnalysis';
 import { WhyScoresDiverge } from '../../components/trends/WhyScoresDiverge';
 import { ScoringHistory } from '../../components/trends/ScoringHistory';
 import { ResearchHistory } from '../../components/trends/ResearchHistory';
+import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES } from '../../lib/signals';
 
@@ -102,6 +103,10 @@ export default function SignalDetail() {
 
       {/* Research history (lazy) */}
       <ResearchHistory topicKey={signal.id} />
+      <View className="h-4" />
+
+      {/* X dual-role signal (lazy) */}
+      <XSignalPanel topic={signal.topic} />
       <View className="h-4" />
 
       {/* WHAT TO DO */}
