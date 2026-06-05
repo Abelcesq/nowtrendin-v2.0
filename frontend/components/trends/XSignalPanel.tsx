@@ -10,6 +10,14 @@ const ROLE_COLOR: Record<string, string> = {
   WEAK: '#9AA3B0',
 };
 
+const INTEGRITY_COLOR: Record<string, string> = {
+  AUTHENTIC: '#00C896',
+  MIXED: '#D4A017',
+  SUSPICIOUS: '#E85A1E',
+  MANUFACTURED: '#DC2626',
+  INSUFFICIENT_DATA: '#9AA3B0',
+};
+
 // Lazy X (Twitter) dual-role panel — fetches /signal-x/{topic} on expand.
 export function XSignalPanel({ topic }: { topic: string }) {
   const [open, setOpen] = useState(false);
@@ -54,6 +62,38 @@ export function XSignalPanel({ topic }: { topic: string }) {
                 </View>
               </View>
               {!!x.interpretation && <Text className="text-textSecondary text-[13px] leading-5">{x.interpretation}</Text>}
+
+              {/* Signal Integrity — genuine chatter vs bot/astroturf */}
+              {x.integrity && (
+                <View className="mt-3 pt-3 border-t border-border">
+                  <View className="flex-row items-center justify-between mb-1.5">
+                    <Text className="text-textMuted text-[9px] font-bold tracking-wider">SIGNAL INTEGRITY</Text>
+                    <View className="flex-row items-center gap-1.5">
+                      <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${INTEGRITY_COLOR[x.integrity.classification] ?? '#9AA3B0'}1A` }}>
+                        <Text className="text-[10px] font-bold" style={{ color: INTEGRITY_COLOR[x.integrity.classification] ?? '#9AA3B0' }}>
+                          {x.integrity.classification?.replace('_', ' ')}
+                        </Text>
+                      </View>
+                      <Text className="text-textPrimary text-xs font-black">{Math.round(x.integrity.score)}<Text className="text-textMuted text-[9px]">/100</Text></Text>
+                    </View>
+                  </View>
+                  <Text className="text-textSecondary text-[12px] leading-4">{x.integrity.summary}</Text>
+                  {x.integrity.multiplier < 1 && (
+                    <Text className="text-[11px] mt-1 font-semibold" style={{ color: INTEGRITY_COLOR[x.integrity.classification] ?? '#9AA3B0' }}>
+                      Dark-matter contribution discounted {Math.round((1 - x.integrity.multiplier) * 100)}%.
+                    </Text>
+                  )}
+                  {!!x.integrity.flags?.length && (
+                    <View className="mt-2 gap-0.5">
+                      {x.integrity.flags.slice(0, 4).map((f, i) => (
+                        <Text key={i} className="text-textMuted text-[10px] leading-4">
+                          <Text className="font-bold">[{f.source}]</Text> {f.flag}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
             </>
           )}
         </View>

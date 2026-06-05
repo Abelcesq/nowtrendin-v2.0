@@ -191,6 +191,15 @@ export async function fetchAccuracy(): Promise<AccuracyReport> {
   };
 }
 
+export interface SignalIntegrity {
+  score: number;
+  classification: string; // AUTHENTIC | MIXED | SUSPICIOUS | MANUFACTURED | INSUFFICIENT_DATA
+  multiplier: number;
+  summary: string;
+  components?: { network?: number; temporal?: number; account?: number; engagement?: number; incentiveRisk?: number };
+  flags?: { source: string; flag: string }[];
+}
+
 export interface XSignal {
   available: boolean;
   role?: string;
@@ -199,6 +208,7 @@ export interface XSignal {
   intraGradient?: number;
   velocity?: number;
   xContribution?: number;
+  integrity?: SignalIntegrity;
 }
 
 // Live X (Twitter) dual-role analysis for a topic (gated on X_BEARER_TOKEN).
@@ -208,6 +218,7 @@ export async function fetchXSignal(topic: string): Promise<XSignal> {
   const d = await res.json();
   if (!d?.available) return { available: false };
   const diff = d.diffusion || {};
+  const si = d.signal_integrity;
   return {
     available: true,
     role: d.x_role || diff.role,
@@ -216,6 +227,20 @@ export async function fetchXSignal(topic: string): Promise<XSignal> {
     intraGradient: diff.intra_gradient,
     velocity: diff.velocity,
     xContribution: diff.x_contribution,
+    integrity: si ? {
+      score: si.score,
+      classification: si.classification,
+      multiplier: si.multiplier,
+      summary: si.summary,
+      components: si.component_scores ? {
+        network: si.component_scores.network,
+        temporal: si.component_scores.temporal,
+        account: si.component_scores.account,
+        engagement: si.component_scores.engagement,
+        incentiveRisk: si.component_scores.incentive_risk,
+      } : undefined,
+      flags: Array.isArray(si.flags) ? si.flags.map((f: any) => ({ source: f.source, flag: f.flag })) : [],
+    } : undefined,
   };
 }
 
