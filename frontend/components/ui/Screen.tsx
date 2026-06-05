@@ -12,9 +12,19 @@ interface ScreenProps {
 }
 
 const isAndroid = Platform.OS === 'android';
+const isWeb = Platform.OS === 'web';
+
+// On web, constrain content to a readable column and center it so the app
+// doesn't stretch edge-to-edge on desktop monitors. No-op on native.
+const WEB_MAX_WIDTH = 760;
+const webContentStyle = isWeb
+  ? ({ width: '100%', maxWidth: WEB_MAX_WIDTH, alignSelf: 'center' } as const)
+  : undefined;
 
 export function Screen({ children, scroll = false, className = '', padded = true }: ScreenProps) {
   const padding = padded ? 'px-5' : '';
+  const webWrap = (node: React.ReactNode) =>
+    isWeb ? <View style={webContentStyle} className="flex-1">{node}</View> : node;
 
   // Pinch-to-zoom. iOS uses the ScrollView's native zoom; Android has none,
   // so we drive a transform scale via a pinch gesture.
@@ -37,20 +47,26 @@ export function Screen({ children, scroll = false, className = '', padded = true
   );
 
   if (!scroll) {
-    return frame(<View className={`flex-1 ${padding} ${className}`}>{children}</View>);
+    return frame(<View className={`flex-1 ${padding} ${className}`}>{webWrap(children)}</View>);
   }
 
   const sv = (
     <ScrollView
       className={`flex-1 ${padding} ${className}`}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, ...(isWeb ? { alignItems: 'center' } : null) }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       {...(isAndroid
         ? {}
         : { minimumZoomScale: 1, maximumZoomScale: 3, bouncesZoom: true, pinchGestureEnabled: true })}
     >
-      {isAndroid ? <Animated.View style={zoomStyle}>{children}</Animated.View> : children}
+      {isAndroid ? (
+        <Animated.View style={zoomStyle}>{children}</Animated.View>
+      ) : isWeb ? (
+        <View style={webContentStyle}>{children}</View>
+      ) : (
+        children
+      )}
     </ScrollView>
   );
 
