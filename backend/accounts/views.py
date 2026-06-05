@@ -198,6 +198,35 @@ class PullTrendsView(APIView):
         )
 
 
+class GradeView(APIView):
+    """Enterprise-only: AI-grade a topic not in our data (Perplexity research +
+    Claude synthesis), deducting one token only when a proposed score returns."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        if profile.tier != 'enterprise':
+            return Response({'detail': 'AI grading is an Enterprise feature.'}, status=403)
+        if (profile.tokens_remaining or 0) <= 0:
+            return Response({'detail': 'No query tokens remaining this month.'}, status=402)
+        topic = (str(request.data.get('topic') or '')).strip()
+        if not topic:
+            return Response({'detail': 'A topic is required.'}, status=400)
+
+        try:
+            r = requests.post(f'{GRADIENT_API}/grade', json={'topic': topic}, timeout=120)
+            data = r.json()
+        except Exception as exc:
+            return Response({'detail': f'AI grade engine unavailable: {exc}'}, status=503)
+
+        # Charge a token only when a proposed score actually came back.
+        if data.get('available') and data.get('proposed'):
+            profile.tokens_remaining = max(0, (profile.tokens_remaining or 0) - 1)
+            profile.save()
+        data['tokensRemaining'] = profile.tokens_remaining
+        return Response(data, status=200)
+
+
 def _notify_alert(alert, current):
     """Deliver a fired alert. Email now; push requires an Expo push token (dev build)."""
     user = alert.user
