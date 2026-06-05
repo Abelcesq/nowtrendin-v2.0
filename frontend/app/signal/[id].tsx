@@ -11,7 +11,7 @@ import { ScoringHistory } from '../../components/trends/ScoringHistory';
 import { ResearchHistory } from '../../components/trends/ResearchHistory';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES } from '../../lib/signals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex } from '../../lib/signals';
 
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,7 +45,9 @@ export default function SignalDetail() {
   const gap = scoreGap(signal);
   const action = actionFor(signal);
   const groups = breakdownGroups(signal);
-  const agree = gap <= 6;
+  // Use the SAME 0–15 threshold as the Gap Interpretation table (gapBandIndex 0)
+  // so the headline can't contradict the table on the same screen.
+  const agree = gapBandIndex(gap) === 0;
 
   return (
     <Screen scroll>
@@ -89,7 +91,7 @@ export default function SignalDetail() {
         </View>
         <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: agree ? '#00C89655' : '#2D7EEF55', backgroundColor: agree ? '#00C8960F' : '#2D7EEF0F' }}>
           <Text className="text-sm font-bold" style={{ color: agree ? '#009970' : '#2D7EEF' }}>
-            {gap}-point gap — {agree ? 'both models agree' : 'early stage, confirmation building'}
+            {gap}-point gap — {agree ? `scores aligned at ${signal.stage}` : 'early stage, confirmation building'}
           </Text>
           {!!signal.gapMeaning && (
             <Text className="text-textMuted text-xs mt-1 leading-5">{signal.gapMeaning}</Text>

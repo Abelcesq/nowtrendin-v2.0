@@ -14,7 +14,17 @@ function normalizeStage(raw: string | undefined): Stage {
   return 'MONITORING';
 }
 
+// Friendlier display names for specific engine component keys. "Gradient
+// Strength" is really the niche-vs-mainstream concentration ratio — labeling it
+// "Niche Concentration" stops it being confused with the headline Gradient Score
+// (Detection/Confidence are the composites; this is one input to them).
+const LABEL_OVERRIDES: Record<string, string> = {
+  gradient_strength: 'Niche Concentration',
+};
+
 function prettify(key: string): string {
+  const k = (key || '').toLowerCase();
+  if (LABEL_OVERRIDES[k]) return LABEL_OVERRIDES[k];
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

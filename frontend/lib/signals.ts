@@ -84,18 +84,18 @@ export const SCORE_ROLES = {
   detection: {
     color: '#2D7EEF',
     falsePositive: '~22% false positive · Speed',
-    who: 'Content creators, brand managers, trend-forward marketers. Speed creates value — accepts ~1 in 5 false alarms, confirmed by engine backtesting.',
+    who: 'Content creators, brand managers, trend-forward marketers. Speed creates value — accepts ~1 in 5 false alarms, based on the engine’s calibration model.',
   },
   confidence: {
     color: '#00C896',
     falsePositive: '<9% false positive · Precision',
-    who: 'Institutional analysts, strategic planners, investors. Precision over speed — requires 4+ sustained evidence windows, confirmed by engine backtesting.',
+    who: 'Institutional analysts, strategic planners, investors. Precision over speed — requires 4+ sustained evidence windows, based on the engine’s calibration model.',
   },
 } as const;
 
 // Gap interpretation bands — how early the signal is.
 export const GAP_BANDS = [
-  { max: 15, range: '0–15 pts', label: 'Both agree — high conviction either way', color: '#00C896' },
+  { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#00C896' },
   { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#D4A017' },
   { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#CF2A1B' },
   { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#8B5CF6' },
@@ -106,10 +106,13 @@ export function gapBandIndex(gap: number): number {
   return i < 0 ? GAP_BANDS.length - 1 : i;
 }
 
-// One-line gap meaning + tone for the card footer.
+// One-line gap meaning + tone for the card footer. Uses the SAME 0–15 threshold
+// as GAP_BANDS so the headline can never contradict the interpretation table.
+// "Agree" means the two scores are aligned (not in conflict) — NOT that the
+// signal is strong; a low-but-aligned signal is agreement that it's early.
 export function gapInsight(gap: number): { text: string; agree: boolean } {
-  return gap <= 6
-    ? { text: 'Both scores agree — high conviction signal', agree: true }
+  return gap <= 15
+    ? { text: 'Scores aligned — agreement on where this sits, not that it’s strong', agree: true }
     : { text: 'Confirmation building — 24–72h to alignment', agree: false };
 }
 
