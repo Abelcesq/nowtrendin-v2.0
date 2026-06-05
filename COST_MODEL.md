@@ -97,14 +97,13 @@ at 1am/1pm). When those background jobs run together they saturate the single
 512 MB / shared-CPU dyno and `/scores` times out (observed live). At hedge-fund
 concurrency this is the #1 reliability risk. Fixes below, in priority order.
 
-### Priority 1 — Separate background work from web serving (architecture, ~$7–25/mo)
-Move the scheduler to its **own worker dyno** so collection/scoring/scans never
-block API requests. This is the single biggest reliability win — more than raw
-size.
-- Add a `worker` process to the Procfile that runs the scheduler loop; remove
-  the in-process APScheduler from the web dyno.
-- Web dyno then only serves requests → no contention.
-- Cost: +1 Basic worker ($7) or Standard-1X ($25).
+### Priority 1 — Separate background work from web serving ✅ DONE (+$7/mo)
+**Implemented.** The scheduler now runs on a dedicated **worker dyno**
+(`worker: --mode=worker`); the web dyno serves only requests (it prints
+"Scheduler NOT started on web dyno"). This removed the collect/scan-vs-web
+contention that caused `/scores` timeouts. Verified: web uncontended, `/scores`
+~0.35s cached. Cost: +1 Basic worker ($7/mo). Toggle back with
+`RUN_SCHEDULER_IN_WEB=1` for single-dyno/dev.
 
 ### Priority 2 — Upsize the web tier (concurrency + HA)
 | Tier | RAM | $/mo | When |
