@@ -127,6 +127,11 @@ export interface RiskScore {
   maturity: string;
   maturityNote: string;
   components: Record<string, number>;
+  baselineSignals?: number;
+  baselineCycles?: number;
+  abnormality?: number;     // % above (or below) the topic's own baseline
+  baselineStatus?: string;  // INSUFFICIENT_HISTORY | BELOW_BASELINE | AT_BASELINE | ELEVATED_VS_SELF | SPIKE_VS_SELF
+  baselineNote?: string;
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -158,6 +163,11 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     maturity: r.maturity || '',
     maturityNote: r.maturity_note || '',
     components: r.components && typeof r.components === 'object' ? r.components : {},
+    baselineSignals: r.baseline_signals != null ? Number(r.baseline_signals) : undefined,
+    baselineCycles: r.baseline_cycles != null ? Number(r.baseline_cycles) : undefined,
+    abnormality: r.abnormality != null ? Number(r.abnormality) : undefined,
+    baselineStatus: r.baseline_status || undefined,
+    baselineNote: r.baseline_note || undefined,
   }));
 }
 

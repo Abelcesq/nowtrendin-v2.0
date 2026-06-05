@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ShieldAlert, Globe, Clock, Info } from 'lucide-react-native';
+import { ChevronLeft, ShieldAlert, Globe, Clock, Info, Activity } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
 import { useRisk } from '../../hooks/useSignals';
@@ -11,6 +11,14 @@ const STAGE_COLOR: Record<string, string> = {
 
 const MATURITY_COLOR: Record<string, string> = {
   ESTABLISHED: '#2D7EEF', MACRO: '#8B5CF6', EMERGING: '#D4A017',
+};
+
+const BASELINE_META: Record<string, { color: string; label: string }> = {
+  SPIKE_VS_SELF:        { color: '#CF2A1B', label: 'Spike vs. own baseline' },
+  ELEVATED_VS_SELF:     { color: '#E85A1E', label: 'Elevated vs. own baseline' },
+  AT_BASELINE:          { color: '#00C896', label: 'At its own baseline' },
+  BELOW_BASELINE:       { color: '#9AA3B0', label: 'Below its own baseline' },
+  INSUFFICIENT_HISTORY: { color: '#9AA3B0', label: 'Building baseline' },
 };
 
 const PIPELINE = [
@@ -108,14 +116,46 @@ export default function RiskDetail() {
           <Text className="text-sm font-bold" style={{ color: matColor }}>{risk.maturity || 'UNCLASSIFIED'}</Text>
         </View>
         <Text className="text-textSecondary text-[13px] leading-5">{risk.maturityNote}</Text>
-        <View className="flex-row items-start gap-2 mt-3 pt-3 border-t border-border">
-          <Info size={13} color="#9AA3B0" />
-          <Text className="text-textMuted text-[11px] leading-4 flex-1">
-            We began continuous monitoring recently. Until 2+ collection cycles accumulate, the score reflects
-            current positioning intensity — not confirmed acceleration vs. this name's long-run baseline.
-          </Text>
-        </View>
       </View>
+
+      {/* Abnormal-vs-own-baseline — emerging vs. always-present */}
+      {!!risk.baselineStatus && (() => {
+        const bm = BASELINE_META[risk.baselineStatus!] ?? BASELINE_META.INSUFFICIENT_HISTORY;
+        const insufficient = risk.baselineStatus === 'INSUFFICIENT_HISTORY';
+        const abn = risk.abnormality ?? 0;
+        const abnLabel = abn > 0 ? `+${abn}%` : `${abn}%`;
+        return (
+          <>
+            <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Vs. its own baseline</Text>
+            <View className="bg-surface rounded-2xl border p-4 mb-5" style={{ borderColor: `${bm.color}55` }}>
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center gap-2">
+                  <Activity size={14} color={bm.color} />
+                  <Text className="text-sm font-bold" style={{ color: bm.color }}>{bm.label}</Text>
+                </View>
+                {!insufficient && (
+                  <Text className="text-lg font-black" style={{ color: bm.color }}>{abnLabel}</Text>
+                )}
+              </View>
+              {!insufficient && (
+                <Text className="text-textMuted text-[11px] mb-2">
+                  Now {risk.totalSignals} signals vs. a {risk.baselineSignals}-signal baseline over{' '}
+                  {risk.baselineCycles} prior cycles.
+                </Text>
+              )}
+              <Text className="text-textSecondary text-[13px] leading-5">{risk.baselineNote}</Text>
+              <View className="flex-row items-start gap-2 mt-3 pt-3 border-t border-border">
+                <Info size={13} color="#9AA3B0" />
+                <Text className="text-textMuted text-[11px] leading-4 flex-1">
+                  Established names carry routine insider / 8-K activity every cycle, so absolute counts always
+                  look elevated. This compares the topic against ITS OWN history — only an abnormal rise above
+                  its baseline marks a genuinely emerging risk.
+                </Text>
+              </View>
+            </View>
+          </>
+        );
+      })()}
 
       {/* Why this matters */}
       {!!risk.interpretation && (
