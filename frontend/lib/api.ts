@@ -37,6 +37,8 @@ export const queryApi = {
   run: (topic: string) => api.post('/api/query/', { topic }),
   // Enterprise "Pull Trends" — fresh collect+score run (token-metered) → { status, message, tokensRemaining }
   pullTrends: () => api.post('/api/pull-trends/', {}),
+  // Enterprise AI Grade — web research + proposed score (token-metered)
+  grade: (topic: string) => api.post('/api/grade/', { topic }),
 };
 
 export const alertsApi = {
