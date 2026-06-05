@@ -144,15 +144,18 @@ constants/  tiers.ts          # ← THE authority on access control
 
 | Tier | Price/mo | Data freshness | Search | New query | Sources | Tokens |
 |------|----------|----------------|--------|-----------|---------|--------|
-| Consumer   | $49     | ≥ 1h   | ✗ | ✗ | ✗ | 0 |
-| Business   | $499    | ≥ 30m  | ✓ | ✗ | ✗ | 0 |
-| Enterprise | $25,000 | live   | ✓ | ✓ | ✓ | 1000 |
+| Consumer   | $49      | ≥ 24h  | ✗ | ✗ | ✗ | 0 |
+| Business   | $499     | ≥ 12h  | ✓ | ✗ | ✗ | 0 |
+| Enterprise | $250,000 | live   | ✓ | ✓ (1 token/search) | ✓ | 1000 |
 
 Use `canAccess(tier, feature)` and `isDataAccessible(tier, dataAgeMs)` everywhere.
 Never hardcode a tier check anywhere else.
 
-**Data-aging waterfall:** a new score is Enterprise-only at first → at 30 min it
-becomes visible to Business → at 1 h to Consumer → (future) at 1 day to partners.
+**Data-aging waterfall:** a new score is Enterprise-only at first (live, the moment
+it is obtained) → at 12 h it becomes visible to Business → at 24 h to Consumer →
+(future) at 1 day+ to partners. X data is pulled twice daily (1am & 1pm Pacific)
+to feed the 12 h Business window. Consumer/Business cannot run queries; Enterprise
+can run direct queries at 1 token per search.
 Enforced purely by `dataFreshness` + `isDataAccessible(tier, age)` on the score's age.
 **Retention:** engine persists all scores in Postgres (≥30-day history); monthly
 research snapshots for a year are a planned backend job.

@@ -7,7 +7,7 @@ export const TIERS = {
     name: 'Consumer',
     price: 49,
     colour: '#2D7EEF',
-    dataFreshness: 1 * 60 * 60 * 1000, // 1h in ms — can only see data >= 1h old
+    dataFreshness: 24 * 60 * 60 * 1000, // 24h in ms — can only see data >= 24h old
     canSearch: false,
     canQueryNew: false,
     canAccessGradientScore: true,
@@ -15,15 +15,15 @@ export const TIERS = {
     canEditSources: false,
     canDirectSearch: false,
     apiTokens: 0,
-    description: 'Trend history access (1h+).',
+    description: 'Trend history access (24h+).',
     features: [
-      'Gradient Score history (1h+)',
+      'Gradient Score history (24h+)',
       'Trend monitoring feed',
       'Email + push alerts',
       'All signal categories',
     ],
     restrictions: [
-      'Cannot access signals less than 1 hour old',
+      'Cannot access signals less than 24 hours old',
       'Cannot query new trend topics',
     ],
   },
@@ -32,7 +32,7 @@ export const TIERS = {
     name: 'Business',
     price: 499,
     colour: '#00C896',
-    dataFreshness: 30 * 60 * 1000, // 30m in ms
+    dataFreshness: 12 * 60 * 60 * 1000, // 12h in ms
     canSearch: true,
     canQueryNew: false,
     canAccessGradientScore: true,
@@ -40,25 +40,25 @@ export const TIERS = {
     canEditSources: false,
     canDirectSearch: false,
     apiTokens: 0,
-    description: 'Near-real-time trend intelligence for teams.',
+    description: 'Twice-daily trend intelligence for teams (12h+).',
     features: [
       'Everything in Consumer',
-      'Gradient Score history (30m+)',
+      'Gradient Score history (12h+)',
       'Full signal search + filter',
       'Business analytics',
       'Team sharing',
     ],
     restrictions: [
-      'Cannot access signals less than 30 minutes old',
+      'Cannot access signals less than 12 hours old',
       'Cannot query new trend topics',
     ],
   },
   enterprise: {
     id: 'enterprise' as const,
     name: 'Enterprise',
-    price: 25000,
+    price: 250000,
     colour: '#D4A017',
-    dataFreshness: 0, // real-time
+    dataFreshness: 0, // live — data available as soon as it is obtained
     canSearch: true,
     canQueryNew: true,
     canAccessGradientScore: true,
@@ -66,17 +66,18 @@ export const TIERS = {
     canEditSources: true,
     canDirectSearch: true,
     apiTokens: 1000,
-    description: 'Full real-time access + live queries.',
+    tokenCostPerSearch: 1,
+    description: 'Live access the moment data is obtained + token-based queries.',
     features: [
-      'Real-time Gradient Score (live)',
-      'Direct topic query (tokenised)',
+      'Live Gradient Score (data the moment it is obtained)',
+      'Direct topic query — 1 token per search',
       'Edit data source weights',
       'Custom alert thresholds',
       'API access',
       '1,000 query tokens/month',
     ],
     restrictions: [
-      'Token-based queries (1,000/month)',
+      'Each search query costs 1 token (1,000/month)',
       'All search results proprietary to Now TrendIn',
     ],
   },

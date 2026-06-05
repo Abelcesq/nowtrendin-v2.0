@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Zap, Briefcase, Building2, Check, X } from 'lucide-react-native';
 import { Button } from '../ui/Button';
 import { TIERS, TierID } from '../../constants/tiers';
@@ -24,7 +24,6 @@ function TierCard({
   const tier = TIERS[tierId];
   const Icon = TIER_ICONS[tierId];
   const isPopular = tierId === 'business';
-  const isEnterprise = tierId === 'enterprise';
 
   return (
     <TouchableOpacity
@@ -47,7 +46,7 @@ function TierCard({
           <View>
             <Text className="text-textPrimary font-bold text-lg">{tier.name}</Text>
             <Text style={{ color: tier.colour }} className="text-sm font-medium">
-              {isEnterprise ? 'Contact for pricing' : `$${tier.price.toLocaleString()}/month`}
+              {`$${tier.price.toLocaleString()}/month`}
             </Text>
           </View>
         </View>
@@ -74,7 +73,7 @@ function TierCard({
       </View>
 
       <Button variant={tierId} size="md" onPress={onAction}>
-        {isEnterprise ? 'Contact Sales' : `Start ${tier.name} Plan`}
+        {`Start ${tier.name} Plan`}
       </Button>
     </TouchableOpacity>
   );
@@ -85,10 +84,6 @@ export function MembershipPlans({ onChoose }: { onChoose: (tier: TierID) => void
   const [selected, setSelected] = useState<TierID>('business');
 
   const choose = (tierId: TierID) => {
-    if (tierId === 'enterprise') {
-      Linking.openURL('mailto:enterprise@nowtrendin.com?subject=Enterprise%20Access');
-      return;
-    }
     onChoose(tierId);
   };
 
