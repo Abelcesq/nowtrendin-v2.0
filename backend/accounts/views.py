@@ -163,6 +163,41 @@ class DirectQueryView(APIView):
         return Response(data, status=200)
 
 
+class PullTrendsView(APIView):
+    """Enterprise-only: trigger a fresh trend collection + scoring run on the
+    engine, deducting one query token. Mirrors the per-search token model so a
+    'Pull Trends' costs exactly 1 token, same as a direct query."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        if profile.tier != 'enterprise':
+            return Response({'detail': 'Pulling trends is an Enterprise feature.'}, status=403)
+        if (profile.tokens_remaining or 0) <= 0:
+            return Response({'detail': 'No query tokens remaining this month.'}, status=402)
+
+        try:
+            # /collect returns immediately; the engine runs the pipeline in the
+            # background. We charge the token once the run is accepted.
+            r = requests.post(f'{GRADIENT_API}/collect', timeout=30)
+            ok = r.status_code in (200, 202)
+        except Exception as exc:
+            return Response({'detail': f'Scoring engine unavailable: {exc}'}, status=503)
+
+        if not ok:
+            return Response({'detail': 'Engine did not accept the collection request.'},
+                            status=502)
+
+        profile.tokens_remaining = max(0, (profile.tokens_remaining or 0) - 1)
+        profile.save()
+        return Response(
+            {'status': 'started',
+             'message': 'Trend collection running. New scores appear shortly.',
+             'tokensRemaining': profile.tokens_remaining},
+            status=200,
+        )
+
+
 def _notify_alert(alert, current):
     """Deliver a fired alert. Email now; push requires an Expo push token (dev build)."""
     user = alert.user
