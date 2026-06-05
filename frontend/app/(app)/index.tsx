@@ -8,6 +8,7 @@ import { RiskCard } from '../../components/trends/RiskCard';
 import { RiskExplainer } from '../../components/trends/RiskExplainer';
 import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
+import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, scoreGap } from '../../lib/signals';
@@ -134,6 +135,9 @@ export default function Dashboard() {
           style={{ color: '#1A1A2E' }}
         />
       </View>
+
+      {/* Enterprise: token-metered Pull Trends (renders only for enterprise tier) */}
+      <PullTrendsButton />
 
       {/* Filter chips — fixed-height row so the pills can't stretch */}
       <View style={{ height: 40 }} className="mb-4">

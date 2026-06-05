@@ -35,6 +35,8 @@ export const api = {
 export const queryApi = {
   // Enterprise direct topic query (token-metered) → { found, result, tokensRemaining, detail }
   run: (topic: string) => api.post('/api/query/', { topic }),
+  // Enterprise "Pull Trends" — fresh collect+score run (token-metered) → { status, message, tokensRemaining }
+  pullTrends: () => api.post('/api/pull-trends/', {}),
 };
 
 export const alertsApi = {
