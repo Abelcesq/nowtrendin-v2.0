@@ -9,6 +9,7 @@ import { RiskExplainer } from '../../components/trends/RiskExplainer';
 import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
+import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, scoreGap } from '../../lib/signals';
@@ -39,7 +40,7 @@ export default function Dashboard() {
 
   const { accessible, lockedCount, isLoading, isSample, refetch } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
-  const [mode, setMode] = useState<'attention' | 'risk'>('attention');
+  const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
@@ -102,19 +103,23 @@ export default function Dashboard() {
         </View>
       </View>
 
-      {/* Attention | Risk toggle */}
+      {/* Trends | Other | Grade toggle */}
       <View className="flex-row bg-surface rounded-xl border border-border p-1 mb-4">
-        {(['attention', 'risk'] as const).map((m) => {
-          const on = mode === m;
+        {([
+          { k: 'attention', label: 'Trends', color: '#00C896' },
+          { k: 'risk', label: 'Other', color: '#CF2A1B' },
+          { k: 'grade', label: 'Grade', color: '#D4A017' },
+        ] as const).map((t) => {
+          const on = mode === t.k;
           return (
             <TouchableOpacity
-              key={m}
-              onPress={() => setMode(m)}
+              key={t.k}
+              onPress={() => setMode(t.k)}
               className="flex-1 rounded-lg py-2 items-center"
-              style={{ backgroundColor: on ? (m === 'risk' ? '#CF2A1B' : '#00C896') : 'transparent' }}
+              style={{ backgroundColor: on ? t.color : 'transparent' }}
             >
               <Text className="text-xs font-bold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
-                {m === 'attention' ? 'Attention' : 'Risk'}
+                {t.label}
               </Text>
             </TouchableOpacity>
           );
@@ -129,7 +134,7 @@ export default function Dashboard() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search trends..."
+          placeholder="Search Current Trends"
           placeholderTextColor="#9AA3B0"
           className="flex-1 ml-3 text-textPrimary text-base"
           style={{ color: '#1A1A2E' }}
@@ -224,20 +229,22 @@ export default function Dashboard() {
         </>
       )}
 
+      {mode === 'grade' && <GradeTool />}
+
       {mode === 'risk' && (
         <>
           {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
 
           <View className="flex-row items-center gap-2 mb-2">
             <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />
-            <Text className="text-textPrimary text-xl font-black">Risk Signals</Text>
+            <Text className="text-textPrimary text-xl font-black">Other Signals</Text>
             <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
               <Text className="text-textMuted text-[11px] font-bold">{accessibleRisks.length}</Text>
             </View>
             <Text className="text-textMuted text-[10px] ml-auto">{dataWindowLabel(tier)}</Text>
           </View>
           <Text className="text-textMuted text-[11px] mb-3">
-            Emerging financial risks scored by diffusion stage — early smart-money positioning ranks highest.
+            Emerging items scored by diffusion stage — early smart-money positioning ranks highest.
           </Text>
           {riskLoading ? (
             <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />

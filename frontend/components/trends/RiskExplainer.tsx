@@ -9,10 +9,10 @@ export function RiskExplainer({ onDismiss }: { onDismiss: () => void }) {
     <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: '#E85A1E12', borderWidth: 1, borderColor: '#E85A1E40' }}>
       <View className="flex-row items-center gap-2 mb-2">
         <ShieldAlert size={18} color="#E85A1E" />
-        <Text className="font-bold text-base" style={{ color: '#E85A1E' }}>Risk Mode</Text>
+        <Text className="font-bold text-base" style={{ color: '#E85A1E' }}>Other Items</Text>
       </View>
       <Text className="text-textSecondary text-sm leading-5 mb-2">
-        Risk mode scores emerging financial risks before they're priced in. A high score means smart money
+        Scores emerging financial items before they're priced in. A high score means smart money
         is positioning early — detected from public SEC filings, Federal Reserve data, and official APIs.
         Every signal shows its sources for full transparency.
       </Text>
