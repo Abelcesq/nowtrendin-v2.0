@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/storage';
 import { fetchMe, logout } from '../../lib/auth';
 import { useAuthStore } from '../../store/auth.store';
 

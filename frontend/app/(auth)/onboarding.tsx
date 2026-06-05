@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { View, Text, useWindowDimensions, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TrendingUp, Activity, Building2 } from 'lucide-react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../../lib/storage';
 import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 

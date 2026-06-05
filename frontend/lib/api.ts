@@ -1,6 +1,6 @@
 // Real API client for Now TrendIn 2.0 (Django on Heroku).
 // Phase 1 uses mock auth (see lib/auth.ts) — these endpoints are wired in a later phase.
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './storage';
 
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||

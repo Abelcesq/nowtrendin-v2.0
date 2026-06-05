@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../lib/storage';
 import type { TierID } from '../constants/tiers';
 
 export interface User {

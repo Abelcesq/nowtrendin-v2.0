@@ -1,5 +1,5 @@
 // Real auth — talks to the Django JWT backend (lib/api.ts).
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './storage';
 import { api } from './api';
 import type { User } from '../store/auth.store';
 import type { TierID } from '../constants/tiers';
