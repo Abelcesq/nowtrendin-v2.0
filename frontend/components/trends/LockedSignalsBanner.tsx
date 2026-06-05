@@ -15,7 +15,11 @@ export function LockedSignalsBanner({ tier, lockedCount }: { tier: TierID; locke
   if (!next) return null;
 
   const cfg = TIERS[next];
-  const window = next === 'enterprise' ? 'real-time live' : '30m+';
+  // Derive the freshness label from the tier's actual dataFreshness window
+  // (0 = live, otherwise N hours) so it never drifts from constants/tiers.ts.
+  const window = cfg.dataFreshness === 0
+    ? 'live, real-time'
+    : `${Math.round(cfg.dataFreshness / (60 * 60 * 1000))}h-fresh`;
 
   return (
     <View
