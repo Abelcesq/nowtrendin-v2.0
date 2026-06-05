@@ -30,7 +30,7 @@ const PIPELINE = [
 ] as const;
 
 const COMPONENT_LABELS: Record<string, string> = {
-  gradient_strength: 'Gradient (niche vs mainstream)',
+  gradient_strength: 'Niche Concentration',
   dark_matter: 'Dark matter (insider positioning)',
   inertia: 'Inertia (acceleration)',
   medium_sequence: 'Diffusion (cross-stage)',
