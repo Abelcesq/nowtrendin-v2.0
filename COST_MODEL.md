@@ -86,3 +86,61 @@ _Last updated: 2026-06-05_
 - Apify per-run cost (check Apify usage dashboard for $/run).
 - X Pay-Per-Use exact per-read rate (effective Jun 21).
 - Heroku dyno tier needed at N concurrent funds (load-test).
+
+---
+
+## 6. Infrastructure scaling spec (Heroku)
+
+**Why:** today the engine runs **everything on one Basic web dyno** — the FastAPI
+server AND the in-process APScheduler (collect every 30 min, risk cycle, X scan
+at 1am/1pm). When those background jobs run together they saturate the single
+512 MB / shared-CPU dyno and `/scores` times out (observed live). At hedge-fund
+concurrency this is the #1 reliability risk. Fixes below, in priority order.
+
+### Priority 1 — Separate background work from web serving (architecture, ~$7–25/mo)
+Move the scheduler to its **own worker dyno** so collection/scoring/scans never
+block API requests. This is the single biggest reliability win — more than raw
+size.
+- Add a `worker` process to the Procfile that runs the scheduler loop; remove
+  the in-process APScheduler from the web dyno.
+- Web dyno then only serves requests → no contention.
+- Cost: +1 Basic worker ($7) or Standard-1X ($25).
+
+### Priority 2 — Upsize the web tier (concurrency + HA)
+| Tier | RAM | $/mo | When |
+|---|---|---|---|
+| Basic (today) | 512 MB | $7 | dev / pre-launch |
+| Standard-1X | 512 MB, better CPU, **metrics + autoscale** | $25 | first paying account |
+| Standard-2X | 1 GB | $50 | a few concurrent accounts |
+| Performance-M | 2.5 GB, dedicated | $250 | many funds / heavy polling |
+- Run **2× web dynos** (any Standard+ tier) for horizontal concurrency + zero-downtime deploys. Standard tiers support **autoscaling** on request latency.
+
+### Priority 3 — Upgrade Postgres (engine)
+| Plan | RAM cache | Conns | $/mo | When |
+|---|---|---|---|---|
+| essential-0 (today) | shared, **CPU-throttled** | 20 | $5 | dev |
+| essential-2 | shared | 40 | $25 | bridge |
+| **standard-0** | 4 GB, **no throttle**, metrics | 120 | $50 | **recommended at launch** |
+| standard-2 | 8 GB | 400 | $200 | scale |
+- Data is only ~50 MB, so size isn't the driver — **CPU throttling + connection
+  count** are. standard-0 removes the throttle and adds the metrics needed to
+  watch load. Same for the Django backend Postgres when user volume grows.
+
+### Recommended launch baseline (first hedge-fund accounts)
+| Component | Plan | $/mo |
+|---|---|---|
+| Engine web | Standard-1X × 2 | 50 |
+| Engine worker (scheduler) | Standard-1X | 25 |
+| Engine Postgres | standard-0 | 50 |
+| Backend web | Standard-1X | 25 |
+| Backend Postgres | essential-2 → standard-0 | 25–50 |
+| **Total** | | **~$175–200/mo** |
+
+**Margin impact:** ~$200/mo infra vs **$250,000/account** = **<0.1%**. Even a
+Performance-M build (~$700/mo) is rounding error against revenue — upgrade freely;
+reliability matters more than the line item. The 80% floor is untouched.
+
+### Trigger metrics (when to upsize)
+- Heroku dyno **memory > 80%** or **load (load avg/#cores) > 1** sustained → bigger dyno.
+- Router **H12 timeouts** appearing → add a dyno or move work to worker (P1).
+- Postgres **CPU throttle events** or conns near cap → upgrade plan.
