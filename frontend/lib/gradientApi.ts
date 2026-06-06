@@ -20,6 +20,7 @@ function normalizeStage(raw: string | undefined): Stage {
 // (Detection/Confidence are the composites; this is one input to them).
 const LABEL_OVERRIDES: Record<string, string> = {
   gradient_strength: 'Niche Concentration',
+  nowtrendin_demand: 'Now Trending (internal demand)',
 };
 
 function prettify(key: string): string {
@@ -28,7 +29,7 @@ function prettify(key: string): string {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function mapGroups(cg: any): BreakdownGroup[] | undefined {
+function mapGroups(cg: any, nVal?: number): BreakdownGroup[] | undefined {
   if (!cg || typeof cg !== 'object') return undefined;
   const groups: BreakdownGroup[] = [];
   for (const groupKey of Object.keys(cg)) {
@@ -36,6 +37,14 @@ function mapGroups(cg: any): BreakdownGroup[] | undefined {
     if (!g) continue;
     const items = Object.keys(g.components || {}).map((compKey) => {
       const c = g.components[compKey];
+      // The "now trending" N component (internal app demand) is computed and
+      // served on every row as `nowtrendin_score`, but the engine's
+      // component_groups structure still carries it as a hardcoded 0/pending
+      // placeholder. Splice the real value in so it surfaces in the breakdown.
+      if (compKey === 'nowtrendin_demand' && nVal != null && nVal > 0) {
+        const v = Math.round(Number(nVal));
+        return { label: prettify(compKey), value: v, conf: v, desc: c?.desc || undefined };
+      }
       return {
         label: prettify(compKey),
         value: Math.round(Number(c?.det ?? 0)),
@@ -80,8 +89,28 @@ export function mapSignal(r: any): Signal {
     why: r.why_this_matters || undefined,
     whatToWatch: r.what_to_watch || undefined,
     platforms: Array.isArray(r.platforms_active) ? r.platforms_active : [],
-    groups: mapGroups(r.component_groups),
+    groups: mapGroups(r.component_groups, r.nowtrendin_score != null ? Number(r.nowtrendin_score) : undefined),
+    nowTrending: r.nowtrendin_score != null ? Math.round(Number(r.nowtrendin_score)) : undefined,
     aiTierLabel: r.ai_tier_label || undefined,
+    aiTier: r.ai_tier || undefined,
+    aiTierColour: r.ai_tier_colour || undefined,
+    aiClassification: r.ai_classification || undefined,
+    aiVelocity: r.ai_velocity_signal || undefined,
+    scoreExplanation: typeof r.score_explanation === 'string' ? r.score_explanation : undefined,
+    variations: Array.isArray(r.variations)
+      ? r.variations.map((v: any) => ({
+          topicKey: String(v.topic_key ?? ''),
+          display: v.display ?? v.topic_key ?? '',
+          tier: v.tier ?? undefined,
+          tierLabel: v.tier_label ?? undefined,
+          tierColour: v.tier_colour ?? undefined,
+          velocity: v.velocity ?? undefined,
+          typicalDetection: Math.round(Number(v.typical_detection ?? 0)),
+          typicalConfidence: Math.round(Number(v.typical_confidence ?? 0)),
+          isQueried: Boolean(v.is_queried),
+          whyDifferent: v.why_different || undefined,
+        }))
+      : undefined,
     totalMentions: r.total_mentions != null ? Number(r.total_mentions) : undefined,
     timesScored: r.times_scored != null ? Number(r.times_scored) : undefined,
     isAnomaly: Boolean(r.is_anomaly ?? r.is_gravitational_anomaly),

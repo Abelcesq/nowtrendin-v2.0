@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronDown, ChevronUp, Bell } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, ChevronUp, Bell, Flame } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Button } from '../../components/ui/Button';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
@@ -10,9 +10,10 @@ import { WhyScoresDiverge } from '../../components/trends/WhyScoresDiverge';
 import { ScoringHistory } from '../../components/trends/ScoringHistory';
 import { ResearchHistory } from '../../components/trends/ResearchHistory';
 import { TopicResearch } from '../../components/trends/TopicResearch';
+import { TopicVariationMap } from '../../components/trends/TopicVariationMap';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex } from '../../lib/signals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex } from '../../lib/signals';
 
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,9 +60,30 @@ export default function SignalDetail() {
 
       <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>
       <Text className="text-textPrimary text-3xl font-bold mt-0.5">{signal.topic}</Text>
+
+      {/* AI tier badge — only for taxonomy-recognized AI topics */}
+      {!!signal.aiTierLabel && (
+        <View
+          className="self-start rounded-full px-2.5 py-1 mt-1.5"
+          style={{ backgroundColor: `${tierColourHex(signal.aiTierColour)}1A` }}
+        >
+          <Text className="text-[10px] font-bold" style={{ color: tierColourHex(signal.aiTierColour) }}>
+            {signal.aiTierLabel}{signal.aiVelocity ? ` · ${signal.aiVelocity}` : ''}
+          </Text>
+        </View>
+      )}
       <Text className="text-textMuted text-sm mb-4">
         {signal.totalMentions ?? 0} signals · {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
       </Text>
+
+      {/* Now Trending — internal app demand (the N component) */}
+      {signal.nowTrending != null && signal.nowTrending > 0 && (
+        <View className="flex-row items-center gap-1.5 self-start rounded-full px-3 py-1.5 mb-4 bg-primary/10 border border-primary/30">
+          <Flame size={14} color="#00C896" />
+          <Text className="text-primaryDk text-xs font-bold">Now Trending {signal.nowTrending}</Text>
+          <Text className="text-textMuted text-[11px]">· internal demand</Text>
+        </View>
+      )}
 
       {/* Tagline */}
       <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
@@ -99,6 +121,16 @@ export default function SignalDetail() {
           )}
         </View>
       </View>
+
+      {/* AI score explanation — why this taxonomy topic scores where it does */}
+      {!!signal.scoreExplanation && (
+        <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
+          <Text className="text-textSecondary text-sm leading-5">{signal.scoreExplanation}</Text>
+        </View>
+      )}
+
+      {/* AI Variation Map — "AI" umbrella vs specific variations like "agentic coding" */}
+      <TopicVariationMap variations={signal.variations} />
 
       {/* Research — AI plain-English explanation of what this trend means */}
       <TopicResearch topicKey={signal.id} topicName={signal.topic} />

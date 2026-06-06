@@ -33,6 +33,31 @@ export interface WhatToDo {
   detail?: string;
 }
 
+// One entry in the AI variation map (e.g. "AI"=20 vs "agentic coding"=97).
+export interface TopicVariation {
+  topicKey: string;
+  display: string;
+  tier?: string;
+  tierLabel?: string;
+  tierColour?: string;
+  velocity?: string;
+  typicalDetection: number;
+  typicalConfidence: number;
+  isQueried?: boolean;
+  whyDifferent?: string;
+}
+
+// Map AI taxonomy colour names → design palette hex.
+export function tierColourHex(name?: string): string {
+  switch ((name || '').toLowerCase()) {
+    case 'green': return '#00C896';
+    case 'blue': return '#2D7EEF';
+    case 'gray': case 'grey': return '#94A3B8';
+    case 'muted': return '#9AA3B0';
+    default: return '#5B6472';
+  }
+}
+
 export interface Signal {
   id: string;
   topic: string;
@@ -56,6 +81,15 @@ export interface Signal {
   totalMentions?: number;
   timesScored?: number;
   isAnomaly?: boolean;
+  // N component — "Now Trending" internal app demand (0–100), from query frequency.
+  nowTrending?: number;
+  // AI Topic Intelligence (present only for taxonomy-recognized AI topics)
+  aiTier?: string;           // tier_1 | tier_2 | tier_3 | tier_4
+  aiTierColour?: string;     // green | blue | gray | muted
+  aiClassification?: string;
+  aiVelocity?: string;       // ACCELERATING | STEADY | ...
+  scoreExplanation?: string;
+  variations?: TopicVariation[];
 }
 
 // Legend shown on the home page ("what do these scores mean").
