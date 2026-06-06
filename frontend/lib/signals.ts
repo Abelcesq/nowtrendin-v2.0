@@ -90,6 +90,10 @@ export interface Signal {
   aiVelocity?: string;       // ACCELERATING | STEADY | ...
   scoreExplanation?: string;
   variations?: TopicVariation[];
+  // Dark Matter signatures (inferred private-conversation indicators)
+  darkMatter?: number;          // D component 0–100
+  firstTimerRatio?: number;     // 0–1 — share of first-time participants
+  engagementAsymmetry?: boolean; // comments exceed normal upvote ratio
 }
 
 // Legend shown on the home page ("what do these scores mean").

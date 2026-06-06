@@ -91,6 +91,11 @@ export function mapSignal(r: any): Signal {
     platforms: Array.isArray(r.platforms_active) ? r.platforms_active : [],
     groups: mapGroups(r.component_groups, r.nowtrendin_score != null ? Number(r.nowtrendin_score) : undefined),
     nowTrending: r.nowtrendin_score != null ? Math.round(Number(r.nowtrendin_score)) : undefined,
+    darkMatter: r.dark_matter_score != null ? Math.round(Number(r.dark_matter_score)) : undefined,
+    firstTimerRatio: r.first_timer_ratio != null ? Number(r.first_timer_ratio) : undefined,
+    engagementAsymmetry: r.engagement_asymmetry != null
+      ? Boolean(Number(r.engagement_asymmetry))
+      : (typeof r.engagement_asymmetry === 'boolean' ? r.engagement_asymmetry : undefined),
     aiTierLabel: r.ai_tier_label || undefined,
     aiTier: r.ai_tier || undefined,
     aiTierColour: r.ai_tier_colour || undefined,

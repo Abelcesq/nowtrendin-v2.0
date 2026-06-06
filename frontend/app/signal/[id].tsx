@@ -11,6 +11,8 @@ import { ScoringHistory } from '../../components/trends/ScoringHistory';
 import { ResearchHistory } from '../../components/trends/ResearchHistory';
 import { TopicResearch } from '../../components/trends/TopicResearch';
 import { TopicVariationMap } from '../../components/trends/TopicVariationMap';
+import { DarkMatterPanel } from '../../components/trends/DarkMatterPanel';
+import { MethodologyExplainer } from '../../components/trends/MethodologyExplainer';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex } from '../../lib/signals';
@@ -147,6 +149,9 @@ export default function SignalDetail() {
       <XSignalPanel topic={signal.topic} />
       <View className="h-4" />
 
+      {/* Dark Matter signatures — inferred private-conversation indicators */}
+      <DarkMatterPanel signal={signal} />
+
       {/* WHAT TO DO */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to do</Text>
       <View className="rounded-2xl p-5 mb-5 border" style={{ borderColor: color, backgroundColor: `${color}10` }}>
@@ -218,6 +223,11 @@ export default function SignalDetail() {
       {/* Why the scores diverge */}
       <View className="mt-5">
         <WhyScoresDiverge />
+      </View>
+
+      {/* How the Gradient Score works (methodology — the 3 laws + Heisenberg) */}
+      <View className="mt-5">
+        <MethodologyExplainer />
       </View>
 
       {/* Actual scoring history */}
