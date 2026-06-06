@@ -9,6 +9,7 @@ import { DualScoreAnalysis } from '../../components/trends/DualScoreAnalysis';
 import { WhyScoresDiverge } from '../../components/trends/WhyScoresDiverge';
 import { ScoringHistory } from '../../components/trends/ScoringHistory';
 import { ResearchHistory } from '../../components/trends/ResearchHistory';
+import { TopicResearch } from '../../components/trends/TopicResearch';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex } from '../../lib/signals';
@@ -98,6 +99,9 @@ export default function SignalDetail() {
           )}
         </View>
       </View>
+
+      {/* Research — AI plain-English explanation of what this trend means */}
+      <TopicResearch topicKey={signal.id} topicName={signal.topic} />
 
       {/* Dual Score Analysis (gap bands + who uses which score) */}
       <DualScoreAnalysis signal={signal} />

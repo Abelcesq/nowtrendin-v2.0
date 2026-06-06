@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Signal, ageLabel, stageColor, scoreGap, actionLine, gapInsight } from '../../lib/signals';
+import { ChevronRight, Sparkles } from 'lucide-react-native';
+import { Signal, ageLabel, stageColor, scoreGap, gapInsight } from '../../lib/signals';
+import { useExplainer } from '../../hooks/useSignals';
 
 const DET_COLOR = '#2D7EEF';
 const CONF_COLOR = '#00C896';
@@ -19,6 +21,7 @@ export function TrendCard({ signal }: { signal: Signal }) {
   const stageCol = stageColor(signal.stage);
   const gap = scoreGap(signal);
   const insight = gapInsight(gap);
+  const { explainer } = useExplainer(signal.id, signal.topic);
   const platform = signal.platforms?.[0] ?? 'Multi-Platform';
   const multi = (signal.platforms?.length ?? 0) > 1;
   const isNew = (signal.timesScored ?? 0) <= 1;
@@ -68,9 +71,6 @@ export function TrendCard({ signal }: { signal: Signal }) {
         </View>
       </View>
 
-      {/* action line */}
-      <Text className="text-textSecondary text-[13px] mt-2">→ {actionLine(signal.stage)}</Text>
-
       {/* component bars + gap pill row */}
       <View className="flex-row items-center justify-between mt-3">
         <View className="flex-row items-center gap-1.5 flex-1 mr-3">
@@ -109,6 +109,20 @@ export function TrendCard({ signal }: { signal: Signal }) {
           {gap}-point gap: {insight.text}
         </Text>
       </View>
+
+      {/* AI explainer — what this trend means + a clear call to tap for more */}
+      {!!explainer?.short && (
+        <View className="mt-3">
+          <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={3}>
+            {explainer.short}
+          </Text>
+          <View className="flex-row items-center self-start mt-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: '#2D7EEF' }}>
+            <Sparkles size={12} color="#FFFFFF" />
+            <Text className="text-white text-[11px] font-bold ml-1 mr-0.5">MORE INFO</Text>
+            <ChevronRight size={13} color="#FFFFFF" />
+          </View>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }

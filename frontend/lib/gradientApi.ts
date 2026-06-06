@@ -211,6 +211,24 @@ export async function fetchAccuracy(): Promise<AccuracyReport> {
   };
 }
 
+export interface TopicExplainer {
+  available: boolean;
+  short?: string;
+  full?: string;
+}
+
+// Evergreen plain-English explainer for a topic (cached server-side; ~free).
+// Shown on trend cards (short) and the signal-detail Research section (full).
+export async function fetchExplainer(topicKey: string, topicName?: string): Promise<TopicExplainer> {
+  const q = topicName ? `?topic=${encodeURIComponent(topicName)}` : '';
+  const res = await fetch(`${GRADIENT_API}/explainer/${encodeURIComponent(topicKey)}${q}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) return { available: false };
+  const d = await res.json();
+  if (!d?.available) return { available: false };
+  const clean = (s?: string) => (s || '').replace(/\[\d+\]/g, '').replace(/\s+\./g, '.').trim();
+  return { available: true, short: clean(d.short), full: clean(d.full) };
+}
+
 export interface SignalIntegrity {
   score: number;
   classification: string; // AUTHENTIC | MIXED | SUSPICIOUS | MANUFACTURED | INSUFFICIENT_DATA

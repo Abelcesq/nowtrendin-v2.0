@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -75,6 +75,19 @@ export function useXSignal(topic: string | undefined, enabled: boolean) {
     retry: 0,
   });
   return { x: q.data, isLoading: q.isLoading };
+}
+
+// Evergreen topic explainer — cached forever client-side (server persists it).
+export function useExplainer(topicKey: string | undefined, topicName?: string, enabled = true) {
+  const q = useQuery({
+    queryKey: ['explainer', topicKey],
+    queryFn: () => fetchExplainer(topicKey as string, topicName),
+    enabled: !!topicKey && enabled,
+    staleTime: Infinity,
+    gcTime: 24 * 60 * 60 * 1000,
+    retry: 0,
+  });
+  return { explainer: q.data, isLoading: q.isLoading };
 }
 
 export function useRisk(key: string | undefined) {
