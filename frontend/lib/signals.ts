@@ -28,7 +28,6 @@ export interface BreakdownGroup {
 
 export interface WhatToDo {
   action: string;
-  urgency?: string;
   instruction?: string;
   detail?: string;
 }

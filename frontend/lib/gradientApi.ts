@@ -81,7 +81,6 @@ export function mapSignal(r: any): Signal {
     whatToDo: r.what_to_do_action
       ? {
           action: r.what_to_do_action,
-          urgency: r.what_to_do_urgency || undefined,
           instruction: r.what_to_do_instruction || undefined,
           detail: r.what_to_do_detail || undefined,
         }
