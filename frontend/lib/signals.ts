@@ -114,10 +114,12 @@ export interface Signal {
 
 // Legend shown on the home page ("what do these scores mean").
 export const STAGE_META = [
-  { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', action: 'Act now', color: '#00C896' },
-  { key: 'STRONG', label: 'STRONG', range: '70–84', action: 'Window open', color: '#2D7EEF' },
-  { key: 'EMERGING', label: 'EMERGING', range: '55–69', action: 'Begin planning', color: '#D4A017' },
-  { key: 'WATCHING', label: 'WATCHING', range: '35–54', action: 'Too early to act', color: '#E85A1E' },
+  // Neutral, descriptive labels only — no prescriptive "what to do" guidance.
+  // We surface the analysis; the user decides any action.
+  { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', desc: 'Strongest signal', color: '#00C896' },
+  { key: 'STRONG', label: 'STRONG', range: '70–84', desc: 'High signal strength', color: '#2D7EEF' },
+  { key: 'EMERGING', label: 'EMERGING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
+  { key: 'WATCHING', label: 'WATCHING', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
 
 // Short action line per stage (shown on each trend card).

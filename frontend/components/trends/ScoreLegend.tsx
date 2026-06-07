@@ -21,7 +21,7 @@ export function ScoreLegend() {
             </Text>
             <Text className="text-textMuted text-[10px] mt-0.5">{s.range}</Text>
             <Text style={{ color: s.color }} className="text-[11px] font-semibold mt-1">
-              {s.action}
+              {s.desc}
             </Text>
           </View>
         ))}
