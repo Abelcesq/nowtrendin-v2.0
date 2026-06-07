@@ -11,6 +11,8 @@ export interface User {
   tokensRemaining?: number;
   phone?: string | null;
   phoneVerified?: boolean;
+  notifyEmail?: boolean;
+  notifyPush?: boolean;
 }
 
 interface AuthState {

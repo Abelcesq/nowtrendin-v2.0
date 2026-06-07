@@ -18,6 +18,8 @@ function normalizeUser(u: any): User {
     tokensRemaining: u.tokensRemaining ?? 0,
     phone: u.phone ?? null,
     phoneVerified: !!u.phoneVerified,
+    notifyEmail: u.notifyEmail ?? true,
+    notifyPush: u.notifyPush ?? true,
   };
 }
 
@@ -35,6 +37,13 @@ export async function login(email: string, password: string): Promise<AuthResult
 
 export async function signup(name: string, email: string, password: string): Promise<AuthResult> {
   const data = await api.post('/api/auth/signup/', { name, email, password });
+  await persistRefresh(data.refresh);
+  return { user: normalizeUser(data.user), token: data.access };
+}
+
+// Exchange a Google ID token (from expo-auth-session) for our own JWT.
+export async function loginWithGoogle(idToken: string): Promise<AuthResult> {
+  const data = await api.post('/api/auth/google/', { id_token: idToken });
   await persistRefresh(data.refresh);
   return { user: normalizeUser(data.user), token: data.access };
 }

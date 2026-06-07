@@ -32,7 +32,8 @@
     "owner": "now-trendin",
     "plugins": [
       "expo-secure-store",
-      "expo-router"
+      "expo-router",
+      "expo-web-browser"
     ]
   }
 }

@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/auth.store';
 import { login as apiLogin } from '../../lib/auth';
+import { useGoogleAuth } from '../../lib/useGoogleAuth';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -20,6 +21,7 @@ type FormData = z.infer<typeof schema>;
 export default function Login() {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
+  const { promptGoogle, googleBusy, googleError, ready: googleReady } = useGoogleAuth();
   const {
     control,
     handleSubmit,
@@ -96,10 +98,14 @@ export default function Login() {
         <View className="flex-1 h-px bg-border" />
       </View>
 
+      {googleError && <Text className="text-error text-sm text-center mb-3">{googleError}</Text>}
+
       <Button
         variant="secondary"
         size="lg"
-        onPress={() => setError('root', { message: 'Google sign-in is coming soon.' })}
+        onPress={promptGoogle}
+        loading={googleBusy}
+        disabled={!googleReady || googleBusy}
       >
         Continue with Google
       </Button>
