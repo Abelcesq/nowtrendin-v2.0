@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
@@ -163,32 +163,51 @@ export default function RiskDetail() {
         );
       })()}
 
-      {/* Meet Kevin retail coverage — attributed data point, not advice */}
-      {!!risk.meetKevin && (
+      {/* Retail Coverage — attributed data points, not advice. No external
+          links (titles/URLs are shown as plain copyable text). */}
+      {(!!risk.meetKevin || !!risk.alphaVantage) && (
         <>
-          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail coverage · Meet Kevin</Text>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail Coverage</Text>
           <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
-            <View className="flex-row items-center gap-2 mb-2">
-              <Play size={16} color="#CF2A1B" />
-              <Text className="text-textPrimary text-sm font-bold flex-1">
-                {risk.meetKevin.covered
-                  ? `${risk.meetKevin.count} recent video${risk.meetKevin.count === 1 ? '' : 's'} on this name`
-                  : 'Not in Meet Kevin’s recent uploads'}
-              </Text>
-            </View>
-            {risk.meetKevin.covered && (risk.meetKevin.recent ?? []).map((v, i) => (
-              <TouchableOpacity key={i} onPress={() => Linking.openURL(v.url)} className="mb-1.5">
-                <Text className="text-[13px] leading-5" style={{ color: '#2D7EEF' }} numberOfLines={2}>
-                  ▸ {v.title}
+            {/* Alpha Vantage — news volume + tone */}
+            {!!risk.alphaVantage && (
+              <View className="mb-3">
+                <Text className="text-textPrimary text-sm font-bold mb-1">
+                  {risk.alphaVantage.articleCount} recent news article{risk.alphaVantage.articleCount === 1 ? '' : 's'}
+                  {risk.alphaVantage.sentimentLabel ? ` · ${risk.alphaVantage.sentimentLabel}` : ''}
                 </Text>
-                <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => Linking.openURL(risk.meetKevin!.channelUrl)} className="mt-1">
-              <Text className="text-[12px] font-semibold" style={{ color: '#2D7EEF' }}>Open @MeetKevin on YouTube →</Text>
-            </TouchableOpacity>
+                {(risk.alphaVantage.recent ?? []).slice(0, 3).map((a, i) => (
+                  <View key={i} className="mb-1">
+                    <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {a.title}</Text>
+                    <Text className="text-textMuted text-[10px]">{a.source} · {(a.published || '').slice(0, 8)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {/* Meet Kevin (YouTube) — coverage data, attributed, no link */}
+            {!!risk.meetKevin && (
+              <View className={risk.alphaVantage ? 'pt-3 border-t border-border' : ''}>
+                <View className="flex-row items-center gap-2 mb-1">
+                  <Play size={16} color="#CF2A1B" />
+                  <Text className="text-textPrimary text-sm font-bold flex-1">
+                    {risk.meetKevin.covered
+                      ? `${risk.meetKevin.count} recent video${risk.meetKevin.count === 1 ? '' : 's'} on this name`
+                      : 'Not in recent uploads'}
+                  </Text>
+                </View>
+                {risk.meetKevin.covered && (risk.meetKevin.recent ?? []).map((v, i) => (
+                  <View key={i} className="mb-1.5">
+                    <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
+                    <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+                  </View>
+                ))}
+                <Text className="text-textMuted text-[10px] mt-1">Source: Meet Kevin (youtube.com/@MeetKevin)</Text>
+              </View>
+            )}
           </View>
-          <Text className="text-textMuted text-[10px] mb-5">{risk.meetKevin.note}</Text>
+          <Text className="text-textMuted text-[10px] mb-5">
+            {risk.alphaVantage?.note || risk.meetKevin?.note}
+          </Text>
         </>
       )}
 

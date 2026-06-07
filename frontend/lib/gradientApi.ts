@@ -219,6 +219,15 @@ export interface RiskScore {
     channelUrl: string;
     note: string;
   };
+  // Alpha Vantage news/retail coverage (article volume + tone; attributed)
+  alphaVantage?: {
+    covered: boolean;
+    articleCount: number;
+    avgSentiment?: number | null;
+    sentimentLabel?: string;
+    recent?: { title: string; source: string; published: string }[];
+    note: string;
+  };
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -294,6 +303,14 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       recent: Array.isArray(r.meet_kevin.recent) ? r.meet_kevin.recent : undefined,
       channelUrl: r.meet_kevin.channel_url || 'https://www.youtube.com/@MeetKevin',
       note: r.meet_kevin.note || '',
+    } : undefined,
+    alphaVantage: r.alpha_vantage ? {
+      covered: Boolean(r.alpha_vantage.covered),
+      articleCount: Number(r.alpha_vantage.article_count ?? 0),
+      avgSentiment: r.alpha_vantage.avg_sentiment ?? null,
+      sentimentLabel: r.alpha_vantage.sentiment_label || undefined,
+      recent: Array.isArray(r.alpha_vantage.recent) ? r.alpha_vantage.recent : undefined,
+      note: r.alpha_vantage.note || '',
     } : undefined,
   }));
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Linking } from 'react-native';
-import { GraduationCap, Sparkles, Lock, ExternalLink } from 'lucide-react-native';
+import { View, Text, TextInput } from 'react-native';
+import { GraduationCap, Sparkles, Lock } from 'lucide-react-native';
 import { Button } from '../ui/Button';
 import { GradientScoreRing } from '../ui/GradientScoreRing';
 import { useAuthStore } from '../../store/auth.store';
@@ -173,11 +173,11 @@ export function GradeTool() {
                   {result.citations.slice(0, 8).map((c, i) => (
                     <Text
                       key={i}
-                      onPress={() => Linking.openURL(c)}
-                      className="text-info text-[11px] mb-1"
+                      selectable
+                      className="text-textMuted text-[11px] mb-1"
                       numberOfLines={1}
                     >
-                      <ExternalLink size={10} color="#2D7EEF" /> {c}
+                      • {c}
                     </Text>
                   ))}
                 </>
