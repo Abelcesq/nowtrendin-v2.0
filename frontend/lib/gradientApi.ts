@@ -178,6 +178,17 @@ export interface RiskScore {
   abnormality?: number;     // % above (or below) the topic's own baseline
   baselineStatus?: string;  // INSUFFICIENT_HISTORY | BELOW_BASELINE | AT_BASELINE | ELEVATED_VS_SELF | SPIKE_VS_SELF
   baselineNote?: string;
+  // ── Positioning engine (baseline-relative; the primary "Other" signal) ──
+  positioningScore?: number;       // 0–100 anomaly vs the item's own baseline
+  classification?: string;         // CALIBRATING | ROUTINE | WATCH | ELEVATED | UNUSUAL
+  headline?: string;
+  narrative?: string;
+  earlySignal?: boolean;
+  percentDelta?: number | null;    // % vs baseline
+  positioningCycles?: number;      // baseline cycles accumulated
+  definition?: string;
+  // diffusion (positioning shape): stage label -> { count, z }
+  stages?: Record<string, { count: number; z: number | null }>;
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -214,6 +225,17 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     abnormality: r.abnormality != null ? Number(r.abnormality) : undefined,
     baselineStatus: r.baseline_status || undefined,
     baselineNote: r.baseline_note || undefined,
+    // Positioning (baseline-relative) fields — primary for the "Other" section.
+    positioningScore: r.positioning_score != null ? Math.round(Number(r.positioning_score)) : undefined,
+    classification: r.classification || undefined,
+    headline: r.headline || undefined,
+    narrative: r.narrative || undefined,
+    earlySignal: Boolean(r.early_signal),
+    percentDelta: r.percent_delta != null ? Number(r.percent_delta) : null,
+    positioningCycles: r.baseline_cycles != null ? Number(r.baseline_cycles) : undefined,
+    definition: r.definition || undefined,
+    stages: r.diffusion && typeof r.diffusion === 'object' && !Array.isArray(r.diffusion)
+      ? r.diffusion : undefined,
   }));
 }
 

@@ -1,12 +1,12 @@
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ShieldAlert, Globe, Clock, Info, Activity } from 'lucide-react-native';
+import { ChevronLeft, Globe, Clock, Info, Activity } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
 import { useRisk } from '../../hooks/useSignals';
 
-const STAGE_COLOR: Record<string, string> = {
-  ACUTE: '#CF2A1B', ELEVATED: '#E85A1E', EMERGING: '#D4A017', WATCH: '#2D7EEF', BACKGROUND: '#9AA3B0',
+const CLASS_COLOR: Record<string, string> = {
+  UNUSUAL: '#CF2A1B', ELEVATED: '#E85A1E', WATCH: '#2D7EEF', ROUTINE: '#9AA3B0', CALIBRATING: '#9AA3B0',
 };
 
 const MATURITY_COLOR: Record<string, string> = {
@@ -22,11 +22,11 @@ const BASELINE_META: Record<string, { color: string; label: string }> = {
 };
 
 const PIPELINE = [
-  { key: 'dark', label: 'Dark Positioning', desc: 'Insider Form 4 / 13F — smart money', detect: true },
-  { key: 'expert', label: 'Expert Warning', desc: '8-K material events, macro stress' },
-  { key: 'consumer', label: 'Consumer Concern', desc: 'Financial communities' },
-  { key: 'media', label: 'Media Coverage', desc: 'News flow' },
-  { key: 'retail', label: 'Retail Amplify', desc: 'Finance YouTube / crowd' },
+  { key: 'Dark Positioning', label: 'Dark Positioning', desc: 'Insider Form 4 / 13F — smart money', detect: true },
+  { key: 'Expert Warning', label: 'Expert Warning', desc: '8-K material events, macro stress', detect: false },
+  { key: 'Consumer Concern', label: 'Consumer Concern', desc: 'Financial communities', detect: false },
+  { key: 'Media Coverage', label: 'Media Coverage', desc: 'News flow', detect: false },
+  { key: 'Retail Amplify', label: 'Retail Amplify', desc: 'Finance YouTube / crowd', detect: false },
 ] as const;
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -58,55 +58,51 @@ export default function RiskDetail() {
         <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
           <ChevronLeft size={24} color="#5B6472" />
         </TouchableOpacity>
-        <Text className="text-textMuted text-center mt-20">Risk not found.</Text>
+        <Text className="text-textMuted text-center mt-20">Not found.</Text>
       </Screen>
     );
   }
 
-  const color = STAGE_COLOR[risk.stage] ?? '#9AA3B0';
+  const cls = risk.classification ?? 'CALIBRATING';
+  const color = CLASS_COLOR[cls] ?? '#9AA3B0';
   const matColor = MATURITY_COLOR[risk.maturity] ?? '#9AA3B0';
-  const maxStage = Math.max(1, ...PIPELINE.map((s) => (risk.diffusion as any)[s.key] as number));
+  const maxStage = Math.max(1, ...PIPELINE.map((s) => risk.stages?.[s.key]?.count ?? 0));
 
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-4 self-start flex-row items-center gap-1">
         <ChevronLeft size={22} color="#5B6472" />
-        <Text className="text-textSecondary text-sm">Risk Intel</Text>
+        <Text className="text-textSecondary text-sm">Positioning</Text>
       </TouchableOpacity>
 
-      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Risk Gradient</Text>
+      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Positioning</Text>
       <View className="flex-row items-center gap-2 mt-0.5">
-        <ShieldAlert size={22} color={color} />
+        <Activity size={22} color={color} />
         <Text className="text-textPrimary text-3xl font-bold flex-1">{risk.display}</Text>
       </View>
-      <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {risk.stage}</Text>
+      <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {cls}</Text>
 
-      {/* Dual score */}
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-5" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-        <View className="flex-row justify-around items-start">
-          <View className="items-center">
-            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold">{risk.stage}</Text>
-            </View>
-            <GradientScoreRing score={risk.detection} color="#2D7EEF" size="lg" caption="/100" />
-            <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-            <Text className="text-textMuted text-[10px]">earliness</Text>
-          </View>
-          <View className="items-center">
-            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold">{risk.stage}</Text>
-            </View>
-            <GradientScoreRing score={risk.confidence} color="#00C896" size="lg" caption="/100" />
-            <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-            <Text className="text-textMuted text-[10px]">precision</Text>
-          </View>
+      {/* Positioning score (baseline-relative) — single anomaly read */}
+      <View className="bg-surface rounded-2xl p-5 border border-border mb-2 items-center" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+        <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
+          <Text style={{ color }} className="text-[9px] font-bold">{cls}</Text>
         </View>
-        {!!risk.action && (
-          <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: `${color}55`, backgroundColor: `${color}10` }}>
-            <Text className="text-sm font-bold" style={{ color }}>{risk.action}</Text>
+        <GradientScoreRing score={risk.positioningScore ?? 0} color={color} size="lg" caption="/100" />
+        <Text className="text-textPrimary text-xs font-bold mt-2">POSITIONING</Text>
+        <Text className="text-textMuted text-[10px]">
+          {risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}
+        </Text>
+        {!!(risk.headline || risk.narrative) && (
+          <View className="rounded-xl px-3 py-2 mt-4 border w-full" style={{ borderColor: `${color}55`, backgroundColor: `${color}10` }}>
+            {!!risk.headline && <Text className="text-sm font-bold mb-0.5" style={{ color }}>{risk.headline}</Text>}
+            {!!risk.narrative && <Text className="text-textSecondary text-[13px] leading-5">{risk.narrative}</Text>}
           </View>
         )}
       </View>
+      <Text className="text-textMuted text-[10px] mb-5">
+        {risk.definition || 'Positioning measures how unusual an item’s insider/institutional activity is vs its own baseline.'}
+        {' '}Analysis only — not financial advice.
+      </Text>
 
       {/* Market tenure / maturity — the analysis the user asked for */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Market tenure</Text>
@@ -149,7 +145,7 @@ export default function RiskDetail() {
                 <Text className="text-textMuted text-[11px] leading-4 flex-1">
                   Established names carry routine insider / 8-K activity every cycle, so absolute counts always
                   look elevated. This compares the topic against ITS OWN history — only an abnormal rise above
-                  its baseline marks a genuinely emerging risk.
+                  its baseline marks genuinely unusual positioning.
                 </Text>
               </View>
             </View>
@@ -169,7 +165,7 @@ export default function RiskDetail() {
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Diffusion pipeline</Text>
       <View className="bg-surface rounded-2xl border border-border p-4 mb-5">
         {PIPELINE.map((s) => {
-          const v = (risk.diffusion as any)[s.key] as number;
+          const v = risk.stages?.[s.key]?.count ?? 0;
           const pct = Math.round((v / maxStage) * 100);
           return (
             <View key={s.key} className="mb-3">
@@ -222,6 +218,11 @@ export default function RiskDetail() {
           </Text>
         </View>
       )}
+
+      <Text className="text-textMuted text-[10px] text-center mb-8 px-2 leading-4">
+        Positioning analysis for informational purposes only — not financial, investment, or legal advice,
+        and not a risk rating of any company. All decisions are your own.
+      </Text>
     </Screen>
   );
 }

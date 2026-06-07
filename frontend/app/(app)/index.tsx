@@ -230,14 +230,14 @@ export default function Dashboard() {
 
           <View className="flex-row items-center gap-2 mb-2">
             <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />
-            <Text className="text-textPrimary text-xl font-black">Other Signals</Text>
+            <Text className="text-textPrimary text-xl font-black">Positioning</Text>
             <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
               <Text className="text-textMuted text-[11px] font-bold">{accessibleRisks.length}</Text>
             </View>
             <Text className="text-textMuted text-[10px] ml-auto">{dataWindowLabel(tier)}</Text>
           </View>
           <Text className="text-textMuted text-[11px] mb-3">
-            Emerging items scored by diffusion stage — early smart-money positioning ranks highest.
+            Items where insider/institutional positioning is unusually active vs their own baseline. Analysis only — not advice or a risk rating.
           </Text>
           {riskLoading ? (
             <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />
