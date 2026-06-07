@@ -104,6 +104,46 @@ export default function RiskDetail() {
         {' '}Analysis only — not financial advice.
       </Text>
 
+      {/* Financial Sustainability — factual balance-sheet health (companies only) */}
+      {!!risk.sustainability && (() => {
+        const s = risk.sustainability!;
+        const sc = s.score >= 75 ? '#00C896' : s.score >= 50 ? '#2D7EEF' : s.score >= 30 ? '#D4A017' : '#CF2A1B';
+        const Bar = ({ label, val }: { label: string; val: number | null }) => (
+          <View className="mb-2">
+            <View className="flex-row justify-between mb-1">
+              <Text className="text-textSecondary text-[12px]">{label}</Text>
+              <Text className="text-textPrimary text-[12px] font-bold">{val == null ? 'n/a' : Math.round(val)}</Text>
+            </View>
+            <View className="h-1.5 rounded-full bg-border overflow-hidden">
+              <View style={{ width: `${Math.max(0, Math.min(100, val ?? 0))}%`, backgroundColor: sc }} className="h-full rounded-full" />
+            </View>
+          </View>
+        );
+        return (
+          <>
+            <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Financial sustainability</Text>
+            <View className="bg-surface rounded-2xl border p-4 mb-2" style={{ borderColor: `${sc}55` }}>
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm font-bold" style={{ color: sc }}>{s.label}</Text>
+                <Text className="text-2xl font-black" style={{ color: sc }}>{s.score}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
+              </View>
+              <Bar label="Profitability (margin · ROE)" val={s.profitability} />
+              <Bar label="Cash & liquidity" val={s.liquidity} />
+              <Bar label="Leverage health (lower debt = higher)" val={s.leverageHealth} />
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-border">
+                {s.netProfitMargin != null && <Text className="text-textMuted text-[11px]">Net margin {s.netProfitMargin}%</Text>}
+                {s.roe != null && <Text className="text-textMuted text-[11px]">ROE {s.roe}%</Text>}
+                {s.currentRatio != null && <Text className="text-textMuted text-[11px]">Current ratio {s.currentRatio}</Text>}
+                {s.debtToEquity != null && <Text className="text-textMuted text-[11px]">Debt/equity {s.debtToEquity}</Text>}
+              </View>
+            </View>
+            <Text className="text-textMuted text-[10px] mb-5">
+              From {s.ticker}'s reported financials. Descriptive data only — not a buy/sell recommendation or financial advice.
+            </Text>
+          </>
+        );
+      })()}
+
       {/* Market tenure / maturity — the analysis the user asked for */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Market tenure</Text>
       <View className="bg-surface rounded-2xl border p-4 mb-5" style={{ borderColor: `${matColor}55` }}>

@@ -189,6 +189,20 @@ export interface RiskScore {
   definition?: string;
   // diffusion (positioning shape): stage label -> { count, z }
   stages?: Record<string, { count: number; z: number | null }>;
+  // Financial Sustainability (factual fundamentals; companies only)
+  sustainability?: {
+    score: number;
+    label: string;
+    profitability: number | null;
+    liquidity: number | null;
+    leverageHealth: number | null;
+    ticker?: string;
+    netProfitMargin?: number | null;
+    roe?: number | null;
+    currentRatio?: number | null;
+    debtToEquity?: number | null;
+    definition?: string;
+  };
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -236,6 +250,19 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     definition: r.definition || undefined,
     stages: r.diffusion && typeof r.diffusion === 'object' && !Array.isArray(r.diffusion)
       ? r.diffusion : undefined,
+    sustainability: r.sustainability ? {
+      score: Math.round(Number(r.sustainability.score ?? 0)),
+      label: r.sustainability.label || '',
+      profitability: r.sustainability.profitability ?? null,
+      liquidity: r.sustainability.liquidity ?? null,
+      leverageHealth: r.sustainability.leverage_health ?? null,
+      ticker: r.sustainability.ticker || undefined,
+      netProfitMargin: r.sustainability.metrics?.net_profit_margin_pct ?? null,
+      roe: r.sustainability.metrics?.roe_pct ?? null,
+      currentRatio: r.sustainability.metrics?.current_ratio ?? null,
+      debtToEquity: r.sustainability.metrics?.debt_to_equity ?? null,
+      definition: r.sustainability.definition || undefined,
+    } : undefined,
   }));
 }
 

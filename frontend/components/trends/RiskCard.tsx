@@ -90,6 +90,18 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
         <Text className="text-textSecondary text-[12px] leading-5 mt-3">{risk.narrative || risk.interpretation}</Text>
       )}
 
+      {/* Financial sustainability (factual fundamentals) — compact line */}
+      {!!risk.sustainability && (
+        <View className="flex-row items-center gap-2 mt-3">
+          <Text className="text-textMuted text-[11px]">Financial sustainability</Text>
+          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${risk.sustainability.score >= 75 ? '#00C896' : risk.sustainability.score >= 50 ? '#2D7EEF' : risk.sustainability.score >= 30 ? '#D4A017' : '#CF2A1B'}1A` }}>
+            <Text className="text-[11px] font-bold" style={{ color: risk.sustainability.score >= 75 ? '#009970' : risk.sustainability.score >= 50 ? '#2D7EEF' : risk.sustainability.score >= 30 ? '#B8860B' : '#CF2A1B' }}>
+              {risk.sustainability.score}/100 · {risk.sustainability.label}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Source provenance — the audit trail (institutional trust) */}
       {risk.sources.length > 0 && (
         <View className="flex-row items-center gap-1 mt-3 pt-2 border-t border-border">
