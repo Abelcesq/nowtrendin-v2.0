@@ -72,6 +72,69 @@ class LoginView(APIView):
         return Response({'user': UserSerializer(user).data, **_tokens_for(user)})
 
 
+class GoogleAuthView(APIView):
+    """Sign in / sign up with a Google ID token from the mobile/web client.
+
+    The client (expo-auth-session) obtains a Google ID token and posts it here.
+    We verify the token's signature against Google's public keys and confirm the
+    audience matches one of our OAuth client IDs, then get-or-create the user and
+    issue our own JWT — identical shape to the password login response.
+    No client secret needed (ID-token flow)."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = (str(request.data.get('id_token') or request.data.get('idToken') or '')).strip()
+        if not token:
+            return Response({'detail': 'A Google id_token is required.'}, status=400)
+
+        # Accept any of our platform client IDs as a valid audience.
+        allowed = [
+            os.environ.get('GOOGLE_WEB_CLIENT_ID', ''),
+            os.environ.get('GOOGLE_IOS_CLIENT_ID', ''),
+            os.environ.get('GOOGLE_ANDROID_CLIENT_ID', ''),
+        ]
+        allowed = [a for a in allowed if a]
+
+        try:
+            from google.oauth2 import id_token as google_id_token
+            from google.auth.transport import requests as google_requests
+
+            info = google_id_token.verify_oauth2_token(
+                token, google_requests.Request()
+            )
+        except Exception as exc:
+            return Response({'detail': f'Could not verify Google token: {exc}'}, status=401)
+
+        if info.get('iss') not in ('accounts.google.com', 'https://accounts.google.com'):
+            return Response({'detail': 'Invalid token issuer.'}, status=401)
+        if allowed and info.get('aud') not in allowed:
+            return Response({'detail': 'Token was not issued for this app.'}, status=401)
+        if not info.get('email_verified', False):
+            return Response({'detail': 'Google email is not verified.'}, status=401)
+
+        email = (info.get('email') or '').lower().strip()
+        if not email:
+            return Response({'detail': 'Google account has no email.'}, status=400)
+        name = info.get('name') or info.get('given_name') or email.split('@')[0]
+
+        user = (User.objects.filter(email__iexact=email).first()
+                or User.objects.filter(username__iexact=email).first())
+        created = False
+        if user is None:
+            user = User.objects.create_user(username=email, email=email, first_name=name)
+            user.set_unusable_password()
+            user.save()
+            Profile.objects.create(user=user, tier=None)
+            created = True
+        else:
+            Profile.objects.get_or_create(user=user)
+
+        return Response(
+            {'user': UserSerializer(user).data, 'created': created, **_tokens_for(user)},
+            status=201 if created else 200,
+        )
+
+
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
