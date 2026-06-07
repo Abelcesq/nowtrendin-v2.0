@@ -15,7 +15,7 @@ import { DarkMatterPanel } from '../../components/trends/DarkMatterPanel';
 import { MethodologyExplainer } from '../../components/trends/MethodologyExplainer';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
 import { useSignal } from '../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex } from '../../lib/signals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../lib/signals';
 
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -62,6 +62,23 @@ export default function SignalDetail() {
 
       <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>
       <Text className="text-textPrimary text-3xl font-bold mt-0.5">{signal.topic}</Text>
+
+      {/* Maturity classification badge (NEW / ESTABLISHED / RESURGENT …) */}
+      {!!signal.maturityClass && (
+        <View className="flex-row items-center gap-2 mt-1.5">
+          <View
+            className="self-start rounded-full px-2.5 py-1"
+            style={{ backgroundColor: `${maturityColourHex(signal.maturityClass)}1A` }}
+          >
+            <Text className="text-[10px] font-bold" style={{ color: maturityColourHex(signal.maturityClass) }}>
+              {signal.maturityBadge || signal.maturityClass}
+            </Text>
+          </View>
+          {signal.maturityClass === 'ESTABLISHED' && (
+            <Text className="text-textMuted text-[10px] flex-1">gradient reflects permanent expert home</Text>
+          )}
+        </View>
+      )}
 
       {/* AI tier badge — only for taxonomy-recognized AI topics */}
       {!!signal.aiTierLabel && (

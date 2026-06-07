@@ -47,6 +47,18 @@ export interface TopicVariation {
   whyDifferent?: string;
 }
 
+// Map maturity class → design palette hex.
+export function maturityColourHex(cls?: string): string {
+  switch ((cls || '').toUpperCase()) {
+    case 'RESURGENT': return '#D4A017';   // gold — established but re-accelerating
+    case 'EMERGING': return '#00C896';    // green
+    case 'NEW': return '#2D7EEF';         // blue
+    case 'ESTABLISHED': return '#94A3B8'; // slate — permanent expert home
+    case 'MONITORING': return '#9AA3B0';  // muted
+    default: return '#5B6472';
+  }
+}
+
 // Map AI taxonomy colour names → design palette hex.
 export function tierColourHex(name?: string): string {
   switch ((name || '').toLowerCase()) {
@@ -94,6 +106,10 @@ export interface Signal {
   darkMatter?: number;          // D component 0–100
   firstTimerRatio?: number;     // 0–1 — share of first-time participants
   engagementAsymmetry?: boolean; // comments exceed normal upvote ratio
+  // Maturity classification (calibration lifecycle)
+  maturityClass?: string;       // NEW | EMERGING | ESTABLISHED | RESURGENT | MONITORING
+  maturityBadge?: string;       // e.g. "🔵 New Signal"
+  maturityReason?: string;
 }
 
 // Legend shown on the home page ("what do these scores mean").
