@@ -169,9 +169,9 @@ export default function SignalDetail() {
       {/* Dark Matter signatures — inferred private-conversation indicators */}
       <DarkMatterPanel signal={signal} />
 
-      {/* WHAT TO DO */}
-      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to do</Text>
-      <View className="rounded-2xl p-5 mb-5 border" style={{ borderColor: color, backgroundColor: `${color}10` }}>
+      {/* WHAT THIS MEANS (signal read — analysis only, not advice) */}
+      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal read</Text>
+      <View className="rounded-2xl p-5 mb-2 border" style={{ borderColor: color, backgroundColor: `${color}10` }}>
         <Text className="text-2xl font-black mb-1" style={{ color }}>
           {action.title}
         </Text>
@@ -180,6 +180,9 @@ export default function SignalDetail() {
           <Text className="text-textMuted text-sm leading-5 mt-2">{signal.whatToDo.detail}</Text>
         )}
       </View>
+      <Text className="text-textMuted text-[10px] mb-5">
+        Signal analysis only — not financial, investment, or legal advice. You decide any action.
+      </Text>
 
       {/* WHY THIS MATTERS */}
       {!!signal.why && (

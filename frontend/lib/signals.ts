@@ -122,16 +122,16 @@ export const STAGE_META = [
   { key: 'WATCHING', label: 'WATCHING', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
 
-// Short action line per stage (shown on each trend card).
+// Short, descriptive signal-read per stage (analysis only — no action guidance).
 const ACTION_LINE: Record<Stage, string> = {
-  VIRAL: 'Act now — viral signal. Window open.',
-  BREAKOUT: 'Act now — breakout in progress.',
-  STRONG: 'Window open — strong momentum.',
-  EMERGING: 'Begin planning — momentum forming.',
-  WATCHING: 'Too early to act — keep watching.',
-  WATCH: 'Too early to act — keep watching.',
-  MONITORING: 'Monitoring — wait for stronger signal.',
-  DECAY: 'Standing down — attention falling.',
+  VIRAL: 'Viral-level signal across platforms.',
+  BREAKOUT: 'Breakout in progress.',
+  STRONG: 'Strong, sustained momentum.',
+  EMERGING: 'Early momentum forming.',
+  WATCHING: 'Building — not yet confirmed.',
+  WATCH: 'Building — not yet confirmed.',
+  MONITORING: 'Low-intensity background signal.',
+  DECAY: 'Attention falling.',
 };
 export const actionLine = (s: Stage) => ACTION_LINE[s] ?? ACTION_LINE.MONITORING;
 
@@ -254,16 +254,17 @@ export function scoreGap(s: Signal): number {
   return s.gap ?? Math.abs(s.detection - s.confidence);
 }
 
-// Fallback "what to do" (used only when live whatToDo is absent).
+// Descriptive "signal read" per stage — analysis only, no action guidance.
+// (Used only when live engine text is absent.)
 const ACTIONS: Record<Stage, { title: string; body: string }> = {
-  VIRAL: { title: 'Act now.', body: 'Tier 1 viral topic across platforms. The window is open — move before it goes fully mainstream.' },
-  BREAKOUT: { title: 'Move fast.', body: 'Breakout in progress with strong multi-platform momentum. High-conviction entry.' },
-  STRONG: { title: 'Lean in.', body: 'Established strength and steady momentum. Solid entry with manageable risk.' },
-  EMERGING: { title: 'Position early.', body: 'Early momentum forming. Get ahead of confirmation while attention is still cheap.' },
-  WATCHING: { title: 'Keep on radar.', body: 'Signal is building but not yet confirmed. Set an alert and wait for acceleration.' },
-  WATCH: { title: 'Keep on radar.', body: 'Signal is building but not yet confirmed. Set an alert and wait for acceleration.' },
-  MONITORING: { title: 'Note it.', body: 'Low-intensity background signal. Worth tracking, not yet actionable.' },
-  DECAY: { title: 'Stand down.', body: 'Attention is falling. The window has likely closed.' },
+  VIRAL: { title: 'Viral-level signal.', body: 'Tier-1 viral topic across multiple platforms, still concentrated in expert communities ahead of mainstream awareness.' },
+  BREAKOUT: { title: 'Breakout in progress.', body: 'Strong multi-platform momentum with both scores in the breakout band.' },
+  STRONG: { title: 'Strong signal.', body: 'Established strength and steady momentum across platforms.' },
+  EMERGING: { title: 'Early momentum.', body: 'Momentum is forming but not yet confirmed across multiple cycles.' },
+  WATCHING: { title: 'Building — unconfirmed.', body: 'The signal is building but has not yet been confirmed across cycles.' },
+  WATCH: { title: 'Building — unconfirmed.', body: 'The signal is building but has not yet been confirmed across cycles.' },
+  MONITORING: { title: 'Background signal.', body: 'Low-intensity background activity, below the emerging threshold.' },
+  DECAY: { title: 'Attention falling.', body: 'Attention for this topic is declining from its peak.' },
 };
 export function actionFor(s: Signal) {
   if (s.whatToDo?.action) {

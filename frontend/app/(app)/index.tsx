@@ -255,6 +255,12 @@ export default function Dashboard() {
           )}
         </>
       )}
+
+      {/* Global disclaimer — we provide analysis, not advice. */}
+      <Text className="text-textMuted text-[10px] text-center mt-6 mb-2 px-4 leading-4">
+        Now TrendIn provides signal analysis for informational purposes only — not financial,
+        investment, or legal advice. All decisions are your own.
+      </Text>
     </Screen>
   );
 }
