@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { Bell, Zap, Briefcase, Building2, Search, RotateCcw } from 'lucide-react-native';
+import { Bell, Zap, Briefcase, Building2, Search } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
@@ -38,7 +38,7 @@ export default function Dashboard() {
   const cfg = TIERS[tier];
   const Icon = TIER_ICONS[tier];
 
-  const { accessible, lockedCount, isLoading, isSample, refetch } = useTierFeed(tier);
+  const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
@@ -171,7 +171,7 @@ export default function Dashboard() {
       </View>
 
       {/* Trends header */}
-      <View className="flex-row items-center justify-between mb-3">
+      <View className="flex-row items-center mb-3">
         <View className="flex-row items-center gap-2">
           <View className="w-1 h-5 rounded-full bg-brandMaroon" />
           <Text className="text-textPrimary text-xl font-black">Trends</Text>
@@ -179,16 +179,9 @@ export default function Dashboard() {
             <Text className="text-textMuted text-[11px] font-bold">{filtered.length}</Text>
           </View>
         </View>
-        {tier !== 'consumer' && (
-          <TouchableOpacity
-            onPress={() => refetch()}
-            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border"
-            style={{ borderColor: '#E8551C' }}
-          >
-            <RotateCcw size={13} color="#E8551C" />
-            <Text className="text-xs font-bold" style={{ color: '#E8551C' }}>Pull Trends</Text>
-          </TouchableOpacity>
-        )}
+        {/* The token-metered "Pull Trends" action lives in <PullTrendsButton /> above —
+            the yellow CTA that clearly states it costs 1 token. A second unlabeled
+            refetch button here was redundant and confusing, so it was removed. */}
       </View>
 
       {/* Stat row */}
