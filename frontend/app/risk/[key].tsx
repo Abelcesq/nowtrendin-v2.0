@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Globe, Clock, Info, Activity } from 'lucide-react-native';
+import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
 import { useRisk } from '../../hooks/useSignals';
@@ -107,7 +107,11 @@ export default function RiskDetail() {
       {/* Financial Sustainability — factual balance-sheet health (companies only) */}
       {!!risk.sustainability && (() => {
         const s = risk.sustainability!;
-        const sc = s.score >= 75 ? '#00C896' : s.score >= 50 ? '#2D7EEF' : s.score >= 30 ? '#D4A017' : '#CF2A1B';
+        const tone = (v: number) => v >= 75 ? '#00C896' : v >= 50 ? '#2D7EEF' : v >= 30 ? '#D4A017' : '#CF2A1B';
+        const sc = tone(s.score);
+        const hasAdj = s.sectorAdjustedScore != null && s.sectorAdjustedScore !== s.score;
+        const adj = s.sectorAdjustedScore ?? s.score;
+        const adjC = tone(adj);
         const Bar = ({ label, val }: { label: string; val: number | null }) => (
           <View className="mb-2">
             <View className="flex-row justify-between mb-1">
@@ -123,13 +127,28 @@ export default function RiskDetail() {
           <>
             <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Financial sustainability</Text>
             <View className="bg-surface rounded-2xl border p-4 mb-2" style={{ borderColor: `${sc}55` }}>
-              <View className="flex-row items-center justify-between mb-3">
-                <Text className="text-sm font-bold" style={{ color: sc }}>{s.label}</Text>
-                <Text className="text-2xl font-black" style={{ color: sc }}>{s.score}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
+              {/* Dual score: raw (vs all companies) + sector-adjusted */}
+              <View className="flex-row gap-3 mb-3">
+                <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: `${sc}12` }}>
+                  <Text className="text-textMuted text-[10px] font-bold">SCORE</Text>
+                  <Text className="text-2xl font-black" style={{ color: sc }}>{s.score}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
+                  <Text className="text-[11px] font-semibold" style={{ color: sc }}>{s.label}</Text>
+                  <Text className="text-textMuted text-[9px] mt-0.5">vs all companies</Text>
+                </View>
+                <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: `${adjC}12` }}>
+                  <Text className="text-textMuted text-[10px] font-bold">SECTOR-ADJUSTED</Text>
+                  <Text className="text-2xl font-black" style={{ color: adjC }}>{adj}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
+                  <Text className="text-[11px] font-semibold" style={{ color: adjC }}>{s.sectorAdjustedLabel || s.label}</Text>
+                  <Text className="text-textMuted text-[9px] mt-0.5">vs {s.sector || 'sector'} peers</Text>
+                </View>
               </View>
+              {!!s.sectorExplanation && (
+                <Text className="text-textSecondary text-[11px] leading-4 mb-3">{s.sectorExplanation}</Text>
+              )}
               <Bar label="Profitability (margin · ROE)" val={s.profitability} />
               <Bar label="Cash & liquidity" val={s.liquidity} />
-              <Bar label="Leverage health (lower debt = higher)" val={s.leverageHealth} />
+              <Bar label={hasAdj ? 'Leverage health (raw)' : 'Leverage health (lower debt = higher)'} val={s.leverageHealth} />
+              {hasAdj && <Bar label={`Leverage health (vs ${s.sector || 'sector'})`} val={s.leverageHealthSector ?? null} />}
               <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-border">
                 {s.netProfitMargin != null && <Text className="text-textMuted text-[11px]">Net margin {s.netProfitMargin}%</Text>}
                 {s.roe != null && <Text className="text-textMuted text-[11px]">ROE {s.roe}%</Text>}
@@ -143,6 +162,35 @@ export default function RiskDetail() {
           </>
         );
       })()}
+
+      {/* Meet Kevin retail coverage — attributed data point, not advice */}
+      {!!risk.meetKevin && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail coverage · Meet Kevin</Text>
+          <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
+            <View className="flex-row items-center gap-2 mb-2">
+              <Play size={16} color="#CF2A1B" />
+              <Text className="text-textPrimary text-sm font-bold flex-1">
+                {risk.meetKevin.covered
+                  ? `${risk.meetKevin.count} recent video${risk.meetKevin.count === 1 ? '' : 's'} on this name`
+                  : 'Not in Meet Kevin’s recent uploads'}
+              </Text>
+            </View>
+            {risk.meetKevin.covered && (risk.meetKevin.recent ?? []).map((v, i) => (
+              <TouchableOpacity key={i} onPress={() => Linking.openURL(v.url)} className="mb-1.5">
+                <Text className="text-[13px] leading-5" style={{ color: '#2D7EEF' }} numberOfLines={2}>
+                  ▸ {v.title}
+                </Text>
+                <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => Linking.openURL(risk.meetKevin!.channelUrl)} className="mt-1">
+              <Text className="text-[12px] font-semibold" style={{ color: '#2D7EEF' }}>Open @MeetKevin on YouTube →</Text>
+            </TouchableOpacity>
+          </View>
+          <Text className="text-textMuted text-[10px] mb-5">{risk.meetKevin.note}</Text>
+        </>
+      )}
 
       {/* Market tenure / maturity — the analysis the user asked for */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Market tenure</Text>

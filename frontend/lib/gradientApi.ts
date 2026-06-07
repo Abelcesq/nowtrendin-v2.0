@@ -193,15 +193,31 @@ export interface RiskScore {
   sustainability?: {
     score: number;
     label: string;
+    sector?: string;
+    sectorAdjustedScore?: number | null;
+    sectorAdjustedLabel?: string;
+    sectorExplanation?: string;
     profitability: number | null;
     liquidity: number | null;
     leverageHealth: number | null;
+    leverageHealthSector?: number | null;
     ticker?: string;
     netProfitMargin?: number | null;
     roe?: number | null;
     currentRatio?: number | null;
     debtToEquity?: number | null;
     definition?: string;
+  };
+  // Meet Kevin retail-attention coverage (attributed data point; not advice)
+  meetKevin?: {
+    covered: boolean;
+    count: number;
+    latestTitle?: string;
+    latestPublished?: string;
+    latestUrl?: string;
+    recent?: { title: string; published: string; url: string }[];
+    channelUrl: string;
+    note: string;
   };
 }
 
@@ -253,15 +269,31 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     sustainability: r.sustainability ? {
       score: Math.round(Number(r.sustainability.score ?? 0)),
       label: r.sustainability.label || '',
+      sector: r.sustainability.sector || undefined,
+      sectorAdjustedScore: r.sustainability.sector_adjusted_score != null
+        ? Math.round(Number(r.sustainability.sector_adjusted_score)) : null,
+      sectorAdjustedLabel: r.sustainability.sector_adjusted_label || undefined,
+      sectorExplanation: r.sustainability.sector_explanation || undefined,
       profitability: r.sustainability.profitability ?? null,
       liquidity: r.sustainability.liquidity ?? null,
       leverageHealth: r.sustainability.leverage_health ?? null,
+      leverageHealthSector: r.sustainability.leverage_health_sector ?? null,
       ticker: r.sustainability.ticker || undefined,
       netProfitMargin: r.sustainability.metrics?.net_profit_margin_pct ?? null,
       roe: r.sustainability.metrics?.roe_pct ?? null,
       currentRatio: r.sustainability.metrics?.current_ratio ?? null,
       debtToEquity: r.sustainability.metrics?.debt_to_equity ?? null,
       definition: r.sustainability.definition || undefined,
+    } : undefined,
+    meetKevin: r.meet_kevin ? {
+      covered: Boolean(r.meet_kevin.covered),
+      count: Number(r.meet_kevin.count ?? 0),
+      latestTitle: r.meet_kevin.latest_title || undefined,
+      latestPublished: r.meet_kevin.latest_published || undefined,
+      latestUrl: r.meet_kevin.latest_url || undefined,
+      recent: Array.isArray(r.meet_kevin.recent) ? r.meet_kevin.recent : undefined,
+      channelUrl: r.meet_kevin.channel_url || 'https://www.youtube.com/@MeetKevin',
+      note: r.meet_kevin.note || '',
     } : undefined,
   }));
 }
