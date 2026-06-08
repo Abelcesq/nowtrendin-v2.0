@@ -360,6 +360,19 @@ class EvaluateAlertsView(APIView):
         return Response({'fired': fired, 'checked': active.count()})
 
 
+class ResetCreditsView(APIView):
+    """Internal: reset every profile's monthly query + AI-grade credits to its
+    tier allowance. Called monthly by the engine scheduler (X-Internal-Key)."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        if request.headers.get('X-Internal-Key') != settings.INTERNAL_API_KEY:
+            return Response({'detail': 'forbidden'}, status=403)
+        from .credits import reset_all_credits
+        counts = reset_all_credits()
+        return Response({'status': 'reset', 'counts': counts})
+
+
 class AlertListCreate(generics.ListCreateAPIView):
     serializer_class = AlertSerializer
     permission_classes = [permissions.IsAuthenticated]
