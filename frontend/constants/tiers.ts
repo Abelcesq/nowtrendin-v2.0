@@ -14,13 +14,16 @@ export const TIERS = {
     canSetAlerts: true,
     canEditSources: false,
     canDirectSearch: false,
+    canAIGrade: true,
     apiTokens: 0,
+    gradeTokens: 25,
     description: 'Trend history access (24h+).',
     features: [
       'Gradient Score history (24h+)',
       'Trend monitoring feed',
       'Email + push alerts',
       'All signal categories',
+      'AI Grade — 25 credits/mo',
     ],
     restrictions: [
       'Cannot access signals less than 24 hours old',
@@ -39,7 +42,9 @@ export const TIERS = {
     canSetAlerts: true,
     canEditSources: false,
     canDirectSearch: false,
+    canAIGrade: true,
     apiTokens: 0,
+    gradeTokens: 250,
     description: 'Twice-daily trend intelligence for teams (12h+).',
     features: [
       'Everything in Consumer',
@@ -47,6 +52,7 @@ export const TIERS = {
       'Full signal search + filter',
       'Business analytics',
       'Team sharing',
+      'AI Grade — 250 credits/mo',
     ],
     restrictions: [
       'Cannot access signals less than 12 hours old',
@@ -65,7 +71,9 @@ export const TIERS = {
     canSetAlerts: true,
     canEditSources: true,
     canDirectSearch: true,
+    canAIGrade: true,
     apiTokens: 100000,
+    gradeTokens: 1000,
     tokenCostPerSearch: 1,
     seats: 5,
     description: 'Live access the moment data is obtained + token-based queries.',
@@ -74,6 +82,7 @@ export const TIERS = {
       'Unlimited reads of current trends',
       'Direct topic query — 1 token per search',
       '100,000 query tokens/month (included)',
+      'AI Grade — 1,000 credits/mo',
       'Up to 5 users — shared token pool',
       'Edit data source weights',
       'Custom alert thresholds',
@@ -100,7 +109,8 @@ type BooleanFeature =
   | 'canAccessGradientScore'
   | 'canSetAlerts'
   | 'canEditSources'
-  | 'canDirectSearch';
+  | 'canDirectSearch'
+  | 'canAIGrade';
 
 export function canAccess(tier: TierID, feature: BooleanFeature): boolean {
   return !!TIERS[tier]?.[feature];

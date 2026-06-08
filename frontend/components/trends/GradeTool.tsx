@@ -4,7 +4,6 @@ import { GraduationCap, Sparkles, Lock } from 'lucide-react-native';
 import { Button } from '../ui/Button';
 import { GradientScoreRing } from '../ui/GradientScoreRing';
 import { useAuthStore } from '../../store/auth.store';
-import { TierID, canAccess } from '../../constants/tiers';
 import { queryApi } from '../../lib/api';
 import { GAP_BANDS, gapBandIndex } from '../../lib/signals';
 
@@ -26,14 +25,13 @@ interface Proposed {
 export function GradeTool() {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
-  const tier = (user?.tier ?? 'consumer') as TierID;
   const [topic, setTopic] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [result, setResult] = useState<Proposed | null>(null);
 
-  const canGrade = canAccess(tier, 'canQueryNew'); // Enterprise only
-  const tokens = user?.tokensRemaining ?? 0;
+  const canGrade = !!user?.tier;            // any plan; metered by grade credits
+  const tokens = user?.gradeTokens ?? 0;    // monthly AI-grade credits
 
   const grade = async () => {
     setMsg(null);
@@ -41,7 +39,7 @@ export function GradeTool() {
     setBusy(true);
     try {
       const d: any = await queryApi.grade(topic.trim());
-      if (user) updateUser({ ...user, tokensRemaining: d?.tokensRemaining ?? tokens });
+      if (user) updateUser({ ...user, gradeTokens: d?.gradeTokens ?? tokens });
       if (d?.available && d?.proposed) {
         setResult(d as Proposed);
       } else {
@@ -68,9 +66,9 @@ export function GradeTool() {
       {!canGrade ? (
         <View className="rounded-xl border p-5 items-center" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
           <Lock size={22} color="#D4A017" />
-          <Text className="text-textPrimary font-bold text-sm mt-2 text-center">Enterprise feature</Text>
+          <Text className="text-textPrimary font-bold text-sm mt-2 text-center">Choose a plan</Text>
           <Text className="text-textMuted text-xs mt-1 text-center">
-            AI grading of new topics is available on the Enterprise plan (token-based).
+            AI grading is included on every plan with a monthly credit allowance. Select a membership to start.
           </Text>
         </View>
       ) : (
@@ -91,10 +89,10 @@ export function GradeTool() {
             <View className="flex-row items-center gap-2 mb-1">
               <Sparkles size={15} color="#D4A017" />
               <Text className="text-textPrimary text-sm font-bold">AI Proposed Gradient Score</Text>
-              <Text className="text-textMuted text-xs ml-auto">{tokens} tokens left</Text>
+              <Text className="text-textMuted text-xs ml-auto">{tokens} grade credits left</Text>
             </View>
             <Text className="text-textMuted text-xs mb-3">
-              Researches the open web and proposes a score with citations — uses 1 query token.
+              Researches the open web and proposes a score with citations — uses 1 grade credit.
             </Text>
             <Button
               variant="enterprise"
@@ -103,7 +101,7 @@ export function GradeTool() {
               disabled={!topic.trim() || tokens <= 0}
               onPress={grade}
             >
-              {tokens <= 0 ? 'No tokens remaining' : topic.trim() ? `Grade "${topic.trim()}" · 1 token` : 'Type a topic to grade'}
+              {tokens <= 0 ? 'No grade credits remaining this month' : topic.trim() ? `Grade "${topic.trim()}" · 1 credit` : 'Type a topic to grade'}
             </Button>
             {msg && <Text className="text-error text-xs mt-2">{msg}</Text>}
             {busy && <Text className="text-textMuted text-[11px] mt-2">Researching the web and scoring… ~20–40s.</Text>}

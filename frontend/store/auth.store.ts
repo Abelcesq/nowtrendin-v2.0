@@ -9,6 +9,7 @@ export interface User {
   tier: TierID | null;
   avatar?: string;
   tokensRemaining?: number;
+  gradeTokens?: number;
   phone?: string | null;
   phoneVerified?: boolean;
   notifyEmail?: boolean;

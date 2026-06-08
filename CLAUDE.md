@@ -142,11 +142,16 @@ constants/  tiers.ts          # ← THE authority on access control
 
 ## 6. MEMBERSHIP TIERS — access rules live ONLY in constants/tiers.ts
 
-| Tier | Price/mo | Data freshness | Search | New query | Sources | Tokens |
-|------|----------|----------------|--------|-----------|---------|--------|
-| Consumer   | $49      | ≥ 24h  | ✗ | ✗ | ✗ | 0 |
-| Business   | $499     | ≥ 12h  | ✓ | ✗ | ✗ | 0 |
-| Enterprise | $250,000 | live   | ✓ | ✓ (1 token/search) | ✓ | 100000 (5 users, shared) |
+| Tier | Price/mo | Data freshness | Search | New query | Sources | Query Tokens | AI Grade /mo |
+|------|----------|----------------|--------|-----------|---------|--------|------|
+| Consumer   | $49      | ≥ 24h  | ✗ | ✗ | ✗ | 0 | 25 |
+| Business   | $499     | ≥ 12h  | ✓ | ✗ | ✗ | 0 | 250 |
+| Enterprise | $250,000 | live   | ✓ | ✓ (1 token/search) | ✓ | 100000 (5 users, shared) | 1000 |
+
+**AI Grade** (the "Grade" tool — Perplexity + Claude, ~$0.012/grade, 12h-cached) is on **all
+three tiers**, metered by a separate monthly grade-credit allowance (`profile.grade_tokens`,
+Consumer 25 / Business 250 / Enterprise 1000). Enforced in Django `GradeView`; 1 credit charged
+only when a proposed score returns. Distinct from Enterprise query tokens.
 
 Use `canAccess(tier, feature)` and `isDataAccessible(tier, dataAgeMs)` everywhere.
 Never hardcode a tier check anywhere else.

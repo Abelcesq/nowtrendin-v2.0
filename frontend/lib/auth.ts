@@ -16,6 +16,7 @@ function normalizeUser(u: any): User {
     email: u.email,
     tier: (u.tier ?? null) as TierID | null,
     tokensRemaining: u.tokensRemaining ?? 0,
+    gradeTokens: u.gradeTokens ?? 0,
     phone: u.phone ?? null,
     phoneVerified: !!u.phoneVerified,
     notifyEmail: u.notifyEmail ?? true,
