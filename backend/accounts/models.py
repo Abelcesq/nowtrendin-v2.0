@@ -6,7 +6,8 @@ class Profile(models.Model):
     """Extra per-user data: membership tier + query tokens."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     tier = models.CharField(max_length=20, null=True, blank=True)  # consumer / business / enterprise
-    tokens_remaining = models.IntegerField(default=0)
+    tokens_remaining = models.IntegerField(default=0)        # query tokens (Enterprise)
+    grade_tokens = models.IntegerField(default=0)            # monthly AI-grade credits (all tiers)
     phone = models.CharField(max_length=20, null=True, blank=True)
     phone_verified = models.BooleanField(default=False)
     otp_code = models.CharField(max_length=6, null=True, blank=True)

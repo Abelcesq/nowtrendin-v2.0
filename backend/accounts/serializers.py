@@ -8,6 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     tier = serializers.SerializerMethodField()
     tokensRemaining = serializers.SerializerMethodField()
+    gradeTokens = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
     phoneVerified = serializers.SerializerMethodField()
     notifyEmail = serializers.SerializerMethodField()
@@ -15,7 +16,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'phone', 'phoneVerified', 'notifyEmail', 'notifyPush']
+        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'gradeTokens', 'phone', 'phoneVerified', 'notifyEmail', 'notifyPush']
+
+    def get_gradeTokens(self, u):
+        p = getattr(u, 'profile', None)
+        return p.grade_tokens if p else 0
 
     def get_notifyEmail(self, u):
         p = getattr(u, 'profile', None)

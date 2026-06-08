@@ -18,6 +18,8 @@ from .models import Profile, Alert
 from .serializers import SignupSerializer, UserSerializer, AlertSerializer
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
+# Monthly AI-grade credits per tier (grade ≈ $0.012 each; caps the exposure).
+GRADE_TOKENS = {'consumer': 25, 'business': 250, 'enterprise': 1000}
 
 
 def _send_sms(to, body):
@@ -166,6 +168,7 @@ class MeView(APIView):
         if data.get('tier') is not None:
             profile.tier = data['tier']
             profile.tokens_remaining = TIER_TOKENS.get(data['tier'], 0)
+            profile.grade_tokens = GRADE_TOKENS.get(data['tier'], 0)
         if 'phone' in data:
             new_phone = (str(data['phone']).strip() or None) if data['phone'] is not None else None
             if new_phone != profile.phone:
@@ -264,16 +267,19 @@ class PullTrendsView(APIView):
 
 
 class GradeView(APIView):
-    """Enterprise-only: AI-grade a topic not in our data (Perplexity research +
-    Claude synthesis), deducting one token only when a proposed score returns."""
+    """AI-grade a topic not in our data (Perplexity research + Claude synthesis).
+    Available on ALL tiers, metered by a monthly grade-token allowance
+    (Consumer 25 / Business 250 / Enterprise 1000). One grade token is charged
+    only when a proposed score actually returns."""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         profile, _ = Profile.objects.get_or_create(user=request.user)
-        if profile.tier != 'enterprise':
-            return Response({'detail': 'AI grading is an Enterprise feature.'}, status=403)
-        if (profile.tokens_remaining or 0) <= 0:
-            return Response({'detail': 'No query tokens remaining this month.'}, status=402)
+        if not profile.tier:
+            return Response({'detail': 'Choose a membership plan to use AI grading.'}, status=403)
+        if (profile.grade_tokens or 0) <= 0:
+            return Response({'detail': 'No AI-grade credits remaining this month.',
+                             'gradeTokens': 0}, status=402)
         topic = (str(request.data.get('topic') or '')).strip()
         if not topic:
             return Response({'detail': 'A topic is required.'}, status=400)
@@ -285,11 +291,11 @@ class GradeView(APIView):
         except Exception as exc:
             return Response({'detail': f'AI grade engine unavailable: {exc}'}, status=503)
 
-        # Charge a token only when a proposed score actually came back.
+        # Charge a grade token only when a proposed score actually came back.
         if data.get('available') and data.get('proposed'):
-            profile.tokens_remaining = max(0, (profile.tokens_remaining or 0) - 1)
+            profile.grade_tokens = max(0, (profile.grade_tokens or 0) - 1)
             profile.save()
-        data['tokensRemaining'] = profile.tokens_remaining
+        data['gradeTokens'] = profile.grade_tokens
         return Response(data, status=200)
 
 
