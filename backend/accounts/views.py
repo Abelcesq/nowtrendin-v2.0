@@ -213,7 +213,8 @@ class DirectQueryView(APIView):
             return Response({'detail': 'A topic is required.'}, status=400)
 
         try:
-            r = requests.post(f'{GRADIENT_API}/query', json={'topic': topic}, timeout=110)
+            r = requests.post(f'{GRADIENT_API}/query', json={'topic': topic},
+                              headers={'X-Internal-Key': settings.INTERNAL_API_KEY}, timeout=110)
             data = r.json()
         except Exception as exc:
             return Response({'detail': f'Scoring engine unavailable: {exc}'}, status=503)
@@ -242,7 +243,8 @@ class PullTrendsView(APIView):
         try:
             # /collect returns immediately; the engine runs the pipeline in the
             # background. We charge the token once the run is accepted.
-            r = requests.post(f'{GRADIENT_API}/collect', timeout=30)
+            r = requests.post(f'{GRADIENT_API}/collect',
+                              headers={'X-Internal-Key': settings.INTERNAL_API_KEY}, timeout=30)
             ok = r.status_code in (200, 202)
         except Exception as exc:
             return Response({'detail': f'Scoring engine unavailable: {exc}'}, status=503)
@@ -277,7 +279,8 @@ class GradeView(APIView):
             return Response({'detail': 'A topic is required.'}, status=400)
 
         try:
-            r = requests.post(f'{GRADIENT_API}/grade', json={'topic': topic}, timeout=120)
+            r = requests.post(f'{GRADIENT_API}/grade', json={'topic': topic},
+                              headers={'X-Internal-Key': settings.INTERNAL_API_KEY}, timeout=120)
             data = r.json()
         except Exception as exc:
             return Response({'detail': f'AI grade engine unavailable: {exc}'}, status=503)
