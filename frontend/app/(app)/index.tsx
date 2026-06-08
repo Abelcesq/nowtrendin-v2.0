@@ -6,6 +6,7 @@ import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
 import { RiskExplainer } from '../../components/trends/RiskExplainer';
+import { MacroLeverageCard } from '../../components/trends/MacroLeverageCard';
 import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
@@ -227,6 +228,8 @@ export default function Dashboard() {
       {mode === 'risk' && (
         <>
           {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
+
+          <MacroLeverageCard />
 
           <View className="flex-row items-center gap-2 mb-2">
             <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />

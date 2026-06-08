@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -49,6 +49,16 @@ export function useScoreHistory(topicKey: string | undefined) {
     retry: 1,
   });
   return { rows: q.data ?? [], isLoading: q.isLoading };
+}
+
+export function useMacroLeverage() {
+  const q = useQuery({
+    queryKey: ['macro-leverage'],
+    queryFn: fetchMacroLeverage,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+  return { macro: q.data ?? null, isLoading: q.isLoading };
 }
 
 export function useRiskScores() {

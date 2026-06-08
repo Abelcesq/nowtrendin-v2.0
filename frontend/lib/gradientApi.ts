@@ -219,6 +219,17 @@ export interface RiskScore {
     channelUrl: string;
     note: string;
   };
+  // FINRA short interest — leverage/distress indicator (companies only)
+  shortInterest?: {
+    shortPosition?: number | null;
+    changePct?: number | null;
+    daysToCover?: number | null;
+    settlementDate?: string;
+    label?: string;
+    note?: string;
+  };
+  // OFR macro leverage / funding-stress context (shared)
+  macroLeverage?: MacroLeverage;
   // Combined creator coverage (Meet Kevin + Andrei Jikh)
   creatorCoverage?: {
     note: string;
@@ -234,6 +245,44 @@ export interface RiskScore {
     recent?: { title: string; source: string; published: string }[];
     note: string;
   };
+}
+
+// OFR Short-Term Funding Monitor — systemic leverage + funding-stress overlay.
+export interface MacroLeverage {
+  asOf?: string;
+  leverageLabel?: string;
+  leverageScore?: number | null;
+  repoVolumeUsd?: number | null;
+  repoVolumeChangePct?: number | null;
+  stressLabel?: string;
+  repoSpreadBps?: number | null;
+  source?: string;
+  note?: string;
+}
+
+function mapMacro(m: any): MacroLeverage {
+  return {
+    asOf: m.as_of || undefined,
+    leverageLabel: m.leverage?.label,
+    leverageScore: m.leverage?.score ?? null,
+    repoVolumeUsd: m.leverage?.repo_volume_usd ?? null,
+    repoVolumeChangePct: m.leverage?.repo_volume_change_pct ?? null,
+    stressLabel: m.funding_stress?.label,
+    repoSpreadBps: m.funding_stress?.repo_rate_spread_bps ?? null,
+    source: m.source,
+    note: m.note,
+  };
+}
+
+export async function fetchMacroLeverage(): Promise<MacroLeverage | null> {
+  try {
+    const res = await fetch(`${GRADIENT_API}/macro/leverage`, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d?.available ? mapMacro(d) : null;
+  } catch {
+    return null;
+  }
 }
 
 // Risk Gradient Scores — emerging financial risks scored by diffusion stage.
@@ -314,6 +363,15 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       note: r.creator_coverage.note || '',
       creators: Array.isArray(r.creator_coverage.creators) ? r.creator_coverage.creators : [],
     } : undefined,
+    shortInterest: r.short_interest && r.short_interest.available ? {
+      shortPosition: r.short_interest.short_position ?? null,
+      changePct: r.short_interest.change_pct ?? null,
+      daysToCover: r.short_interest.days_to_cover ?? null,
+      settlementDate: r.short_interest.settlement_date || undefined,
+      label: r.short_interest.label || undefined,
+      note: r.short_interest.note || undefined,
+    } : undefined,
+    macroLeverage: r.macro_leverage ? mapMacro(r.macro_leverage) : undefined,
     alphaVantage: r.alpha_vantage ? {
       covered: Boolean(r.alpha_vantage.covered),
       articleCount: Number(r.alpha_vantage.article_count ?? 0),

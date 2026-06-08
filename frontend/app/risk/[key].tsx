@@ -211,6 +211,42 @@ export default function RiskDetail() {
         </>
       )}
 
+      {/* Leverage — FINRA short interest (company) + OFR macro funding context */}
+      {(!!risk.shortInterest || !!risk.macroLeverage) && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Leverage &amp; funding</Text>
+          <View className="bg-surface rounded-2xl border border-border p-4 mb-5">
+            {!!risk.shortInterest && (
+              <View className="mb-2">
+                <Text className="text-textPrimary text-sm font-bold mb-1">{risk.shortInterest.label}</Text>
+                <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                  {risk.shortInterest.shortPosition != null && (
+                    <Text className="text-textSecondary text-[12px]">Short interest {(risk.shortInterest.shortPosition / 1e6).toFixed(1)}M sh</Text>
+                  )}
+                  {risk.shortInterest.changePct != null && (
+                    <Text className="text-textSecondary text-[12px]">{risk.shortInterest.changePct >= 0 ? '+' : ''}{risk.shortInterest.changePct}% vs prior</Text>
+                  )}
+                  {risk.shortInterest.daysToCover != null && (
+                    <Text className="text-textSecondary text-[12px]">{risk.shortInterest.daysToCover} days to cover</Text>
+                  )}
+                </View>
+                <Text className="text-textMuted text-[10px] mt-1">FINRA short interest{risk.shortInterest.settlementDate ? ` · ${risk.shortInterest.settlementDate}` : ''}</Text>
+              </View>
+            )}
+            {!!risk.macroLeverage && (
+              <View className={risk.shortInterest ? 'pt-2 border-t border-border' : ''}>
+                <Text className="text-textSecondary text-[12px]">
+                  Market funding: <Text className="font-semibold text-textPrimary">{risk.macroLeverage.leverageLabel}</Text>
+                  {risk.macroLeverage.stressLabel ? ` · ${risk.macroLeverage.stressLabel}` : ''}
+                </Text>
+                <Text className="text-textMuted text-[10px] mt-1">OFR Short-Term Funding Monitor (repo){risk.macroLeverage.asOf ? ` · ${risk.macroLeverage.asOf}` : ''}</Text>
+              </View>
+            )}
+            <Text className="text-textMuted text-[10px] mt-2">Descriptive leverage indicators — not investment advice.</Text>
+          </View>
+        </>
+      )}
+
       {/* Market tenure / maturity — the analysis the user asked for */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Market tenure</Text>
       <View className="bg-surface rounded-2xl border p-4 mb-5" style={{ borderColor: `${matColor}55` }}>
