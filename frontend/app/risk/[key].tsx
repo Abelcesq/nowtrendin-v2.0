@@ -165,7 +165,7 @@ export default function RiskDetail() {
 
       {/* Retail Coverage — attributed data points, not advice. No external
           links (titles/URLs are shown as plain copyable text). */}
-      {(!!risk.meetKevin || !!risk.alphaVantage) && (
+      {(!!risk.creatorCoverage || !!risk.alphaVantage) && (
         <>
           <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail Coverage</Text>
           <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
@@ -184,29 +184,29 @@ export default function RiskDetail() {
                 ))}
               </View>
             )}
-            {/* Meet Kevin (YouTube) — coverage data, attributed, no link */}
-            {!!risk.meetKevin && (
-              <View className={risk.alphaVantage ? 'pt-3 border-t border-border' : ''}>
+            {/* Creator coverage (Meet Kevin + Andrei Jikh) — attributed, no links */}
+            {(risk.creatorCoverage?.creators ?? []).map((cr, ci) => (
+              <View key={cr.handle} className={(ci > 0 || risk.alphaVantage) ? 'pt-3 border-t border-border' : ''}>
                 <View className="flex-row items-center gap-2 mb-1">
                   <Play size={16} color="#CF2A1B" />
                   <Text className="text-textPrimary text-sm font-bold flex-1">
-                    {risk.meetKevin.covered
-                      ? `${risk.meetKevin.count} recent video${risk.meetKevin.count === 1 ? '' : 's'} on this name`
-                      : 'Not in recent uploads'}
+                    {cr.name}: {cr.covered
+                      ? `${cr.count} recent video${cr.count === 1 ? '' : 's'} on this name`
+                      : 'not in recent uploads'}
                   </Text>
                 </View>
-                {risk.meetKevin.covered && (risk.meetKevin.recent ?? []).map((v, i) => (
+                {cr.covered && (cr.recent ?? []).map((v, i) => (
                   <View key={i} className="mb-1.5">
                     <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
                     <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
                   </View>
                 ))}
-                <Text className="text-textMuted text-[10px] mt-1">Source: Meet Kevin (youtube.com/@MeetKevin)</Text>
+                <Text className="text-textMuted text-[10px] mt-1">Source: {cr.name} (youtube.com/@{cr.handle})</Text>
               </View>
-            )}
+            ))}
           </View>
           <Text className="text-textMuted text-[10px] mb-5">
-            {risk.alphaVantage?.note || risk.meetKevin?.note}
+            {risk.alphaVantage?.note || risk.creatorCoverage?.note || risk.meetKevin?.note}
           </Text>
         </>
       )}

@@ -219,6 +219,12 @@ export interface RiskScore {
     channelUrl: string;
     note: string;
   };
+  // Combined creator coverage (Meet Kevin + Andrei Jikh)
+  creatorCoverage?: {
+    note: string;
+    creators: { name: string; handle: string; covered: boolean; count: number;
+                recent?: { title: string; published: string }[] }[];
+  };
   // Alpha Vantage news/retail coverage (article volume + tone; attributed)
   alphaVantage?: {
     covered: boolean;
@@ -303,6 +309,10 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       recent: Array.isArray(r.meet_kevin.recent) ? r.meet_kevin.recent : undefined,
       channelUrl: r.meet_kevin.channel_url || 'https://www.youtube.com/@MeetKevin',
       note: r.meet_kevin.note || '',
+    } : undefined,
+    creatorCoverage: r.creator_coverage ? {
+      note: r.creator_coverage.note || '',
+      creators: Array.isArray(r.creator_coverage.creators) ? r.creator_coverage.creators : [],
     } : undefined,
     alphaVantage: r.alpha_vantage ? {
       covered: Boolean(r.alpha_vantage.covered),
