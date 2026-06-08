@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Target, TrendingUp, Clock } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
+import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { useAccuracy } from '../../../hooks/useSignals';
 
 function Metric({ label, value, suffix }: { label: string; value: number | string; suffix?: string }) {
@@ -79,6 +80,8 @@ export default function AccuracyLedger() {
           </Text>
         </View>
       )}
+
+      <Disclaimer />
     </Screen>
   );
 }

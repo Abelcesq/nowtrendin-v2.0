@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Trash2, Plus, Minus } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
+import { Disclaimer } from '../../components/ui/Disclaimer';
 import { Button } from '../../components/ui/Button';
 import { alertsApi } from '../../lib/api';
 import { useSignals } from '../../hooks/useSignals';
@@ -144,6 +145,8 @@ export default function Alerts() {
           Create Alert
         </Button>
       </View>
+
+      <Disclaimer />
     </Screen>
   );
 }

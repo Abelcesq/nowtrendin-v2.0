@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Search, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
+import { Disclaimer } from '../../components/ui/Disclaimer';
 import { HistoryRow } from '../../components/trends/HistoryRow';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
@@ -126,6 +127,8 @@ export default function History() {
           </View>
         </>
       )}
+
+      <Disclaimer />
     </Screen>
   );
 }
