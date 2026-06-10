@@ -19,7 +19,7 @@ from .serializers import SignupSerializer, UserSerializer, AlertSerializer
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
 # Monthly AI-grade credits per tier (grade ≈ $0.012 each; caps the exposure).
-GRADE_TOKENS = {'consumer': 25, 'business': 250, 'enterprise': 1000}
+GRADE_TOKENS = {'consumer': 25, 'business': 250, 'enterprise': 100000}
 
 
 def _send_sms(to, body):

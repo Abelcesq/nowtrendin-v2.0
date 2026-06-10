@@ -4,7 +4,7 @@ from .models import Profile
 
 # Monthly allowances per tier.
 TIER_QUERY_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
-TIER_GRADE_TOKENS = {'consumer': 25, 'business': 250, 'enterprise': 1000}
+TIER_GRADE_TOKENS = {'consumer': 25, 'business': 250, 'enterprise': 100000}
 
 
 def reset_all_credits() -> dict:
