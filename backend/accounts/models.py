@@ -22,6 +22,28 @@ class Profile(models.Model):
         return f"{self.user.email} ({self.tier or 'no tier'})"
 
 
+class GradeHistory(models.Model):
+    """Every AI-grade result a user obtains. Per-user history (12-month retention)
+    powers the 'History' tab; the union across users powers the 'Graded' tab."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='grades')
+    topic = models.CharField(max_length=200)
+    detection = models.FloatField(default=0)
+    confidence = models.FloatField(default=0)
+    stage = models.CharField(max_length=24, blank=True)
+    result_json = models.JSONField(default=dict)   # full proposed-score payload
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['topic']),
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.topic} ({self.user.email} · {self.created_at:%Y-%m-%d})"
+
+
 class Alert(models.Model):
     SCORE_TYPES = [('detection', 'detection'), ('confidence', 'confidence'), ('overall', 'overall')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')

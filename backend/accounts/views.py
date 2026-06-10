@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, Alert
+from .models import Profile, Alert, GradeHistory
 from .serializers import SignupSerializer, UserSerializer, AlertSerializer
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
@@ -336,8 +336,66 @@ class GradeView(APIView):
         if data.get('available') and data.get('proposed'):
             profile.grade_tokens = max(0, (profile.grade_tokens or 0) - 1)
             profile.save()
+            # Persist to the user's grade history (powers History + Graded tabs).
+            try:
+                GradeHistory.objects.create(
+                    user=request.user, topic=topic[:200],
+                    detection=float(data.get('detection_score') or 0),
+                    confidence=float(data.get('confidence_score') or 0),
+                    stage=str(data.get('stage') or '')[:24],
+                    result_json=data,
+                )
+            except Exception:
+                pass
         data['gradeTokens'] = profile.grade_tokens
         return Response(data, status=200)
+
+
+def _serialize_grade(g):
+    return {
+        'id': g.id, 'topic': g.topic,
+        'detection': round(g.detection, 1), 'confidence': round(g.confidence, 1),
+        'stage': g.stage, 'createdAt': g.created_at.isoformat(),
+        'result': g.result_json,
+    }
+
+
+class GradeHistoryView(APIView):
+    """The signed-in user's own grade history — last 12 months, newest first.
+    No token charge (just reading). Optional ?q= substring search on topic."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        cutoff = timezone.now() - timedelta(days=365)
+        qs = GradeHistory.objects.filter(user=request.user, created_at__gte=cutoff)
+        q = (request.query_params.get('q') or '').strip()
+        if q:
+            qs = qs.filter(topic__icontains=q)
+        qs = qs.order_by('-created_at')[:500]
+        return Response({'grades': [_serialize_grade(g) for g in qs]}, status=200)
+
+
+class GradedAllView(APIView):
+    """All topics graded by ANY member (across all tiers) — the community 'Graded'
+    list. Deduped to the latest grade per topic, newest first. No token charge.
+    Optional ?q= substring search."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        q = (request.query_params.get('q') or '').strip()
+        qs = GradeHistory.objects.all()
+        if q:
+            qs = qs.filter(topic__icontains=q)
+        # Latest grade per (case-insensitive) topic.
+        seen = {}
+        for g in qs.order_by('-created_at')[:2000]:
+            key = g.topic.strip().lower()
+            if key not in seen:
+                seen[key] = g
+            if len(seen) >= 300:
+                break
+        items = sorted(seen.values(), key=lambda g: g.created_at, reverse=True)
+        return Response({'grades': [_serialize_grade(g) for g in items]}, status=200)
 
 
 def _notify_alert(alert, current):

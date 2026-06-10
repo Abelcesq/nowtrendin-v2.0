@@ -43,6 +43,10 @@ export const queryApi = {
   pullMarket: () => api.post('/api/pull-market/', {}),
   // Enterprise AI Grade — web research + proposed score (token-metered)
   grade: (topic: string) => api.post('/api/grade/', { topic }),
+  // The signed-in user's grade history (12 months, no token charge). ?q= search.
+  gradeHistory: (q?: string) => api.get(`/api/grade/history/${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  // All topics graded by any member (deduped). No token charge. ?q= search.
+  gradedAll: (q?: string) => api.get(`/api/grade/all/${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 };
 
 export const alertsApi = {

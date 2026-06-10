@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput } from 'react-native';
-import { GraduationCap, Sparkles, Lock } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { GraduationCap, Sparkles, Lock, Clock, Globe, Search, Plus } from 'lucide-react-native';
 import { Button } from '../ui/Button';
 import { GradientScoreRing } from '../ui/GradientScoreRing';
 import { useAuthStore } from '../../store/auth.store';
@@ -18,38 +18,49 @@ interface Proposed {
   dark_matter: number; persistence: number;
   stage: string; action: string; reasoning: string; research: string; citations: string[];
 }
+interface GradeRow {
+  id: number; topic: string; detection: number; confidence: number;
+  stage: string; createdAt: string; result?: any;
+}
 
-// GRADE — AI internet-search a topic NOT in our data → PROPOSED Gradient Score
-// + research/citations. Perplexity researches the open web; Claude synthesizes
-// the score in our framework. Token-metered (1 token). Enterprise only.
+type Tab = 'new' | 'history' | 'graded';
+
+function timeAgo(iso: string): string {
+  const d = new Date(iso).getTime();
+  const mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+// GRADE — three tabs: New Grade (token-metered AI score), History (this member's
+// past grades, 12 months, free), Graded (all members' graded topics, free).
 export function GradeTool() {
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
+  const [tab, setTab] = useState<Tab>('new');
   const [topic, setTopic] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [result, setResult] = useState<Proposed | null>(null);
 
-  const canGrade = !!user?.tier;            // any plan; metered by grade credits
-  const tokens = user?.gradeTokens ?? 0;    // monthly AI-grade credits
+  const canGrade = !!user?.tier;
+  const tokens = user?.gradeTokens ?? 0;
 
   const grade = async () => {
-    setMsg(null);
-    setResult(null);
-    setBusy(true);
+    setMsg(null); setResult(null); setBusy(true);
     try {
       const d: any = await queryApi.grade(topic.trim());
       if (user) updateUser({ ...user, gradeTokens: d?.gradeTokens ?? tokens });
-      if (d?.available && d?.proposed) {
-        setResult(d as Proposed);
-      } else {
-        setMsg(d?.detail ?? d?.reason ?? 'AI grading is not available yet.');
-      }
+      if (d?.available && d?.proposed) setResult(d as Proposed);
+      else setMsg(d?.detail ?? d?.reason ?? 'AI grading is not available yet.');
     } catch (err: any) {
       setMsg(err?.data?.detail ?? 'Grade failed. Try again.');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -58,136 +69,185 @@ export function GradeTool() {
         <GraduationCap size={20} color="#D4A017" />
         <Text className="text-textPrimary text-xl font-black">Grade a Topic</Text>
       </View>
-      <Text className="text-textMuted text-[12px] leading-4 mb-4">
+      <Text className="text-textMuted text-[12px] leading-4 mb-3">
         Propose a Gradient Score for a topic that isn&apos;t in our trends yet. AI researches the open web and
         returns a proposed score with the evidence behind it.
       </Text>
 
-      {!canGrade ? (
-        <View className="rounded-xl border p-5 items-center" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
-          <Lock size={22} color="#D4A017" />
-          <Text className="text-textPrimary font-bold text-sm mt-2 text-center">Choose a plan</Text>
-          <Text className="text-textMuted text-xs mt-1 text-center">
-            AI grading is included on every plan with a monthly credit allowance. Select a membership to start.
+      {/* Three tab icons — New Grade | History | Graded */}
+      <View className="flex-row gap-2 mb-4">
+        <TabBtn icon={<Plus size={15} color={tab === 'new' ? '#FFFFFF' : '#5B6472'} />} label="New Grade" active={tab === 'new'} onPress={() => setTab('new')} />
+        <TabBtn icon={<Clock size={15} color={tab === 'history' ? '#FFFFFF' : '#5B6472'} />} label="History" active={tab === 'history'} onPress={() => setTab('history')} />
+        <TabBtn icon={<Globe size={15} color={tab === 'graded' ? '#FFFFFF' : '#5B6472'} />} label="Graded" active={tab === 'graded'} onPress={() => setTab('graded')} />
+      </View>
+
+      {tab === 'new' && (
+        !canGrade ? (
+          <View className="rounded-xl border p-5 items-center" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
+            <Lock size={22} color="#D4A017" />
+            <Text className="text-textPrimary font-bold text-sm mt-2 text-center">Choose a plan</Text>
+            <Text className="text-textMuted text-xs mt-1 text-center">AI grading is included on every plan with a monthly credit allowance.</Text>
+          </View>
+        ) : (
+          <>
+            <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
+              <Sparkles size={18} color="#D4A017" />
+              <TextInput value={topic} onChangeText={setTopic} placeholder="Enter any word or topic to grade…"
+                placeholderTextColor="#9AA3B0" className="flex-1 ml-3 text-base" style={{ color: '#1A1A2E' }} />
+            </View>
+            <View className="rounded-xl border p-4 mb-4" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
+              <View className="flex-row items-center gap-2 mb-1">
+                <Sparkles size={15} color="#D4A017" />
+                <Text className="text-textPrimary text-sm font-bold">AI Proposed Gradient Score</Text>
+                <Text className="text-textMuted text-xs ml-auto">{tokens} grade tokens left</Text>
+              </View>
+              <Text className="text-textMuted text-xs mb-3">Researches the open web and proposes a score with citations — uses 1 token.</Text>
+              <Button variant="enterprise" size="md" loading={busy} disabled={!topic.trim() || tokens <= 0} onPress={grade}>
+                {tokens <= 0 ? 'No grade tokens remaining this month' : 'Grade · 1 token'}
+              </Button>
+              {msg && <Text className="text-error text-xs mt-2">{msg}</Text>}
+              {busy && <Text className="text-textMuted text-[11px] mt-2">Researching the web and scoring… ~20–40s.</Text>}
+            </View>
+            {result && <ProposedCard result={result} />}
+          </>
+        )
+      )}
+
+      {tab === 'history' && <GradeList kind="history" />}
+      {tab === 'graded' && <GradeList kind="graded" />}
+    </View>
+  );
+}
+
+function TabBtn({ icon, label, active, onPress }: { icon: React.ReactNode; label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border"
+      style={{ backgroundColor: active ? '#D4A017' : '#FFFFFF', borderColor: active ? '#D4A017' : '#E4E7EC' }}>
+      {icon}
+      <Text className="text-[12px] font-bold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// History (this member's grades) + Graded (all members') share one list component.
+function GradeList({ kind }: { kind: 'history' | 'graded' }) {
+  const [q, setQ] = useState('');
+  const [rows, setRows] = useState<GradeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async (query: string) => {
+    setLoading(true);
+    try {
+      const d: any = kind === 'history' ? await queryApi.gradeHistory(query) : await queryApi.gradedAll(query);
+      setRows(Array.isArray(d?.grades) ? d.grades : []);
+    } catch { setRows([]); }
+    finally { setLoading(false); }
+  }, [kind]);
+
+  useEffect(() => { load(''); }, [load]);
+  // Debounced search.
+  useEffect(() => {
+    const t = setTimeout(() => load(q.trim()), 350);
+    return () => clearTimeout(t);
+  }, [q, load]);
+
+  return (
+    <View>
+      <View className="flex-row items-center bg-surface rounded-xl px-4 py-2.5 border border-border mb-3">
+        <Search size={16} color="#9AA3B0" />
+        <TextInput value={q} onChangeText={setQ}
+          placeholder={kind === 'history' ? 'Search your graded topics…' : 'Search all graded topics…'}
+          placeholderTextColor="#9AA3B0" className="flex-1 ml-2.5 text-sm" style={{ color: '#1A1A2E' }} />
+      </View>
+      <Text className="text-textMuted text-[11px] mb-3">
+        {kind === 'history'
+          ? 'Your AI grades from the last 12 months. No token charge to view.'
+          : 'Topics graded by Now TrendIn members across all plans. No token charge to view.'}
+      </Text>
+
+      {loading ? (
+        <ActivityIndicator size="small" color="#D4A017" style={{ marginTop: 24 }} />
+      ) : rows.length === 0 ? (
+        <View className="bg-surface rounded-2xl border border-border p-6 items-center">
+          <Text className="text-textMuted text-sm text-center">
+            {q ? 'No graded topics match your search.' : (kind === 'history' ? 'You haven’t graded any topics yet.' : 'No topics have been graded yet.')}
           </Text>
         </View>
       ) : (
-        <>
-          <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-            <Sparkles size={18} color="#D4A017" />
-            <TextInput
-              value={topic}
-              onChangeText={setTopic}
-              placeholder="Enter any word or topic to grade…"
-              placeholderTextColor="#9AA3B0"
-              className="flex-1 ml-3 text-base"
-              style={{ color: '#1A1A2E' }}
-            />
-          </View>
-
-          <View className="rounded-xl border p-4 mb-4" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
-            <View className="flex-row items-center gap-2 mb-1">
-              <Sparkles size={15} color="#D4A017" />
-              <Text className="text-textPrimary text-sm font-bold">AI Proposed Gradient Score</Text>
-              <Text className="text-textMuted text-xs ml-auto">{tokens} grade credits left</Text>
-            </View>
-            <Text className="text-textMuted text-xs mb-3">
-              Researches the open web and proposes a score with citations — uses 1 grade credit.
-            </Text>
-            <Button
-              variant="enterprise"
-              size="md"
-              loading={busy}
-              disabled={!topic.trim() || tokens <= 0}
-              onPress={grade}
-            >
-              {tokens <= 0 ? 'No grade credits remaining this month' : topic.trim() ? `Grade "${topic.trim()}" · 1 credit` : 'Type a topic to grade'}
-            </Button>
-            {msg && <Text className="text-error text-xs mt-2">{msg}</Text>}
-            {busy && <Text className="text-textMuted text-[11px] mt-2">Researching the web and scoring… ~20–40s.</Text>}
-          </View>
-
-          {result && (
-            <View className="bg-surface rounded-2xl border border-border p-5 mb-4">
-              <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Proposed · AI estimate</Text>
-                <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
-                  <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
-                </View>
-              </View>
-
-              <View className="flex-row justify-around items-start mt-2 mb-3">
-                <View className="items-center">
-                  <GradientScoreRing score={Math.round(result.detection_score)} color="#2D7EEF" size="md" caption="/100" />
-                  <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-                </View>
-                <View className="items-center">
-                  <GradientScoreRing score={Math.round(result.confidence_score)} color="#00C896" size="md" caption="/100" />
-                  <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-                </View>
-              </View>
-
-              {/* Gap interpretation — same bands as a regular signal */}
-              {(() => {
-                const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
-                const band = GAP_BANDS[gapBandIndex(gap)];
-                return (
-                  <View className="rounded-xl px-3 py-2 mb-3 border" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
-                    <Text className="text-sm font-bold" style={{ color: band.color }}>{gap}-point gap — {band.label}</Text>
+        rows.map((g) => {
+          const col = STAGE_COLOR[g.stage] ?? '#94A3B8';
+          return (
+            <View key={g.id} className="bg-surface rounded-xl border border-border p-3 mb-2">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{g.topic}</Text>
+                {!!g.stage && (
+                  <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
+                    <Text className="text-[9px] font-bold" style={{ color: col }}>{g.stage}</Text>
                   </View>
-                );
-              })()}
-
-              {/* Claude's holistic read, shown alongside the engine-calibrated score */}
-              <Text className="text-textMuted text-[11px] mb-3">
-                Engine-calibrated above · AI holistic estimate: DET {Math.round(result.holistic_detection)} · CONF {Math.round(result.holistic_confidence)}
-              </Text>
-
-              {!!result.action && (
-                <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#1A1A2E' }}>{result.action}</Text>
-              )}
-              {!!result.reasoning && <Text className="text-textSecondary text-[13px] leading-5 mb-3">{result.reasoning}</Text>}
-
-              {/* Signal Quality — component breakdown (same components as a signal) */}
-              <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal quality</Text>
-              <View className="gap-2 mb-3">
-                <Bar label="Niche Concentration" value={result.gradient_strength} />
-                <Bar label="Platform Diversity" value={result.platform_diversity} />
-                <Bar label="Momentum" value={result.inertia} />
-                <Bar label="Dark Matter" value={result.dark_matter} />
-                <Bar label="Persistence" value={result.persistence} />
+                )}
               </View>
-
-              {!!result.research && (
-                <>
-                  <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Research</Text>
-                  <Text className="text-textMuted text-[12px] leading-5 mb-3">{result.research}</Text>
-                </>
-              )}
-
-              {Array.isArray(result.citations) && result.citations.length > 0 && (
-                <>
-                  <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Sources</Text>
-                  {result.citations.slice(0, 8).map((c, i) => (
-                    <Text
-                      key={i}
-                      selectable
-                      className="text-textMuted text-[11px] mb-1"
-                      numberOfLines={1}
-                    >
-                      • {c}
-                    </Text>
-                  ))}
-                </>
-              )}
-
-              <Text className="text-textMuted text-[10px] leading-4 mt-3">
-                Proposed score — an AI estimate from public web evidence, not a measured engine score.
-              </Text>
+              <View className="flex-row items-center gap-3 mt-1">
+                <Text className="text-[11px]" style={{ color: '#2D7EEF' }}>DET {Math.round(g.detection)}</Text>
+                <Text className="text-[11px]" style={{ color: '#00C896' }}>CONF {Math.round(g.confidence)}</Text>
+                <Text className="text-textMuted text-[11px] ml-auto">{timeAgo(g.createdAt)}</Text>
+              </View>
             </View>
-          )}
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+function ProposedCard({ result }: { result: Proposed }) {
+  const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
+  const band = GAP_BANDS[gapBandIndex(gap)];
+  return (
+    <View className="bg-surface rounded-2xl border border-border p-5 mb-4">
+      <View className="flex-row items-center justify-between mb-1">
+        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Proposed · AI estimate</Text>
+        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
+          <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
+        </View>
+      </View>
+      <View className="flex-row justify-around items-start mt-2 mb-3">
+        <View className="items-center">
+          <GradientScoreRing score={Math.round(result.detection_score)} color="#2D7EEF" size="md" caption="/100" />
+          <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
+        </View>
+        <View className="items-center">
+          <GradientScoreRing score={Math.round(result.confidence_score)} color="#00C896" size="md" caption="/100" />
+          <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
+        </View>
+      </View>
+      <View className="rounded-xl px-3 py-2 mb-3 border" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
+        <Text className="text-sm font-bold" style={{ color: band.color }}>{gap}-point gap — {band.label}</Text>
+      </View>
+      {!!result.action && <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#1A1A2E' }}>{result.action}</Text>}
+      {!!result.reasoning && <Text className="text-textSecondary text-[13px] leading-5 mb-3">{result.reasoning}</Text>}
+      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal quality</Text>
+      <View className="gap-2 mb-3">
+        <Bar label="Niche Concentration" value={result.gradient_strength} />
+        <Bar label="Platform Diversity" value={result.platform_diversity} />
+        <Bar label="Momentum" value={result.inertia} />
+        <Bar label="Dark Matter" value={result.dark_matter} />
+        <Bar label="Persistence" value={result.persistence} />
+      </View>
+      {!!result.research && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Research</Text>
+          <Text className="text-textMuted text-[12px] leading-5 mb-3">{result.research}</Text>
         </>
       )}
+      {Array.isArray(result.citations) && result.citations.length > 0 && (
+        <>
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Sources</Text>
+          {result.citations.slice(0, 8).map((c, i) => (
+            <Text key={i} selectable className="text-textMuted text-[11px] mb-1" numberOfLines={1}>• {c}</Text>
+          ))}
+        </>
+      )}
+      <Text className="text-textMuted text-[10px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
     </View>
   );
 }
