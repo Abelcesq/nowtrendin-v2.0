@@ -18,6 +18,16 @@ import { ConvergenceBadge } from '../../components/trends/ConvergenceBadge';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../lib/signals';
 
+// Plain-English fallback for each maturity class (used when the engine's live
+// maturity_reason is absent). Explains what the lifecycle stage means for the score.
+const MATURITY_EXPLAIN: Record<string, string> = {
+  NEW: 'First cycles scored — the gradient is still stabilizing on this topic.',
+  EMERGING: 'Gaining across cycles; calibration is still building confidence.',
+  ESTABLISHED: 'A long-running topic with a permanent expert base. The gradient reflects its steady home, not a new surge — so scores are discounted to avoid over-reading an old, well-known topic as breaking news.',
+  RESURGENT: 'A previously-established topic that is re-accelerating — worth a closer look.',
+  MONITORING: 'Low-intensity background topic, below the emerging threshold.',
+};
+
 export default function SignalDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -64,20 +74,31 @@ export default function SignalDetail() {
       <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>
       <Text className="text-textPrimary text-3xl font-bold mt-0.5">{signal.topic}</Text>
 
-      {/* Maturity classification badge (NEW / ESTABLISHED / RESURGENT …) */}
+      {/* Topic maturity — LIVE calibration lifecycle (NEW / EMERGING /
+          ESTABLISHED / RESURGENT / MONITORING). Updates each scoring cycle.
+          Shows the engine's live maturity_reason so it's clear what the
+          classification means for THIS topic, not a static label. */}
       {!!signal.maturityClass && (
-        <View className="flex-row items-center gap-2 mt-1.5">
-          <View
-            className="self-start rounded-full px-2.5 py-1"
-            style={{ backgroundColor: `${maturityColourHex(signal.maturityClass)}1A` }}
-          >
-            <Text className="text-[10px] font-bold" style={{ color: maturityColourHex(signal.maturityClass) }}>
-              {signal.maturityBadge || signal.maturityClass}
+        <View className="rounded-xl border border-border bg-surface p-3 mt-2">
+          <View className="flex-row items-center gap-2">
+            <View
+              className="rounded-full px-2.5 py-1"
+              style={{ backgroundColor: `${maturityColourHex(signal.maturityClass)}1A` }}
+            >
+              <Text className="text-[10px] font-bold" style={{ color: maturityColourHex(signal.maturityClass) }}>
+                {signal.maturityBadge || signal.maturityClass}
+              </Text>
+            </View>
+            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
+              Topic maturity
             </Text>
           </View>
-          {signal.maturityClass === 'ESTABLISHED' && (
-            <Text className="text-textMuted text-[10px] flex-1">gradient reflects permanent expert home</Text>
-          )}
+          <Text className="text-textSecondary text-[12px] leading-4 mt-1.5">
+            {signal.maturityReason || MATURITY_EXPLAIN[signal.maturityClass] || ''}
+          </Text>
+          <Text className="text-textMuted text-[10px] mt-1">
+            Lifecycle stage from the calibration engine · re-evaluated each scoring cycle
+          </Text>
         </View>
       )}
 
@@ -290,7 +311,7 @@ export default function SignalDetail() {
 
       {/* Why the scores diverge */}
       <View className="mt-5">
-        <WhyScoresDiverge />
+        <WhyScoresDiverge signal={signal} />
       </View>
 
       {/* How the Gradient Score works (methodology — the 3 laws + Duality) */}
