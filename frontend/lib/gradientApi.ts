@@ -178,21 +178,16 @@ export interface RiskScore {
   abnormality?: number;     // % above (or below) the topic's own baseline
   baselineStatus?: string;  // INSUFFICIENT_HISTORY | BELOW_BASELINE | AT_BASELINE | ELEVATED_VS_SELF | SPIKE_VS_SELF
   baselineNote?: string;
-  // ── Market Gradient (data-type Duality — the primary Market score) ──
+  // ── Market Signal (baseline-relative dual score — the primary Market score) ──
   marketGradient?: {
-    detection: number;             // leading/soft: analyst + positioning + baseline
-    confidence: number;            // lagging/hard: fundamentals + price + macro
+    detection: number;             // leading/soft: analyst + positioning + dark
+    confidence: number;            // lagging/hard: fundamentals + momentum
     tier: string;                  // ELEVATED | ACTIVE | BUILDING | ROUTINE | DORMANT
     gap: number;                   // detection − confidence
-    components: {
-      analyst_signal?: number | null;
-      positioning_pressure?: number | null;
-      baseline_abnormality?: number | null;
-      fundamentals?: number | null;
-      price_action?: number | null;
-      macro_context?: number | null;
-    };
-    confidenceBasis?: string;
+    gapState?: string;             // EARLY | CONFIRMING | CONFIRMED | ROUTINE | LAGGING | MIXED | CALIBRATING
+    calibrating?: boolean;
+    // label -> { score, feeds: detection|confidence|both, baselineRelative, z }
+    components: Record<string, { score: number; feeds: string; baselineRelative: boolean; z: number | null }>;
     interpretation?: string;
   };
   // ── Positioning engine (baseline-relative; now a component of the above) ──
@@ -358,8 +353,15 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       confidence: Number(r.market_gradient.confidence ?? 0),
       tier: r.market_gradient.tier || 'DORMANT',
       gap: Number(r.market_gradient.gap ?? 0),
-      components: r.market_gradient.components || {},
-      confidenceBasis: r.market_gradient.confidence_basis || undefined,
+      gapState: r.market_gradient.gap_state || undefined,
+      calibrating: Boolean(r.market_gradient.calibrating),
+      components: Object.fromEntries(
+        Object.entries(r.market_gradient.components || {}).map(([label, v]: [string, any]) => [
+          label,
+          { score: Number(v?.score ?? 0), feeds: v?.feeds || 'both',
+            baselineRelative: Boolean(v?.baseline_relative), z: v?.z ?? null },
+        ])
+      ),
       interpretation: r.market_gradient.interpretation || undefined,
     } : undefined,
     // Positioning (baseline-relative) fields — now a component of the above.

@@ -50,15 +50,8 @@ const MARKET_TIERS = [
   { key: 'ROUTINE',  range: '25–39',  desc: 'In line with own baseline' },
   { key: 'DORMANT',  range: '0–24',   desc: 'Quiet vs baseline' },
 ];
-// The six Market Gradient components, grouped by which score they drive.
-const MARKET_COMPONENTS: { key: string; label: string; side: 'DET' | 'CONF' }[] = [
-  { key: 'analyst_signal',       label: 'Analyst Signal',       side: 'DET' },
-  { key: 'positioning_pressure', label: 'Positioning Pressure', side: 'DET' },
-  { key: 'baseline_abnormality', label: 'Baseline Abnormality', side: 'DET' },
-  { key: 'fundamentals',         label: 'Fundamentals',         side: 'CONF' },
-  { key: 'price_action',         label: 'Price Action',         side: 'CONF' },
-  { key: 'macro_context',        label: 'Macro Context',        side: 'CONF' },
-];
+// Component color by which score it feeds (detection=blue, confidence=green, both=purple).
+const FEEDS_COLOR: Record<string, string> = { detection: '#2D7EEF', confidence: '#00C896', both: '#8B5CF6' };
 const MKT_DET = '#2D7EEF';
 const MKT_CONF = '#00C896';
 
@@ -134,7 +127,8 @@ export default function RiskDetail() {
                 </View>
                 <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
                   <Text className="text-sm font-bold" style={{ color: tierCol }}>
-                    {gap}-pt gap{mg.gap >= 0 ? ' — leading signals ahead of confirmation' : ' — confirmed in hard data'}
+                    {mg.calibrating ? 'CALIBRATING' : (mg.gapState || `${gap}-pt gap`)}
+                    {!mg.calibrating && ` · ${gap}-pt gap`}
                   </Text>
                   {!!mg.interpretation && (
                     <Text className="text-textSecondary text-[13px] leading-5 mt-1">{mg.interpretation}</Text>
@@ -155,31 +149,32 @@ export default function RiskDetail() {
               how early the move is. Measurement only — not financial advice.
             </Text>
 
-            {/* Component breakdown — the six market factors, by side */}
-            {mg && (
+            {/* Component breakdown — the seven market factors, colored by which
+                score they feed. ✓ = baseline-relative (scored vs this item's own
+                history); otherwise still calibrating on absolute scale. */}
+            {mg && Object.keys(mg.components).length > 0 && (
               <View className="bg-surface rounded-2xl border border-border p-4 mb-3">
                 <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">Market factors</Text>
-                {MARKET_COMPONENTS.map((c) => {
-                  const raw = (mg.components as any)?.[c.key];
-                  const col = c.side === 'DET' ? MKT_DET : MKT_CONF;
-                  const present = raw != null;
+                {Object.entries(mg.components).map(([label, c]) => {
+                  const col = FEEDS_COLOR[c.feeds] ?? '#9AA3B0';
                   return (
-                    <View key={c.key} className="mb-2.5">
+                    <View key={label} className="mb-2.5">
                       <View className="flex-row justify-between mb-1">
-                        <View className="flex-row items-center gap-1.5">
-                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: present ? col : '#E4E7EC' }} />
-                          <Text className="text-textSecondary text-[12px]">{c.label}</Text>
+                        <View className="flex-row items-center gap-1.5 flex-1 pr-2">
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: col }} />
+                          <Text className="text-textSecondary text-[11px] flex-1" numberOfLines={1}>{label}</Text>
+                          {c.baselineRelative && <Text className="text-[9px]" style={{ color: '#00C896' }}>✓ base</Text>}
                         </View>
-                        <Text className="text-textPrimary text-[12px] font-bold">{present ? Math.round(raw) : 'n/a'}</Text>
+                        <Text className="text-textPrimary text-[12px] font-bold">{Math.round(c.score)}</Text>
                       </View>
                       <View className="h-1.5 rounded-full bg-border overflow-hidden">
-                        <View style={{ width: `${present ? Math.max(4, Math.min(100, raw)) : 0}%`, backgroundColor: col }} className="h-full rounded-full" />
+                        <View style={{ width: `${Math.max(4, Math.min(100, c.score))}%`, backgroundColor: col }} className="h-full rounded-full" />
                       </View>
                     </View>
                   );
                 })}
                 <Text className="text-textMuted text-[10px] mt-1">
-                  <Text style={{ color: MKT_DET }}>Blue</Text> = leading (Detection) · <Text style={{ color: MKT_CONF }}>Green</Text> = confirming (Confidence). "n/a" = no ticker-level data for this item.
+                  <Text style={{ color: '#2D7EEF' }}>Blue</Text> = leading (Detection) · <Text style={{ color: '#00C896' }}>Green</Text> = confirming · <Text style={{ color: '#8B5CF6' }}>Purple</Text> = both. ✓ base = scored vs this item's own history.
                 </Text>
               </View>
             )}
