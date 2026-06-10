@@ -532,6 +532,48 @@ export interface ResearchHistory {
   milestones?: { year?: string | number; label?: string }[];
 }
 
+// Signal Convergence — downstream directional validation. Reads the Gradient
+// Score's recent trajectory + raw volume + niche concentration and reports
+// whether the score's direction is CONFIRMED / MIXED / CONFLICTING by the data.
+// Independent of the N demand metric (non-circular). Never feeds the score.
+export interface Convergence {
+  status: 'ok' | 'warming_up' | 'unavailable' | 'error';
+  direction?: 'RISING' | 'FALLING' | 'HOLDING';
+  convergence?: 'CONFIRMED' | 'MIXED' | 'CONFLICTING' | 'INCONCLUSIVE';
+  snapshots?: number;
+  needed?: number;
+  note?: string;
+  vsGradient?: { validation: string; text: string; scoreSlope?: number; volumeChangePct?: number };
+  vsNiche?: { validation: string; text: string; nicheG?: number | null };
+}
+
+export async function fetchConvergence(topicKey: string): Promise<Convergence> {
+  const res = await fetch(`${GRADIENT_API}/convergence/${encodeURIComponent(topicKey)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Gradient API ${res.status}`);
+  const d = await res.json();
+  return {
+    status: d.status,
+    direction: d.direction,
+    convergence: d.convergence,
+    snapshots: d.snapshots,
+    needed: d.needed,
+    note: d.note,
+    vsGradient: d.vs_gradient ? {
+      validation: d.vs_gradient.validation,
+      text: d.vs_gradient.text,
+      scoreSlope: d.vs_gradient.score_slope,
+      volumeChangePct: d.vs_gradient.volume_change_pct,
+    } : undefined,
+    vsNiche: d.vs_niche ? {
+      validation: d.vs_niche.validation,
+      text: d.vs_niche.text,
+      nicheG: d.vs_niche.niche_g,
+    } : undefined,
+  };
+}
+
 // Research history for a topic ("how long has this been discussed").
 export async function fetchResearch(topicKey: string): Promise<ResearchHistory> {
   const res = await fetch(`${GRADIENT_API}/scores/${encodeURIComponent(topicKey)}/history`, {

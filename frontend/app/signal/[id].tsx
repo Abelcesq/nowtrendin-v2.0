@@ -14,6 +14,7 @@ import { TopicVariationMap } from '../../components/trends/TopicVariationMap';
 import { DarkMatterPanel } from '../../components/trends/DarkMatterPanel';
 import { MethodologyExplainer } from '../../components/trends/MethodologyExplainer';
 import { XSignalPanel } from '../../components/trends/XSignalPanel';
+import { ConvergenceBadge } from '../../components/trends/ConvergenceBadge';
 import { useSignal } from '../../hooks/useSignals';
 import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../lib/signals';
 
@@ -194,6 +195,11 @@ export default function SignalDetail() {
             </Text>
           </View>
         )}
+
+        {/* Signal Convergence — downstream directional validation of the score's
+            direction against raw volume + niche concentration. Lazy-loaded;
+            independent of N (non-circular). */}
+        <ConvergenceBadge topicKey={signal.id} />
       </View>
 
       {/* Dual Score Analysis (gap bands + who uses which score) */}

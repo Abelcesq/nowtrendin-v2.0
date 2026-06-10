@@ -84,6 +84,40 @@ export default function CategoryPage() {
         <Text className="text-textSecondary text-[13px] leading-5">{cat.howReached}</Text>
       </View>
 
+      {/* Signal Convergence explainer — only on the Now TrendIn page. Explains
+          the downstream validation metric users will see on each signal's detail. */}
+      {isNowTrendin && (
+        <View className="bg-surface rounded-2xl border p-5 mb-4" style={{ borderColor: '#EE6A2A44' }}>
+          <Text className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: '#B5341B' }}>
+            Signal Convergence — how we validate direction
+          </Text>
+          <Text className="text-textPrimary text-sm leading-5 mb-3">
+            Every signal here carries a Convergence check: a downstream test of whether the
+            Gradient Score's direction is actually backed by the underlying data. It reads the
+            score and the raw signals — it never feeds or alters the score — so it's an
+            independent cross-check, not a circular one.
+          </Text>
+          <View className="rounded-xl p-3 mb-2 border" style={{ borderColor: '#00C89633', backgroundColor: '#00C8960A' }}>
+            <Text className="text-[11px] font-bold mb-0.5" style={{ color: '#009970' }}>vs Gradient Score</Text>
+            <Text className="text-textSecondary text-[12px] leading-4">
+              Is the score's rise (or fall) confirmed by raw signal volume moving the same way?
+              A rising score with falling volume is flagged CONFLICTING — a move the data doesn't support.
+            </Text>
+          </View>
+          <View className="rounded-xl p-3 border" style={{ borderColor: '#2D7EEF33', backgroundColor: '#2D7EEF0A' }}>
+            <Text className="text-[11px] font-bold mb-0.5" style={{ color: '#2D7EEF' }}>vs Niche Analysis</Text>
+            <Text className="text-textSecondary text-[12px] leading-4">
+              Is the direction consistent with where the topic sits in the diffusion curve? Rising while
+              still niche-concentrated = genuine early spread; rising once already mainstream = a late move.
+            </Text>
+          </View>
+          <Text className="text-textMuted text-[10px] leading-4 mt-2">
+            Verdicts: CONFIRMED (data agrees) · MIXED (partial) · CONFLICTING (data disagrees). Open any
+            signal to see its live Convergence reading.
+          </Text>
+        </View>
+      )}
+
       {/* Search bar (lets you narrow within the focused view) */}
       <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
         <Search size={18} color="#9AA3B0" />

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage } from '../lib/gradientApi';
+import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -98,6 +98,18 @@ export function useExplainer(topicKey: string | undefined, topicName?: string, e
     retry: 0,
   });
   return { explainer: q.data, isLoading: q.isLoading };
+}
+
+// Signal Convergence — lazy per-topic directional validation (cached 5 min).
+export function useConvergence(topicKey: string | undefined, enabled = true) {
+  const q = useQuery({
+    queryKey: ['convergence', topicKey],
+    queryFn: () => fetchConvergence(topicKey as string),
+    enabled: !!topicKey && enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  return { convergence: q.data, isLoading: q.isLoading };
 }
 
 export function useRisk(key: string | undefined) {
