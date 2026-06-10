@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Atom } from 'lucide-react-native';
 /**
  * "How the Gradient Score works" — ported from the web dashboard's
  * "How It Works" tab. Static, collapsible institutional-trust explainer:
- * the three laws + the Heisenberg dual-score principle.
+ * the three laws + the Duality dual-score principle.
  */
 const LAWS = [
   {
@@ -68,7 +68,7 @@ export function MethodologyExplainer() {
           ))}
 
           <View className="rounded-xl px-3 py-3 mt-1 border" style={{ borderColor: '#D4A01733', backgroundColor: '#D4A0170D' }}>
-            <Text className="text-[11px] font-bold mb-1" style={{ color: '#B8860B' }}>THE HEISENBERG PRINCIPLE</Text>
+            <Text className="text-[11px] font-bold mb-1" style={{ color: '#B8860B' }}>THE DUALITY PRINCIPLE</Text>
             <Text className="text-textMuted text-[11px] leading-5">
               Earlier detection comes with lower certainty; higher certainty needs more data, which means later
               detection. That's why every topic shows two scores — Detection (optimized for earliness) and

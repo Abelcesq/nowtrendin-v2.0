@@ -35,8 +35,12 @@ export const api = {
 export const queryApi = {
   // Enterprise direct topic query (token-metered) → { found, result, tokensRemaining, detail }
   run: (topic: string) => api.post('/api/query/', { topic }),
-  // Enterprise "Pull Trends" — fresh collect+score run (token-metered) → { status, message, tokensRemaining }
+  // Enterprise "Pull Trends" — fresh attention/diffusion collect (Apify Google Trends, X,
+  // GitHub, HN, blogs, news APIs) → { status, message, tokensRemaining }. Token-metered.
   pullTrends: () => api.post('/api/pull-trends/', {}),
+  // Enterprise "Pull Market" — fresh risk/financial collect (FINRA, OFR, WhaleWisdom 13F,
+  // Finnhub, Alpha Vantage, Yahoo Finance, creator + broadcast YouTube). Token-metered.
+  pullMarket: () => api.post('/api/pull-market/', {}),
   // Enterprise AI Grade — web research + proposed score (token-metered)
   grade: (topic: string) => api.post('/api/grade/', { topic }),
 };

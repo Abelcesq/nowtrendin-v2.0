@@ -230,11 +230,27 @@ export interface RiskScore {
   };
   // OFR macro leverage / funding-stress context (shared)
   macroLeverage?: MacroLeverage;
-  // Combined creator coverage (Meet Kevin + Andrei Jikh)
+  // WhaleWisdom 13F — institutional smart-money positioning (companies only)
+  institutionalHoldings?: {
+    holdersCount?: number | null;
+    sharesHeld?: number | null;
+    sharesChangePct?: number | null;
+    sentiment?: string;
+    label?: string;
+    topHolders?: { name: string; shares?: number | null; changePct?: number | null }[];
+  };
+  // Retail finance creator coverage (Meet Kevin, Andrei Jikh, Graham Stephan, etc.)
   creatorCoverage?: {
     note: string;
     creators: { name: string; handle: string; covered: boolean; count: number;
                 recent?: { title: string; published: string }[] }[];
+  };
+  // Broadcast / institutional media coverage (CNBC, Bloomberg, Reuters, BBC, etc.)
+  broadcastCoverage?: {
+    note: string;
+    totalChannels: number;
+    channels: { name: string; handle: string; region: string; covered: boolean;
+                count: number; recent?: { title: string; published: string }[] }[];
   };
   // Alpha Vantage news/retail coverage (article volume + tone; attributed)
   alphaVantage?: {
@@ -372,6 +388,28 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       note: r.short_interest.note || undefined,
     } : undefined,
     macroLeverage: r.macro_leverage ? mapMacro(r.macro_leverage) : undefined,
+    broadcastCoverage: r.broadcast_coverage ? {
+      note: r.broadcast_coverage.note || '',
+      totalChannels: r.broadcast_coverage.total_channels ?? 0,
+      channels: Array.isArray(r.broadcast_coverage.channels)
+        ? r.broadcast_coverage.channels.map((c: any) => ({
+            name: c.name, handle: c.handle, region: c.region || '',
+            covered: !!c.covered, count: c.count ?? 0,
+            recent: Array.isArray(c.recent) ? c.recent : [],
+          }))
+        : [],
+    } : undefined,
+    institutionalHoldings: r.institutional_holdings && r.institutional_holdings.available ? {
+      holdersCount: r.institutional_holdings.holders_count ?? null,
+      sharesHeld: r.institutional_holdings.shares_held ?? null,
+      sharesChangePct: r.institutional_holdings.shares_change_pct ?? null,
+      sentiment: r.institutional_holdings.sentiment || undefined,
+      label: r.institutional_holdings.label || undefined,
+      topHolders: Array.isArray(r.institutional_holdings.top_holders)
+        ? r.institutional_holdings.top_holders.map((h: any) => ({
+            name: h.name, shares: h.shares ?? null, changePct: h.change_pct ?? null }))
+        : undefined,
+    } : undefined,
     alphaVantage: r.alpha_vantage ? {
       covered: Boolean(r.alpha_vantage.covered),
       articleCount: Number(r.alpha_vantage.article_count ?? 0),

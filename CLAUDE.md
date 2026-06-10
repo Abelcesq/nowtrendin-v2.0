@@ -36,12 +36,11 @@ Storage:     expo-secure-store (tokens) + AsyncStorage (preferences)
 Push alerts: expo-notifications
 ```
 
-> **Phase 1 deviations (Expo Go compatibility):**
-> - `@stripe/stripe-react-native` and `expo-notifications` push are NOT installed yet —
->   they require a custom dev client and break Expo Go. They are added in a later phase.
-> - Phase 1 uses a **mock auth** flow (no real Django endpoints yet) so the full
->   navigation can be tested on a device immediately. Real JWT auth replaces the mock
->   in a follow-up step without changing screen code.
+> **Live status (current):** Real Django JWT + Google OAuth auth is in production —
+> backend on Heroku (`nowtrendin-backend`), engine on Heroku (`nowtrendin`). Phases
+> 1–4 are complete (auth, tier-gated dashboard, Gradient Score, search/alerts).
+> Stripe and `expo-notifications` push are **still deferred** — they require a custom
+> dev client and break Expo Go. Add when moving off Expo Go for production builds.
 
 **FORBIDDEN:** Do not use:
 - react-navigation (use expo-router only)
@@ -186,12 +185,15 @@ or results obtained through the platform."
 
 ---
 
-## 9. PHASES — DO NOT SKIP
-1. **Auth + onboarding + membership shell** (mock auth) ← CURRENT
-2. Dashboard + tier-restricted nav (TierGate + age filtering)
-3. Gradient Score display (rings, signal cards, breakdown)
-4. Search + alerts + push
-5. Enterprise direct-query + token deduction + source editor
+## 9. PHASES — current status
+1. ✅ Auth + onboarding + membership shell (real Django JWT + Google OAuth)
+2. ✅ Dashboard + tier-restricted nav (TierGate + data-aging filter)
+3. ✅ Gradient Score display (rings, signal cards, breakdown)
+4. ✅ Search + alerts (push deferred — needs custom dev client)
+5. ✅ Enterprise direct-query + token deduction
+6. ✅ Risk/Other tab (FINRA + OFR + WhaleWisdom + creators + broadcast)
+7. ✅ Trend Beneficiary (SanDisk-pattern), auto-theme extension
+8. ⏳ Stripe payments + push notifications (require custom dev client)
 
 ---
 
@@ -210,4 +212,4 @@ dark text #1A1A2E. Green #00C896 = accents/active states. Wordmark: "Now" brandO
 brandMaroon. Flame logo preserved from v1.0 — rendered via components/ui/Logo.tsx (SVG stand-in;
 swap for the original logo.png in assets/ when available). StatusBar = dark-content.
 
-*Last updated: Now TrendIn 2.0 — Phase 1 (SDK 54, mock auth)*
+*Last updated: 2026-06-10 — Phases 1–7 live, real JWT auth, 22 broadcast + 5 creator feeds, Trend Beneficiary + auto-theme extension shipped*

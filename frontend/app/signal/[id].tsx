@@ -95,14 +95,7 @@ export default function SignalDetail() {
         {signal.totalMentions ?? 0} signals · {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
       </Text>
 
-      {/* Now Trending — internal app demand (the N component) */}
-      {signal.nowTrending != null && signal.nowTrending > 0 && (
-        <View className="flex-row items-center gap-1.5 self-start rounded-full px-3 py-1.5 mb-4 bg-primary/10 border border-primary/30">
-          <Flame size={14} color="#00C896" />
-          <Text className="text-primaryDk text-xs font-bold">Now Trending {signal.nowTrending}</Text>
-          <Text className="text-textMuted text-[11px]">· internal demand</Text>
-        </View>
-      )}
+{/* (N — Now TrendIn — section moved below, just above Dual Score Analysis) */}
 
       {/* Tagline */}
       <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
@@ -153,6 +146,55 @@ export default function SignalDetail() {
 
       {/* Research — AI plain-English explanation of what this trend means */}
       <TopicResearch topicKey={signal.id} topicName={signal.topic} />
+
+      {/* Now TrendIn (N component) — internal on-platform query demand.
+          Positioned just above the Dual Score Analysis so the reader sees
+          our headline metric before reading about Detection/Confidence gap
+          mechanics. Always rendered — when N=0 we explain why (no demand yet). */}
+      <View className="rounded-2xl p-4 mb-5 border"
+            style={{ borderColor: '#EE6A2A55', backgroundColor: '#EE6A2A0C' }}>
+        <View className="flex-row items-center gap-2 mb-2">
+          <Flame size={16} color="#EE6A2A" />
+          <View className="flex-row items-baseline">
+            <Text className="text-base font-black" style={{ color: '#EE6A2A' }}>Now</Text>
+            <Text className="text-base font-black" style={{ color: '#B5341B' }}>TrendIn</Text>
+            <Text className="text-textSecondary text-sm font-semibold ml-2">
+              · N component
+            </Text>
+          </View>
+          <View className="flex-1" />
+          <Text className="text-2xl font-black" style={{ color: '#EE6A2A' }}>
+            {signal.nowTrending ?? 0}
+          </Text>
+        </View>
+        <Text className="text-textSecondary text-[12px] leading-4 mb-2">
+          The on-platform demand signal — how often Now TrendIn users have been asking the
+          engine about this topic. Captures real institutional curiosity that no public
+          source can see.
+        </Text>
+        <Text className="text-textMuted text-[11px] leading-4">
+          <Text className="font-bold">How it's calculated: </Text>
+          two parts — <Text className="font-bold">Volume (70%):</Text> log-scale of total
+          user queries about this topic over the last 30 days.
+          <Text className="font-bold"> Recency (30%):</Text> spike in the last 24 hours
+          vs the 7-day average rate. Combined 0–100. A score of 20+ means weekly attention;
+          50+ means daily; 80+ means viral demand inside the app.
+        </Text>
+        <Text className="text-textMuted text-[11px] leading-4 mt-1.5">
+          <Text className="font-bold">Why it counts: </Text>
+          N is weighted at <Text className="font-bold">12% of Detection</Text> and
+          <Text className="font-bold"> 10% of Confidence</Text>. When N is elevated, it
+          confirms that humans (not just our crawlers) are seeing the early signal too.
+        </Text>
+        {(!signal.nowTrending || signal.nowTrending === 0) && (
+          <View className="mt-2 pt-2 border-t" style={{ borderColor: '#EE6A2A33' }}>
+            <Text className="text-textMuted text-[11px] italic">
+              No on-platform demand has registered for this topic yet — N will rise as
+              users query about it.
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Dual Score Analysis (gap bands + who uses which score) */}
       <DualScoreAnalysis signal={signal} />
@@ -245,7 +287,7 @@ export default function SignalDetail() {
         <WhyScoresDiverge />
       </View>
 
-      {/* How the Gradient Score works (methodology — the 3 laws + Heisenberg) */}
+      {/* How the Gradient Score works (methodology — the 3 laws + Duality) */}
       <View className="mt-5">
         <MethodologyExplainer />
       </View>

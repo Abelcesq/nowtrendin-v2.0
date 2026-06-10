@@ -121,6 +121,150 @@ export const STAGE_META = [
   { key: 'WATCHING', label: 'WATCHING', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
 
+// CATEGORY_DEFS — the single source of truth for the homepage chip row, the
+// stat-tile grid, and the focused category page. Each entry knows its label,
+// brand colors, a long-form definition, and how a signal qualifies. Adding a
+// category here automatically adds it to the chip row and the focused-page
+// router (no other code change needed).
+//
+// ⚠️ The `filter` arrows below reference `scoreGap` BEFORE its definition
+// further down in this file. This works ONLY because `scoreGap` is declared
+// with the `function` keyword (hoisted to module scope). If you ever convert
+// it to `const scoreGap = (s) => …`, these filters will throw ReferenceError
+// at call time — move CATEGORY_DEFS below `scoreGap` if you make that switch.
+export type CategoryKey =
+  | 'nowtrendin' | 'all' | 'breakout' | 'strong'
+  | 'emerging' | 'lowrisk' | 'anomalies';
+
+export const CATEGORY_DEFS: Array<{
+  key: CategoryKey;
+  label: string;
+  short: string;          // tile label (very short)
+  range: string;          // score range / criterion string
+  color: string;          // primary color
+  altColor?: string;      // secondary color (used for NowTrendIn wordmark split)
+  definition: string;     // 2-3 sentence explanation for the focused page
+  howReached: string;     // how a trend lands here
+  showTile: boolean;      // whether to render in the stat-tile grid
+  filter: (s: Signal) => boolean; // membership predicate
+}> = [
+  {
+    key: 'nowtrendin',
+    label: 'Now TrendIn',
+    short: 'NOW TRENDIN',
+    range: 'Sorted by Detection Score 100 → 0',
+    color: '#EE6A2A', altColor: '#B5341B',
+    definition:
+      'Every accessible trend, ranked by Detection Score from highest to lowest. ' +
+      'Detection Score weights early-edge components (Gradient Strength 40%, Dark Matter 25%, ' +
+      'Inertia 20%) — it is the metric Now TrendIn was built around: where attention is ' +
+      'moving BEFORE it arrives at mainstream.',
+    howReached:
+      'No threshold — this view shows everything the engine has scored that is accessible ' +
+      'to your tier, sorted by earliness. A high Detection Score here means the engine ' +
+      'sees concentrated niche signal ahead of mainstream confirmation.',
+    showTile: true,
+    filter: () => true,
+  },
+  {
+    key: 'all',
+    label: 'All Signals',
+    short: 'ALL',
+    range: 'Every accessible signal',
+    color: '#5B6472',
+    definition: 'Every signal currently visible to your tier, in the default engine ordering.',
+    howReached: 'No filter applied.',
+    showTile: false,
+    filter: () => true,
+  },
+  {
+    key: 'breakout',
+    label: 'Breakout ≥85',
+    short: 'BREAKOUT',
+    range: 'Detection Score 85–100',
+    color: '#00C896',
+    definition:
+      'Topics where Detection Score is at or above 85 — the strongest live signal band. ' +
+      'These are trends already breaking out across multiple platforms with the engine ' +
+      'showing high confidence in the diffusion.',
+    howReached:
+      'A topic reaches Breakout when its Detection Score (G·0.40 + D·0.25 + I·0.20 + M·0.10 + C·0.05) ' +
+      'lands at 85 or higher. This typically requires sustained cross-platform mentions, strong ' +
+      'first-timer ratio (Dark Matter), and accelerating engagement.',
+    showTile: true,
+    filter: (s) => s.score >= 85,
+  },
+  {
+    key: 'strong',
+    label: 'Strong ≥70',
+    short: 'STRONG',
+    range: 'Detection Score 70–84',
+    color: '#2D7EEF',
+    definition:
+      'Topics with high signal strength but not yet at breakout intensity. The diffusion ' +
+      'is established and momentum is steady — a candidate to watch for promotion to Breakout.',
+    howReached:
+      'Detection Score lands in the 70–84 band. Usually means broad platform coverage is in ' +
+      'place, Inertia is positive, but one or more components (often Dark Matter or Gradient ' +
+      'Strength) has not yet maxed out.',
+    showTile: true,
+    filter: (s) => s.score >= 70 && s.score < 85,
+  },
+  {
+    key: 'emerging',
+    label: 'Emerging',
+    short: 'EMERGING',
+    range: 'Detection Score 55–69',
+    color: '#D4A017',
+    definition:
+      'Building signals — early momentum is forming but the engine has not yet confirmed ' +
+      'sustained acceleration across multiple cycles. The earliest end of the actionable band.',
+    howReached:
+      'Detection Score 55–69. Typically Gradient Strength is high (niche concentration) but ' +
+      'Inertia and Medium Sequence are still ramping. Many will fade; some will graduate to Strong.',
+    showTile: true,
+    filter: (s) => s.score >= 55 && s.score < 70,
+  },
+  {
+    key: 'lowrisk',
+    label: 'Low Risk',
+    short: 'LOW RISK',
+    range: 'Detection vs Confidence gap ≤ 6 pts',
+    color: '#10B981',
+    definition:
+      'Signals where Detection and Confidence Scores are tightly aligned (within 6 points). ' +
+      'The engine sees both earliness AND confirmation — the most balanced, least uncertain band.',
+    howReached:
+      'Both Detection and Confidence land near the same value, meaning the early-edge ' +
+      'components (G, D) and the confirmation components (I, M) are reading the same story. ' +
+      'Convergent evidence on both sides of the Duality split.',
+    showTile: true,
+    filter: (s) => scoreGap(s) <= 6,
+  },
+  {
+    key: 'anomalies',
+    label: 'Anomalies',
+    short: 'ANOMALIES',
+    range: 'Detection vs Confidence gap ≥ 18 pts',
+    color: '#8B5CF6',
+    definition:
+      'Signals where Detection Score is sharply diverging from Confidence Score by 18+ points. ' +
+      'These are the engine\'s earliest, most uncertain leads — strong early-edge evidence (high G ' +
+      'or D) running ahead of cross-platform confirmation. Sometimes the future arriving; ' +
+      'sometimes noise.',
+    howReached:
+      'The absolute gap between Detection and Confidence reaches 18 points or more. Typically ' +
+      'driven by a Dark Matter or Gradient Strength spike that has not yet been validated by ' +
+      'Inertia or Medium Sequence.',
+    showTile: true,
+    filter: (s) => scoreGap(s) >= 18,
+  },
+];
+
+export function getCategory(key: string) {
+  return CATEGORY_DEFS.find((c) => c.key === key) ?? CATEGORY_DEFS[1]; // default to 'all'
+}
+
 // Short, descriptive signal-read per stage (analysis only — no action guidance).
 const ACTION_LINE: Record<Stage, string> = {
   VIRAL: 'Viral-level signal across platforms.',
@@ -134,7 +278,7 @@ const ACTION_LINE: Record<Stage, string> = {
 };
 export const actionLine = (s: Stage) => ACTION_LINE[s] ?? ACTION_LINE.MONITORING;
 
-// Detection vs Confidence — fixed engine characteristics (the "Heisenberg split").
+// Detection vs Confidence — fixed engine characteristics (the "Duality split").
 export const SCORE_ROLES = {
   detection: {
     color: '#2D7EEF',

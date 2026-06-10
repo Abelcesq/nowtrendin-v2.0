@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Bell, Zap, Briefcase, Building2, Search } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
@@ -7,33 +8,19 @@ import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
 import { RiskExplainer } from '../../components/trends/RiskExplainer';
 import { MacroLeverageCard } from '../../components/trends/MacroLeverageCard';
-import { ScoreLegend } from '../../components/trends/ScoreLegend';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
+import { PullMarketButton } from '../../components/trends/PullMarketButton';
 import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
-import { dataWindowLabel, scoreGap } from '../../lib/signals';
+import { dataWindowLabel, scoreGap, CATEGORY_DEFS } from '../../lib/signals';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 
-const FILTERS = [
-  { k: 'all', label: 'All Signals' },
-  { k: 'breakout', label: 'Breakout ≥85' },
-  { k: 'strong', label: 'Strong ≥70' },
-  { k: 'emerging', label: 'Emerging' },
-  { k: 'lowrisk', label: 'Low Risk' },
-] as const;
-
-const STATS = [
-  { k: 'breakout', label: 'BREAKOUT', color: '#00C896' },
-  { k: 'strong', label: 'STRONG', color: '#2D7EEF' },
-  { k: 'emerging', label: 'EMERGING', color: '#D4A017' },
-  { k: 'anomalies', label: 'ANOMALIES', color: '#8B5CF6' },
-] as const;
-
 export default function Dashboard() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tier = (user?.tier ?? 'consumer') as TierID;
   const cfg = TIERS[tier];
@@ -44,7 +31,6 @@ export default function Dashboard() {
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<string>('all');
 
   // Risk obeys the same data-aging waterfall as Attention.
   const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
@@ -59,21 +45,18 @@ export default function Dashboard() {
       : hour >= 18 && hour < 21 ? 'Good evening'   // 6:00pm – 8:59pm
       : 'Good night';                              // 9:00pm – 12:59am
 
-  const counts = {
-    breakout: accessible.filter((s) => s.stage === 'BREAKOUT' || s.score >= 85).length,
-    strong: accessible.filter((s) => s.stage === 'STRONG').length,
-    emerging: accessible.filter((s) => s.stage === 'EMERGING').length,
-    anomalies: accessible.filter((s) => s.isAnomaly).length,
-  } as Record<string, number>;
+  // Counts per category — single source of truth: CATEGORY_DEFS.filter
+  const counts = Object.fromEntries(
+    CATEGORY_DEFS.map((c) => [c.key, accessible.filter(c.filter).length])
+  ) as Record<string, number>;
 
-  const filtered = accessible.filter((s) => {
-    if (query && !s.topic.toLowerCase().includes(query.toLowerCase())) return false;
-    if (filter === 'breakout') return s.score >= 85;
-    if (filter === 'strong') return s.score >= 70;
-    if (filter === 'emerging') return s.score >= 55 && s.score < 70;
-    if (filter === 'lowrisk') return scoreGap(s) <= 6;
-    return true;
-  });
+  // The inline list on the homepage shows ALL accessible signals (with the
+  // search query applied). Filtering by category navigates to the focused page.
+  const filtered = accessible.filter((s) =>
+    !query || s.topic.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const goToCategory = (key: string) => router.push(`/category/${key}` as any);
 
   return (
     <Screen scroll>
@@ -108,7 +91,7 @@ export default function Dashboard() {
       <View className="flex-row bg-surface rounded-xl border border-border p-1 mb-4">
         {([
           { k: 'attention', label: 'Trends', color: '#00C896' },
-          { k: 'risk', label: 'Other', color: '#CF2A1B' },
+          { k: 'risk', label: 'Market', color: '#CF2A1B' },
           { k: 'grade', label: 'Grade', color: '#D4A017' },
         ] as const).map((t) => {
           const on = mode === t.k;
@@ -145,26 +128,37 @@ export default function Dashboard() {
       {/* Enterprise: token-metered Pull Trends (renders only for enterprise tier) */}
       <PullTrendsButton />
 
-      {/* Filter chips — fixed-height row so the pills can't stretch */}
+      {/* Category chips — each navigates to a focused category page.
+          "Now TrendIn" leads with brand colors; "All Signals" is the in-place
+          default. Order matches CATEGORY_DEFS so chip + tile rows stay in sync. */}
       <View style={{ height: 40 }} className="mb-4">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {FILTERS.map((f) => {
-            const active = filter === f.k;
+          {CATEGORY_DEFS.map((c) => {
+            const isNT = c.key === 'nowtrendin';
+            // Every chip now navigates to a focused category page — including
+            // "All Signals", which gets its own page for symmetry with the rest.
             return (
               <TouchableOpacity
-                key={f.k}
-                onPress={() => setFilter(f.k)}
+                key={c.key}
+                onPress={() => goToCategory(c.key)}
                 className="px-4 rounded-full items-center justify-center"
                 style={{
                   height: 34,
-                  borderWidth: 1,
-                  backgroundColor: active ? '#00C896' : '#FFFFFF',
-                  borderColor: active ? '#00C896' : '#E4E7EC',
+                  borderWidth: isNT ? 1.5 : 1,
+                  backgroundColor: '#FFFFFF',
+                  borderColor: isNT ? c.color : '#E4E7EC',
                 }}
               >
-                <Text className="text-xs font-semibold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>
-                  {f.label}
-                </Text>
+                {isNT ? (
+                  <View className="flex-row items-baseline">
+                    <Text className="text-xs font-bold" style={{ color: c.color }}>Now</Text>
+                    <Text className="text-xs font-bold" style={{ color: c.altColor }}>TrendIn</Text>
+                  </View>
+                ) : (
+                  <Text className="text-xs font-semibold" style={{ color: '#5B6472' }}>
+                    {c.label}
+                  </Text>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -185,18 +179,42 @@ export default function Dashboard() {
             refetch button here was redundant and confusing, so it was removed. */}
       </View>
 
-      {/* Stat row */}
-      <View className="flex-row gap-2 mb-4">
-        {STATS.map((st) => (
-          <View key={st.k} className="flex-1 bg-surface rounded-xl border border-border py-3 items-center">
-            <Text className="text-2xl font-black" style={{ color: st.color }}>{counts[st.k] ?? 0}</Text>
-            <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">{st.label}</Text>
-          </View>
-        ))}
+      {/* Stat tiles — 3 cols × 2 rows, each tappable → focused category page.
+          Same source of truth as the chip row (CATEGORY_DEFS with showTile=true).
+          NowTrendin tile renders the brand wordmark (Now orange + TrendIn maroon)
+          for visual parity with the chip. The old "What does this mean?" static
+          legend was removed; the focused page now carries the per-category
+          definition + how-reached explanation. */}
+      <View className="flex-row flex-wrap gap-2 mb-4">
+        {CATEGORY_DEFS.filter((c) => c.showTile).map((c) => {
+          const isNT = c.key === 'nowtrendin';
+          return (
+            <TouchableOpacity
+              key={c.key}
+              onPress={() => goToCategory(c.key)}
+              className="bg-surface rounded-xl border py-3 items-center"
+              style={{
+                width: '32%',
+                borderColor: isNT ? c.color : `${c.color}33`,
+                borderWidth: isNT ? 1.5 : 1,
+              }}
+              activeOpacity={0.7}
+            >
+              <Text className="text-2xl font-black" style={{ color: c.color }}>{counts[c.key] ?? 0}</Text>
+              {isNT ? (
+                <View className="flex-row items-baseline mt-0.5">
+                  <Text className="text-[9px] font-bold tracking-wider" style={{ color: c.color }}>NOW</Text>
+                  <Text className="text-[9px] font-bold tracking-wider" style={{ color: c.altColor }}>TRENDIN</Text>
+                </View>
+              ) : (
+                <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">
+                  {c.short}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
-
-      {/* Legend */}
-      <ScoreLegend />
 
       {isSample && (
         <View className="rounded-lg px-3 py-2 mb-4 border border-border bg-surface">
@@ -228,6 +246,10 @@ export default function Dashboard() {
       {mode === 'risk' && (
         <>
           {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
+
+          {/* Enterprise: Pull Market Trends button (mirrors Pull Trends in
+              the attention feed — 1 token, refreshes the risk/market pipeline). */}
+          <PullMarketButton />
 
           <MacroLeverageCard />
 

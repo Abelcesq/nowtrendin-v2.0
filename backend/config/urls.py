@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 
-from accounts.views import AlertListCreate, AlertDetail, DirectQueryView, EvaluateAlertsView, PullTrendsView, GradeView, ResetCreditsView
+from accounts.views import AlertListCreate, AlertDetail, DirectQueryView, EvaluateAlertsView, PullTrendsView, PullMarketView, GradeView, ResetCreditsView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/alerts/<int:pk>/', AlertDetail.as_view()),
     path('api/query/', DirectQueryView.as_view()),
     path('api/pull-trends/', PullTrendsView.as_view()),
+    path('api/pull-market/', PullMarketView.as_view()),
     path('api/grade/', GradeView.as_view()),
     path('api/internal/evaluate-alerts/', EvaluateAlertsView.as_view()),
     path('api/internal/reset-credits/', ResetCreditsView.as_view()),

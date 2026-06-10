@@ -165,7 +165,7 @@ export default function RiskDetail() {
 
       {/* Retail Coverage — attributed data points, not advice. No external
           links (titles/URLs are shown as plain copyable text). */}
-      {(!!risk.creatorCoverage || !!risk.alphaVantage) && (
+      {(!!risk.creatorCoverage || !!risk.alphaVantage || !!risk.broadcastCoverage) && (
         <>
           <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail Coverage</Text>
           <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
@@ -205,6 +205,35 @@ export default function RiskDetail() {
               </View>
             ))}
           </View>
+          {/* Broadcast / institutional media coverage */}
+          {!!risk.broadcastCoverage && risk.broadcastCoverage.channels.length > 0 && (
+            <View className={(risk.creatorCoverage || risk.alphaVantage) ? 'pt-3 border-t border-border mt-1' : ''}>
+              <Text className="text-textSecondary text-xs font-semibold uppercase tracking-wider mb-2">
+                Broadcast Media ({risk.broadcastCoverage.channels.length}/{risk.broadcastCoverage.totalChannels} channels)
+              </Text>
+              {risk.broadcastCoverage.channels.map((ch, ci) => (
+                <View key={ch.handle} className={ci > 0 ? 'pt-2 border-t border-border mt-1' : ''}>
+                  <View className="flex-row items-center gap-2 mb-0.5">
+                    <Play size={14} color="#5B6472" />
+                    <Text className="text-textPrimary text-[13px] font-semibold flex-1">
+                      {ch.name}{ch.region ? ` · ${ch.region}` : ''}: {ch.count} recent video{ch.count === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                  {(ch.recent ?? []).slice(0, 2).map((v, i) => (
+                    <View key={i} className="mb-1">
+                      <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {v.title}</Text>
+                      <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
+          {!!risk.broadcastCoverage && risk.broadcastCoverage.channels.length === 0 && (
+            <View className={(risk.creatorCoverage || risk.alphaVantage) ? 'pt-3 border-t border-border mt-1' : ''}>
+              <Text className="text-textMuted text-[12px]">No recent broadcast media coverage across {risk.broadcastCoverage.totalChannels} monitored channels.</Text>
+            </View>
+          )}
           <Text className="text-textMuted text-[10px] mb-5">
             {risk.alphaVantage?.note || risk.creatorCoverage?.note || risk.meetKevin?.note}
           </Text>
@@ -212,7 +241,7 @@ export default function RiskDetail() {
       )}
 
       {/* Leverage — FINRA short interest (company) + OFR macro funding context */}
-      {(!!risk.shortInterest || !!risk.macroLeverage) && (
+      {(!!risk.shortInterest || !!risk.macroLeverage || !!risk.institutionalHoldings) && (
         <>
           <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Leverage &amp; funding</Text>
           <View className="bg-surface rounded-2xl border border-border p-4 mb-5">
@@ -240,6 +269,25 @@ export default function RiskDetail() {
                   {risk.macroLeverage.stressLabel ? ` · ${risk.macroLeverage.stressLabel}` : ''}
                 </Text>
                 <Text className="text-textMuted text-[10px] mt-1">OFR Short-Term Funding Monitor (repo){risk.macroLeverage.asOf ? ` · ${risk.macroLeverage.asOf}` : ''}</Text>
+              </View>
+            )}
+            {!!risk.institutionalHoldings && (
+              <View className={(risk.shortInterest || risk.macroLeverage) ? 'pt-2 border-t border-border mt-2' : ''}>
+                <Text className="text-textPrimary text-sm font-bold mb-1">{risk.institutionalHoldings.label || 'Institutional positioning'}</Text>
+                <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                  {risk.institutionalHoldings.holdersCount != null && (
+                    <Text className="text-textSecondary text-[12px]">{risk.institutionalHoldings.holdersCount} institutional holders</Text>
+                  )}
+                  {risk.institutionalHoldings.sharesChangePct != null && (
+                    <Text className="text-textSecondary text-[12px]">{risk.institutionalHoldings.sharesChangePct >= 0 ? '+' : ''}{risk.institutionalHoldings.sharesChangePct}% avg position change</Text>
+                  )}
+                </View>
+                {!!risk.institutionalHoldings.topHolders?.length && (
+                  <Text className="text-textMuted text-[11px] mt-1" numberOfLines={2}>
+                    Top: {risk.institutionalHoldings.topHolders.slice(0, 4).map((h) => h.name).join(', ')}
+                  </Text>
+                )}
+                <Text className="text-textMuted text-[10px] mt-1">WhaleWisdom 13F institutional holdings</Text>
               </View>
             )}
             <Text className="text-textMuted text-[10px] mt-2">Descriptive leverage indicators — not investment advice.</Text>
