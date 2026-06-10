@@ -37,6 +37,31 @@ const COMPONENT_LABELS: Record<string, string> = {
   confidence_decay: 'Freshness',
 };
 
+// Market Gradient — neutral intensity tiers + colors (describe how unusual the
+// positioning is, never what to do). Mirrors the Trends gradient's tier legend.
+const MARKET_TIER_COLOR: Record<string, string> = {
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017',
+  ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+};
+const MARKET_TIERS = [
+  { key: 'ELEVATED', range: '80–100', desc: 'Strongly elevated positioning' },
+  { key: 'ACTIVE',   range: '60–79',  desc: 'Clearly above routine' },
+  { key: 'BUILDING', range: '40–59',  desc: 'Building, not yet elevated' },
+  { key: 'ROUTINE',  range: '25–39',  desc: 'In line with own baseline' },
+  { key: 'DORMANT',  range: '0–24',   desc: 'Quiet vs baseline' },
+];
+// The six Market Gradient components, grouped by which score they drive.
+const MARKET_COMPONENTS: { key: string; label: string; side: 'DET' | 'CONF' }[] = [
+  { key: 'analyst_signal',       label: 'Analyst Signal',       side: 'DET' },
+  { key: 'positioning_pressure', label: 'Positioning Pressure', side: 'DET' },
+  { key: 'baseline_abnormality', label: 'Baseline Abnormality', side: 'DET' },
+  { key: 'fundamentals',         label: 'Fundamentals',         side: 'CONF' },
+  { key: 'price_action',         label: 'Price Action',         side: 'CONF' },
+  { key: 'macro_context',        label: 'Macro Context',        side: 'CONF' },
+];
+const MKT_DET = '#2D7EEF';
+const MKT_CONF = '#00C896';
+
 export default function RiskDetail() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const router = useRouter();
@@ -70,39 +95,114 @@ export default function RiskDetail() {
 
   return (
     <Screen scroll>
-      <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-4 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
-        <Text className="text-textSecondary text-sm">Positioning</Text>
-      </TouchableOpacity>
+      {(() => {
+        const mg = risk.marketGradient;
+        const tier = mg?.tier ?? 'DORMANT';
+        const tierCol = MARKET_TIER_COLOR[tier] ?? '#9AA3B0';
+        const gap = mg ? Math.round(Math.abs(mg.gap)) : 0;
+        return (
+          <>
+            <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-4 self-start flex-row items-center gap-1">
+              <ChevronLeft size={22} color="#5B6472" />
+              <Text className="text-textSecondary text-sm">Market Signal</Text>
+            </TouchableOpacity>
 
-      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Positioning</Text>
-      <View className="flex-row items-center gap-2 mt-0.5">
-        <Activity size={22} color={color} />
-        <Text className="text-textPrimary text-3xl font-bold flex-1">{risk.display}</Text>
-      </View>
-      <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {cls}</Text>
+            <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Market Signal</Text>
+            <View className="flex-row items-center gap-2 mt-0.5">
+              <Activity size={22} color={tierCol} />
+              <Text className="text-textPrimary text-3xl font-bold flex-1">{risk.display}</Text>
+            </View>
+            <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {tier}</Text>
 
-      {/* Positioning score (baseline-relative) — single anomaly read */}
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-2 items-center" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-        <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-          <Text style={{ color }} className="text-[9px] font-bold">{cls}</Text>
-        </View>
-        <GradientScoreRing score={risk.positioningScore ?? 0} color={color} size="lg" caption="/100" />
-        <Text className="text-textPrimary text-xs font-bold mt-2">POSITIONING</Text>
-        <Text className="text-textMuted text-[10px]">
-          {risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}
-        </Text>
-        {!!(risk.headline || risk.narrative) && (
-          <View className="rounded-xl px-3 py-2 mt-4 border w-full" style={{ borderColor: `${color}55`, backgroundColor: `${color}10` }}>
-            {!!risk.headline && <Text className="text-sm font-bold mb-0.5" style={{ color }}>{risk.headline}</Text>}
-            {!!risk.narrative && <Text className="text-textSecondary text-[13px] leading-5">{risk.narrative}</Text>}
-          </View>
-        )}
-      </View>
-      <Text className="text-textMuted text-[10px] mb-5">
-        {risk.definition || 'Positioning measures how unusual an item’s insider/institutional activity is vs its own baseline.'}
-        {' '}Analysis only — not financial advice.
-      </Text>
+            {/* Market Gradient — dual score (Detection vs Confidence), mirrors Trends */}
+            {mg ? (
+              <View className="bg-surface rounded-2xl p-5 border border-border mb-2" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                <View className="self-center px-2.5 py-1 rounded-full mb-3" style={{ backgroundColor: `${tierCol}1A` }}>
+                  <Text style={{ color: tierCol }} className="text-[9px] font-bold tracking-wide">{tier}</Text>
+                </View>
+                <View className="flex-row justify-around items-start">
+                  <View className="items-center">
+                    <GradientScoreRing score={Math.round(mg.detection)} color={MKT_DET} size="lg" caption="/100" />
+                    <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
+                    <Text className="text-textMuted text-[10px]">analysts + positioning</Text>
+                  </View>
+                  <View className="items-center">
+                    <GradientScoreRing score={Math.round(mg.confidence)} color={MKT_CONF} size="lg" caption="/100" />
+                    <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
+                    <Text className="text-textMuted text-[10px]">fundamentals + price</Text>
+                  </View>
+                </View>
+                <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
+                  <Text className="text-sm font-bold" style={{ color: tierCol }}>
+                    {gap}-pt gap{mg.gap >= 0 ? ' — leading signals ahead of confirmation' : ' — confirmed in hard data'}
+                  </Text>
+                  {!!mg.interpretation && (
+                    <Text className="text-textSecondary text-[13px] leading-5 mt-1">{mg.interpretation}</Text>
+                  )}
+                </View>
+              </View>
+            ) : (
+              // Fallback: items without a market gradient yet show baseline only.
+              <View className="bg-surface rounded-2xl p-5 border border-border mb-2 items-center">
+                <GradientScoreRing score={risk.positioningScore ?? 0} color={tierCol} size="lg" caption="/100" />
+                <Text className="text-textPrimary text-xs font-bold mt-2">POSITIONING</Text>
+                <Text className="text-textMuted text-[10px]">{risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}</Text>
+              </View>
+            )}
+            <Text className="text-textMuted text-[10px] mb-4">
+              The Market Gradient splits signals by type: Detection = what analysts say + how smart money is
+              positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows
+              how early the move is. Measurement only — not financial advice.
+            </Text>
+
+            {/* Component breakdown — the six market factors, by side */}
+            {mg && (
+              <View className="bg-surface rounded-2xl border border-border p-4 mb-3">
+                <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">Market factors</Text>
+                {MARKET_COMPONENTS.map((c) => {
+                  const raw = (mg.components as any)?.[c.key];
+                  const col = c.side === 'DET' ? MKT_DET : MKT_CONF;
+                  const present = raw != null;
+                  return (
+                    <View key={c.key} className="mb-2.5">
+                      <View className="flex-row justify-between mb-1">
+                        <View className="flex-row items-center gap-1.5">
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: present ? col : '#E4E7EC' }} />
+                          <Text className="text-textSecondary text-[12px]">{c.label}</Text>
+                        </View>
+                        <Text className="text-textPrimary text-[12px] font-bold">{present ? Math.round(raw) : 'n/a'}</Text>
+                      </View>
+                      <View className="h-1.5 rounded-full bg-border overflow-hidden">
+                        <View style={{ width: `${present ? Math.max(4, Math.min(100, raw)) : 0}%`, backgroundColor: col }} className="h-full rounded-full" />
+                      </View>
+                    </View>
+                  );
+                })}
+                <Text className="text-textMuted text-[10px] mt-1">
+                  <Text style={{ color: MKT_DET }}>Blue</Text> = leading (Detection) · <Text style={{ color: MKT_CONF }}>Green</Text> = confirming (Confidence). "n/a" = no ticker-level data for this item.
+                </Text>
+              </View>
+            )}
+
+            {/* Tier legend — what the intensity bands mean (mirrors Trends legend) */}
+            <View className="bg-surface rounded-2xl border border-border p-4 mb-5">
+              <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">What the tiers mean</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {MARKET_TIERS.map((t) => {
+                  const tc = MARKET_TIER_COLOR[t.key];
+                  return (
+                    <View key={t.key} className="flex-1 min-w-[46%] rounded-xl p-3 border" style={{ borderColor: `${tc}55`, backgroundColor: `${tc}12` }}>
+                      <Text style={{ color: tc }} className="text-xs font-bold">{t.key}</Text>
+                      <Text className="text-textMuted text-[10px] mt-0.5">{t.range}</Text>
+                      <Text style={{ color: tc }} className="text-[11px] font-semibold mt-1">{t.desc}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        );
+      })()}
 
       {/* Financial Sustainability — factual balance-sheet health (companies only) */}
       {!!risk.sustainability && (() => {

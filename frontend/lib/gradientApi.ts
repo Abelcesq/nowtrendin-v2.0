@@ -178,7 +178,24 @@ export interface RiskScore {
   abnormality?: number;     // % above (or below) the topic's own baseline
   baselineStatus?: string;  // INSUFFICIENT_HISTORY | BELOW_BASELINE | AT_BASELINE | ELEVATED_VS_SELF | SPIKE_VS_SELF
   baselineNote?: string;
-  // ── Positioning engine (baseline-relative; the primary "Other" signal) ──
+  // ── Market Gradient (data-type Duality — the primary Market score) ──
+  marketGradient?: {
+    detection: number;             // leading/soft: analyst + positioning + baseline
+    confidence: number;            // lagging/hard: fundamentals + price + macro
+    tier: string;                  // ELEVATED | ACTIVE | BUILDING | ROUTINE | DORMANT
+    gap: number;                   // detection − confidence
+    components: {
+      analyst_signal?: number | null;
+      positioning_pressure?: number | null;
+      baseline_abnormality?: number | null;
+      fundamentals?: number | null;
+      price_action?: number | null;
+      macro_context?: number | null;
+    };
+    confidenceBasis?: string;
+    interpretation?: string;
+  };
+  // ── Positioning engine (baseline-relative; now a component of the above) ──
   positioningScore?: number;       // 0–100 anomaly vs the item's own baseline
   classification?: string;         // CALIBRATING | ROUTINE | WATCH | ELEVATED | UNUSUAL
   headline?: string;
@@ -335,7 +352,17 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     abnormality: r.abnormality != null ? Number(r.abnormality) : undefined,
     baselineStatus: r.baseline_status || undefined,
     baselineNote: r.baseline_note || undefined,
-    // Positioning (baseline-relative) fields — primary for the "Other" section.
+    // Market Gradient (data-type Duality) — primary Market score.
+    marketGradient: r.market_gradient ? {
+      detection: Number(r.market_gradient.detection ?? 0),
+      confidence: Number(r.market_gradient.confidence ?? 0),
+      tier: r.market_gradient.tier || 'DORMANT',
+      gap: Number(r.market_gradient.gap ?? 0),
+      components: r.market_gradient.components || {},
+      confidenceBasis: r.market_gradient.confidence_basis || undefined,
+      interpretation: r.market_gradient.interpretation || undefined,
+    } : undefined,
+    // Positioning (baseline-relative) fields — now a component of the above.
     positioningScore: r.positioning_score != null ? Math.round(Number(r.positioning_score)) : undefined,
     classification: r.classification || undefined,
     headline: r.headline || undefined,
