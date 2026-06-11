@@ -71,7 +71,7 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         desc={
           ftr >= 0.35
             ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → dark-social signal inferred.`
-            : `${ftrPct}% new participants. Below the 35% threshold — monitor for an increase.`
+            : `${ftrPct}% new participants — below the dark-social threshold; monitor for an increase.`
         }
       />
       <Indicator

@@ -45,7 +45,7 @@ export function TopicResearch({ topicKey, topicName }: { topicKey: string; topic
                 </Text>
               );
             })}
-            <Text className="text-textMuted text-[10px] mt-1">AI-generated overview · for context, not investment advice.</Text>
+            <Text className="text-textMuted text-[10px] mt-1">AI-generated overview · qualitative context, not investment advice. Any figures are approximate; the measured score and velocity are the engine's.</Text>
           </>
         )}
       </View>

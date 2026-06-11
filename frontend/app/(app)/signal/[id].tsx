@@ -194,20 +194,48 @@ export default function SignalDetail() {
           engine about this topic. Captures real institutional curiosity that no public
           source can see.
         </Text>
-        <Text className="text-textMuted text-[11px] leading-4">
-          <Text className="font-bold">How it's calculated: </Text>
-          two parts — <Text className="font-bold">Volume (70%):</Text> log-scale of total
-          user queries about this topic over the last 30 days.
-          <Text className="font-bold"> Recency (30%):</Text> spike in the last 24 hours
-          vs the 7-day average rate. Combined 0–100. A score of 20+ means weekly attention;
-          50+ means daily; 80+ means viral demand inside the app.
-        </Text>
-        <Text className="text-textMuted text-[11px] leading-4 mt-1.5">
-          <Text className="font-bold">Why it counts: </Text>
-          N is weighted at <Text className="font-bold">12% of Detection</Text> and
-          <Text className="font-bold"> 10% of Confidence</Text>. When N is elevated, it
-          confirms that humans (not just our crawlers) are seeing the early signal too.
-        </Text>
+        {/* The "Now Trending Gradient Score" — a separate, demand-inclusive read
+            unique to the trend signal section. The headline Detection/Confidence
+            stay N-free (external-world only); this shows where the score would land
+            if internal demand (N) were folded in as an extra factor. The weighting
+            is computed server-side and never exposed (internal trade secret). */}
+        {signal.nowTrending != null && signal.nowTrending > 0 &&
+         signal.nowTrendingGradientDetection != null &&
+         signal.nowTrendingGradientConfidence != null && (
+          <View className="mt-3 pt-3 border-t" style={{ borderColor: '#EE6A2A33' }}>
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#EE6A2A' }}>
+                Now Trending Gradient Score
+              </Text>
+              <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EE6A2A1A' }}>
+                <Text className="text-[9px] font-bold" style={{ color: '#EE6A2A' }}>SEPARATE · DEMAND-INCLUSIVE</Text>
+              </View>
+            </View>
+            <Text className="text-textMuted text-[11px] leading-4 mb-2">
+              A separate, what-if read: where the score would land if on-platform demand (N)
+              were folded in. The headline Detection/Confidence above stay N-free (external
+              world only) — this demand-inclusive view is shown only here, never sold as the
+              Gradient Score.
+            </Text>
+            <View className="flex-row gap-3">
+              <View className="flex-1 rounded-xl border p-2.5" style={{ borderColor: '#2D7EEF33', backgroundColor: '#2D7EEF0A' }}>
+                <Text className="text-textMuted text-[9px] font-bold tracking-wider">DETECTION + N</Text>
+                <Text className="text-xl font-black" style={{ color: '#2D7EEF' }}>{Math.round(signal.nowTrendingGradientDetection)}</Text>
+              </View>
+              <View className="flex-1 rounded-xl border p-2.5" style={{ borderColor: '#00C89633', backgroundColor: '#00C8960A' }}>
+                <Text className="text-textMuted text-[9px] font-bold tracking-wider">CONFIDENCE + N</Text>
+                <Text className="text-xl font-black" style={{ color: '#00C896' }}>{Math.round(signal.nowTrendingGradientConfidence)}</Text>
+              </View>
+            </View>
+            {signal.nowTrendingGradientDemandDriven && (
+              <Text className="text-[10px] leading-4 mt-2" style={{ color: '#B5341B' }}>
+                ⚠ Substantially driven by internal demand — external confirmation is limited
+                for this topic. N's weight is reduced here so demand alone can't lift the score.
+              </Text>
+            )}
+          </View>
+        )}
+
         {(!signal.nowTrending || signal.nowTrending === 0) && (
           <View className="mt-2 pt-2 border-t" style={{ borderColor: '#EE6A2A33' }}>
             <Text className="text-textMuted text-[11px] italic">

@@ -33,7 +33,7 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 ### Integrity (HARD RULES — now enforced)
 - Reputable-publisher **allowlist** on aggregated news (`_NEWS_REPUTABLE_SOURCES`) — only vetted outlets enter the corpus; non-reputable dropped with a logged count.
 - **Provenance tiering**: broad/unverified news quarantined at ~1% weight, promoted to ~10% ONLY when independently corroborated — reputable corroboration → mainstream (M), dark-matter corroboration → Dark Matter (D). Uncorroborated never stands alone (excluded from scoring).
-- **No circular metrics**: the N (Now TrendIn demand) component feeds the gradient, so the Signal Convergence validator deliberately uses N-independent factors.
+- **No circular metrics**: the N (Now TrendIn demand) component is DELIBERATELY EXCLUDED from the Gradient Score (Detection/Confidence/Overall) — the live engine composes from six external components (G/I/M/D/C/P), renormalized to sum to 1.0, so our own users' demand can never create a feedback loop. N is computed and shown as a SEPARATE community-demand signal. The Signal Convergence validator also uses N-independent factors. (A separate, demand-inclusive "Now Trending Gradient Score" what-if is shown only on the trend signal page, clearly labeled and never sold as the Gradient Score.)
 - Measurement, not advice — neutral tiers, disclaimers everywhere.
 
 ### Engine / scoring

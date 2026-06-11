@@ -76,7 +76,8 @@ export interface Signal {
   score: number;
   detection: number;
   confidence: number;
-  stage: Stage;
+  stage: Stage;               // displayed stage — Detection-based (see stageFromScore)
+  engineStage?: Stage;        // engine's overall-based signal_stage, for reference
   createdAt: number; // epoch ms — latest score time (for "Xm ago" + sorting)
   firstSeenAt?: number; // epoch ms — earliest score time (for tier data-aging)
   // Rich fields (present for live engine data; optional for mock)
@@ -94,6 +95,14 @@ export interface Signal {
   isAnomaly?: boolean;
   // N component — "Now Trending" internal app demand (0–100), from query frequency.
   nowTrending?: number;
+  // "Now Trending Gradient Score" — separate, demand-inclusive what-if read: the
+  // Detection/Confidence the engine would produce if N were folded in as an extra
+  // factor. Computed server-side (weighting never exposed). Headline scores stay N-free.
+  nowTrendingGradientDetection?: number;
+  nowTrendingGradientConfidence?: number;
+  // True when external evidence is thin and demand exceeds the external read —
+  // surface a "limited external confirmation" note so demand can't quietly inflate.
+  nowTrendingGradientDemandDriven?: boolean;
   // AI Topic Intelligence (present only for taxonomy-recognized AI topics)
   aiTier?: string;           // tier_1 | tier_2 | tier_3 | tier_4
   aiTierColour?: string;     // green | blue | gray | muted
@@ -120,6 +129,20 @@ export const STAGE_META = [
   { key: 'EMERGING', label: 'EMERGING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
   { key: 'WATCHING', label: 'WATCHING', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
+
+// Single source of truth for the displayed stage band. Derived from the
+// Detection score — the headline metric the product leads with and the basis
+// the category tiles (CATEGORY_DEFS) and STAGE_META ranges already use. Keeping
+// the badge on this same basis stops the stage label from contradicting the
+// category a topic appears in (e.g. a Detection-74 topic sitting in the STRONG
+// tile must not show an EMERGING badge sourced from a lower overall score).
+export function stageFromScore(score: number): Stage {
+  if (score >= 85) return 'BREAKOUT';
+  if (score >= 70) return 'STRONG';
+  if (score >= 55) return 'EMERGING';
+  if (score >= 35) return 'WATCHING';
+  return 'MONITORING';
+}
 
 // CATEGORY_DEFS — the single source of truth for the homepage chip row, the
 // stat-tile grid, and the focused category page. Each entry knows its label,
@@ -156,8 +179,8 @@ export const CATEGORY_DEFS: Array<{
     color: '#EE6A2A', altColor: '#B5341B',
     definition:
       'Every accessible trend, ranked by Detection Score from highest to lowest. ' +
-      'Detection Score weights early-edge components (Gradient Strength 40%, Dark Matter 25%, ' +
-      'Inertia 20%) — it is the metric Now TrendIn was built around: where attention is ' +
+      'Detection Score weights the early-edge components (Gradient Strength, Dark Matter, ' +
+      'Inertia) — it is the metric Now TrendIn was built around: where attention is ' +
       'moving BEFORE it arrives at mainstream.',
     howReached:
       'No threshold — this view shows everything the engine has scored that is accessible ' +
@@ -282,13 +305,13 @@ export const actionLine = (s: Stage) => ACTION_LINE[s] ?? ACTION_LINE.MONITORING
 export const SCORE_ROLES = {
   detection: {
     color: '#2D7EEF',
-    falsePositive: '~22% false positive · Speed',
-    who: 'Content creators, brand managers, trend-forward marketers. Speed creates value — accepts ~1 in 5 false alarms, based on the engine’s calibration model.',
+    falsePositive: 'Speed',
+    who: 'Content creators, brand managers, trend-forward marketers. Optimized for speed — surfaces signals early, accepting more false alarms in exchange.',
   },
   confidence: {
     color: '#00C896',
-    falsePositive: '<9% false positive · Precision',
-    who: 'Institutional analysts, strategic planners, investors. Precision over speed — requires 4+ sustained evidence windows, based on the engine’s calibration model.',
+    falsePositive: 'Precision',
+    who: 'Institutional analysts, strategic planners, investors. Optimized for precision over speed — requires sustained, repeated confirmation.',
   },
 } as const;
 

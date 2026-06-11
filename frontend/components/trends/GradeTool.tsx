@@ -294,6 +294,18 @@ function ProposedCard({ result }: { result: Proposed }) {
           ))}
         </>
       )}
+      {/* N (on-platform demand) explanation — kept consistent with the trend
+          signal section. N is a separate, measured signal; the Gradient Score
+          itself stays demand-free (no internal-demand feedback loop). */}
+      <View className="mt-3 pt-3 border-t border-border">
+        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#EE6A2A' }}>Now Trending (N)</Text>
+        <Text className="text-textMuted text-[11px] leading-4">
+          On-platform demand (N) — how often Now TrendIn users ask about a topic — is
+          tracked as a separate signal, not folded into this score. It registers once
+          the topic is scored in the live engine, where the trend signal page also shows
+          a demand-inclusive "Now Trending Gradient Score" alongside the demand-free one.
+        </Text>
+      </View>
       <Text className="text-textMuted text-[10px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
     </View>
     </>

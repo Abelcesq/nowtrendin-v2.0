@@ -1,6 +1,6 @@
 // Client for the live Gradient Score engine (separate FastAPI service).
 // Maps the engine's /scores response into our Signal model.
-import { Signal, Stage, BreakdownGroup } from './signals';
+import { Signal, Stage, BreakdownGroup, stageFromScore } from './signals';
 
 export const GRADIENT_API =
   process.env.EXPO_PUBLIC_GRADIENT_API || 'https://nowtrendin-e62dcb9ecb69.herokuapp.com';
@@ -67,7 +67,11 @@ export function mapSignal(r: any): Signal {
     score: det,
     detection: det,
     confidence: conf,
-    stage: normalizeStage(r.signal_stage),
+    // Stage derived from Detection (the headline metric + the basis the category
+    // tiles use) so the badge can't contradict the category a topic sits in.
+    // The engine's overall-based signal_stage is kept available as engineStage.
+    stage: stageFromScore(det),
+    engineStage: normalizeStage(r.signal_stage),
     createdAt: Date.parse(r.scored_at) || Date.now(),
     // Earliest time this topic was scored — used for tier data-aging gating
     // (the latest scored_at is always recent because topics are re-scored each cycle).
@@ -90,6 +94,13 @@ export function mapSignal(r: any): Signal {
     platforms: Array.isArray(r.platforms_active) ? r.platforms_active : [],
     groups: mapGroups(r.component_groups, r.nowtrendin_score != null ? Number(r.nowtrendin_score) : undefined),
     nowTrending: r.nowtrendin_score != null ? Math.round(Number(r.nowtrendin_score)) : undefined,
+    // Separate demand-inclusive "Now Trending Gradient Score" (server-computed).
+    nowTrendingGradientDetection: r.nowtrending_gradient_detection != null
+      ? Math.round(Number(r.nowtrending_gradient_detection)) : undefined,
+    nowTrendingGradientConfidence: r.nowtrending_gradient_confidence != null
+      ? Math.round(Number(r.nowtrending_gradient_confidence)) : undefined,
+    nowTrendingGradientDemandDriven: r.nowtrending_gradient_demand_driven != null
+      ? Boolean(r.nowtrending_gradient_demand_driven) : undefined,
     maturityClass: r.calibration?.maturity_class ?? r.maturity_class ?? undefined,
     maturityBadge: r.calibration?.maturity_badge ?? undefined,
     maturityReason: r.calibration?.maturity_reason ?? r.maturity_reason ?? undefined,
