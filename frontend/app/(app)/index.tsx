@@ -15,6 +15,7 @@ import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, scoreGap, CATEGORY_DEFS } from '../../lib/signals';
+import { MARKET_CATEGORY_DEFS } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
@@ -31,6 +32,8 @@ export default function Dashboard() {
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
+  const [marketQuery, setMarketQuery] = useState('');
+  const goToMarketCategory = (key: string) => router.push(`/market-category/${key}` as any);
 
   // Risk obeys the same data-aging waterfall as Attention.
   const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
@@ -243,43 +246,106 @@ export default function Dashboard() {
 
       {mode === 'grade' && <GradeTool />}
 
-      {mode === 'risk' && (
+      {mode === 'risk' && (() => {
+        const mq = marketQuery.trim().toLowerCase();
+        const marketFiltered = accessibleRisks.filter((r) => !mq || r.display.toLowerCase().includes(mq));
+        const mCounts = Object.fromEntries(
+          MARKET_CATEGORY_DEFS.map((c) => [c.key, accessibleRisks.filter(c.filter).length])
+        ) as Record<string, number>;
+        return (
         <>
-          {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
+          {/* Search bar — mirrors the Trends section */}
+          <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
+            <Search size={18} color="#9AA3B0" />
+            <TextInput
+              value={marketQuery}
+              onChangeText={setMarketQuery}
+              placeholder="Search Current Market Trends"
+              placeholderTextColor="#9AA3B0"
+              className="flex-1 ml-3 text-textPrimary text-base"
+              style={{ color: '#1A1A2E' }}
+            />
+          </View>
 
-          {/* Enterprise: Pull Market Trends button (mirrors Pull Trends in
-              the attention feed — 1 token, refreshes the risk/market pipeline). */}
+          {/* Enterprise: Pull Market Trends button (1 token) */}
           <PullMarketButton />
+
+          {/* Revised Market Signal explanation box */}
+          {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
 
           <MacroLeverageCard />
 
+          {/* Market category chips — each navigates to a focused page. Mirrors
+              the Trends chip row. 'Market Signal' leads (brand-colored). */}
+          <View style={{ height: 40 }} className="mb-4">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+              {MARKET_CATEGORY_DEFS.map((c) => {
+                const isMS = c.key === 'marketsignal';
+                return (
+                  <TouchableOpacity
+                    key={c.key}
+                    onPress={() => goToMarketCategory(c.key)}
+                    className="px-4 rounded-full items-center justify-center"
+                    style={{ height: 34, borderWidth: isMS ? 1.5 : 1, backgroundColor: '#FFFFFF',
+                      borderColor: isMS ? c.color : '#E4E7EC' }}
+                  >
+                    {isMS ? (
+                      <View className="flex-row items-baseline">
+                        <Text className="text-xs font-bold" style={{ color: c.color }}>Market</Text>
+                        <Text className="text-xs font-bold" style={{ color: c.altColor }}>Signal</Text>
+                      </View>
+                    ) : (
+                      <Text className="text-xs font-semibold" style={{ color: '#5B6472' }}>{c.label}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Market stat tiles — tappable → focused category page (mirrors Trends) */}
+          <View className="flex-row flex-wrap gap-2 mb-4">
+            {MARKET_CATEGORY_DEFS.filter((c) => c.showTile).map((c) => (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => goToMarketCategory(c.key)}
+                className="bg-surface rounded-xl border py-3 items-center"
+                style={{ width: '32%', borderColor: `${c.color}33` }}
+                activeOpacity={0.7}
+              >
+                <Text className="text-2xl font-black" style={{ color: c.color }}>{mCounts[c.key] ?? 0}</Text>
+                <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">{c.short}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Market list header */}
           <View className="flex-row items-center gap-2 mb-2">
             <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />
-            <Text className="text-textPrimary text-xl font-black">Positioning</Text>
+            <Text className="text-textPrimary text-xl font-black">Market</Text>
             <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
-              <Text className="text-textMuted text-[11px] font-bold">{accessibleRisks.length}</Text>
+              <Text className="text-textMuted text-[11px] font-bold">{marketFiltered.length}</Text>
             </View>
             <Text className="text-textMuted text-[10px] ml-auto">{dataWindowLabel(tier)}</Text>
           </View>
-          <Text className="text-textMuted text-[11px] mb-3">
-            Items where insider/institutional positioning is unusually active vs their own baseline. Analysis only — not advice or a risk rating.
-          </Text>
           {riskLoading ? (
             <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />
-          ) : accessibleRisks.length === 0 ? (
+          ) : marketFiltered.length === 0 ? (
             <Text className="text-textMuted text-center mt-8">
-              {lockedRiskCount > 0 ? 'Newer risk signals are still aging into your tier.' : 'No risk signals yet.'}
+              {mq ? `No market items match "${marketQuery}".`
+                : lockedRiskCount > 0 ? 'Newer market signals are still aging into your tier.' : 'No market signals yet.'}
             </Text>
           ) : (
-            accessibleRisks.map((r) => <RiskCard key={r.key} risk={r} />)
+            marketFiltered.map((r) => <RiskCard key={r.key} risk={r} />)
           )}
-          {lockedRiskCount > 0 && accessibleRisks.length > 0 && (
+          {lockedRiskCount > 0 && marketFiltered.length > 0 && (
             <View className="mt-1">
               <LockedSignalsBanner tier={tier} lockedCount={lockedRiskCount} />
             </View>
           )}
         </>
-      )}
+        );
+      })()}
 
       {/* Global disclaimer — we provide analysis, not advice. */}
       <Text className="text-textMuted text-[10px] text-center mt-6 mb-2 px-4 leading-4">

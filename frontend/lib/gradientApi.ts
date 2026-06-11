@@ -186,6 +186,7 @@ export interface RiskScore {
     gap: number;                   // detection − confidence
     gapState?: string;             // EARLY | CONFIRMING | CONFIRMED | ROUTINE | LAGGING | MIXED | CALIBRATING
     calibrating?: boolean;
+    leverageHealth?: number | null; // 1-100, HIGH = lower debt (companies only)
     // label -> { score, feeds: detection|confidence|both, baselineRelative, z }
     components: Record<string, { score: number; feeds: string; baselineRelative: boolean; z: number | null }>;
     interpretation?: string;
@@ -355,6 +356,7 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       gap: Number(r.market_gradient.gap ?? 0),
       gapState: r.market_gradient.gap_state || undefined,
       calibrating: Boolean(r.market_gradient.calibrating),
+      leverageHealth: r.market_gradient.leverage_health ?? null,
       components: Object.fromEntries(
         Object.entries(r.market_gradient.components || {}).map(([label, v]: [string, any]) => [
           label,
