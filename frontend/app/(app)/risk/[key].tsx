@@ -1,9 +1,9 @@
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
-import { Screen } from '../../components/ui/Screen';
-import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
-import { useRisk } from '../../hooks/useSignals';
+import { Screen } from '../../../components/ui/Screen';
+import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
+import { useRisk } from '../../../hooks/useSignals';
 
 const CLASS_COLOR: Record<string, string> = {
   UNUSUAL: '#CF2A1B', ELEVATED: '#E85A1E', WATCH: '#2D7EEF', ROUTINE: '#9AA3B0', CALIBRATING: '#9AA3B0',
@@ -110,6 +110,8 @@ export default function RiskDetail() {
             {/* Market Gradient — dual score (Detection vs Confidence), mirrors Trends */}
             {mg ? (
               <View className="bg-surface rounded-2xl p-5 border border-border mb-2" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+                {/* Company / item name above the tier badge + scores */}
+                <Text className="text-textPrimary text-lg font-black text-center mb-1">{risk.display}</Text>
                 <View className="self-center px-2.5 py-1 rounded-full mb-3" style={{ backgroundColor: `${tierCol}1A` }}>
                   <Text style={{ color: tierCol }} className="text-[9px] font-bold tracking-wide">{tier}</Text>
                 </View>

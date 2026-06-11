@@ -2,21 +2,21 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, ChevronDown, ChevronUp, Bell, Flame } from 'lucide-react-native';
-import { Screen } from '../../components/ui/Screen';
-import { Button } from '../../components/ui/Button';
-import { GradientScoreRing } from '../../components/ui/GradientScoreRing';
-import { DualScoreAnalysis } from '../../components/trends/DualScoreAnalysis';
-import { WhyScoresDiverge } from '../../components/trends/WhyScoresDiverge';
-import { ScoringHistory } from '../../components/trends/ScoringHistory';
-import { ResearchHistory } from '../../components/trends/ResearchHistory';
-import { TopicResearch } from '../../components/trends/TopicResearch';
-import { TopicVariationMap } from '../../components/trends/TopicVariationMap';
-import { DarkMatterPanel } from '../../components/trends/DarkMatterPanel';
-import { MethodologyExplainer } from '../../components/trends/MethodologyExplainer';
-import { XSignalPanel } from '../../components/trends/XSignalPanel';
-import { ConvergenceBadge } from '../../components/trends/ConvergenceBadge';
-import { useSignal } from '../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../lib/signals';
+import { Screen } from '../../../components/ui/Screen';
+import { Button } from '../../../components/ui/Button';
+import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
+import { DualScoreAnalysis } from '../../../components/trends/DualScoreAnalysis';
+import { WhyScoresDiverge } from '../../../components/trends/WhyScoresDiverge';
+import { ScoringHistory } from '../../../components/trends/ScoringHistory';
+import { ResearchHistory } from '../../../components/trends/ResearchHistory';
+import { TopicResearch } from '../../../components/trends/TopicResearch';
+import { TopicVariationMap } from '../../../components/trends/TopicVariationMap';
+import { DarkMatterPanel } from '../../../components/trends/DarkMatterPanel';
+import { MethodologyExplainer } from '../../../components/trends/MethodologyExplainer';
+import { XSignalPanel } from '../../../components/trends/XSignalPanel';
+import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
+import { useSignal } from '../../../hooks/useSignals';
+import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../../lib/signals';
 
 // Plain-English fallback for each maturity class (used when the engine's live
 // maturity_reason is absent). Explains what the lifecycle stage means for the score.
