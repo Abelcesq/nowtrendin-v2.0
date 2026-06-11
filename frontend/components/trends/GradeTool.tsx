@@ -17,7 +17,19 @@ interface Proposed {
   gradient_strength: number; platform_diversity: number; inertia: number;
   dark_matter: number; persistence: number;
   stage: string; action: string; reasoning: string; research: string; citations: string[];
+  market_signal?: {
+    ticker?: string; display?: string;
+    market_gradient?: {
+      detection: number; confidence: number; tier: string; gap: number;
+      gap_state?: string; calibrating?: boolean; leverage_health?: number | null;
+      interpretation?: string;
+    };
+  };
 }
+
+const MARKET_TIER_COLOR: Record<string, string> = {
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017', ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+};
 interface GradeRow {
   id: number; topic: string; detection: number; confidence: number;
   stage: string; createdAt: string; result?: any;
@@ -202,10 +214,45 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
 function ProposedCard({ result }: { result: Proposed }) {
   const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
   const band = GAP_BANDS[gapBandIndex(gap)];
+  const ms = result.market_signal?.market_gradient;
   return (
+    <>
+    {/* MARKET read for companies — identical to the Market section, pulled from
+        the full financial stack. Shown FIRST so a company's market read leads. */}
+    {ms && (() => {
+      const tc = MARKET_TIER_COLOR[ms.tier] ?? '#9AA3B0';
+      return (
+        <View className="bg-surface rounded-2xl border p-5 mb-4" style={{ borderColor: `${tc}44` }}>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#E85A1E' }}>Market Signal · measured</Text>
+            <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tc}1A` }}>
+              <Text className="text-[10px] font-bold" style={{ color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</Text>
+            </View>
+          </View>
+          <View className="flex-row justify-around items-start mb-2">
+            <View className="items-center">
+              <GradientScoreRing score={Math.round(ms.detection)} color="#2D7EEF" size="md" caption="/100" />
+              <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
+              <Text className="text-textMuted text-[9px]">analysts + positioning</Text>
+            </View>
+            <View className="items-center">
+              <GradientScoreRing score={Math.round(ms.confidence)} color="#00C896" size="md" caption="/100" />
+              <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
+              <Text className="text-textMuted text-[9px]">fundamentals + price</Text>
+            </View>
+          </View>
+          {ms.leverage_health != null && (
+            <Text className="text-[11px] font-bold text-center mb-1" style={{ color: '#10B981' }}>Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</Text>
+          )}
+          {!!ms.interpretation && <Text className="text-textSecondary text-[12px] leading-4">{ms.interpretation}</Text>}
+          <Text className="text-textMuted text-[10px] mt-2">This is the measured MARKET read — the same as the Market section. The AI estimate below is the separate ATTENTION read.</Text>
+        </View>
+      );
+    })()}
+
     <View className="bg-surface rounded-2xl border border-border p-5 mb-4">
       <View className="flex-row items-center justify-between mb-1">
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Proposed · AI estimate</Text>
+        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">{ms ? 'Attention estimate · AI' : 'Proposed · AI estimate'}</Text>
         <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
           <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
         </View>
@@ -249,6 +296,7 @@ function ProposedCard({ result }: { result: Proposed }) {
       )}
       <Text className="text-textMuted text-[10px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
     </View>
+    </>
   );
 }
 
