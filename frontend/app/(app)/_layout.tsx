@@ -37,6 +37,13 @@ export default function AppLayout() {
       <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color }) => <Clock size={20} color={color} /> }} />
       <Tabs.Screen name="alerts" options={{ title: 'Alerts', tabBarIcon: ({ color }) => <Bell size={20} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <User size={20} color={color} /> }} />
+
+      {/* Detail / focused routes live under (app) so they inherit the tab bar,
+          but they must NOT appear AS tabs — href: null hides them from the bar. */}
+      <Tabs.Screen name="category/[stage]" options={{ href: null }} />
+      <Tabs.Screen name="market-category/[key]" options={{ href: null }} />
+      <Tabs.Screen name="risk/[key]" options={{ href: null }} />
+      <Tabs.Screen name="signal/[id]" options={{ href: null }} />
     </Tabs>
   );
 }
