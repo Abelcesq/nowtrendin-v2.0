@@ -32,7 +32,10 @@ const SLIDES = [
 
 export default function Onboarding() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  // Cap slide width to the app's max column (480) so the paged carousel doesn't
+  // overflow on desktop web, where the window is far wider than the app column.
+  const { width: winWidth } = useWindowDimensions();
+  const width = Math.min(winWidth, 480);
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
 
