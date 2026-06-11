@@ -1,0 +1,15 @@
+# Installed deps + the copied web bundle (rebuilt from frontend/dist each time)
+node_modules/
+www/
+
+# Electron build outputs (the electron/ project itself IS committed once generated)
+electron/node_modules/
+electron/dist/
+electron/build/
+
+# Native platform build outputs
+android/.gradle/
+android/app/build/
+android/build/
+ios/App/Pods/
+ios/App/build/

@@ -1,0 +1,8 @@
+{
+  "appId": "com.nowtrendin.app",
+  "appName": "Now TrendIn",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
