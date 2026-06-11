@@ -10,6 +10,12 @@
 
 $root = $PSScriptRoot
 
+# Prepend portable Node so all node/npm/npx calls work without a system-level install.
+$portableNode = "C:\Users\acinv\tools\node-v24.16.0-win-x64"
+if (Test-Path $portableNode) {
+    $env:PATH = "$portableNode;" + $env:PATH
+}
+
 Write-Host "[0/6] Preflight: Node..." -ForegroundColor Cyan
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) {
