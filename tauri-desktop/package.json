@@ -1,0 +1,15 @@
+{
+  "name": "nowtrendin-tauri-desktop",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Tauri 2 desktop shell wrapping the Expo web build (frontend/dist). Lightweight alternative to the Capacitor/Electron shell (~5-10 MB installer vs ~100+ MB).",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon ../frontend/assets/icon.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
