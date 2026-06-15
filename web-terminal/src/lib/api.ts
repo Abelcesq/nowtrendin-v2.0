@@ -1,9 +1,11 @@
 // Engine client for the institutional terminal. Reads the public engine
 // endpoints directly (scores/topics/categories/ledger). Auth-gated and
 // write endpoints come later via the backend.
+// The dedicated v2.0 engine (separate from v1.0's). One database feeds all
+// v2.0 surfaces (website, desktop, mobile) — this is that single source.
 const ENGINE =
   (import.meta as any).env?.VITE_ENGINE_URL ||
-  'https://nowtrendin-e62dcb9ecb69.herokuapp.com'
+  'https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com'
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${ENGINE}${path}`, { headers: { Accept: 'application/json' } })
