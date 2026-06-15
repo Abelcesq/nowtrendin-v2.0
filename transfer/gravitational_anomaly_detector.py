@@ -4027,17 +4027,66 @@ except Exception as _ent_exc:
 _SCHEDULER_STARTED = False
 
 
+# ── Hybrid worker heartbeat ───────────────────────────────────────────────
+# The heavy SCORING job runs on a local worker (free hardware); the Heroku
+# worker COLLECTS every 6h and only SCORES as failover when the local scorer
+# goes quiet. The local scorer stamps a heartbeat after each cycle; the Heroku
+# failover reads it. One shared DB, so the heartbeat coordinates both.
+def _write_heartbeat(role: str) -> None:
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS worker_heartbeat "
+                     "(role TEXT PRIMARY KEY, beat_at TEXT)")
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            conn.execute("INSERT INTO worker_heartbeat (role, beat_at) VALUES (?, ?) "
+                         "ON CONFLICT (role) DO UPDATE SET beat_at = EXCLUDED.beat_at",
+                         (role, now))
+        except Exception:
+            conn.rollback()
+            conn.execute("UPDATE worker_heartbeat SET beat_at=? WHERE role=?", (now, role))
+            if conn.execute("SELECT 1 FROM worker_heartbeat WHERE role=?", (role,)).fetchone() is None:
+                conn.execute("INSERT INTO worker_heartbeat (role, beat_at) VALUES (?,?)", (role, now))
+        conn.commit(); conn.close()
+    except Exception as _hbe:
+        print(f"[heartbeat] write {role} failed: {_hbe}")
+
+
+def _heartbeat_age_min(role: str) -> float:
+    """Minutes since `role` last beat; large number if never."""
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS worker_heartbeat "
+                     "(role TEXT PRIMARY KEY, beat_at TEXT)")
+        row = conn.execute("SELECT beat_at FROM worker_heartbeat WHERE role=?", (role,)).fetchone()
+        conn.close()
+        if not row or not row[0]:
+            return 1e9
+        beat = datetime.fromisoformat(row[0])
+        if beat.tzinfo is None:
+            beat = beat.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - beat).total_seconds() / 60.0
+    except Exception:
+        return 1e9
+
+
 def start_scheduler():
-    """Build and start the background APScheduler (collect+score every 30 min,
-    daily velocity recompute, twice-daily X scan, monthly retention). Runs on
-    the worker dyno by default; safe to call once per process."""
+    """Build and start the background APScheduler. Role-gated for the hybrid:
+      WORKER_COLLECT (default 1)  — run the collectors (Heroku, every
+        COLLECT_INTERVAL_MIN, default 360 = 6h).
+      WORKER_SCORE   (default 1)  — "1" always score every SCORE_INTERVAL_MIN
+        (the LOCAL scorer); "failover" score only when the local heartbeat is
+        older than SCORE_STALE_MIN (the Heroku safety net); "0" never score.
+    The local worker runs COLLECT=0 SCORE=1; the Heroku worker runs COLLECT=1
+    SCORE=failover. Safe to call once per process."""
     global _SCHEDULER_STARTED
     if _SCHEDULER_STARTED:
         return None
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
 
-        def _scheduled_cycle():
+        def _collect_phase():
+            """Pull data only (the always-on cloud job). No heavy scoring."""
             try:
                 c = get_db(DB_PATH)
                 for _nm, _fn in (("reddit", collect_reddit),
@@ -4060,48 +4109,53 @@ def start_scheduler():
                 c.close()
                 if _BLOGS_AVAILABLE:
                     try:
-                        # collect_all_blogs returns a per-platform RESULTS DICT,
-                        # not a count — passing the dict as the signal count made
-                        # the success _log_health insert throw on every cycle, so
-                        # health showed blogs as 'never recorded a successful run'
-                        # even when collection worked. Extract the real total.
                         _blog_res = _bc.collect_all_blogs() or {}
                         _bn = int((_blog_res.get("_total") or {}).get("signals", 0) or 0)
                         _log_health("blogs", _bn, "success")
                     except Exception as _be:
                         _log_health("blogs", 0, "failure")
                         print(f"[scheduler] blog collect error: {_be}")
+                if _DISCOVERY_AVAILABLE:
+                    try:
+                        c2 = get_db(DB_PATH); _dc.collect_all_discovery(c2); c2.close()
+                    except Exception as _de:
+                        print(f"[scheduler] discovery error: {_de}")
+                if _RISK_AVAILABLE:
+                    try:
+                        _rres = risk.run_risk_collection(DB_PATH) or {}
+                        _rn = sum(v for v in _rres.values() if isinstance(v, (int, float)))
+                        risk.score_all_risks(DB_PATH)
+                        _log_health("risk", int(_rn), "success")
+                        print("[scheduler] risk cycle complete.")
+                    except Exception as _rce:
+                        _log_health("risk", 0, "failure")
+                        print(f"[scheduler] risk error: {_rce}")
+                print("[scheduler] collect phase complete.")
+            except Exception as _ce:
+                print(f"[scheduler] collect phase error: {_ce}")
+
+        def _score_phase():
+            """The heavy job: score every topic, record ledger, prune, precompute,
+            fire alerts. Runs on the local worker (or Heroku failover). Stamps the
+            'score' heartbeat so the failover knows the scorer is alive."""
+            try:
                 detector.score_all_topics(hours=72)
                 _cache.invalidate()
-                print("[scheduler] collect+score cycle complete.")
-                # Start the accuracy clock: log the strongest current detections
-                # as PENDING ledger entries (every call, not just the winners).
+                print("[scheduler] score cycle complete.")
                 try:
                     _record_top_detections(limit=int(os.getenv("LEDGER_RECORD_TOP", "20")))
                 except Exception as _lre:
                     print(f"[scheduler] ledger record error: {_lre}")
-                # Keep velocity_scores bounded so the latest-per-topic join in
-                # /scores stays fast (unbounded growth caused a 30s timeout
-                # outage). This is a per-cycle ROW cap per topic — it must be high
-                # enough not to undercut the 90-day time-based retention below
-                # (90d x ~48 cycles/day = 4320; 5000 leaves margin). The daily
-                # day-based prune + weekly VACUUM are the real size controls now
-                # that we're on the 10GB Essential-1 plan.
                 try:
                     _prune_velocity_scores(int(os.getenv("KEEP_CYCLES_PER_TOPIC", "5000")))
                     _prune_anomaly_log(int(os.getenv("KEEP_ANOMALY_DAYS", "30")))
                 except Exception as _pe:
                     print(f"[scheduler] prune error: {_pe}")
-                # Precompute the calibrated serve rows so /scores reads them
-                # directly (cold /scores was 6–11s recalibrating per request).
                 try:
                     _precompute_serve_payloads(int(os.getenv("PRECOMPUTE_TOP_N", "600")))
                     _cache.invalidate()
                 except Exception as _ppe:
                     print(f"[scheduler] precompute error: {_ppe}")
-                # Explainers are generated on-demand (cached) — the per-cycle
-                # backfill added DB/Perplexity load to the shared essential-0 PG
-                # and is disabled by default. Enable with EXPLAINER_BACKFILL_PER_CYCLE>0.
                 _exp_n = int(os.getenv("EXPLAINER_BACKFILL_PER_CYCLE", "0"))
                 if _exp_n > 0:
                     try:
@@ -4118,25 +4172,22 @@ def start_scheduler():
                         )
                     except Exception as _ae:
                         print(f"[scheduler] alert eval error: {_ae}")
-                if _RISK_AVAILABLE:
-                    try:
-                        # run_risk_collection returns a per-collector counts DICT
-                        # (same bug class as blogs): logging the dict as the int
-                        # signal count made the success insert throw → only
-                        # failures ever recorded → health showed 'risk DOWN' for
-                        # days while risk data was actually scoring every cycle
-                        # (and the false trust gate suppressed the LIVE badge).
-                        _rres = risk.run_risk_collection(DB_PATH) or {}
-                        _rn = sum(v for v in _rres.values()
-                                  if isinstance(v, (int, float)))
-                        risk.score_all_risks(DB_PATH)
-                        _log_health("risk", int(_rn), "success")
-                        print("[scheduler] risk cycle complete.")
-                    except Exception as _rce:
-                        _log_health("risk", 0, "failure")
-                        print(f"[scheduler] risk error: {_rce}")
+                _write_heartbeat("score")
             except Exception as _ce:
-                print(f"[scheduler] cycle error: {_ce}")
+                print(f"[scheduler] score phase error: {_ce}")
+
+        def _scheduled_cycle():
+            """Full collect+score (single-role / dev fallback)."""
+            _collect_phase()
+            _score_phase()
+
+        def _failover_score():
+            """Heroku safety net: score ONLY if the local scorer has gone quiet."""
+            age = _heartbeat_age_min("score")
+            stale = float(os.getenv("SCORE_STALE_MIN", "45"))
+            if age > stale:
+                print(f"[scheduler] local scorer stale ({age:.0f}m > {stale:.0f}m) — failover scoring.")
+                _score_phase()
 
         def _scheduled_velocities():
             try:
@@ -4161,9 +4212,34 @@ def start_scheduler():
                     print(f"[scheduler] ledger sweep error: {_se}")
 
         _sched = BackgroundScheduler(timezone="UTC")
-        _sched.add_job(_scheduled_cycle, "interval", minutes=30,
-                       id="collect_score", max_instances=1,
-                       coalesce=True, misfire_grace_time=600)
+        # ── Hybrid role gating ──
+        _w_collect = os.getenv("WORKER_COLLECT", "1").lower() in ("1", "true", "yes")
+        _w_score = os.getenv("WORKER_SCORE", "1").lower()
+        _collect_min = int(os.getenv("COLLECT_INTERVAL_MIN", "30"))
+        _score_min = int(os.getenv("SCORE_INTERVAL_MIN", "30"))
+        if _w_collect:
+            _sched.add_job(_collect_phase, "interval", minutes=_collect_min,
+                           id="collect", max_instances=1, coalesce=True, misfire_grace_time=600)
+            print(f"[scheduler] COLLECT job every {_collect_min}m")
+        if _w_score in ("1", "true", "yes"):
+            _sched.add_job(_score_phase, "interval", minutes=_score_min,
+                           id="score", max_instances=1, coalesce=True, misfire_grace_time=600)
+            print(f"[scheduler] SCORE job every {_score_min}m (primary scorer)")
+        elif _w_score == "failover":
+            _fail_min = int(os.getenv("FAILOVER_CHECK_MIN", "20"))
+            _sched.add_job(_failover_score, "interval", minutes=_fail_min,
+                           id="failover_score", max_instances=1, coalesce=True, misfire_grace_time=300)
+            print(f"[scheduler] SCORE failover every {_fail_min}m (if local stale > "
+                  f"{os.getenv('SCORE_STALE_MIN', '45')}m)")
+        # Local scorer (WORKER_COLLECT=0): score-only. Skip ALL the cloud aux
+        # jobs below (velocities, X scan, google-trends, retention, vacuum, …) —
+        # those run on the always-on Heroku collect worker, never duplicated
+        # locally (they spend API budget and do destructive retention).
+        if not _w_collect:
+            _sched.start()
+            _SCHEDULER_STARTED = True
+            print("[scheduler] started — LOCAL SCORER (score job only; cloud aux jobs skipped).")
+            return _sched
         _sched.add_job(_scheduled_velocities, "cron", hour=6, minute=0,
                        id="recompute_velocities", max_instances=1,
                        coalesce=True)
