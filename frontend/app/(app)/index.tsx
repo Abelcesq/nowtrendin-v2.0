@@ -177,46 +177,7 @@ export default function Dashboard() {
         </ScrollView>
       </View>
 
-      {/* ── ROW 2: CATEGORY chips (the WHAT axis — content area). Separate
-          labelled row, distinct in kind from the Signal chips above. These
-          filter the list in place; "All" leads, each shows its live count and
-          dims when empty. */}
-      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1.5">Category</Text>
-      <View style={{ height: 38 }} className="mb-4">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
-            const on = contentCat === c.key;
-            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
-            const empty = c.key !== 'all' && count === 0;
-            return (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => setContentCat(c.key)}
-                disabled={empty}
-                className="px-3.5 rounded-full flex-row items-center"
-                style={{
-                  height: 32,
-                  backgroundColor: on ? c.color : '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: on ? c.color : '#E4E7EC',
-                  opacity: empty ? 0.4 : 1,
-                }}
-              >
-                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
-                  {c.label}
-                </Text>
-                {count > 0 && (
-                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>
-                    {count}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Trends header */}
+      {/* Trends header (SIGNAL big tiles below) */}
       <View className="flex-row items-center mb-3">
         <View className="flex-row items-center gap-2">
           <View className="w-1 h-5 rounded-full bg-brandMaroon" />
@@ -262,6 +223,61 @@ export default function Dashboard() {
                   {c.short}
                 </Text>
               )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* ── CATEGORY section (the WHAT axis) — chips + big tiles, mirroring the
+          Trends/Signal section above. Sits under the signal tiles per the
+          mobile layout spec. Chip OR tile filters the trend list in place. */}
+      <View className="flex-row items-center mb-3 mt-1">
+        <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#2D7EEF' }} />
+        <Text className="text-textPrimary text-xl font-black ml-2">Category</Text>
+      </View>
+      <View style={{ height: 38 }} className="mb-3">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
+            const on = contentCat === c.key;
+            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
+            const empty = c.key !== 'all' && count === 0;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => setContentCat(c.key)}
+                disabled={empty}
+                className="px-3.5 rounded-full flex-row items-center"
+                style={{ height: 32, backgroundColor: on ? c.color : '#FFFFFF', borderWidth: 1,
+                  borderColor: on ? c.color : '#E4E7EC', opacity: empty ? 0.4 : 1 }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>{c.label}</Text>
+                {count > 0 && (
+                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>{count}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+      {/* Category BIG tiles — same format as the Trends tiles, one per content
+          category. Tap to filter (toggle); count from contentCounts; dim empties. */}
+      <View className="flex-row flex-wrap gap-2 mb-4">
+        {CONTENT_CATEGORIES.map((c) => {
+          const on = contentCat === c.key;
+          const n = contentCounts[c.key] ?? 0;
+          return (
+            <TouchableOpacity
+              key={c.key}
+              onPress={() => setContentCat(on ? 'all' : c.key)}
+              className="bg-surface rounded-xl border py-3 items-center"
+              activeOpacity={0.7}
+              style={{ width: '32%', borderColor: on ? c.color : `${c.color}33`,
+                borderWidth: on ? 1.5 : 1, opacity: n === 0 ? 0.45 : 1 }}
+            >
+              <Text className="text-2xl font-black" style={{ color: c.color }}>{n}</Text>
+              <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5" numberOfLines={1}>
+                {c.label.toUpperCase()}
+              </Text>
             </TouchableOpacity>
           );
         })}
