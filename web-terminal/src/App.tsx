@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Shell, type NavKey } from './components/Shell'
 import { Ledger } from './views/Ledger'
 import { Screener } from './views/Screener'
+import { Login } from './views/Login'
+import { fetchMe, logout, type User } from './lib/auth'
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -14,17 +16,27 @@ function Placeholder({ title }: { title: string }) {
       </div>
       <div className="center-state">
         {title} view is queued.
-        <div className="muted">Shipped: Signal Screener + Accuracy Ledger. Next: Market Signal, Grade, Watchlists, Methodology, auth.</div>
+        <div className="muted">Shipped: Signal Screener · Accuracy Ledger · Auth. Next: Market Signal, Grade, Watchlists, Methodology.</div>
       </div>
     </>
   )
 }
 
 export function App() {
+  const [user, setUser] = useState<User | null>(null)
+  const [booting, setBooting] = useState(true)
   const [nav, setNav] = useState<NavKey>('trends')
   const [rail, setRail] = useState<ReactNode | null>(null)
 
+  useEffect(() => { fetchMe().then((u) => { setUser(u); setBooting(false) }) }, [])
+
+  if (booting) {
+    return <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}><div className="spinner" /></div>
+  }
+  if (!user) return <Login onAuthed={setUser} />
+
   const go = (k: NavKey) => { setRail(null); setNav(k) }
+  const signOut = () => { logout(); setUser(null) }
 
   let body: ReactNode
   if (nav === 'trends') body = <Screener onRail={setRail} />
@@ -32,7 +44,7 @@ export function App() {
   else body = <Placeholder title={titleFor(nav)} />
 
   return (
-    <Shell nav={nav} onNav={go} rail={nav === 'trends' ? rail : null}>
+    <Shell nav={nav} onNav={go} rail={nav === 'trends' ? rail : null} user={user} onSignOut={signOut}>
       {body}
     </Shell>
   )

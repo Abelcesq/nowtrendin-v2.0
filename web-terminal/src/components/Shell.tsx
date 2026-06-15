@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { TIER_LABEL, type User } from '../lib/auth'
 
 export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'grade'
@@ -29,14 +30,18 @@ function useEtClock() {
 }
 
 export function Shell({
-  nav, onNav, children, rail,
+  nav, onNav, children, rail, user, onSignOut,
 }: {
   nav: NavKey
   onNav: (k: NavKey) => void
   children: ReactNode
   rail?: ReactNode
+  user?: User | null
+  onSignOut?: () => void
 }) {
   const clock = useEtClock()
+  const initials = (user?.name || user?.email || 'NT').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'NT'
+  const plan = user?.tier ? TIER_LABEL[user.tier].toUpperCase() : 'GUEST'
   return (
     <div className="app">
       {/* TOP BAR */}
@@ -63,8 +68,8 @@ export function Shell({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <span className="dot">3</span>
           </div>
-          <span className="plan">ENTERPRISE</span>
-          <div className="avatar" title="Account">AB</div>
+          <span className="plan">{plan}</span>
+          <div className="avatar" title={`${user?.name || ''} — sign out`} onClick={onSignOut} style={{ cursor: 'pointer' }}>{initials}</div>
         </div>
       </header>
 
