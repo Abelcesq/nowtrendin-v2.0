@@ -4217,18 +4217,22 @@ def start_scheduler():
         _w_score = os.getenv("WORKER_SCORE", "1").lower()
         _collect_min = int(os.getenv("COLLECT_INTERVAL_MIN", "30"))
         _score_min = int(os.getenv("SCORE_INTERVAL_MIN", "30"))
+        _soon = datetime.now(timezone.utc) + timedelta(seconds=20)  # fire shortly after boot
         if _w_collect:
             _sched.add_job(_collect_phase, "interval", minutes=_collect_min,
-                           id="collect", max_instances=1, coalesce=True, misfire_grace_time=600)
+                           id="collect", max_instances=1, coalesce=True,
+                           misfire_grace_time=600, next_run_time=_soon)
             print(f"[scheduler] COLLECT job every {_collect_min}m")
         if _w_score in ("1", "true", "yes"):
             _sched.add_job(_score_phase, "interval", minutes=_score_min,
-                           id="score", max_instances=1, coalesce=True, misfire_grace_time=600)
+                           id="score", max_instances=1, coalesce=True,
+                           misfire_grace_time=600, next_run_time=_soon)
             print(f"[scheduler] SCORE job every {_score_min}m (primary scorer)")
         elif _w_score == "failover":
             _fail_min = int(os.getenv("FAILOVER_CHECK_MIN", "20"))
             _sched.add_job(_failover_score, "interval", minutes=_fail_min,
-                           id="failover_score", max_instances=1, coalesce=True, misfire_grace_time=300)
+                           id="failover_score", max_instances=1, coalesce=True,
+                           misfire_grace_time=300, next_run_time=_soon)
             print(f"[scheduler] SCORE failover every {_fail_min}m (if local stale > "
                   f"{os.getenv('SCORE_STALE_MIN', '45')}m)")
         # Local scorer (WORKER_COLLECT=0): score-only. Skip ALL the cloud aux

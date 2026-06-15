@@ -1,0 +1,4 @@
+# Local worker — never commit secrets or the venv
+venv/
+.env
+*.log
