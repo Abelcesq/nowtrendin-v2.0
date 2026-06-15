@@ -6371,10 +6371,10 @@ def list_topics(
     cat = category.strip().lower()
     conn = get_db(DB_PATH)
     filter_str = "AND r.is_anomaly = 1" if anomalies_only else ""
-    # When filtering by category, scan a wide candidate set before classifying
-    # so on-topic but low-scored entities (e.g. an emerging sports story buried
-    # under fragmented tech/news n-grams) still surface under their chip.
-    scan = 2000 if cat else limit
+    # Always scan a wide candidate set before the quality + category filters,
+    # so quality topics still surface even when the top-by-score rows are junk
+    # (the quality filter can otherwise empty a narrow top-N window entirely).
+    scan = 2000
     rows = conn.execute(f"""
         SELECT r.topic_key, r.topic_display, r.current_stage,
                r.total_mentions, r.is_anomaly, r.last_seen_at,
