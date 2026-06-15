@@ -63,7 +63,10 @@ export function mapSignal(r: any): Signal {
   return {
     id: String(r.topic_key),
     topic: r.topic_display || r.topic_key,
-    category: r.ai_tier_label || 'Signal',
+    // Content category from the engine classifier (sports/technology/…). Falls
+    // back to the AI-tier label, then 'general'. Used for the category chip
+    // filter + the card badge (the WHAT axis, orthogonal to signal stage).
+    category: (r.category as string) || r.ai_tier_label || 'general',
     score: det,
     detection: det,
     confidence: conf,

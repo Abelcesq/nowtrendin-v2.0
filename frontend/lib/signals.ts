@@ -288,6 +288,35 @@ export function getCategory(key: string) {
   return CATEGORY_DEFS.find((c) => c.key === key) ?? CATEGORY_DEFS[1]; // default to 'all'
 }
 
+// ── CONTENT CATEGORIES (the WHAT axis — Now TrendIn 1.0 taxonomy) ──────────
+// Orthogonal to the signal-STAGE axis above. Mirrors the engine's
+// topic_categories.py keys so the chip row, card badge, and ?category= API
+// filter all agree. Each entry: engine key + display label + accent color.
+export const CONTENT_CATEGORIES: Array<{ key: string; label: string; color: string }> = [
+  { key: 'technology',     label: 'Technology',     color: '#2D7EEF' },
+  { key: 'business',       label: 'Business',       color: '#0EA5A0' },
+  { key: 'economy',        label: 'Economy',        color: '#D4A017' },
+  { key: 'sports',         label: 'Sports',         color: '#00C896' },
+  { key: 'entertainment',  label: 'Entertainment',  color: '#E0457B' },
+  { key: 'politics',       label: 'Politics',       color: '#9333EA' },
+  { key: 'current_events', label: 'Current Events', color: '#E85A1E' },
+  { key: 'health',         label: 'Health',         color: '#16A34A' },
+  { key: 'fashion',        label: 'Fashion',        color: '#DB2777' },
+  { key: 'education',      label: 'Education',       color: '#7C5CFC' },
+  { key: 'religion',       label: 'Religion',        color: '#B5341B' },
+  { key: 'news',           label: 'News',            color: '#5B6472' },
+];
+
+const CONTENT_CATEGORY_INDEX: Record<string, { key: string; label: string; color: string }> =
+  Object.fromEntries(CONTENT_CATEGORIES.map((c) => [c.key, c]));
+
+// Look up display metadata for a content-category key (case/spacing tolerant).
+export function contentCategoryMeta(key?: string) {
+  if (!key) return { key: 'general', label: 'General', color: '#9AA3B0' };
+  const norm = key.toLowerCase().trim().replace(/\s+/g, '_');
+  return CONTENT_CATEGORY_INDEX[norm] ?? { key: norm, label: key, color: '#9AA3B0' };
+}
+
 // Short, descriptive signal-read per stage (analysis only — no action guidance).
 const ACTION_LINE: Record<Stage, string> = {
   VIRAL: 'Viral-level signal across platforms.',

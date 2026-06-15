@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Sparkles, Flame } from 'lucide-react-native';
-import { Signal, ageLabel, stageColor, scoreGap, gapInsight, STAGE_META } from '../../lib/signals';
+import { Signal, ageLabel, stageColor, scoreGap, gapInsight, STAGE_META, contentCategoryMeta } from '../../lib/signals';
 import { useExplainer } from '../../hooks/useSignals';
 
 const DET_COLOR = '#2D7EEF';
@@ -29,6 +29,7 @@ export function TrendCard({ signal }: { signal: Signal }) {
   // EMERGING). Pulled from STAGE_META so it stays in sync with the homepage
   // legend + the focused category page.
   const stageDef = STAGE_META.find((m) => m.key === signal.stage)?.desc ?? '';
+  const cat = contentCategoryMeta(signal.category);
   // Now Trending score (N component) — always show; default to 0 when absent
   // so users see the metric exists and can read its detail on tap.
   const nowTrending = signal.nowTrending ?? 0;
@@ -51,10 +52,18 @@ export function TrendCard({ signal }: { signal: Signal }) {
         <Text className="text-textMuted text-[11px]">
           {platform} · {signal.totalMentions ?? 0} signals · {ageLabel(signal.createdAt)}
         </Text>
-        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${stageCol}1A` }}>
-          <Text style={{ color: stageCol }} className="text-[10px] font-bold tracking-wide">
-            {signal.stage}
-          </Text>
+        <View className="flex-row items-center gap-1.5">
+          {/* Content-category badge (WHAT) — sits beside the stage badge (HOW) */}
+          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${cat.color}1A` }}>
+            <Text style={{ color: cat.color }} className="text-[10px] font-bold tracking-wide">
+              {cat.label}
+            </Text>
+          </View>
+          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${stageCol}1A` }}>
+            <Text style={{ color: stageCol }} className="text-[10px] font-bold tracking-wide">
+              {signal.stage}
+            </Text>
+          </View>
         </View>
       </View>
 

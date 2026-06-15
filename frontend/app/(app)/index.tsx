@@ -14,7 +14,7 @@ import { PullMarketButton } from '../../components/trends/PullMarketButton';
 import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
-import { dataWindowLabel, scoreGap, CATEGORY_DEFS } from '../../lib/signals';
+import { dataWindowLabel, scoreGap, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
 import { MARKET_CATEGORY_DEFS } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
+  const [contentCat, setContentCat] = useState('all'); // WHAT-axis filter (content category)
   const [marketQuery, setMarketQuery] = useState('');
   const goToMarketCategory = (key: string) => router.push(`/market-category/${key}` as any);
 
@@ -56,8 +57,15 @@ export default function Dashboard() {
   // The inline list on the homepage shows ALL accessible signals (with the
   // search query applied). Filtering by category navigates to the focused page.
   const filtered = accessible.filter((s) =>
-    !query || s.topic.toLowerCase().includes(query.toLowerCase())
+    (!query || s.topic.toLowerCase().includes(query.toLowerCase())) &&
+    (contentCat === 'all' || contentCategoryMeta(s.category).key === contentCat)
   );
+
+  // Live per-content-category counts for the chip row (so empty categories
+  // can be visually de-emphasized rather than leading to a blank list).
+  const contentCounts = Object.fromEntries(
+    CONTENT_CATEGORIES.map((c) => [c.key, accessible.filter((s) => contentCategoryMeta(s.category).key === c.key).length])
+  ) as Record<string, number>;
 
   const goToCategory = (key: string) => router.push(`/category/${key}` as any);
 
@@ -126,6 +134,44 @@ export default function Dashboard() {
           className="flex-1 ml-3 text-textPrimary text-base"
           style={{ color: '#1A1A2E' }}
         />
+      </View>
+
+      {/* Content-category filter (the WHAT axis — Now TrendIn 1.0 taxonomy).
+          Primary navigation for the widened topic pool: filters the list to one
+          content area. Orthogonal to the signal-STAGE tiles below (the HOW axis).
+          "All" leads; each chip shows its live count and de-emphasizes when empty. */}
+      <View style={{ height: 38 }} className="mb-3">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
+            const on = contentCat === c.key;
+            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
+            const empty = c.key !== 'all' && count === 0;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => setContentCat(c.key)}
+                disabled={empty}
+                className="px-3.5 rounded-full flex-row items-center"
+                style={{
+                  height: 32,
+                  backgroundColor: on ? c.color : '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: on ? c.color : '#E4E7EC',
+                  opacity: empty ? 0.4 : 1,
+                }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
+                  {c.label}
+                </Text>
+                {count > 0 && (
+                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>
+                    {count}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Enterprise: token-metered Pull Trends (renders only for enterprise tier) */}
