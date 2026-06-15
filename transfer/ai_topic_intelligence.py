@@ -74,6 +74,7 @@ SCORING PHILOSOPHY:
 ================================================================
 """
 
+import os
 import re
 import math
 import json
@@ -569,6 +570,26 @@ def compute_tier_aware_scores(
 
     tier_key, topic_key, topic_config, tier_config = result
 
+    # ── EVIDENCE GATE (integrity) ─────────────────────────────────
+    # The taxonomy floor + VIRAL tier label must NOT apply to a topic we have
+    # little/no collected evidence for. Otherwise a recognized term with 0
+    # signals floors to a measured-looking "VIRAL 96" — the credibility bug.
+    # Below the minimum, fall back to the RAW measured score and NO tier, so the
+    # displayed score + stage are consistent with the actual data. The topic
+    # earns its tier treatment once real signals confirm it.
+    _AI_MIN_SIGNALS = int(os.getenv("AI_TAXONOMY_MIN_SIGNALS", "5"))
+    if (signal_count or 0) < _AI_MIN_SIGNALS:
+        return {
+            "detection_score":  raw_detection,
+            "confidence_score": raw_confidence,
+            "tier":             None,
+            "tier_label":       None,
+            "ai_classification": None,
+            "score_explanation": None,
+            "research_note":     None,
+            "insufficient_evidence": True,
+        }
+
     det_floor   = tier_config["detection_floor"]
     conf_floor  = tier_config["confidence_floor"]
     det_ceiling = tier_config["detection_ceiling"]
@@ -682,9 +703,9 @@ def _build_score_explanation(
             f"building over the past {int(years_old * 12)} months."
         )
         action = (
-            "Detection is optimised for speed — act now if you can tolerate "
-            "some uncertainty. Confidence is high enough to recommend planning "
-            "concrete action. This is inside the early-actor window."
+            "Detection is optimised for speed (earliness); confidence is high "
+            "for a signal this early. The topic is still inside the expert-only "
+            "window, ahead of mainstream awareness."
         )
     elif tier == "tier_2":
         intro = (
@@ -694,9 +715,9 @@ def _build_score_explanation(
             f"not just persist."
         )
         action = (
-            "The window to act as an early mover is narrowing but still open. "
-            "Begin planning concrete strategy. Wait for one more confirmation "
-            "cycle if confidence matters more than speed."
+            "The early-mover window is narrowing but still open. Confidence is "
+            "still accumulating — the detection/confidence gap typically closes "
+            "with one more confirmation cycle."
         )
     elif "resurgent" in str(tier):
         intro = (
@@ -707,8 +728,8 @@ def _build_score_explanation(
         )
         action = (
             "Resurgence signals often move faster than first-emergence signals "
-            "because the infrastructure and vocabulary already exist. Act with "
-            "the same urgency as a Tier 1 signal."
+            "because the infrastructure and vocabulary already exist — comparable "
+            "in strength to a Tier 1 signal."
         )
     elif tier == "tier_3":
         intro = (
@@ -953,22 +974,21 @@ def generate_research_section(
     elif "tier_1" in tier_key:
         if detection_score >= 85:
             what_to_do = (
-                "Act now. This is a Tier 1 VIRAL topic with confirmed signal volume. "
-                "The expert community is actively producing content on this. "
-                "Mainstream awareness is still low — the lead time window is open."
+                "Tier 1 VIRAL topic with confirmed signal volume. The expert "
+                "community is actively producing content on this, and mainstream "
+                "awareness is still low — the lead-time window is open."
             )
         else:
             what_to_do = (
-                "Begin planning. This is a Tier 1 topic and more collection cycles "
-                "will push scores higher as inertia and persistence activate. "
-                "Position now while the topic is still primarily in expert communities."
+                "Tier 1 topic; scores typically rise further as inertia and "
+                "persistence activate over more cycles. Still primarily in expert "
+                "communities, ahead of mainstream awareness."
             )
     elif tier_key == "tier_2":
         what_to_do = (
-            "Window is open but closing. This topic has been building for "
-            f"{int(years_old * 12)} months and is showing continued positive velocity. "
-            "Begin positioning now — the early-mover advantage is still available "
-            "but decreasing each week."
+            "The early-mover window is open but narrowing. This topic has been "
+            f"building for {int(years_old * 12)} months with continued positive "
+            "velocity, though that advantage decreases each week."
         )
     elif tier_key == "tier_3":
         what_to_do = (
@@ -1093,7 +1113,11 @@ def apply_ai_intelligence(raw_result: dict) -> dict:
     inertia    = raw_result.get("inertia_score", 0) or 0
     velocity   = raw_result.get("gradient_velocity")
     times_scored = raw_result.get("times_scored", 0) or 0
-    is_first_run = (times_scored <= 1 or inertia < 5)
+    # "First run" must mean genuinely first — NOT merely low inertia. A topic
+    # scored several cycles but with flat inertia is "momentum not yet building",
+    # not "first collection" (which contradicts the visible scoring history).
+    # Low-inertia messaging is handled separately by the lead_time_warning.
+    is_first_run = (times_scored <= 1)
 
     # ── Compute tier-aware scores ─────────────────────────────────
     tier_result = compute_tier_aware_scores(
@@ -1128,6 +1152,12 @@ def apply_ai_intelligence(raw_result: dict) -> dict:
         # Overwrite with AI-taxonomy-aware scores
         "detection_score":    tier_result["detection_score"],
         "confidence_score":   tier_result["confidence_score"],
+        # Keep overall consistent with the overridden dual scores. Without this,
+        # overall stayed at the low raw component sum (e.g. mcp overall 46 vs
+        # det 88) and AI topics were under-ranked on the default overall sort.
+        "overall_score":      round(
+            (tier_result["detection_score"] + tier_result["confidence_score"]) / 2, 1
+        ),
 
         # AI taxonomy fields
         "ai_tier":            tier_result.get("tier"),

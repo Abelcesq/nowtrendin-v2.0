@@ -65,6 +65,7 @@ import re
 import json
 import math
 import sqlite3
+import db_compat
 import hashlib
 import argparse
 from datetime import datetime, timezone, timedelta
@@ -498,7 +499,7 @@ def seed_known_topics(db_path: str = DB_PATH) -> int:
     # Ensure calibration tables exist
     init_calibration_db(db_path)
 
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
 
     count = 0
@@ -541,7 +542,7 @@ def seed_known_topics(db_path: str = DB_PATH) -> int:
         ).isoformat()
 
         conn.execute("""
-            INSERT OR REPLACE INTO topic_maturity (
+            INSERT INTO topic_maturity (
                 topic_key, topic_display,
                 first_detected_at, last_scored_at,
                 times_scored, days_in_system,
@@ -552,6 +553,24 @@ def seed_known_topics(db_path: str = DB_PATH) -> int:
                 calibration_multiplier, anomaly_gate_passed,
                 updated_at
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(topic_key) DO UPDATE SET
+                topic_display=EXCLUDED.topic_display,
+                first_detected_at=EXCLUDED.first_detected_at,
+                last_scored_at=EXCLUDED.last_scored_at,
+                times_scored=EXCLUDED.times_scored,
+                days_in_system=EXCLUDED.days_in_system,
+                maturity_class=EXCLUDED.maturity_class,
+                maturity_reason=EXCLUDED.maturity_reason,
+                baseline_gradient=EXCLUDED.baseline_gradient,
+                baseline_overall=EXCLUDED.baseline_overall,
+                baseline_detection=EXCLUDED.baseline_detection,
+                baseline_confidence=EXCLUDED.baseline_confidence,
+                gradient_velocity=EXCLUDED.gradient_velocity,
+                score_velocity=EXCLUDED.score_velocity,
+                velocity_trend=EXCLUDED.velocity_trend,
+                calibration_multiplier=EXCLUDED.calibration_multiplier,
+                anomaly_gate_passed=EXCLUDED.anomaly_gate_passed,
+                updated_at=EXCLUDED.updated_at
         """, (
             topic_key,
             info["display"],
@@ -636,7 +655,7 @@ def get_topic_maturity_state(
       2. KNOWN_TOPICS knowledge base (correct on day 1)
       3. Default NEW state (first time we've seen it)
     """
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
 
     try:
@@ -748,7 +767,7 @@ def record_score_history(
         f"{topic_key}-{now_str}".encode()
     ).hexdigest()[:16]
 
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
 
     try:
         # Insert score history record
@@ -769,11 +788,11 @@ def record_score_history(
                  avg_detection, avg_confidence, signal_count)
             VALUES (?,?,?,?,?,?,1)
             ON CONFLICT(topic_key, snapshot_date) DO UPDATE SET
-                avg_gradient   = (avg_gradient   * signal_count + ?) / (signal_count + 1),
-                avg_overall    = (avg_overall    * signal_count + ?) / (signal_count + 1),
-                avg_detection  = (avg_detection  * signal_count + ?) / (signal_count + 1),
-                avg_confidence = (avg_confidence * signal_count + ?) / (signal_count + 1),
-                signal_count   = signal_count + 1
+                avg_gradient   = (topic_baselines.avg_gradient   * topic_baselines.signal_count + ?) / (topic_baselines.signal_count + 1),
+                avg_overall    = (topic_baselines.avg_overall    * topic_baselines.signal_count + ?) / (topic_baselines.signal_count + 1),
+                avg_detection  = (topic_baselines.avg_detection  * topic_baselines.signal_count + ?) / (topic_baselines.signal_count + 1),
+                avg_confidence = (topic_baselines.avg_confidence * topic_baselines.signal_count + ?) / (topic_baselines.signal_count + 1),
+                signal_count   = topic_baselines.signal_count + 1
         """, (
             topic_key, date_str,
             calibrated_gradient, overall_score, detection_score, confidence_score,
@@ -824,7 +843,7 @@ def recompute_velocities(db_path: str = DB_PATH) -> int:
     This is what makes "ai agent" correctly RESURGENT if a new
     breakthrough causes it to actually accelerate above its baseline.
     """
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
     updated = 0
 
@@ -924,9 +943,9 @@ def recompute_velocities(db_path: str = DB_PATH) -> int:
                     calibration_multiplier = CASE
                         WHEN ? = 'RESURGENT'  THEN 1.2
                         WHEN ? = 'EMERGING'   THEN 1.0
-                        WHEN ? = 'ESTABLISHED' THEN 0.25
-                        WHEN ? = 'MONITORING' THEN 0.55
-                        ELSE 0.75
+                        WHEN ? = 'ESTABLISHED' THEN 0.40
+                        WHEN ? = 'MONITORING' THEN 0.60
+                        ELSE 0.80
                     END,
                     updated_at = ?
                 WHERE topic_key = ?
@@ -989,8 +1008,19 @@ def apply_calibration(
     ft_ratio        = raw_result.get("first_timer_ratio", 0.0) or 0.0
     asymmetry       = raw_result.get("engagement_asymmetry_detected", False)
     stage           = raw_result.get("signal_stage", "MONITORING")
-    times_scored    = maturity.get("times_scored", 0)
-    is_first_run    = (times_scored <= 1 or inertia <= INERTIA_ZERO_THRESHOLD)
+    # Prefer the authoritative lifecycle cycle count — the topic_maturity record's
+    # own counter can lag at 0 even after several scoring cycles, which would
+    # mislabel an established topic as "first collection".
+    times_scored    = max(
+        int(maturity.get("times_scored", 0) or 0),
+        int(raw_result.get("total_scoring_cycles", 0) or 0),
+        # The scorer surfaces the real cycle count (from stored history) here.
+        int(raw_result.get("momentum_cycle_count", 0) or 0),
+        int(raw_result.get("persistence_cycles", 0) or 0),
+    )
+    # "First run" must mean genuinely first — NOT merely flat inertia (a multi-
+    # cycle topic with flat momentum is messaged separately, not "first collection").
+    is_first_run    = (times_scored <= 1)
 
     # ── Calibrate gradient ────────────────────────────────────────
     if CAL_ENGINE_AVAILABLE:
@@ -1014,27 +1044,39 @@ def apply_calibration(
     # Confidence:  I(0.35) + M(0.30) + G(0.20) + C(0.10) + D(0.05)
     inertia_d  = raw_result.get("inertia_detection", inertia)
     inertia_c  = raw_result.get("inertia_confidence", inertia)
-    platform_d = raw_result.get("platform_diversity_detection", 0) or 0
-    platform_c = raw_result.get("platform_diversity_confidence", 0) or 0
-    dark_d     = raw_result.get("dark_matter_detection", 0) or 0
-    dark_c     = raw_result.get("dark_matter_confidence", 0) or 0
-    decay_d    = raw_result.get("confidence_decay_detection", 0) or 0
-    decay_c    = raw_result.get("confidence_decay_confidence", 0) or 0
+    # These mode-specific fields (..._detection/..._confidence) are not stored as
+    # separate columns — the engine persists one value per component. Fall back to
+    # the actual stored column so Platform Diversity, Dark Matter and Confidence
+    # Decay aren't silently zeroed in the serve recompute AND the breakdown display.
+    _platform = raw_result.get("platform_diversity", 0) or 0
+    _dark     = raw_result.get("dark_matter_score", 0) or 0
+    _decay    = raw_result.get("confidence_decay", 0) or 0
+    platform_d = raw_result.get("platform_diversity_detection", _platform) or 0
+    platform_c = raw_result.get("platform_diversity_confidence", _platform) or 0
+    dark_d     = raw_result.get("dark_matter_detection", _dark) or 0
+    dark_c     = raw_result.get("dark_matter_confidence", _dark) or 0
+    decay_d    = raw_result.get("confidence_decay_detection", _decay) or 0
+    decay_c    = raw_result.get("confidence_decay_confidence", _decay) or 0
 
+    # 6-component external weights (N excluded by design; renormalized to 1.0).
+    # Matches the authoritative scoring formula in gravitational_anomaly_detector.
+    _persist = raw_result.get("persistence_score", 0) or 0
     new_detection = round(
-        cal_gradient_d * 0.40 +
-        dark_d         * 0.25 +
-        inertia_d      * 0.20 +
-        platform_d     * 0.10 +
-        decay_d        * 0.05,
+        cal_gradient_d * 0.375 +
+        dark_d         * 0.216 +
+        inertia_d      * 0.182 +
+        platform_d     * 0.102 +
+        decay_d        * 0.057 +
+        _persist       * 0.068,
         1
     )
     new_confidence = round(
-        inertia_c      * 0.35 +
-        platform_c     * 0.30 +
-        cal_gradient_c * 0.20 +
-        decay_c        * 0.10 +
-        dark_c         * 0.05,
+        inertia_c      * 0.278 +
+        _persist       * 0.267 +
+        platform_c     * 0.222 +
+        cal_gradient_c * 0.122 +
+        decay_c        * 0.067 +
+        dark_c         * 0.044,
         1
     )
     new_overall = round((new_detection + new_confidence) / 2, 1)
@@ -1109,7 +1151,11 @@ def apply_calibration(
             "persistence":         raw_result.get("persistence_score", 0) or 0,
             "dark_matter":         dark_d,
             "confidence_decay":    decay_d,
-            "nowtrend_internal":   raw_result.get("nowtrend_internal", 0) or 0,
+            # N "now trending" internal demand is stored as `nowtrendin_score`
+            # (with `nowtrend_internal` as a legacy fallback alias). Reading the
+            # wrong key was leaving N hardcoded at 0/pending in the breakdown.
+            "nowtrend_internal":   raw_result.get("nowtrendin_score",
+                                       raw_result.get("nowtrend_internal", 0)) or 0,
             "gradient_calibration_note": cal_note_d,
         })
     else:
@@ -1195,7 +1241,6 @@ def apply_calibration(
 
         # ── Communication text (WHAT TO DO first) ─────────────────
         "what_to_do_action":             what_to_do_dict["action"],
-        "what_to_do_urgency":            what_to_do_dict["urgency"],
         "what_to_do_instruction":        what_to_do_dict["instruction"],
         "what_to_do_detail":             what_to_do_dict.get("detail", ""),
         "show_lead_time":                show_lead_time,
@@ -1249,7 +1294,7 @@ def apply_calibration(
 
 def print_calibration_report(db_path: str = DB_PATH) -> None:
     """Print a summary of current calibration state."""
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
 
     try:

@@ -62,6 +62,7 @@ import re
 import json
 import math
 import sqlite3
+import db_compat
 import argparse
 import statistics
 from datetime import datetime, timezone, timedelta
@@ -171,7 +172,7 @@ CREATE INDEX IF NOT EXISTS idx_baselines_topic
 
 def init_calibration_db(db_path: str = DB_PATH):
     """Add calibration tables to the existing detector database."""
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.executescript(CALIBRATION_SCHEMA)
     conn.commit()
@@ -180,7 +181,7 @@ def init_calibration_db(db_path: str = DB_PATH):
 
 
 def get_db(db_path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -534,7 +535,7 @@ def evaluate_anomaly_gate(
     Rules:
     ┌────────────┬──────────────────────────────────────────────┐
     │ ESTABLISHED│ Anomaly ONLY if: velocity > 15pts AND        │
-    │            │ (first_timer_ratio >= 30% OR inertia > 30)   │
+    │            │ (first_timer_ratio >= 35% OR inertia > 30)   │
     ├────────────┼──────────────────────────────────────────────┤
     │ NEW        │ Anomaly if: cross-platform (2+ platforms) AND │
     │            │ at least 1 of: ft_ratio, asymmetry, inertia  │
@@ -555,7 +556,7 @@ def evaluate_anomaly_gate(
     anomaly_label = ""
 
     # ── Evidence collection ───────────────────────────────────────
-    has_first_timer = ft_ratio >= 0.30
+    has_first_timer = ft_ratio >= 0.35   # unified with FIRST_TIMER_THRESHOLD (was 0.30)
     has_asymmetry   = asymmetry_detected
     has_inertia     = inertia_score > INERTIA_ZERO_THRESHOLD
     has_xplatform   = platform_count >= 2
@@ -679,13 +680,14 @@ def build_what_to_do(
       - urgency: HIGH / MEDIUM / LOW / WAIT
     """
     # ── First-run state ───────────────────────────────────────────
-    if times_scored <= 1 or inertia_score <= INERTIA_ZERO_THRESHOLD:
+    # GENUINELY first cycle — no history yet.
+    if times_scored <= 1:
         return {
-            "action":    "Monitor — first collection",
+            "action":    "First collection cycle",
             "urgency":   "WAIT",
             "instruction": (
                 "Engine is in its first scoring cycle for this topic. "
-                "No action recommended yet."
+                "Scores will sharpen after more cycles."
             ),
             "detail": (
                 "Inertia requires 2+ consecutive 6-hour windows to confirm. "
@@ -694,11 +696,27 @@ def build_what_to_do(
             ),
             "lead_time_note": None,  # NEVER show lead time estimate with inertia = 0
         }
+    # Scored several cycles but momentum (inertia) is still flat — this is NOT a
+    # first collection; it's a tracked topic whose acceleration hasn't kicked in.
+    if inertia_score <= INERTIA_ZERO_THRESHOLD:
+        return {
+            "action":    "Momentum not yet building",
+            "urgency":   "WAIT",
+            "instruction": (
+                f"Tracked across {times_scored} scoring cycles, but momentum "
+                f"(inertia) is still flat — no confirmed acceleration yet."
+            ),
+            "detail": (
+                "Inertia needs 2+ consecutive 6-hour windows of acceleration to "
+                "confirm. The signal is stable but not yet accelerating."
+            ),
+            "lead_time_note": None,  # no lead-time estimate without confirmed inertia
+        }
 
     # ── Established topics: different action framing ──────────────
     if maturity_class == "ESTABLISHED":
         return {
-            "action":    "Context — established topic",
+            "action":    "Established topic",
             "urgency":   "LOW",
             "instruction": (
                 "This is an established expert-community topic, "
@@ -715,7 +733,7 @@ def build_what_to_do(
     # ── Resurgent: established but waking up ──────────────────────
     if maturity_class == "RESURGENT":
         return {
-            "action":    "Act — resurgence confirmed",
+            "action":    "Resurgence detected",
             "urgency":   "HIGH",
             "instruction": (
                 "An established topic is showing renewed acceleration "
@@ -733,9 +751,9 @@ def build_what_to_do(
     # ── Standard stage-based recommendations ─────────────────────
     if stage == "BREAKOUT":
         return {
-            "action":    "Act now — maximum lead time",
+            "action":    "Breakout — maximum lead time",
             "urgency":   "HIGH",
-            "instruction": "Both scores above 85. This is as confirmed as early signals get.",
+            "instruction": "Both scores above 85 — as confirmed as early signals get.",
             "detail": (
                 "Gradient and inertia are both high, cross-platform spread is confirmed, "
                 "and the gap between detection and confidence is closing. "
@@ -746,13 +764,13 @@ def build_what_to_do(
 
     elif stage == "STRONG":
         return {
-            "action":    "Prepare — window open",
+            "action":    "Strong signal — window open",
             "urgency":   "MEDIUM",
-            "instruction": "Strong signal with good confidence. Begin planning now.",
+            "instruction": "Strong signal with good confidence; not yet breakout.",
             "detail": (
                 "Both scores agree this is real. Not yet breakout, "
-                "but the runway ahead is significant. "
-                "Use this window to position before the confidence score catches up."
+                "but the runway ahead is significant — detection is ahead of "
+                "confidence, and that gap typically closes over subsequent cycles."
             ),
             "lead_time_note": f"Est. {_estimate_lead_time(detection_score, confidence_score)} days before Google Trends breakout.",
         }
@@ -760,36 +778,34 @@ def build_what_to_do(
     elif stage == "EMERGING":
         if confidence_score >= 55:
             return {
-                "action":    "Begin planning",
+                "action":    "Confidence building",
                 "urgency":   "MEDIUM",
-                "instruction": "Confidence is building. Prepare to act when breakout threshold approaches.",
+                "instruction": "Confidence is building toward the breakout threshold.",
                 "detail": (
                     "Signal is confirmed across multiple windows. "
-                    "Detection is ahead of confidence — that gap will close. "
-                    "Now is the time to prepare assets, not deploy them."
+                    "Detection is ahead of confidence — that gap typically closes "
+                    "over subsequent cycles."
                 ),
                 "lead_time_note": f"Est. {_estimate_lead_time(detection_score, confidence_score)} days before Google Trends breakout.",
             }
         else:
             return {
-                "action":    "Monitor — signal building",
+                "action":    "Signal building",
                 "urgency":   "LOW",
                 "instruction": "Movement detected but confidence still building.",
                 "detail": (
-                    "The detection score sees something meaningful. "
-                    "Wait for confidence to cross 55 before planning concrete action. "
-                    "Continue monitoring across the next 2–3 collection cycles."
+                    "The detection score sees something meaningful, but confidence "
+                    "has not yet crossed 55. Worth tracking across the next 2–3 cycles."
                 ),
                 "lead_time_note": None,
             }
 
     elif stage == "WATCHING":
         return {
-            "action":    "Monitor — signal building",
+            "action":    "Signal building",
             "urgency":   "WAIT",
             "instruction": (
-                "Not yet confirmed. The engine is watching — "
-                "check back after the next collection run."
+                "Not yet confirmed — scores are in the early 35–54 range."
             ),
             "detail": (
                 "Both scores are in the 35–54 range. "
@@ -801,13 +817,12 @@ def build_what_to_do(
 
     else:  # MONITORING
         return {
-            "action":    "Background — below threshold",
+            "action":    "Below threshold",
             "urgency":   "WAIT",
-            "instruction": "Signal is below monitoring threshold. No action needed.",
+            "instruction": "Signal is below the monitoring threshold.",
             "detail": (
                 "Topic is present but not trending. "
-                "It will remain in the background queue. "
-                "Any acceleration will surface it automatically."
+                "It remains in the background queue; any acceleration surfaces it automatically."
             ),
             "lead_time_note": None,
         }
@@ -839,7 +854,7 @@ def build_gap_interpretation(gap: float, stage: str, maturity: str) -> dict:
     makes clear that high conviction of weakness is not a strong signal.
     """
     if gap <= 15:
-        label = f"Both scores agree — high conviction {stage.lower()} signal"
+        label = f"Both scores agree - high conviction {stage.lower()} signal"
         meaning = (
             f"The detection and confidence systems are aligned. "
             f"This is a high-conviction signal at the {stage} level. "
@@ -848,20 +863,20 @@ def build_gap_interpretation(gap: float, stage: str, maturity: str) -> dict:
                else "Both agree this is building.")
         )
     elif gap <= 35:
-        label = "Early stage — confirmation building"
+        label = "Early stage - confirmation building"
         meaning = (
             "Detection sees the signal clearly. Confidence is accumulating evidence. "
             "The gap will close over the next 24–72 hours as more windows confirm."
         )
     elif gap <= 60:
-        label = "Very early — detected, not confirmed"
+        label = "Very early - detected, not confirmed"
         meaning = (
             "Maximum lead time opportunity. The engine detected this before "
             "the confirmation data has arrived. High potential, not yet proven. "
             "Ideal window for early actors who accept some uncertainty."
         )
     else:
-        label = "Speculative — dark matter signal only"
+        label = "Speculative - dark matter signal only"
         meaning = (
             "Detection fired primarily on dark matter inference. "
             "Confirmation has not arrived. Highest risk, "
@@ -870,7 +885,7 @@ def build_gap_interpretation(gap: float, stage: str, maturity: str) -> dict:
 
     # Maturity override for established topics
     if maturity == "ESTABLISHED":
-        label   = f"Established topic — gap reflects permanent expert home"
+        label   = f"Established topic - gap reflects permanent expert home"
         meaning = (
             "High gradient is where this topic permanently lives in expert communities. "
             "The gap does not indicate early emergence — it reflects the topic's "
@@ -928,7 +943,10 @@ def build_component_groups(components: dict) -> dict:
         momentum_label  = "Low — no sustained acceleration detected"
 
     # ── Group 3: Signal Context ───────────────────────────────────
-    context_avg = (d + c + n) / 3
+    # N (internal app demand) is DELIBERATELY excluded from this average and
+    # shown as a separate block below — it must not contaminate the objective
+    # gradient with our own users' behaviour (reflexivity).
+    context_avg = (d + c) / 2
     if context_avg >= 40:
         context_status = "STRONG"
         context_label  = "Strong — dark matter and freshness support signal"
@@ -1000,10 +1018,22 @@ def build_component_groups(components: dict) -> dict:
                     "desc": "Signal freshness and directional momentum",
                     "pending": False,
                 },
+            },
+        },
+        # Separate, clearly-labeled block — NOT part of the Gradient Score math.
+        # Internal app demand (how often our own users surface this topic). Shown
+        # for context only; excluded from Detection/Confidence/Overall to keep the
+        # score an objective measure of EXTERNAL attention.
+        "community_demand": {
+            "label":  "Community Demand",
+            "status": "INFO",
+            "note":   "Internal app demand — shown for context, not part of the Gradient Score",
+            "in_composite": False,
+            "components": {
                 "nowtrendin_demand": {
                     "det":  n,
                     "conf": n,
-                    "desc": "Internal app demand signal",
+                    "desc": "How often Now TrendIn users surface this topic (not scored)",
                     "pending": n == 0,
                 },
             },
@@ -1220,7 +1250,7 @@ class CalibrationEngine:
             ON CONFLICT(topic_key) DO UPDATE SET
                 topic_display       = excluded.topic_display,
                 last_scored_at      = excluded.last_scored_at,
-                times_scored        = times_scored + 1,
+                times_scored        = topic_maturity.times_scored + 1,
                 days_in_system      = excluded.days_in_system,
                 maturity_class      = excluded.maturity_class,
                 maturity_reason     = excluded.maturity_reason,
@@ -1268,7 +1298,14 @@ class CalibrationEngine:
 
         # ── 1. Load/create maturity record ──────────────────────
         record     = self._get_or_create_maturity_record(topic_key)
-        times_scored = record.get("times_scored", 0)
+        # The maturity record's own counter can lag the authoritative lifecycle
+        # count (topic_lifecycle.total_scoring_cycles). Prefer the highest known
+        # cycle count so a topic scored 5× is never mislabeled "first collection".
+        times_scored = max(
+            int(record.get("times_scored", 0) or 0),
+            int(raw_result.get("total_scoring_cycles", 0) or 0),
+            int(raw_result.get("times_scored", 0) or 0),
+        )
         first_detected = record.get("first_detected_at", _now())
 
         # ── 2. Classify maturity ─────────────────────────────────

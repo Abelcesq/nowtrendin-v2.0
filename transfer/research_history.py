@@ -46,6 +46,7 @@ CACHING:
 """
 
 import os, re, json, time, sqlite3, logging, argparse, urllib.parse
+import db_compat
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -361,7 +362,7 @@ CREATE TABLE IF NOT EXISTS research_history_cache (
 
 
 def _init_cache(db_path):
-    conn = sqlite3.connect(db_path)
+    conn = db_compat.connect(db_path)
     conn.executescript(CACHE_SCHEMA)
     conn.commit()
     conn.close()
@@ -369,7 +370,7 @@ def _init_cache(db_path):
 
 def _get_cached(topic_key, db_path):
     try:
-        conn = sqlite3.connect(db_path)
+        conn = db_compat.connect(db_path)
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             "SELECT result_json, expires_at FROM research_history_cache WHERE topic_key=?",
@@ -384,11 +385,14 @@ def _get_cached(topic_key, db_path):
 
 def _set_cache(topic_key, result, db_path):
     try:
-        conn = sqlite3.connect(db_path)
+        conn = db_compat.connect(db_path)
         exp = (datetime.now(timezone.utc)+timedelta(days=CACHE_DAYS)).isoformat()
         conn.execute(
-            "INSERT OR REPLACE INTO research_history_cache "
-            "(topic_key,researched_at,expires_at,result_json,sources_found) VALUES(?,?,?,?,?)",
+            "INSERT INTO research_history_cache "
+            "(topic_key,researched_at,expires_at,result_json,sources_found) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(topic_key) DO UPDATE SET "
+            "researched_at=EXCLUDED.researched_at,expires_at=EXCLUDED.expires_at,"
+            "result_json=EXCLUDED.result_json,sources_found=EXCLUDED.sources_found",
             (topic_key, datetime.now(timezone.utc).isoformat(), exp,
              json.dumps(result), len(result.get("sources",[])))
         )
@@ -612,7 +616,7 @@ def _query_trends(term: str) -> Optional[dict]:
 def _query_internal(topic_key: str, db_path: str) -> Optional[dict]:
     """When Now TrendIn first detected this topic in its own database."""
     try:
-        conn = sqlite3.connect(db_path)
+        conn = db_compat.connect(db_path)
         conn.row_factory = sqlite3.Row
         row = conn.execute("""
             SELECT MIN(extracted_at) first_seen, MAX(extracted_at) last_seen,

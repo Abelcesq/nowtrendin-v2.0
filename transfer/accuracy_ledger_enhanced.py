@@ -1,0 +1,208 @@
+"""
+NOW TRENDIN — ACCURACY LEDGER ENHANCEMENT (engine-native, db_compat)
+
+Honest denominator: counts the MISSES, not just the wins.
+
+Extends google_trends_validation.py. The base ledger recorded topics that broke
+out (LED/LAGGED) but let fizzles sit in limbo forever — survivorship bias. This
+adds:
+  1. PENDING TRACKING  — record_detection() logs every flagged topic with a
+     timeout deadline, starting the clock for every call.
+  2. TIMEOUT SWEEP     — sweep_pending() resolves each pending detection:
+        broke out → LED / LAGGED / SAME_DAY ; past deadline → FALSE_POSITIVE.
+  3. HONEST REPORT     — hit rate = LED / (LED + SAME_DAY + LAGGED + FALSE_POSITIVE),
+     leads with MEDIAN lead time, prints sample size, flags small samples.
+
+Postgres-safe: upserts use explicit ON CONFLICT (db_compat turns the sqlite
+'INSERT OR REPLACE' into a plain INSERT, which would dup-key on re-runs).
+"""
+import os
+import hashlib
+import statistics
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+import db_compat
+
+DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
+DEFAULT_TIMEOUT_DAYS = int(os.getenv("LEDGER_TIMEOUT_DAYS", "90"))
+
+try:
+    from google_trends_validation import (
+        fetch_trends_curve, detect_breakout_date, compute_lead_time,
+    )
+    _HAS_BASE = True
+except Exception:
+    _HAS_BASE = False
+
+
+def init_pending_db(db_path: str = DB_PATH):
+    conn = db_compat.connect(db_path)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pending_detections (
+            id TEXT PRIMARY KEY, topic_key TEXT, topic_display TEXT,
+            detection_date TEXT, detection_score REAL, timeout_date TEXT,
+            last_checked TEXT, status TEXT DEFAULT 'pending')
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS accuracy_ledger (
+            id TEXT PRIMARY KEY, topic_key TEXT, topic_display TEXT,
+            detection_date TEXT, detection_score REAL, breakout_date TEXT,
+            breakout_multiple REAL, lead_time_days INTEGER, verdict TEXT,
+            validated_at TEXT, provider TEXT)
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_detections(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_verdict2 ON accuracy_ledger(verdict)")
+    conn.commit()
+    conn.close()
+
+
+def _parse(date_str: str) -> datetime:
+    s = (date_str or "").strip().replace("Z", "")
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M", "%b %d, %Y", "%m/%d/%Y"):
+        try:
+            base = s.split("T")[0] if (fmt == "%Y-%m-%d" and "T" in s) else s
+            return datetime.strptime(base, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+
+
+def record_detection(topic_key, topic_display, detection_date, detection_score,
+                     timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None):
+    """Log a detection as PENDING the moment the engine flags it. Idempotent on
+    (topic_key, detection_date)."""
+    own = conn is None
+    if own:
+        conn = db_compat.connect(db_path)
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        timeout_dt = (_parse(detection_date) + timedelta(days=timeout_days)).isoformat()
+    except Exception:
+        timeout_dt = None
+    rec_id = hashlib.md5(f"{topic_key}-{detection_date}".encode()).hexdigest()[:16]
+    try:
+        # Don't reopen something already resolved.
+        ex = conn.execute("SELECT status FROM pending_detections WHERE id=%s" if db_compat.USE_PG
+                          else "SELECT status FROM pending_detections WHERE id=?", (rec_id,)).fetchone()
+        if not ex:
+            conn.execute("""
+                INSERT OR IGNORE INTO pending_detections
+                    (id, topic_key, topic_display, detection_date, detection_score,
+                     timeout_date, last_checked, status)
+                VALUES (?,?,?,?,?,?,?,'pending')
+            """, (rec_id, topic_key, topic_display, detection_date,
+                  detection_score, timeout_dt, now))
+            conn.commit()
+    except Exception as e:
+        print(f"[ledger] record_detection error: {e}")
+    finally:
+        if own:
+            conn.close()
+
+
+def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict, provider):
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute("""
+        INSERT INTO accuracy_ledger
+            (id, topic_key, topic_display, detection_date, detection_score,
+             breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT (id) DO UPDATE SET
+            breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
+            lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
+            validated_at=EXCLUDED.validated_at, provider=EXCLUDED.provider
+    """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
+          p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider))
+
+
+def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
+    """Resolve pending detections into hits or counted misses."""
+    if not _HAS_BASE:
+        return {"available": False}
+    conn = db_compat.connect(db_path)
+    q = "SELECT * FROM pending_detections WHERE status='pending'"
+    if limit:
+        q += f" LIMIT {int(limit)}"
+    pending = [dict(r) for r in conn.execute(q).fetchall()]
+    fetch = fetch_fn or fetch_trends_curve
+    now = datetime.now(timezone.utc)
+    led = lagged = same = fp = still = 0
+    for p in pending:
+        try:
+            curve = fetch(p["topic_display"])
+        except Exception:
+            curve = None
+        breakout = detect_breakout_date(curve, breakout_threshold) if curve else None
+        if breakout:
+            lead = compute_lead_time(p["detection_date"], breakout)
+            if lead:
+                rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
+                _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
+                               lead["lead_time_days"], lead["verdict"], "sweep")
+                conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
+                conn.commit()
+                if lead["verdict"] == "LED": led += 1
+                elif lead["verdict"] == "LAGGED": lagged += 1
+                else: same += 1
+                continue
+        timed_out = False
+        if p.get("timeout_date"):
+            try:
+                timed_out = now > _parse(p["timeout_date"])
+            except Exception:
+                timed_out = False
+        if timed_out:
+            rec_id = hashlib.md5(f"fp-{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
+            _upsert_ledger(conn, rec_id, p, None, None, None, "FALSE_POSITIVE", "timeout")
+            conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
+            conn.commit()
+            fp += 1
+        else:
+            conn.execute("UPDATE pending_detections SET last_checked=? WHERE id=?",
+                         (now.isoformat(), p["id"]))
+            conn.commit()
+            still += 1
+    conn.close()
+    out = {"resolved_led": led, "resolved_lagged": lagged, "resolved_same_day": same,
+           "resolved_false_positive": fp, "still_pending": still}
+    print(f"[ledger] sweep: {out}")
+    return out
+
+
+def generate_honest_report(db_path=DB_PATH) -> dict:
+    """Accuracy report with the misses counted in the denominator."""
+    conn = db_compat.connect(db_path)
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM accuracy_ledger").fetchall()]
+        pending = conn.execute(
+            "SELECT COUNT(*) AS c FROM pending_detections WHERE status='pending'").fetchone()["c"]
+    except Exception:
+        conn.close()
+        return {"status": "empty", "message": "Ledger not initialised yet.", "pending": 0}
+    conn.close()
+    led = [r for r in rows if r["verdict"] == "LED"]
+    same = [r for r in rows if r["verdict"] == "SAME_DAY"]
+    lag = [r for r in rows if r["verdict"] == "LAGGED"]
+    fp = [r for r in rows if r["verdict"] == "FALSE_POSITIVE"]
+    resolved = len(led) + len(same) + len(lag) + len(fp)
+    if resolved == 0:
+        return {"status": "empty", "message": "No resolved predictions yet.", "pending": pending}
+    lead_times = [r["lead_time_days"] for r in led if r["lead_time_days"] is not None]
+    naive_denom = len(led) + len(same) + len(lag)
+    return {
+        "status": "ok",
+        "sample_size": resolved,
+        "still_pending": pending,
+        "hits_led": len(led), "same_day": len(same),
+        "misses_lagged": len(lag), "misses_false_positive": len(fp),
+        "honest_hit_rate_pct": round(len(led) / resolved * 100, 1),
+        "naive_hit_rate_pct": round(len(led) / naive_denom * 100, 1) if naive_denom else 0.0,
+        "median_lead_days": round(statistics.median(lead_times), 1) if lead_times else 0,
+        "mean_lead_days": round(statistics.mean(lead_times), 1) if lead_times else 0,
+        "max_lead_days": max(lead_times) if lead_times else 0,
+        "small_sample_warning": resolved < 20,
+        "best": sorted([{"topic": r["topic_display"], "lead_days": r["lead_time_days"]}
+                        for r in led], key=lambda x: x["lead_days"] or 0, reverse=True)[:5],
+    }

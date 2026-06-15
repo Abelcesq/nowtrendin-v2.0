@@ -1,4 +1,5 @@
 # ── Core (required) ───────────────────────────────────────────────
+psycopg2-binary>=2.9.9     # Postgres driver (used when DATABASE_URL is set)
 praw>=7.7.1
 requests>=2.31.0
 vaderSentiment>=3.3.2

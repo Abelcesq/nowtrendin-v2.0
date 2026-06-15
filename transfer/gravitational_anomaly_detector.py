@@ -58,6 +58,7 @@ import time
 import uuid
 import string
 import sqlite3
+import db_compat
 import hashlib
 import argparse
 import statistics
@@ -70,7 +71,7 @@ import praw
 import requests
 import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Body, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -136,6 +137,59 @@ except ImportError:
     _BLOGS_AVAILABLE = False
     print("[startup] blog_collectors.py not found — running Reddit/GitHub/HN only")
 
+# discovery_collectors.py — open-world, category-agnostic intake (Phase A).
+# Surfaces general-culture trends (sports, entertainment, etc.) the seeded tech
+# feeds miss, via Google Trends trending-searches + Wikipedia top pageviews.
+try:
+    import discovery_collectors as _dc
+    _DISCOVERY_AVAILABLE = True
+    print("[startup] discovery_collectors module loaded — open-world feeds active")
+except ImportError:
+    _dc = None                   # type: ignore
+    _DISCOVERY_AVAILABLE = False
+    print("[startup] discovery_collectors.py not found — tech-only intake")
+
+# topic_categories.py — content-category classifier (Sports/Tech/Business/…).
+# Metadata only: labels topics for UI navigation, never feeds the Gradient Score.
+try:
+    from topic_categories import classify_topic as _classify_topic
+    _CATEGORIES_AVAILABLE = True
+    print("[startup] topic_categories loaded — content-category classification active")
+except ImportError:
+    _CATEGORIES_AVAILABLE = False
+    def _classify_topic(topic, text="", hints=None):   # type: ignore
+        return {"category": "general", "label": "General", "confidence": 0.0, "matched": []}
+
+# community_tiers.py — community-LEVEL tier (r/SpaceX expert vs r/all mainstream)
+# instead of a fixed per-platform tier. Lets the gradient + tier-migration read
+# where a signal actually sits, not just which platform it came from.
+try:
+    from community_tiers import community_tier as _community_tier
+except ImportError:
+    def _community_tier(platform, community=""):   # type: ignore
+        return "expert" if (platform or "").lower() in ("github", "hackernews") else "mainstream"
+
+
+def _topic_category(display: str) -> str:
+    """Best-effort content category for a topic display name (safe fallback)."""
+    try:
+        return _classify_topic(display or "")["category"]
+    except Exception:
+        return "general"
+
+# dual_pathway.py — Phase C recalibration. Mainstream-origin topics (consumer
+# culture surfaced by discovery feeds) are scored by attention MAGNITUDE +
+# velocity instead of the expert-gradient that is structurally ~0 for them.
+# Expert-origin (tech) topics are untouched — the moat is preserved.
+try:
+    import dual_pathway as _dual
+    _DUAL_PATHWAY = os.getenv("DUAL_PATHWAY", "1") == "1"
+    print(f"[startup] dual_pathway loaded — mainstream-magnitude detection {'ON' if _DUAL_PATHWAY else 'OFF'}")
+except ImportError:
+    _dual = None  # type: ignore
+    _DUAL_PATHWAY = False
+    print("[startup] dual_pathway.py not found — gradient-only detection")
+
 # ── Signal Calibration Engine ─────────────────────────────────────
 # Provides maturity-aware scoring: discounts ESTABLISHED topics,
 # boosts RESURGENT topics, hides lead-time when inertia unconfirmed,
@@ -185,20 +239,179 @@ except ImportError:
     _CORRECTIONS_AVAILABLE = False
     print("[startup] calibration_parameter_corrections.py not found — running without noise filter")
 
+try:
+    import financial_risk_gradient as risk
+    _RISK_AVAILABLE = True
+    print("[startup] financial_risk_gradient loaded — Risk Gradient Score active")
+except Exception as _risk_exc:
+    _RISK_AVAILABLE = False
+    print(f"[startup] financial_risk_gradient unavailable: {_risk_exc}")
+
+try:
+    import google_trends_validation as accuracy
+    _ACCURACY_AVAILABLE = True
+    print("[startup] google_trends_validation loaded — Accuracy Ledger active")
+except Exception as _acc_exc:
+    _ACCURACY_AVAILABLE = False
+
+try:
+    import accuracy_ledger_enhanced as ledger_plus
+    _LEDGER_PLUS_AVAILABLE = True
+    print("[startup] accuracy_ledger_enhanced loaded — honest-denominator ledger active")
+except Exception as _lpe:
+    _LEDGER_PLUS_AVAILABLE = False
+    print(f"[startup] accuracy_ledger_enhanced unavailable: {_lpe}")
+
+
+def _record_top_detections(limit=20, min_detection=None):
+    """Log the engine's strongest current detections as PENDING ledger entries
+    (starts the clock for every call, not just the winners). Uses each topic's
+    true first-seen as the detection date. Idempotent."""
+    if not _LEDGER_PLUS_AVAILABLE:
+        return 0
+    floor = float(min_detection if min_detection is not None
+                  else os.getenv("LEDGER_DETECTION_FLOOR", "10"))
+    conn = get_db(DB_PATH)
+    n = 0
+    try:
+        rows = conn.execute("""
+            SELECT v.topic_key, v.topic_display, v.detection_score,
+                   COALESCE(lc.first_detected_at, fs.first_at) AS det_date
+            FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
+              ON v.topic_key=l.topic_key AND v.scored_at=l.m
+            INNER JOIN (SELECT topic_key, MIN(scored_at) first_at FROM velocity_scores GROUP BY topic_key) fs
+              ON v.topic_key=fs.topic_key
+            LEFT JOIN topic_lifecycle lc ON v.topic_key=lc.topic_key
+            WHERE v.detection_score >= ?
+            ORDER BY v.detection_score DESC LIMIT ?
+        """, (floor, limit)).fetchall()
+        for r in rows:
+            dd = (r["det_date"] or "")[:10]
+            if not dd:
+                continue
+            ledger_plus.record_detection(r["topic_key"], r["topic_display"], dd,
+                                         r["detection_score"] or 0, conn=conn)
+            n += 1
+    except Exception as e:
+        print(f"[ledger] record_top_detections error: {e}")
+    finally:
+        conn.close()
+    print(f"[ledger] recorded {n} pending detections")
+    return n
+    print(f"[startup] google_trends_validation unavailable: {_acc_exc}")
+
+try:
+    import x_signal_module as xsig
+    _X_AVAILABLE = True
+    print("[startup] x_signal_module loaded — X dual-role signal active")
+except Exception as _x_exc:
+    _X_AVAILABLE = False
+    print(f"[startup] x_signal_module unavailable: {_x_exc}")
+
+try:
+    import ai_grade
+    _AI_GRADE_AVAILABLE = True
+    print("[startup] ai_grade loaded — AI Grade (Perplexity+Claude) active")
+except Exception as _ag_exc:
+    _AI_GRADE_AVAILABLE = False
+    print(f"[startup] ai_grade unavailable: {_ag_exc}")
+
+try:
+    import news_collectors as _news
+    _NEWS_AVAILABLE = True
+    print("[startup] news_collectors loaded — GDELT (Stage 4) media coverage active")
+except Exception as _nc_exc:
+    _NEWS_AVAILABLE = False
+    print(f"[startup] news_collectors unavailable: {_nc_exc}")
+
+try:
+    import ofr_stfm
+    _OFR_AVAILABLE = True
+    print("[startup] ofr_stfm loaded — OFR leverage/funding-stress overlay active")
+except Exception as _ofe:
+    _OFR_AVAILABLE = False
+    print(f"[startup] ofr_stfm unavailable: {_ofe}")
+
+try:
+    import collector_health as _health
+    _HEALTH_AVAILABLE = True
+    print("[startup] collector_health loaded — pipeline safety net active")
+except Exception as _h_exc:
+    _HEALTH_AVAILABLE = False
+    print(f"[startup] collector_health unavailable: {_h_exc}")
+
+
+def _log_health(name, count, status="success", conn=None):
+    """Best-effort collector-health logging (never breaks a collection cycle)."""
+    if not _HEALTH_AVAILABLE:
+        return
+    try:
+        _health.log_collector_run(name, count or 0, status, db_path=DB_PATH, conn=conn)
+    except Exception as _le:
+        print(f"[health] log error {name}: {_le}")
+
+
+def _count_api(source, n=1, conn=None):
+    """Best-effort external-API call counter (usage/cost monitoring)."""
+    if not _HEALTH_AVAILABLE:
+        return
+    try:
+        _health.log_api_call(source, n, db_path=DB_PATH, conn=conn)
+    except Exception:
+        pass
+
+# ── Generic / evergreen topics ────────────────────────────────────
+# Categories too broad to be an actionable emerging trend (like generic "ai"
+# or "software development"). They are perpetually present, so a high score on
+# them is noise, not a signal. Filtered out of the served feed. Override the
+# list via env GENERIC_TOPICS (comma-separated) or disable with
+# GENERIC_TOPIC_FILTER=0.
+GENERIC_TOPICS = {
+    t.strip().lower() for t in os.getenv(
+        "GENERIC_TOPICS",
+        "ai,artificial intelligence,software,software development,software engineering,"
+        "technology,tech,programming,coding,developer,development,computer,computers,"
+        "machine learning,data,data science,startup,startups,business,internet,web,"
+        "app,apps,application,cloud,security,open source,framework,library,api,"
+        "news,update,updates,release,product,company,market,markets,money,finance,"
+        "list,setup,across,structured,guide,tutorial,overview,intro,introduction,"
+        "tips,best practices,how to,review,comparison,example,examples"
+    ).split(",") if t.strip()
+}
+
+
+def _is_generic_topic(topic: str) -> bool:
+    if os.getenv("GENERIC_TOPIC_FILTER", "1") != "1":
+        return False
+    return (topic or "").strip().lower() in GENERIC_TOPICS
+
+
 # ── Platform Tiers ────────────────────────────────────────────────
 # NICHE = expert communities where trends originate (high gradient weight)
 # MAINSTREAM = general communities where trends arrive later (low gradient weight)
 
 NICHE_SUBREDDITS = [
+    # ── Tech / AI (original core) ──
     "LocalLLaMA", "MachineLearning", "artificial", "singularity",
     "ChatGPT", "ClaudeAI", "OpenAI", "StableDiffusion",
     "SideProject", "startups", "Entrepreneur", "programming",
     "learnprogramming", "devops", "Python", "datascience",
     "LanguageTechnology", "computervision", "reinforcementlearning",
+    # ── Sports — devotee communities where sports narratives originate.
+    #    Added 2026-06-11: the niche array was 100% tech, so non-tech topics
+    #    had niche_ratio≈0 → Gradient Strength≈0 → could never score as early
+    #    signal (FIFA World Cup invisible while it was actively underway).
+    #    "Niche" is per-domain: r/soccer is the devotee tier vs r/news. ──
+    "soccer", "worldcup", "nfl", "nba", "baseball",
+    # ── Culture / entertainment devotee communities ──
+    "movies", "television", "popculturechat",
 ]
 MAINSTREAM_SUBREDDITS = [
     "technology", "Futurology", "worldnews", "science",
     "todayilearned", "explainlikeimfive", "news",
+    # General-audience arrival tier for the sports/culture domains above.
+    "sports", "entertainment",
 ]
 ALL_SUBREDDITS = NICHE_SUBREDDITS + MAINSTREAM_SUBREDDITS
 
@@ -213,6 +426,10 @@ GITHUB_TOPICS = [
 
 # Minimum times a topic must appear before it gets scored
 MIN_TOPIC_APPEARANCES = 3
+# A single signal this strong (log1p of ~20,000 views/traffic) is its own
+# evidence — a mass-attention discovery entity (e.g. a 777K-view Wikipedia
+# article) qualifies for scoring even below the multi-mention count floor.
+HIGH_MAGNITUDE_ENG = 9.9
 
 # Anomaly thresholds
 FIRST_TIMER_THRESHOLD  = 0.35   # 35% of commenters new to subreddit
@@ -270,6 +487,7 @@ CACHE_TTL_SCORES  = 300   # 5 min  — /scores and /anomalies (expensive JOINs)
 CACHE_TTL_STATS   = 60    # 1 min  — /stats (lightweight but polled frequently)
 CACHE_TTL_DETAIL  = 120   # 2 min  — /scores/{topic}
 CACHE_TTL_HISTORY = 180   # 3 min  — /history/{topic}
+CACHE_TTL_XSIGNAL = 43200 # 12 h   — /signal-x (conserves X post-cap quota)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -280,6 +498,57 @@ CACHE_TTL_HISTORY = 180   # 3 min  — /history/{topic}
 # ══════════════════════════════════════════════════════════════════
 
 _query_log_queue: "_queue.Queue" = _queue.Queue(maxsize=10_000)
+
+
+def _prune_anomaly_log(keep_days: int = 30) -> int:
+    """Delete anomaly_log rows older than `keep_days`, preserving confirmed
+    ones (was_confirmed=1) since those are the accuracy track record.
+    Returns rows deleted."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).isoformat()
+    conn = get_db(DB_PATH)
+    try:
+        cur = conn.execute(
+            "DELETE FROM anomaly_log WHERE flagged_at < ? AND COALESCE(was_confirmed,0) = 0",
+            (cutoff,),
+        )
+        deleted = cur.rowcount or 0
+        conn.commit()
+        if deleted:
+            print(f"[prune] anomaly_log: removed {deleted} old unconfirmed rows")
+        return deleted
+    finally:
+        conn.close()
+
+
+def _prune_velocity_scores(keep_per_topic: int = 30) -> int:
+    """Delete all but the most recent `keep_per_topic` rows per topic_key.
+
+    velocity_scores grows by one row per topic per scoring cycle; left
+    unbounded, the latest-per-topic GROUP BY join in /scores degrades until it
+    times out. Called once per worker cycle. Returns rows deleted.
+    """
+    conn = get_db(DB_PATH)
+    try:
+        cur = conn.execute(
+            """
+            DELETE FROM velocity_scores v
+            USING (
+                SELECT id, row_number() OVER (
+                    PARTITION BY topic_key ORDER BY scored_at DESC
+                ) AS rn
+                FROM velocity_scores
+            ) ranked
+            WHERE v.id = ranked.id AND ranked.rn > ?
+            """,
+            (keep_per_topic,),
+        )
+        deleted = cur.rowcount or 0
+        conn.commit()
+        if deleted:
+            print(f"[prune] velocity_scores: removed {deleted} old rows")
+        return deleted
+    finally:
+        conn.close()
 
 
 def _log_topic_query(topic_key: str, endpoint: str = "/scores") -> None:
@@ -419,10 +688,13 @@ CREATE TABLE IF NOT EXISTS velocity_scores (
     persistence_score     REAL,    -- P: historical longevity across scoring cycles
     nowtrendin_score      REAL,    -- N: internal query frequency (demand-side)
 
-    -- Final composite scores (G·I·M·D·C·P·N)
-    overall_score         REAL,    -- Balanced: G(22)+I(20)+M(15)+D(12)+C(7)+P(14)+N(10)
-    detection_score       REAL,    -- Earliness: G(33)+D(19)+I(16)+M(9)+C(5)+P(6)+N(12)
-    confidence_score      REAL,    -- Precision: I(25)+P(24)+M(20)+G(11)+C(6)+D(4)+N(10)
+    -- Final composite scores — SIX external components (G·I·M·D·C·P), renormalized
+    -- to sum to 1.0. N (internal demand) is DELIBERATELY EXCLUDED to avoid a demand
+    -- feedback loop (see the composite in score_topic ~line 3012 for live weights —
+    -- kept in code only, trade secret). N is stored above as a separate signal.
+    overall_score         REAL,    -- Balanced (external only)
+    detection_score       REAL,    -- Earliness (external only; G/D weighted highest)
+    confidence_score      REAL,    -- Precision (external only; I/P weighted highest)
     heisenberg_gap        REAL,    -- detection - confidence
 
     -- Evidence (what triggered the score)
@@ -518,9 +790,50 @@ CREATE TABLE IF NOT EXISTS topic_queries (
     endpoint    TEXT NOT NULL    -- /scores | /anomalies | /trending | /scores/{key}
 );
 
+-- ── SCORE ARCHIVE ────────────────────────────────────────────────
+-- Periodic (monthly) research snapshot of the latest score per topic.
+-- Retained ~1 year for research/backtesting; survives velocity_scores pruning.
+CREATE TABLE IF NOT EXISTS score_archive (
+    snapshot_date    TEXT NOT NULL,
+    topic_key        TEXT NOT NULL,
+    topic_display    TEXT,
+    detection_score  REAL,
+    confidence_score REAL,
+    overall_score    REAL,
+    signal_stage     TEXT,
+    scored_at        TEXT,
+    total_mentions   INTEGER,
+    PRIMARY KEY (snapshot_date, topic_key)
+);
+
+-- ── 12-MONTH PULL HISTORY ─────────────────────────────────────────
+-- A durable daily snapshot of every scored item across BOTH feeds
+-- (attention + risk), retained for 12 months. One row per
+-- (day, feed, topic). Records the score and the engine timestamp of the
+-- pull so movement can be charted and audited over a full year. This is
+-- the long-term store; velocity_scores stays short (pruned ~30d).
+CREATE TABLE IF NOT EXISTS pull_history (
+    snapshot_date    TEXT NOT NULL,
+    feed             TEXT NOT NULL,   -- 'attention' | 'risk'
+    topic_key        TEXT NOT NULL,
+    topic_display    TEXT,
+    detection_score  REAL,
+    confidence_score REAL,
+    overall_score    REAL,            -- positioning_score for the risk feed
+    signal_stage     TEXT,
+    total_signals    INTEGER,
+    scored_at        TEXT,            -- engine timestamp of the pull
+    archived_at      TEXT,
+    PRIMARY KEY (snapshot_date, feed, topic_key)
+);
+CREATE INDEX IF NOT EXISTS idx_pull_history_topic ON pull_history (topic_key, snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_pull_history_date ON pull_history (snapshot_date);
+
 -- Indexes for fast queries
 CREATE INDEX IF NOT EXISTS idx_topic_signals_key
     ON topic_signals (topic_key, extracted_at);
+CREATE INDEX IF NOT EXISTS idx_score_archive
+    ON score_archive (snapshot_date, overall_score DESC);
 CREATE INDEX IF NOT EXISTS idx_topic_signals_platform
     ON topic_signals (platform, platform_tier, extracted_at);
 CREATE INDEX IF NOT EXISTS idx_velocity_topic
@@ -538,8 +851,12 @@ CREATE INDEX IF NOT EXISTS idx_topic_queries_recent
 """
 
 
+_SERVE_PAYLOAD_MIGRATED = False
+_BASELINE_COLS_MIGRATED = False
+
+
 def get_db(path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, check_same_thread=False, timeout=30)
+    conn = db_compat.connect(path, check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     # WAL lets multiple readers proceed concurrently while a single writer runs.
     # Critical for thousands of users hitting /scores while scoring is in progress.
@@ -554,6 +871,54 @@ def get_db(path: str = DB_PATH) -> sqlite3.Connection:
     except sqlite3.OperationalError:
         conn.execute("ALTER TABLE velocity_scores ADD COLUMN nowtrendin_score REAL DEFAULT 0")
         conn.commit()
+    # ── Live migration: serve_payload (precomputed calibrated /scores row) ──
+    # Postgres-safe + once-per-process (broad except: psycopg2 raises its own
+    # error class, not sqlite3.OperationalError, and a failed SELECT aborts the
+    # current transaction so we must roll back before the ALTER).
+    global _SERVE_PAYLOAD_MIGRATED
+    if not _SERVE_PAYLOAD_MIGRATED:
+        try:
+            conn.execute("SELECT serve_payload FROM velocity_scores LIMIT 1")
+            _SERVE_PAYLOAD_MIGRATED = True
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE velocity_scores ADD COLUMN serve_payload TEXT")
+                conn.commit()
+                _SERVE_PAYLOAD_MIGRATED = True
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+    # ── Live migration: baseline-relative breadth/magnitude history columns ──
+    # Stored each cycle so the dual-pathway can compute mainstreaming as a
+    # DEVIATION from the topic's own baseline (fame vs. diffusion).
+    global _BASELINE_COLS_MIGRATED
+    if not _BASELINE_COLS_MIGRATED:
+        for _col, _ddl in (("attention_magnitude",
+                            "ALTER TABLE velocity_scores ADD COLUMN attention_magnitude REAL DEFAULT 0"),
+                           ("n_mainstream_platforms",
+                            "ALTER TABLE velocity_scores ADD COLUMN n_mainstream_platforms INTEGER DEFAULT 0")):
+            try:
+                conn.execute(f"SELECT {_col} FROM velocity_scores LIMIT 1")
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                try:
+                    conn.execute(_ddl)
+                    conn.commit()
+                except Exception:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+        _BASELINE_COLS_MIGRATED = True
     return conn
 
 
@@ -607,6 +972,120 @@ COMPOUND_PATTERNS = [
     r'\b\w+\s+\w+\s+(?:model|agent|tool|framework|protocol)\b',
 ]
 
+# Phase B — news-filler words that must NEVER anchor (start/end) a topic phrase.
+# These are the generic verbs/adverbs that glue headlines together and produce
+# the junk n-gram fragments ("announce deal", "announce deal end", "grips north")
+# that bloated the topic pool. They are NOT in STOP_WORDS (they're contentful
+# mid-phrase) but a topic that begins or ends with one is almost always noise.
+NEWS_FILLER = {
+    "announce", "announces", "announced", "announcement", "say", "says", "said",
+    "report", "reports", "reported", "deal", "deals", "end", "ends", "ended",
+    "hit", "hits", "grip", "grips", "set", "sets", "win", "wins", "won", "back",
+    "backs", "plan", "plans", "planned", "move", "moves", "call", "calls",
+    "called", "show", "shows", "reveal", "reveals", "claim", "claims", "warn",
+    "warns", "urge", "urges", "face", "faces", "slam", "slams", "vow", "vows",
+    "push", "pushes", "mark", "marks", "hold", "holds", "give", "gives", "find",
+    "finds", "told", "tell", "tells", "add", "adds", "put", "puts", "expect",
+    "expects", "could", "would", "amid", "latest", "live", "update", "updates",
+    "video", "watch", "photos", "news", "today", "week", "year", "day",
+}
+
+# Profanity / slurs — never surface as topics in an institutional product.
+PROFANITY = {
+    "fuck", "fucking", "fucked", "fuckin", "shit", "shitty", "bullshit",
+    "bitch", "cunt", "dick", "pussy", "asshole", "bastard", "damn", "crap",
+    "piss", "slut", "whore", "nigger", "nigga", "faggot", "retard", "cock",
+}
+
+# Common English words that leak through extraction but are not real topics.
+# A SINGLE common word is never a meaningful trend (proper nouns / brands /
+# multi-word entities / domain terms still pass). Broad set so the filter
+# generalises instead of whack-a-mole. The discriminator: "epstein"/"knicks"
+# (proper nouns) are NOT here and pass; "level"/"section"/"done" are and drop.
+GENERIC_JUNK = {
+    # observed junk
+    "well","draw","game","games","seen","brings","bring","every","single",
+    "favorite","favourite","kids","kid","american","americans","school",
+    "schools","lawn","level","section","done","right","always","rich","four",
+    "baby","jail","sports","really","people","person","thing","things","stuff",
+    # pronouns / determiners / quantifiers
+    "everyone","everything","anything","something","nothing","someone","anyone",
+    "nobody","somebody","another","other","others","each","both","either",
+    "neither","many","much","more","most","some","any","none","several","few",
+    # common verbs
+    "make","makes","made","making","get","gets","got","go","goes","going",
+    "went","come","comes","came","take","takes","took","give","gives","gave",
+    "want","wants","need","needs","know","knows","knew","think","thinks",
+    "thought","say","says","said","tell","tells","told","look","looks","find",
+    "finds","feel","feels","keep","keeps","let","lets","put","puts","mean",
+    "means","start","starts","stop","stops","help","helps","try","tries",
+    "call","calls","work","works","play","plays","run","runs","move","moves",
+    "live","lives","believe","happen","happens","become","becomes","leave",
+    "leaves","bring","turn","turns","talk","talks","ask","asks","show","shows",
+    # common adjectives / adverbs
+    "good","bad","great","best","worst","better","worse","big","small","large",
+    "huge","tiny","old","new","young","high","low","long","short","early","late",
+    "hard","easy","real","true","false","sure","crazy","weird","funny","nice",
+    "cool","hot","cold","full","empty","clean","free","busy","ready","happy",
+    "sad","angry","scared","tired","sick","fine","okay","very","really","just",
+    "even","still","also","too","quite","rather","pretty","almost","always",
+    "never","often","sometimes","usually","maybe","perhaps","actually","simply",
+    # generic nouns / time / media
+    "guy","guys","man","woman","men","women","boy","girl","lady","kid","baby",
+    "lot","lots","way","ways","day","days","today","tonight","week","weekend",
+    "month","year","years","time","times","morning","night","story","stories",
+    "video","videos","watch","photo","photos","picture","post","posts","thread",
+    "comment","comments","news","update","updates","stuff","place","places",
+    "home","house","world","life","money","work","job","jobs","love","hate",
+    "friend","friends","family","car","cars","food","water","money","part",
+    "parts","case","point","points","line","lines","side","fact","facts",
+    "idea","ideas","reason","kind","sort","type","number","group","area",
+}
+
+
+def _is_quality_topic(display: str) -> bool:
+    """Reject profanity and bare generic-word junk so the institutional grid
+    reads clean. Applied at extraction AND serve-time (clears the existing pool
+    without re-collection). Multi-word entities, brands, and domain terms pass."""
+    t = (display or "").strip().lower()
+    if not t:
+        return False
+    toks = t.split()
+    if any(w in PROFANITY for w in toks):
+        return False
+    if len(toks) == 1:
+        w = toks[0]
+        return not (w in GENERIC_JUNK and w not in DOMAIN_TERMS)
+    # multi-word: reject if EVERY token is a stop/junk word ("every single")
+    return not all((w in STOP_WORDS or w in GENERIC_JUNK) for w in toks)
+
+
+# Capitalized entity runs (FIFA World Cup, New York Knicks, Elon Musk) and
+# all-caps acronyms (FIFA, NASA, UFC, NBA) — lightweight NER from headline case.
+_ENTITY_RUN = re.compile(
+    r'\b([A-Z][\w&.-]*(?:\s+(?:of|the|and|for|&|de|van|der|[A-Z][\w&.-]*)){1,5})')
+_ACRONYM = re.compile(r'\b([A-Z]{2,6})(?:\b|\d)')
+
+
+def _extract_entities(text: str) -> list[str]:
+    """Capitalized named entities from ORIGINAL-CASE text — high precision."""
+    ents = []
+    for m in _ENTITY_RUN.finditer(text):
+        run = m.group(1).strip()
+        # must contain >= 2 capitalized tokens (a real multi-word entity), not
+        # just a Sentence-initial Word.
+        caps = sum(1 for w in run.split() if w[:1].isupper())
+        if caps >= 2 and 4 <= len(run) <= 60:
+            ents.append(run)
+    for m in _ACRONYM.finditer(text):
+        ac = m.group(1)
+        if 2 <= len(ac) <= 6 and ac not in ("THE", "AND", "FOR", "USA", "USB"):
+            ents.append(ac)
+        elif ac == "USA":
+            ents.append(ac)   # keep USA; drop the truly generic ones above
+    return ents
+
+
 def extract_topics_from_text(text: str) -> list[str]:
     """
     THE CORE FUNCTION.
@@ -629,6 +1108,13 @@ def extract_topics_from_text(text: str) -> list[str]:
 
     text_lower = text.lower()
     topics = set()
+
+    # ── Step 0: Capitalized named entities (Phase B, highest quality) ──
+    # Pull clean entities ("FIFA World Cup", "Elon Musk", "NASA") from the
+    # ORIGINAL-CASE text BEFORE lowercasing, so real entities win over the
+    # generic lowercase n-gram fragments built later.
+    for ent in _extract_entities(text):
+        topics.add(ent.lower())
 
     # ── Step 1: Domain vocabulary exact matches ────────────────
     for term in DOMAIN_TERMS:
@@ -686,13 +1172,16 @@ def extract_topics_from_text(text: str) -> list[str]:
     seen_keys = set()
     for topic in topics:
         cleaned = _clean_term(topic)
-        if cleaned and len(cleaned) >= 3:
+        if cleaned and len(cleaned) >= 3 and _is_quality_topic(cleaned):
             key = _topic_key(cleaned)
             if key not in seen_keys and len(key) >= 3:
                 seen_keys.add(key)
                 result.append(cleaned)
 
-    return result[:12]   # Max 12 topics per post to avoid noise
+    # Cap topics per post to limit fragmentation. 12 spawned too many overlapping
+    # micro-topics (unigram+bigram+trigram of the same phrase); 8 keeps the most
+    # specific candidates while reducing the long tail. Env-tunable.
+    return result[:int(os.getenv("MAX_TOPICS_PER_POST", "8"))]
 
 
 def _clean_term(term: str) -> str:
@@ -728,6 +1217,11 @@ def _is_meaningful_phrase(phrase: str) -> bool:
     """Is a multi-word phrase worth tracking as a topic?"""
     words = phrase.split()
     if len(words) < 2:
+        return False
+    # Phase B: reject phrases ANCHORED by a news-filler word. A topic that
+    # begins or ends with "announce"/"deal"/"end"/"says"/... is a headline
+    # fragment, not a topic ("announce deal", "deal end", "grips north").
+    if words[0] in NEWS_FILLER or words[-1] in NEWS_FILLER:
         return False
     # At least one word must be meaningful
     meaningful = sum(1 for w in words
@@ -797,10 +1291,37 @@ def check_author_is_first_timer(
         return True
 
 
+def _reddit_posts_for_sub(reddit, sub_name: str) -> list:
+    """Hot posts for one subreddit as plain namespaces (praw only — errors are
+    printed per-sub instead of vanishing). NOTE: a public hot.json fallback was
+    tried 2026-06-12 and removed the same day: Reddit 403s unauthenticated JSON
+    even from residential IPs, so it only burned ~15s/sub in timeouts."""
+    from types import SimpleNamespace
+    posts = []
+    if reddit is not None:
+        try:
+            for p in reddit.subreddit(sub_name).hot(limit=50):
+                posts.append(SimpleNamespace(
+                    id=p.id, title=p.title or "", stickied=bool(p.stickied),
+                    author=str(p.author) if p.author else "",
+                    score=int(p.score or 0),
+                    num_comments=int(p.num_comments or 0),
+                    upvote_ratio=float(getattr(p, "upvote_ratio", 1.0) or 1.0),
+                    permalink=p.permalink or ""))
+        except Exception as e:
+            print(f"    r/{sub_name}: praw error ({e})")
+    return posts
+
+
 def collect_reddit(conn: sqlite3.Connection) -> int:
-    """Collect posts from Reddit and extract topics from each."""
-    if not REDDIT_CLIENT_ID or not REDDIT_CLIENT_SECRET:
-        print("  Reddit: no credentials — skipping")
+    """Collect posts from Reddit and extract topics from each.
+
+    DISABLED unless REDDIT_CLIENT_ID/SECRET are set (2026-06-12, user call:
+    API access not secured). When creds land in Heroku config the collector —
+    including the sports/culture niche subs — reactivates with no code change."""
+    if not (REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET):
+        print("  Reddit: disabled — no API credentials (set REDDIT_CLIENT_ID/"
+              "SECRET to reactivate)")
         return 0
 
     reddit = praw.Reddit(
@@ -818,8 +1339,7 @@ def collect_reddit(conn: sqlite3.Connection) -> int:
     for sub_name in ALL_SUBREDDITS:
         tier = "niche" if sub_name in NICHE_SUBREDDITS else "mainstream"
         try:
-            subreddit = reddit.subreddit(sub_name)
-            posts = list(subreddit.hot(limit=50))
+            posts = _reddit_posts_for_sub(reddit, sub_name)
 
             for post in posts:
                 if post.stickied or not post.author:
@@ -894,6 +1414,7 @@ def collect_reddit(conn: sqlite3.Connection) -> int:
 
 def collect_github(conn: sqlite3.Connection) -> int:
     """Collect GitHub repositories and extract topics."""
+    _count_api("github", conn=conn)
     headers = {"Accept": "application/vnd.github.v3+json"}
     if GITHUB_TOKEN:
         headers["Authorization"] = f"token {GITHUB_TOKEN}"
@@ -947,6 +1468,10 @@ def collect_github(conn: sqlite3.Connection) -> int:
 
                 combined_text = f"{full_name} {description} {' '.join(repo_topics)}"
 
+                # First-timer: is this repo owner new to this GitHub topic-community?
+                gh_owner = full_name.split('/')[0] if full_name else ""
+                gh_first = check_author_is_first_timer(conn, gh_owner, "github", gh_topic)
+
                 conn.execute("""
                     INSERT OR IGNORE INTO raw_signals VALUES
                     (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -958,7 +1483,7 @@ def collect_github(conn: sqlite3.Connection) -> int:
                     stars, issues,
                     round(engagement, 4),
                     round(_sentiment.polarity_scores(description)['compound'], 4),
-                    0, 1,
+                    1 if gh_first else 0, 1,
                     combined_text[:500],
                 ))
 
@@ -986,7 +1511,7 @@ def collect_github(conn: sqlite3.Connection) -> int:
                         "github", "expert", gh_topic,
                         stars, issues,
                         round(engagement, 4),
-                        0, 1,
+                        1 if gh_first else 0, 1,
                     ))
                     total_topic_signals += 1
 
@@ -1002,6 +1527,7 @@ def collect_github(conn: sqlite3.Connection) -> int:
 
 def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
     """Collect Hacker News stories and extract topics."""
+    _count_api("hackernews", conn=conn)
     cutoff_ts = int(
         (datetime.now(timezone.utc) - timedelta(hours=hours_back)).timestamp()
     )
@@ -1041,16 +1567,20 @@ def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
             url = hit.get("url") or f"https://news.ycombinator.com/item?id={object_id}"
             sig_id = hashlib.md5(f"hn-{object_id}".encode()).hexdigest()[:16]
 
+            # First-timer: is this HN author new to the front-page community?
+            hn_author = hit.get("author") or ""
+            hn_first = check_author_is_first_timer(conn, hn_author, "hackernews", "front_page")
+
             conn.execute("""
                 INSERT OR IGNORE INTO raw_signals VALUES
                 (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 sig_id, now, "hackernews", "expert", "front_page",
-                title[:500], url, "",
+                title[:500], url, hn_author[:100],
                 points, comments,
                 round(engagement, 4),
                 round(sentiment, 4),
-                0, 1, title[:500],
+                1 if hn_first else 0, 1, title[:500],
             ))
 
             topics = extract_topics_from_text(title)
@@ -1069,7 +1599,7 @@ def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
                     "hackernews", "expert", "front_page",
                     points, comments,
                     round(engagement, 4),
-                    0, 1,
+                    1 if hn_first else 0, 1,
                 ))
                 total_topic_signals += 1
 
@@ -1080,6 +1610,1235 @@ def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
 
     print(f"  HN: {total_topic_signals} topic signals")
     return total_topic_signals
+
+
+def _demojibake(s: str) -> str:
+    """Repair text that was UTF-8 encoded but decoded as latin-1/cp1252.
+
+    The realtime-trends actor returns non-Latin scripts (Arabic, etc.) double-
+    encoded, e.g. Arabic arrives as 'Ø¨ÙƒØ§Ù„ÙˆØ±ÙŠØ§'. Re-encoding to latin-1 and
+    decoding as UTF-8 recovers the original. Pure-ASCII text round-trips
+    unchanged. Falls back to the original on any failure."""
+    if not s:
+        return ""
+    try:
+        repaired = s.encode("latin-1").decode("utf-8")
+        # Only accept the repair if it didn't introduce replacement chars.
+        return repaired if "�" not in repaired else s
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return s
+
+
+def collect_google_trends(conn) -> int:
+    """Discover what is trending RIGHT NOW via the Apify realtime-trends actor
+    (easyapi/google-realtime-trends-data-scraper). Returns one row per country,
+    each a comma-separated keyword list; we fan those out into topic signals so
+    they enter the Gradient scoring pipeline.
+
+    Runs every 6h on the scheduler. One actor run (~$0.57) returns all ~125
+    countries regardless of how many we keep, so cost is fixed per pull."""
+    token = os.getenv("APIFY_TOKEN", "")
+    if not token:
+        print("  Google Trends: no APIFY_TOKEN — skipping")
+        return 0
+
+    # Immutable actor ID (survives a rename); override via env if needed.
+    actor = os.getenv("APIFY_REALTIME_ACTOR", "oOHXMAv8kImUCpHff")
+    max_terms = int(os.getenv("GOOGLE_TRENDS_MAX_TERMS", "300"))
+    per_country_cap = int(os.getenv("GOOGLE_TRENDS_PER_COUNTRY", "10"))
+    run_timeout = int(os.getenv("APIFY_REALTIME_TIMEOUT", "120"))
+
+    try:
+        from urllib.request import Request, urlopen
+        url = (f"https://api.apify.com/v2/acts/{actor}/"
+               f"run-sync-get-dataset-items?token={token}")
+        # The actor scrapes all countries with default (empty) input.
+        req = Request(url, data=b"{}",
+                      headers={"Content-Type": "application/json"})
+        _count_api("apify_realtime")
+        with urlopen(req, timeout=run_timeout) as resp:
+            rows = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  Google Trends: actor error: {e}")
+        return 0
+
+    # Tally cross-country frequency so the most globally-trending terms win when
+    # we cap. Keep per (country, term) provenance for the signal rows.
+    from collections import defaultdict
+    freq: dict = defaultdict(int)
+    occurrences = []  # (country, term, rank_within_country)
+    for row in rows:
+        country = _demojibake(str(row.get("country") or "")).strip() or "global"
+        kw = _demojibake(str(row.get("keywordsText") or ""))
+        terms = [t.strip() for t in kw.split(",") if t.strip()]
+        for rank, term in enumerate(terms[:per_country_cap]):
+            if len(term) < 2 or len(term) > 80:
+                continue
+            occurrences.append((country, term, rank))
+            freq[_topic_key(term)] += 1
+
+    # Cap distinct terms by global frequency (most widely trending first).
+    allowed_keys = set()
+    for tkey, _ in sorted(freq.items(), key=lambda kv: kv[1], reverse=True)[:max_terms]:
+        allowed_keys.add(tkey)
+    dropped = len(freq) - len(allowed_keys)
+
+    now = datetime.now(timezone.utc).isoformat()
+    total_topic_signals = 0
+    seen_sig = set()
+    for country, term, rank in occurrences:
+        tkey = _topic_key(term)
+        if tkey not in allowed_keys:
+            continue
+        # Rank-weighted engagement: earlier in a country's list = stronger.
+        weight = max(1, per_country_cap - rank)
+        try:
+            sentiment = _sentiment.polarity_scores(term)["compound"]
+        except Exception:
+            sentiment = 0.0
+        sig_id = hashlib.md5(f"gt-{country}-{tkey}".encode()).hexdigest()[:16]
+        if sig_id in seen_sig:
+            continue
+        seen_sig.add(sig_id)
+        engagement = round(math.log1p(weight * 5), 4)
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (sig_id, now, "google_trends", "mainstream", country,
+                 term[:500], "https://trends.google.com/trending", "",
+                 weight, 0, engagement, round(sentiment, 4), 0, 1, term[:500]),
+            )
+            t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+            conn.execute(
+                "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (t_id, now, term, tkey, sig_id, "google_trends", "mainstream",
+                 country, weight, 0, engagement, 0, 1),
+            )
+            total_topic_signals += 1
+        except Exception as e:
+            print(f"    GT insert error ({term}): {e}")
+    conn.commit()
+    print(f"  Google Trends: {len(rows)} countries → {len(allowed_keys)} terms "
+          f"({dropped} less-common dropped) → {total_topic_signals} topic signals")
+    return total_topic_signals
+
+
+def collect_mainstream_news(conn, limit: int = 12) -> int:
+    """Add a MAINSTREAM-tier coverage signal for the top recent topics, so
+    broad/well-covered topics stop reading as niche-only.
+
+    The engine otherwise collects only developer-publishing platforms (all
+    niche/expert tier), so gradient_strength had no mainstream denominator and
+    every topic looked niche — the "mainstream hasn't found it" distortion.
+
+    Primary source: YouTube Data API (reliable from Heroku; key already set).
+    Fallback: GDELT (free/public, but its DOC API frequently 429s from cloud
+    IPs, so it's best-effort only). Runs on a slow cadence with a hard cap to
+    respect the YouTube daily quota (search ≈ 100 units/call)."""
+    if os.getenv("MAINSTREAM_NEWS_ENABLED", "1") != "1":
+        return 0
+    try:
+        rows = conn.execute("""
+            SELECT v.topic_key, v.topic_display FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
+              ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            WHERE COALESCE(v.total_mentions,0) >= 5
+            ORDER BY v.overall_score DESC LIMIT ?
+        """, (limit,)).fetchall()
+    except Exception as e:
+        print(f"  mainstream-news: topic fetch error: {e}")
+        return 0
+
+    yt_key = os.getenv("YOUTUBE_API_KEY", "")
+    now = datetime.now(timezone.utc).isoformat()
+    stored = 0
+    for r in rows:
+        tkey = r["topic_key"]
+        display = r["topic_display"] or tkey.replace("_", " ")
+        platform, channel, vol, engagement, raw = None, None, 0, 0.0, ""
+
+        # ── Primary: YouTube (mainstream/consumer) ──
+        if yt_key:
+            try:
+                _count_api("youtube")
+                resp = requests.get(
+                    "https://www.googleapis.com/youtube/v3/search",
+                    params={"part": "snippet", "q": display, "type": "video",
+                            "maxResults": 15, "order": "relevance", "key": yt_key},
+                    timeout=10)
+                if resp.status_code == 200:
+                    items = resp.json().get("items", [])
+                    vol = len(items)
+                    if vol > 0:
+                        platform, channel = "youtube", "search"
+                        engagement = round(math.log1p(vol * 2), 4)
+                        raw = f"YouTube: {vol} videos for '{display}'"
+            except Exception as e:
+                print(f"  mainstream-news: youtube error '{display}': {e}")
+
+        # ── Fallback: GDELT (best-effort; often 429s from cloud) ──
+        if platform is None and _NEWS_AVAILABLE:
+            try:
+                sig = _news.collect_gdelt_signal(display)
+                if sig and (sig.get("article_count") or 0) > 0:
+                    vol = sig["article_count"]
+                    platform, channel = "gdelt", "news"
+                    engagement = round(math.log1p(vol) + math.log1p((sig.get("source_breadth", 0) or 0) * 2), 4)
+                    raw = sig.get("raw_signal", "")[:500]
+            except Exception:
+                pass
+
+        if platform is None:
+            continue
+        sig_id = hashlib.md5(f"{platform}-{tkey}-{now[:10]}".encode()).hexdigest()[:16]
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (sig_id, now, platform, "mainstream", channel, raw[:500], "", "",
+                 vol, 0, engagement, 0.0, 0, 1, raw[:500]),
+            )
+            t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+            conn.execute(
+                "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (t_id, now, display, tkey, sig_id, platform, "mainstream", channel,
+                 vol, 0, engagement, 0, 1),
+            )
+            stored += 1
+        except Exception as e:
+            print(f"  mainstream-news: insert error '{display}': {e}")
+        time.sleep(0.3)
+    conn.commit()
+    print(f"  Mainstream coverage: {stored}/{len(rows)} topics enriched")
+    return stored
+
+
+# ── News aggregator feeds (NewsAPI.org, NewsAPI.ai, NewsData.io) ──────
+# Genuine MAINSTREAM-tier contributors: each article's headline is mined for
+# topics that flow into the gradient like any other platform. News is
+# deliberately NOT first-timer/dark-matter (it is broad, public, late-stage),
+# so a press release can never masquerade as early "dark matter".
+#
+# Spam/bot authenticity guard: identical or near-identical headlines syndicated
+# across many outlets (the classic PR-wire blast) are counted ONCE and flagged
+# non-organic, so manufactured breadth cannot inflate the signal. Known wire/PR
+# and aggregator domains are also marked non-organic.
+_NEWS_SPAM_SOURCES = {
+    "globenewswire", "prnewswire", "businesswire", "accesswire", "newsfile",
+    "ein presswire", "einpresswire", "pr newswire", "marketscreener",
+    "newsbtc", "24-7 press release", "ad hoc news",
+}
+
+# INTEGRITY ALLOWLIST (hard rule): the news aggregators (newsapi.org/.ai,
+# newsdata.io) and Yahoo Finance surface a broad pool that can include
+# low-quality outlets. NowTrendIn sells to hedge funds, banks, and businesses —
+# client trust depends on only ingesting REPUTABLE, authoritative publishers.
+# A blocklist only catches named spam; this allowlist guarantees provenance.
+# Matched as a substring of the (lowercased) source name. Extend deliberately —
+# adding a source here is asserting it meets the institutional-grade bar.
+_NEWS_REPUTABLE_SOURCES = {
+    # Wire services / agencies (gold standard)
+    "reuters", "associated press", "ap news", "bloomberg", "agence france",
+    "afp", "dow jones", "pa media", "press association",
+    # Financial press
+    "wall street journal", "wsj", "financial times", "ft.com", "barron",
+    "marketwatch", "cnbc", "the economist", "forbes", "fortune", "morningstar",
+    "investing.com", "investopedia", "kiplinger", "the motley fool", "moody",
+    "s&p global", "fitch", "yahoo finance", "yahoo! finance",
+    # National / international press of record
+    "new york times", "nytimes", "washington post", "the guardian", "bbc",
+    "npr", "pbs", "the times", "los angeles times", "usa today", "axios",
+    "politico", "the atlantic", "the new yorker", "national public radio",
+    "abc news", "cbs news", "nbc news", "msnbc", "cnn", "sky news",
+    "al jazeera", "deutsche welle", "dw.com", "france 24", "nhk", "cbc",
+    "the telegraph", "the independent", "newsweek", "time",
+    # Reputable tech / science press
+    "techcrunch", "the verge", "ars technica", "wired", "mit technology",
+    "ieee", "nature", "science", "the information", "engadget", "venturebeat",
+    "zdnet", "cnet", "protocol",
+}
+
+# Default ON — the integrity standard. Set NEWS_REPUTABLE_ONLY=0 only to debug.
+_NEWS_REPUTABLE_ONLY = os.getenv("NEWS_REPUTABLE_ONLY", "1") == "1"
+
+
+def _is_reputable_source(source: str) -> bool:
+    """True if the publisher is on the vetted reputable allowlist."""
+    s = (source or "").lower().strip()
+    if not s:
+        return False
+    return any(rep in s for rep in _NEWS_REPUTABLE_SOURCES)
+
+
+def _news_norm_title(t: str) -> str:
+    return " ".join((t or "").lower().split())[:140]
+
+
+# Provenance weighting (the integrity balance the founder asked for):
+#   reputable  → full weight, enters corpus normally.
+#   unverified → admitted but QUARANTINED at ~1% weight; CANNOT meaningfully move
+#                a score alone. Promoted to ~10% ONLY when independently
+#                corroborated (see corroborate_unverified_news). Routed by path:
+#                reputable/curated corroboration → mainstream (M); organic
+#                dark-matter corroboration → Dark Matter (D). Keeps D pristine.
+#   spam       → dropped entirely.
+_NEWS_FULL_W       = round(math.log1p(120), 4)                       # ~4.79
+_NEWS_QUARANTINE_W = float(os.getenv("NEWS_QUARANTINE_W", "0.05"))   # ~1%
+_NEWS_PROMOTE_W    = float(os.getenv("NEWS_PROMOTE_W", "0.48"))      # ~10%
+# Admit unverified sources at quarantine weight (vs dropping them outright).
+_NEWS_ADMIT_UNVERIFIED = os.getenv("NEWS_ADMIT_UNVERIFIED", "1") == "1"
+
+
+def _news_write(conn, platform: str, items: list) -> int:
+    """Write news headlines into raw_signals + topic_signals, with PROVENANCE
+    TIERING: reputable publishers enter at full weight; broad/unverified sources
+    are admitted but quarantined at ~1% (promoted later only if independently
+    corroborated); spam is dropped. items: list of {title, source}."""
+    now = datetime.now(timezone.utc).isoformat()
+    seen_titles: dict = {}
+    total_topic_signals = 0
+    dropped_spam = 0
+    quarantined = 0
+    for it in items:
+        title = (it.get("title") or "").strip()
+        if len(title) < 12:        # too short to be a real headline
+            continue
+        source = (it.get("source") or "").strip()
+        src_l = source.lower()
+
+        # Spam / PR-wire → dropped entirely (never enters the corpus).
+        if any(s in src_l for s in _NEWS_SPAM_SOURCES):
+            dropped_spam += 1
+            continue
+
+        reputable = _is_reputable_source(source)
+        # A non-reputable source is QUARANTINED, not dropped — unless unverified
+        # admission is disabled, in which case it is dropped (strict mode).
+        if not reputable:
+            if not _NEWS_ADMIT_UNVERIFIED:
+                dropped_spam += 1
+                continue
+
+        norm = _news_norm_title(title)
+        dup_count = seen_titles.get(norm, 0)
+        seen_titles[norm] = dup_count + 1
+        if dup_count >= 1:
+            continue  # count a syndicated headline only once
+
+        try:
+            sentiment = _sentiment.polarity_scores(title)["compound"]
+        except Exception:
+            sentiment = 0.0
+
+        # Provenance tiering:
+        if reputable:
+            tier = "mainstream"
+            is_organic = 1
+            engagement = _NEWS_FULL_W
+        else:
+            tier = "unverified"        # quarantined — can't move a score alone
+            is_organic = 0             # cannot touch Dark Matter on its own
+            engagement = round(_NEWS_QUARANTINE_W, 4)
+            quarantined += 1
+
+        sig_id = hashlib.md5(f"{platform}-{norm}-{now[:10]}".encode()).hexdigest()[:16]
+        conn.execute(
+            "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (sig_id, now, platform, tier, source[:100] or "news",
+             title[:500], "", "", 0, 0, engagement, round(sentiment, 4),
+             0, is_organic, title[:500]),
+        )
+        for topic in extract_topics_from_text(title):
+            tkey = _topic_key(topic)
+            t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+            conn.execute(
+                "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (t_id, now, topic, tkey, sig_id, platform, tier,
+                 source[:100] or "news", 0, 0, engagement, 0, is_organic),
+            )
+            total_topic_signals += 1
+    conn.commit()
+    notes = []
+    if quarantined:   notes.append(f"{quarantined} quarantined@1% (unverified)")
+    if dropped_spam:  notes.append(f"{dropped_spam} dropped (spam/strict)")
+    note = (" [" + "; ".join(notes) + "]") if notes else ""
+    print(f"  {platform}: {len(items)} articles → {total_topic_signals} topic signals{note}")
+    return total_topic_signals
+
+
+def corroborate_unverified_news(conn, hours: int = 72) -> dict:
+    """Promote quarantined unverified-source news signals — but ONLY when the same
+    topic is independently corroborated, and route the promoted weight by PATH:
+
+      • organic DARK-MATTER corroboration (first-timer organic activity on the
+        topic from a vetted source) → set is_organic=1 → contributes to Dark
+        Matter (D). This is genuine early signal.
+      • REPUTABLE / curated corroboration (the topic is independently carried by
+        ANY vetted, non-unverified source) → set tier='mainstream' →
+        contributes to platform breadth (M). This is mainstream confirmation.
+
+    Dark-matter routing is preferred when both apply (the more valuable early
+    read). Uncorroborated unverified signals stay at ~1% (inert) — an unverified
+    source can never stand alone. Runs before scoring so the weights are live.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    promoted_dm = promoted_main = left_inert = 0
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT topic_key FROM topic_signals "
+            "WHERE platform_tier = 'unverified' AND extracted_at >= ?",
+            (cutoff,)).fetchall()
+        topic_keys = [(r["topic_key"] if hasattr(r, "keys") else r[0]) for r in rows]
+
+        for tk in topic_keys:
+            # Capture the unverified signal ids for this topic up front.
+            sig_rows = conn.execute(
+                "SELECT signal_id FROM topic_signals "
+                "WHERE topic_key = ? AND platform_tier = 'unverified' AND extracted_at >= ?",
+                (tk, cutoff)).fetchall()
+            sig_ids = [(r["signal_id"] if hasattr(r, "keys") else r[0]) for r in sig_rows]
+            sig_ids = [s for s in sig_ids if s]
+
+            dm = conn.execute(
+                "SELECT 1 FROM topic_signals WHERE topic_key = ? "
+                "AND platform_tier != 'unverified' AND is_first_timer = 1 "
+                "AND is_organic = 1 AND extracted_at >= ? LIMIT 1",
+                (tk, cutoff)).fetchone()
+            rep = conn.execute(
+                "SELECT 1 FROM topic_signals WHERE topic_key = ? "
+                "AND platform_tier != 'unverified' AND extracted_at >= ? LIMIT 1",
+                (tk, cutoff)).fetchone()
+
+            if dm:  # → Dark Matter
+                # Move OUT of 'unverified' (so scoring includes it) AND mark
+                # organic so it raises Dark Matter's organic quality gate. It's a
+                # mainstream-news source by nature, so it also lands in the
+                # mainstream tier (adds a mainstream denominator → does NOT
+                # inflate niche G). is_first_timer stays 0 — the outlet is not a
+                # first-timer; we only credit the organic alignment.
+                conn.execute(
+                    "UPDATE topic_signals SET platform_tier = 'mainstream', is_organic = 1, engagement_raw = ? "
+                    "WHERE topic_key = ? AND platform_tier = 'unverified' AND extracted_at >= ?",
+                    (_NEWS_PROMOTE_W, tk, cutoff))
+                if sig_ids:
+                    ph = ",".join("?" * len(sig_ids))
+                    conn.execute(
+                        f"UPDATE raw_signals SET platform_tier = 'mainstream', is_organic = 1, engagement_raw = ? WHERE id IN ({ph})",
+                        (_NEWS_PROMOTE_W, *sig_ids))
+                promoted_dm += 1
+            elif rep:  # → mainstream (platform breadth / M)
+                conn.execute(
+                    "UPDATE topic_signals SET platform_tier = 'mainstream', engagement_raw = ? "
+                    "WHERE topic_key = ? AND platform_tier = 'unverified' AND extracted_at >= ?",
+                    (_NEWS_PROMOTE_W, tk, cutoff))
+                if sig_ids:
+                    ph = ",".join("?" * len(sig_ids))
+                    conn.execute(
+                        f"UPDATE raw_signals SET platform_tier = 'mainstream', engagement_raw = ? WHERE id IN ({ph})",
+                        (_NEWS_PROMOTE_W, *sig_ids))
+                promoted_main += 1
+            else:
+                left_inert += 1
+        conn.commit()
+    except Exception as e:
+        print(f"  [corroborate] error: {e}")
+    result = {"promoted_dark_matter": promoted_dm,
+              "promoted_mainstream": promoted_main,
+              "left_inert": left_inert}
+    if promoted_dm or promoted_main or left_inert:
+        print(f"  Corroboration: {result}")
+    return result
+
+
+def collect_newsapi_org(conn) -> int:
+    """NewsAPI.org top headlines (mainstream-tier genuine contributor)."""
+    key = os.getenv("NEWSAPI_ORG_KEY", "")
+    if not key:
+        return 0
+    try:
+        from urllib.request import Request, urlopen
+        _count_api("newsapi_org")
+        url = ("https://newsapi.org/v2/top-headlines?language=en&pageSize=100"
+               f"&apiKey={key}")
+        req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
+        with urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        items = [{"title": a.get("title", ""),
+                  "source": ((a.get("source") or {}).get("name") or "")}
+                 for a in data.get("articles", [])]
+        return _news_write(conn, "newsapi_org", items)
+    except Exception as e:
+        print(f"  newsapi_org error: {e}")
+        return 0
+
+
+def collect_newsapi_ai(conn) -> int:
+    """NewsAPI.ai (Event Registry) recent articles (mainstream-tier contributor)."""
+    key = os.getenv("NEWSAPI_AI_KEY", "")
+    if not key:
+        return 0
+    try:
+        from urllib.request import Request, urlopen
+        from urllib.parse import urlencode
+        q = urlencode({"action": "getArticles", "resultType": "articles",
+                       "articlesSortBy": "date", "articlesCount": "100",
+                       "lang": "eng", "apiKey": key})
+        _count_api("newsapi_ai")
+        url = f"https://eventregistry.org/api/v1/article/getArticles?{q}"
+        req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
+        with urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        results = ((data.get("articles") or {}).get("results")) or []
+        items = [{"title": a.get("title", ""),
+                  "source": ((a.get("source") or {}).get("title") or "")}
+                 for a in results]
+        return _news_write(conn, "newsapi_ai", items)
+    except Exception as e:
+        print(f"  newsapi_ai error: {e}")
+        return 0
+
+
+def collect_newsdata_io(conn) -> int:
+    """NewsData.io latest news (mainstream-tier genuine contributor)."""
+    key = os.getenv("NEWSDATA_IO_KEY", "")
+    if not key:
+        return 0
+    try:
+        from urllib.request import Request, urlopen
+        _count_api("newsdata_io")
+        url = f"https://newsdata.io/api/1/latest?apikey={key}&language=en"
+        req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
+        with urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        items = [{"title": a.get("title", ""),
+                  "source": (a.get("source_id") or a.get("source_name") or "")}
+                 for a in (data.get("results") or [])]
+        return _news_write(conn, "newsdata_io", items)
+    except Exception as e:
+        print(f"  newsdata_io error: {e}")
+        return 0
+
+
+def collect_yahoo_finance_news(conn) -> int:
+    """Yahoo Finance news (RapidAPI, yahoo-finance166) → mainstream-tier genuine
+    contributor. Finance-focused headlines complement the general news feeds."""
+    key = os.getenv("RAPIDAPI_YF_KEY", "")
+    if not key:
+        return 0
+    try:
+        from urllib.request import Request, urlopen
+        _count_api("yahoo_finance")
+        url = ("https://yahoo-finance166.p.rapidapi.com/api/news/list"
+               "?snippetCount=100&region=US")
+        req = Request(url, headers={
+            "x-rapidapi-host": "yahoo-finance166.p.rapidapi.com",
+            "x-rapidapi-key": key,
+            "User-Agent": "NowTrendIn/1.0",
+        })
+        with urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        stream = (((data.get("data") or {}).get("ntk") or {}).get("stream")) or []
+        items = []
+        for it in stream:
+            content = (it.get("content") or it.get("editorialContent") or {})
+            title = content.get("title", "")
+            prov = (content.get("provider") or {}).get("displayName", "") or "Yahoo Finance"
+            if title:
+                items.append({"title": title, "source": prov})
+        return _news_write(conn, "yahoo_finance", items)
+    except Exception as e:
+        print(f"  yahoo_finance error: {e}")
+        return 0
+
+
+def collect_creator_trends(conn) -> int:
+    """Mine retail-finance creators' (Meet Kevin, Andrei Jikh) recent YouTube
+    titles into the TRENDS feed — a genuine mainstream/retail-tier contributor,
+    like X. Authenticity: creator content is attributed and broad → tier
+    'mainstream', is_first_timer=0 (cannot fake first-timer dark matter)."""
+    if not _RISK_AVAILABLE or not os.getenv("YOUTUBE_API_KEY"):
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    total = 0
+    try:
+        creators = getattr(risk, "CREATORS", [])
+        for cr in creators:
+            for v in risk._creator_recent(cr["handle"], 25):
+                title = (v.get("title") or "").strip()
+                if len(title) < 8:
+                    continue
+                try:
+                    sentiment = _sentiment.polarity_scores(title)["compound"]
+                except Exception:
+                    sentiment = 0.0
+                eng = round(math.log1p(40), 4)
+                sig_id = hashlib.md5(f"creator-{cr['handle']}-{title[:60]}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sig_id, now, "creator", "mainstream", cr["name"], title[:500],
+                     v.get("url", ""), cr["name"][:100], 0, 0, eng, round(sentiment, 4),
+                     0, 1, title[:500]),
+                )
+                for topic in extract_topics_from_text(title):
+                    tkey = _topic_key(topic)
+                    t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                    conn.execute(
+                        "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (t_id, now, topic, tkey, sig_id, "creator", "mainstream",
+                         cr["name"], 0, 0, eng, 0, 1),
+                    )
+                    total += 1
+        conn.commit()
+    except Exception as e:
+        print(f"  creator trends error: {e}")
+    print(f"  Creator trends: {total} topic signals")
+    return total
+
+
+def collect_broadcast_trends(conn) -> int:
+    """Mine broadcast/institutional news channels' (CNBC, CNN, Bloomberg, Reuters,
+    etc.) recent YouTube titles into the TRENDS feed — mainstream tier, attributed.
+    These are late-stage public-awareness signals: high engagement but NOT first-
+    timer dark matter (broadcast = the crowd already knows)."""
+    if not _RISK_AVAILABLE or not os.getenv("YOUTUBE_API_KEY"):
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    total = 0
+    try:
+        channels = getattr(risk, "BROADCAST_CHANNELS", [])
+        for bc in channels:
+            for v in risk._broadcast_recent(bc["handle"], 20):
+                title = (v.get("title") or "").strip()
+                if len(title) < 8:
+                    continue
+                try:
+                    sentiment = _sentiment.polarity_scores(title)["compound"]
+                except Exception:
+                    sentiment = 0.0
+                eng = round(math.log1p(200), 4)  # broadcast gets higher base weight
+                sig_id = hashlib.md5(f"broadcast-{bc['handle']}-{title[:60]}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sig_id, now, "broadcast", "mainstream", bc["name"], title[:500],
+                     v.get("url", ""), bc["name"][:100], 0, 0, eng, round(sentiment, 4),
+                     0, 1, title[:500]),
+                )
+                for topic in extract_topics_from_text(title):
+                    tkey = _topic_key(topic)
+                    t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                    conn.execute(
+                        "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (t_id, now, topic, tkey, sig_id, "broadcast", "mainstream",
+                         bc["name"], 0, 0, eng, 0, 1),
+                    )
+                    total += 1
+        conn.commit()
+    except Exception as e:
+        print(f"  broadcast trends error: {e}")
+    print(f"  Broadcast trends: {total} topic signals")
+    return total
+
+
+# ── Social / open-network collectors (added 2026-06-12) ──────────────────
+# Keyless, free APIs that replace Reddit's role as the niche-tier early-chatter
+# sensor. Bluesky + Lemmy carry AUTHOR identity, so the first-timer / dark-matter
+# math works on them exactly as it did on Reddit.
+
+def _social_write_signal(conn, *, sig_id, platform, tier, community, title, url,
+                         author, ups, comments, is_first_timer, is_organic) -> int:
+    """Shared raw_signals + topic_signals writer for the social collectors.
+    Returns the number of topic signals written."""
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        sentiment = _sentiment.polarity_scores(title)["compound"]
+    except Exception:
+        sentiment = 0.0
+    eng = round(math.log1p(max(0, ups)) + math.log1p(max(0, comments) * 2), 4)
+    conn.execute(
+        "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (sig_id, now, platform, tier, community, title[:500], url[:500],
+         (author or "")[:100], ups, comments, eng, round(sentiment, 4),
+         1 if is_first_timer else 0, 1 if is_organic else 0, title[:500]),
+    )
+    n = 0
+    for topic in extract_topics_from_text(title):
+        tkey = _topic_key(topic)
+        t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+        conn.execute(
+            "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (t_id, now, topic, tkey, sig_id, platform, tier, community,
+             ups, comments, eng, 1 if is_first_timer else 0,
+             1 if is_organic else 0),
+        )
+        n += 1
+    return n
+
+
+def collect_bluesky(conn) -> int:
+    """Bluesky What's Hot feed via the public AppView (no auth). Early-adopter
+    network → niche tier. Author handles enable real first-timer detection."""
+    feed_uri = os.getenv(
+        "BLUESKY_FEED_URI",
+        "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot")
+    total = 0
+    try:
+        r = requests.get(
+            "https://public.api.bsky.app/xrpc/app.bsky.feed.getFeed",
+            params={"feed": feed_uri, "limit": 100},
+            headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+        r.raise_for_status()
+        items = (r.json() or {}).get("feed", []) or []
+    except Exception as e:
+        print(f"  Bluesky: feed error: {e}")
+        return 0
+    for it in items:
+        post = (it or {}).get("post") or {}
+        text = ((post.get("record") or {}).get("text") or "").strip()
+        handle = ((post.get("author") or {}).get("handle") or "").strip()
+        uri = post.get("uri", "")
+        if len(text) < 12 or not uri:
+            continue
+        likes = int(post.get("likeCount") or 0)
+        replies = int(post.get("replyCount") or 0)
+        ft = check_author_is_first_timer(conn, handle, "bluesky", "whats-hot") if handle else False
+        organic = not (likes > 5000 and replies < 5)
+        sig_id = hashlib.md5(f"bsky-{uri}".encode()).hexdigest()[:16]
+        web_url = "https://bsky.app/profile/" + handle if handle else "https://bsky.app"
+        total += _social_write_signal(
+            # General social microblog = mainstream chatter, NOT specialist
+            # dark matter. Dark matter is reserved for pre-mainstream expert
+            # communities (GitHub/HN/specialist forums); broad social media is
+            # part of the mainstreaming wave a topic rides AFTER its niche phase.
+            conn, sig_id=sig_id, platform="bluesky", tier="mainstream",
+            community="whats-hot", title=text, url=web_url, author=handle,
+            ups=likes, comments=replies, is_first_timer=ft, is_organic=organic)
+    conn.commit()
+    print(f"  Bluesky: {total} topic signals")
+    return total
+
+
+def collect_lemmy(conn) -> int:
+    """Lemmy (open-source Reddit) hot posts via the open REST API (no auth).
+    Mainstream tier (general social media, not specialist dark matter);
+    creator names enable first-timer detection."""
+    instances = [s.strip() for s in os.getenv(
+        "LEMMY_INSTANCES", "lemmy.world,lemmy.ml").split(",") if s.strip()]
+    total = 0
+    for inst in instances:
+        try:
+            r = requests.get(
+                f"https://{inst}/api/v3/post/list",
+                params={"type_": "All", "sort": "Hot", "limit": 50},
+                headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+            r.raise_for_status()
+            posts = (r.json() or {}).get("posts", []) or []
+        except Exception as e:
+            print(f"  Lemmy {inst}: error: {e}")
+            continue
+        for pv in posts:
+            p = (pv or {}).get("post") or {}
+            counts = (pv or {}).get("counts") or {}
+            creator = ((pv or {}).get("creator") or {}).get("name") or ""
+            community = ((pv or {}).get("community") or {}).get("name") or inst
+            title = (p.get("name") or "").strip()
+            if len(title) < 8 or not p.get("id"):
+                continue
+            score = int(counts.get("score") or 0)
+            comments = int(counts.get("comments") or 0)
+            ft = check_author_is_first_timer(conn, creator, "lemmy", community) if creator else False
+            sig_id = hashlib.md5(f"lemmy-{inst}-{p['id']}".encode()).hexdigest()[:16]
+            total += _social_write_signal(
+                # Community-level tier: a specialist Lemmy community (e.g.
+                # machinelearning@) is expert/dark-matter; a general one
+                # (world, technology) is mainstream.
+                conn, sig_id=sig_id, platform="lemmy",
+                tier=_community_tier("lemmy", community),
+                community=community, title=title,
+                url=p.get("ap_id") or f"https://{inst}/post/{p['id']}",
+                author=creator, ups=score, comments=comments,
+                is_first_timer=ft, is_organic=True)
+    conn.commit()
+    print(f"  Lemmy: {total} topic signals")
+    return total
+
+
+def collect_mastodon(conn) -> int:
+    """Mastodon trending tags + links via the public trends API (no auth).
+    Trend-level (no authors → no first-timer signal), mainstream tier
+    (general social media, not specialist dark matter)."""
+    inst = os.getenv("MASTODON_INSTANCE", "mastodon.social")
+    total = 0
+    for kind, path in (("tag", "tags"), ("link", "links")):
+        try:
+            r = requests.get(f"https://{inst}/api/v1/trends/{path}",
+                             params={"limit": 20},
+                             headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+            r.raise_for_status()
+            rows = r.json() or []
+        except Exception as e:
+            print(f"  Mastodon {path}: error: {e}")
+            continue
+        for row in rows:
+            if kind == "tag":
+                title = (row.get("name") or "").strip()
+                url = row.get("url") or f"https://{inst}/tags/{title}"
+            else:
+                title = (row.get("title") or "").strip()
+                url = row.get("url") or ""
+            if len(title) < 4:
+                continue
+            hist = row.get("history") or []
+            uses = sum(int(h.get("uses") or 0) for h in hist[:2])
+            accounts = sum(int(h.get("accounts") or 0) for h in hist[:2])
+            day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            sig_id = hashlib.md5(f"masto-{kind}-{title.lower()}-{day}".encode()).hexdigest()[:16]
+            total += _social_write_signal(
+                conn, sig_id=sig_id, platform="mastodon", tier="mainstream",
+                community=f"trending-{path}", title=title, url=url, author="",
+                ups=accounts, comments=uses, is_first_timer=False,
+                is_organic=True)
+    conn.commit()
+    print(f"  Mastodon: {total} topic signals")
+    return total
+
+
+def collect_gdelt_trends(conn) -> int:
+    """GDELT Doc API (free, no key) as independent MAINSTREAM corroboration of
+    the engine's newest emerging topics. The attention-mode 'gdelt' health entry
+    previously had no producer at all ('never recorded a successful run').
+    Bounded: ≤15 topic queries per cycle, paced 1s."""
+    try:
+        topics = _x_candidate_topics(int(os.getenv("GDELT_TOPIC_LIMIT", "15")))
+    except Exception:
+        topics = []
+    total = 0
+    for i, t in enumerate(topics):
+        if i:
+            time.sleep(1.0)
+        try:
+            r = requests.get(
+                "https://api.gdeltproject.org/api/v2/doc/doc",
+                params={"query": t, "mode": "ArtList", "format": "json",
+                        "timespan": "24h", "maxrecords": 10, "sort": "hybridrel"},
+                headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+            r.raise_for_status()
+            arts = (r.json() or {}).get("articles", []) or []
+        except Exception as e:
+            print(f"  GDELT '{t}': error: {e}")
+            continue
+        for a in arts:
+            title = (a.get("title") or "").strip()
+            url = a.get("url") or ""
+            domain = (a.get("domain") or "").strip() or "gdelt"
+            if len(title) < 12 or not url:
+                continue
+            sig_id = hashlib.md5(f"gdelt-{url}".encode()).hexdigest()[:16]
+            total += _social_write_signal(
+                conn, sig_id=sig_id, platform="gdelt", tier="mainstream",
+                community=domain, title=title, url=url, author=domain,
+                ups=0, comments=0, is_first_timer=False, is_organic=True)
+    conn.commit()
+    print(f"  GDELT trends: {total} topic signals")
+    return total
+
+
+def collect_for_term(conn, term: str) -> int:
+    """
+    Targeted, on-demand collection for a single queried topic
+    (Enterprise direct query). Searches Hacker News (Algolia) and GitHub for
+    the exact term and attributes every hit to that topic's key.
+    """
+    tkey = _topic_key(term)
+    now = datetime.now(timezone.utc).isoformat()
+    count = 0
+
+    # ── Hacker News (Algolia full-text search) ──────────────────────
+    try:
+        resp = requests.get(
+            "https://hn.algolia.com/api/v1/search",
+            params={"query": term, "tags": "story", "hitsPerPage": 50},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            for hit in resp.json().get("hits", []):
+                title = hit.get("title", "")
+                if not title:
+                    continue
+                points = hit.get("points", 0) or 0
+                comments = hit.get("num_comments", 0) or 0
+                created = hit.get("created_at_i", 0) or 0
+                age_hours = max(1, (time.time() - created) / 3600)
+                engagement = math.log1p((points / age_hours) * 10) + math.log1p(comments)
+                sentiment = _sentiment.polarity_scores(title)['compound']
+                oid = hit.get("objectID", "")
+                url = hit.get("url") or f"https://news.ycombinator.com/item?id={oid}"
+                sig_id = hashlib.md5(f"q-hn-{oid}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sig_id, now, "hackernews", "expert", "search", title[:500], url, "",
+                     points, comments, round(engagement, 4), round(sentiment, 4), 0, 1, title[:500]),
+                )
+                t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (t_id, now, term, tkey, sig_id, "hackernews", "expert", "search",
+                     points, comments, round(engagement, 4), 0, 1),
+                )
+                count += 1
+    except Exception as e:
+        print(f"[query] HN error: {e}")
+
+    # ── GitHub (repository search) ──────────────────────────────────
+    try:
+        headers = {"Accept": "application/vnd.github.v3+json"}
+        if GITHUB_TOKEN:
+            headers["Authorization"] = f"token {GITHUB_TOKEN}"
+        resp = requests.get(
+            "https://api.github.com/search/repositories",
+            params={"q": term, "sort": "stars", "order": "desc", "per_page": 30},
+            headers=headers, timeout=10,
+        )
+        if resp.status_code == 200:
+            for repo in resp.json().get("items", []):
+                stars = repo.get("stargazers_count", 0) or 0
+                forks = repo.get("forks_count", 0) or 0
+                issues = repo.get("open_issues_count", 0) or 0
+                days_old = 1
+                try:
+                    created = datetime.fromisoformat(repo.get("created_at", "").replace("Z", "+00:00"))
+                    days_old = max(1, (datetime.now(timezone.utc) - created).days)
+                except Exception:
+                    pass
+                engagement = math.log1p(stars / days_old) + math.log1p(forks * 2)
+                desc = repo.get("description", "") or ""
+                full_name = repo.get("full_name", "")
+                combined = f"{full_name} {desc}"
+                sig_id = hashlib.md5(f"q-gh-{repo.get('id')}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sig_id, now, "github", "expert", "search", combined[:500],
+                     repo.get("html_url", ""), full_name[:100], stars, issues,
+                     round(engagement, 4), round(_sentiment.polarity_scores(desc)['compound'], 4),
+                     0, 1, combined[:500]),
+                )
+                t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (t_id, now, term, tkey, sig_id, "github", "expert", "search",
+                     stars, issues, round(engagement, 4), 0, 1),
+                )
+                count += 1
+    except Exception as e:
+        print(f"[query] GitHub error: {e}")
+
+    # ── YouTube (mainstream/consumer platform) ──────────────────────
+    # Adds a MAINSTREAM source so platform diversity + the niche-vs-mainstream
+    # gradient reflect reality instead of an expert-only (HN+GitHub) view.
+    yt_key = os.getenv("YOUTUBE_API_KEY", "")
+    if yt_key:
+        try:
+            resp = requests.get(
+                "https://www.googleapis.com/youtube/v3/search",
+                params={"part": "snippet", "q": term, "type": "video",
+                        "maxResults": 15, "order": "relevance", "key": yt_key},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                for item in resp.json().get("items", []):
+                    sn = item.get("snippet", {})
+                    title = sn.get("title", "")
+                    vid = (item.get("id") or {}).get("videoId", "")
+                    if not title or not vid:
+                        continue
+                    try:
+                        pub = datetime.fromisoformat(sn.get("publishedAt", "").replace("Z", "+00:00"))
+                        age_days = max(1, (datetime.now(timezone.utc) - pub).days)
+                    except Exception:
+                        age_days = 30
+                    engagement = math.log1p(30 / age_days)  # recency proxy
+                    sentiment = _sentiment.polarity_scores(title)['compound']
+                    url = f"https://www.youtube.com/watch?v={vid}"
+                    sig_id = hashlib.md5(f"q-yt-{vid}-{tkey}".encode()).hexdigest()[:16]
+                    conn.execute(
+                        "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (sig_id, now, "youtube", "mainstream", "search", title[:500], url,
+                         sn.get("channelTitle", "")[:100], 0, 0, round(engagement, 4),
+                         round(sentiment, 4), 0, 0, title[:500]),
+                    )
+                    t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                    conn.execute(
+                        "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (t_id, now, term, tkey, sig_id, "youtube", "mainstream", "search",
+                         0, 0, round(engagement, 4), 0, 0),
+                    )
+                    count += 1
+        except Exception as e:
+            print(f"[query] YouTube error: {e}")
+
+    # ── Reddit (consumer platform; best-effort — datacenter IPs often blocked) ──
+    try:
+        resp = requests.get(
+            "https://www.reddit.com/search.json",
+            params={"q": term, "sort": "relevance", "limit": 25, "t": "month"},
+            headers={"User-Agent": "nowtrendin/1.0 (+https://nowtrendin.com)"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            for child in resp.json().get("data", {}).get("children", []):
+                post = child.get("data", {})
+                title = post.get("title", "")
+                if not title:
+                    continue
+                ups = post.get("ups", 0) or 0
+                comments = post.get("num_comments", 0) or 0
+                created = post.get("created_utc", 0) or 0
+                age_hours = max(1, (time.time() - created) / 3600)
+                engagement = math.log1p((ups / age_hours) * 10) + math.log1p(comments)
+                sentiment = _sentiment.polarity_scores(title)['compound']
+                pid = post.get("id", "")
+                url = f"https://reddit.com{post.get('permalink', '')}"
+                sig_id = hashlib.md5(f"q-rd-{pid}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sig_id, now, "reddit", "mainstream", "search", title[:500], url,
+                     post.get("subreddit", "")[:100], ups, comments, round(engagement, 4),
+                     round(sentiment, 4), 0, 0, title[:500]),
+                )
+                t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                conn.execute(
+                    "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (t_id, now, term, tkey, sig_id, "reddit", "mainstream", "search",
+                     ups, comments, round(engagement, 4), 0, 0),
+                )
+                count += 1
+    except Exception as e:
+        print(f"[query] Reddit error: {e}")
+
+    # ── Mainstream news (Stage 4) — corrects the niche-gradient distortion ──
+    # Registers how widely the mainstream press covers a topic, inserted as
+    # MAINSTREAM signals so a widely-covered topic (e.g. SpaceX) carries real
+    # mainstream weight and its niche-concentration gradient correctly drops.
+    # Prefer the Guardian API (cloud-friendly, free key); fall back to GDELT
+    # (free/no-key but rate-limited from cloud IPs → circuit-breakered).
+    if _NEWS_AVAILABLE:
+        try:
+            news_key = f"news:{term.strip().lower()}"
+            gd = _cache.get(news_key)
+            if gd is None:
+                gd = (_news.collect_guardian_signal(term)
+                      or _news.collect_gdelt_signal(term)
+                      or {})
+                _cache.set(news_key, gd, CACHE_TTL_XSIGNAL)  # 12h — coverage is stable
+            if gd and gd.get("article_count", 0) > 0:
+                # One mainstream signal per unit of coverage (capped). Engagement
+                # scales with coverage volume; sentiment from tone if present.
+                src = gd.get("source", "news")
+                n = min(25, int(gd.get("article_count", 0)))
+                vol = gd.get("total_volume", 0) or gd.get("article_count", 0)
+                per_eng = round(math.log1p(vol / max(1, n)), 4)
+                tone = gd.get("avg_tone", 0.0) or 0.0
+                for k in range(n):
+                    sig_id = hashlib.md5(f"q-{src}-{tkey}-{k}".encode()).hexdigest()[:16]
+                    txt = f"{src} media coverage: {term}"
+                    conn.execute(
+                        "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (sig_id, now, src, "mainstream", "news", txt, "", "",
+                         0, 0, per_eng, round(tone / 10.0, 4), 0, 0, txt),
+                    )
+                    t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+                    conn.execute(
+                        "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (t_id, now, term, tkey, sig_id, src, "mainstream", "news",
+                         0, 0, per_eng, 0, 0),
+                    )
+                    count += 1
+                print(f"[query] {src} '{term}': {gd.get('article_count')} articles, "
+                      f"{gd.get('source_breadth')} outlets -> {n} mainstream signals")
+        except Exception as e:
+            print(f"[query] news error: {e}")
+
+    conn.commit()
+    return count
+
+
+def persist_velocity_score(conn, result) -> None:
+    """Write one scored result into velocity_scores (used by on-demand query)."""
+    score_id = str(uuid.uuid4())[:16]
+    conn.execute("""
+        INSERT INTO velocity_scores (
+            id, scored_at, topic_key, topic_display,
+            gradient_strength, inertia_score, platform_diversity,
+            dark_matter_score, confidence_decay, persistence_score,
+            nowtrendin_score,
+            overall_score, detection_score, confidence_score, heisenberg_gap,
+            total_mentions, niche_mentions, mainstream_mentions,
+            platforms_active, first_timer_ratio, engagement_asymmetry,
+            gradient_ratio, signal_stage, is_gravitational_anomaly,
+            anomaly_reason, why_this_matters, what_to_watch
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        score_id, result["scored_at"], result["topic_key"], result["topic_display"],
+        result["gradient_strength"], result["inertia_score"], result["platform_diversity"],
+        result["dark_matter_score"], result["confidence_decay"], result["persistence_score"],
+        result["nowtrendin_score"],
+        result["overall_score"], result["detection_score"], result["confidence_score"], result["heisenberg_gap"],
+        result["total_mentions"], result["niche_mentions"], result["mainstream_mentions"],
+        result["platforms_active"], result["first_timer_ratio"], result["engagement_asymmetry"],
+        result["gradient_ratio"], result["signal_stage"], result["is_gravitational_anomaly"],
+        result["anomaly_reason"], result["why_this_matters"], result["what_to_watch"],
+    ))
+    conn.commit()
+
+
+# ══════════════════════════════════════════════════════════════════
+# RESEARCH ARCHIVAL + RETENTION
+# Keep full score detail ~30 days; snapshot latest scores monthly and
+# retain those snapshots ~1 year for research/backtesting.
+# ══════════════════════════════════════════════════════════════════
+
+def archive_scores_snapshot(db_path: str = DB_PATH) -> int:
+    """Save a research snapshot (latest score per topic) tagged with today's date."""
+    snap = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = get_db(db_path)
+    conn.execute("""
+        INSERT INTO score_archive
+            (snapshot_date, topic_key, topic_display, detection_score,
+             confidence_score, overall_score, signal_stage, scored_at, total_mentions)
+        SELECT ?, v.topic_key, v.topic_display, v.detection_score,
+               v.confidence_score, v.overall_score, v.signal_stage, v.scored_at, v.total_mentions
+        FROM velocity_scores v
+        INNER JOIN (
+            SELECT topic_key, MAX(scored_at) AS m FROM velocity_scores GROUP BY topic_key
+        ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
+        ON CONFLICT (snapshot_date, topic_key) DO NOTHING
+    """, (snap,))
+    conn.commit()
+    n = conn.execute(
+        "SELECT COUNT(*) AS c FROM score_archive WHERE snapshot_date = ?", (snap,)
+    ).fetchone()["c"]
+    conn.close()
+    print(f"[archive] snapshot {snap}: {n} topics archived")
+    return n
+
+
+def archive_pull_history(db_path: str = DB_PATH) -> dict:
+    """Persist a daily snapshot of the latest score per topic for BOTH feeds
+    into pull_history (12-month durable store). Idempotent per day via the
+    (snapshot_date, feed, topic_key) primary key. Run daily on the scheduler."""
+    snap = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc).isoformat()
+    conn = get_db(db_path)
+    out = {"attention": 0, "risk": 0}
+    # ── Attention feed (velocity_scores) ──
+    try:
+        conn.execute("""
+            INSERT INTO pull_history
+                (snapshot_date, feed, topic_key, topic_display, detection_score,
+                 confidence_score, overall_score, signal_stage, total_signals, scored_at, archived_at)
+            SELECT ?, 'attention', v.topic_key, v.topic_display, v.detection_score,
+                   v.confidence_score, v.overall_score, v.signal_stage, v.total_mentions, v.scored_at, ?
+            FROM velocity_scores v
+            INNER JOIN (
+                SELECT topic_key, MAX(scored_at) AS m FROM velocity_scores GROUP BY topic_key
+            ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            ON CONFLICT (snapshot_date, feed, topic_key) DO NOTHING
+        """, (snap, now))
+        conn.commit()
+        out["attention"] = conn.execute(
+            "SELECT COUNT(*) AS c FROM pull_history WHERE snapshot_date=? AND feed='attention'",
+            (snap,)).fetchone()["c"]
+    except Exception as e:
+        print(f"[pull_history] attention archive error: {e}")
+    # ── Risk feed (risk_scores) — positioning score stored in overall_score ──
+    try:
+        conn.execute("""
+            INSERT INTO pull_history
+                (snapshot_date, feed, topic_key, topic_display, detection_score,
+                 confidence_score, overall_score, signal_stage, total_signals, scored_at, archived_at)
+            SELECT ?, 'risk', r.risk_topic, r.risk_display, r.detection_score,
+                   r.confidence_score, r.detection_score, r.risk_stage, r.total_signals, r.scored_at, ?
+            FROM risk_scores r
+            INNER JOIN (
+                SELECT risk_topic, MAX(scored_at) AS m FROM risk_scores GROUP BY risk_topic
+            ) l ON r.risk_topic = l.risk_topic AND r.scored_at = l.m
+            ON CONFLICT (snapshot_date, feed, topic_key) DO NOTHING
+        """, (snap, now))
+        conn.commit()
+        out["risk"] = conn.execute(
+            "SELECT COUNT(*) AS c FROM pull_history WHERE snapshot_date=? AND feed='risk'",
+            (snap,)).fetchone()["c"]
+    except Exception as e:
+        print(f"[pull_history] risk archive error: {e}")
+    conn.close()
+    print(f"[pull_history] {snap}: attention={out['attention']} risk={out['risk']} archived")
+    return out
+
+
+def prune_pull_history(db_path: str = DB_PATH, days: int = 365) -> int:
+    """Drop pull_history rows older than 12 months (with a small buffer)."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    conn = get_db(db_path)
+    cur = conn.execute("DELETE FROM pull_history WHERE snapshot_date < ?", (cutoff,))
+    deleted = getattr(cur, "rowcount", 0) or 0
+    conn.commit()
+    conn.close()
+    print(f"[pull_history] pruned {deleted} rows older than {days}d")
+    return deleted
+
+
+def prune_velocity_scores(db_path: str = DB_PATH, days: int = 30) -> int:
+    """Delete velocity_scores older than `days`, always keeping the latest row per topic."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    conn = get_db(db_path)
+    cur = conn.execute("""
+        DELETE FROM velocity_scores
+        WHERE scored_at < ?
+          AND id NOT IN (
+            SELECT v.id FROM velocity_scores v
+            INNER JOIN (
+                SELECT topic_key, MAX(scored_at) AS m FROM velocity_scores GROUP BY topic_key
+            ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
+          )
+    """, (cutoff,))
+    deleted = getattr(cur, "rowcount", 0) or 0
+    conn.commit()
+    conn.close()
+    print(f"[retention] pruned {deleted} velocity_scores rows older than {days}d")
+    return deleted
+
+
+def prune_archive(db_path: str = DB_PATH, days: int = 395) -> int:
+    """Drop research snapshots older than ~1 year."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    conn = get_db(db_path)
+    cur = conn.execute("DELETE FROM score_archive WHERE snapshot_date < ?", (cutoff,))
+    deleted = getattr(cur, "rowcount", 0) or 0
+    conn.commit()
+    conn.close()
+    print(f"[retention] pruned {deleted} archive rows older than {days}d")
+    return deleted
+
+
+def run_retention() -> None:
+    """Monthly job: snapshot latest scores for research, prune old detail, and
+    reset membership credits (query + AI-grade) to each tier's allowance."""
+    try:
+        archive_scores_snapshot(DB_PATH)
+        # 90-day per-cycle retention (matches the daily VELOCITY_KEEP_DAYS=90) —
+        # was a hardcoded 30 that would have silently overridden the 90d intent.
+        prune_velocity_scores(DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "90")))
+        prune_archive(DB_PATH, days=395)
+        # Reset monthly membership credits via the backend (internal-key gated).
+        reset_url = os.getenv("CREDITS_RESET_URL")
+        if reset_url:
+            try:
+                requests.post(reset_url,
+                              headers={"X-Internal-Key": os.getenv("INTERNAL_API_KEY", "")},
+                              timeout=30)
+                print("[retention] monthly credit reset triggered.")
+            except Exception as _cre:
+                print(f"[retention] credit reset error: {_cre}")
+    except Exception as exc:
+        print(f"[retention] error: {exc}")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1110,7 +2869,14 @@ class GravitationalAnomalyDetector:
         topic_key: str,
         hours: int = 72,
     ) -> list[dict]:
-        """Fetch all signals for a topic in the time window."""
+        """Fetch all signals for a topic in the time window.
+
+        Excludes signals still tagged 'unverified' — these are uncorroborated
+        broad-source headlines that the corroboration pass did NOT promote. By
+        design they never enter the scoring set (an unverified source can never
+        stand alone, and excluding them removes any count-padding leak into G).
+        Corroborated ones were already re-tiered to 'mainstream' or made organic,
+        so they ARE included."""
         conn = get_db(self.db_path)
         cutoff = (
             datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -1118,6 +2884,7 @@ class GravitationalAnomalyDetector:
         rows = conn.execute("""
             SELECT * FROM topic_signals
             WHERE topic_key = ? AND extracted_at >= ?
+              AND platform_tier != 'unverified'
             ORDER BY extracted_at ASC
         """, (topic_key, cutoff)).fetchall()
         conn.close()
@@ -1240,9 +3007,18 @@ class GravitationalAnomalyDetector:
 
         platform_list = sorted(list(platforms))
 
-        # Score based on platform count
-        score_map = {1: 20, 2: 50, 3: 80}
-        base_score = score_map.get(len(platforms), 90)
+        # Score based on platform count. The old map pinned EVERY 4+-platform
+        # topic at a flat 90 — no resolution at the top, a primary cause of
+        # Detection saturating (a well-spread topic's M could never move, so the
+        # M-weighted score froze). Keep the original anchors for 1-3 platforms,
+        # but for 4+ use a continuous curve that passes through exactly 90 at 4
+        # platforms (anchor preserved) and then climbs toward 100, so 4 vs 6 vs 9
+        # platforms are distinguishable. Env-revertible for A/B + accuracy sweep.
+        n_plat = len(platforms)
+        if os.getenv("PLATFORM_DIVERSITY_CONTINUOUS", "1") == "1" and n_plat >= 4:
+            base_score = 100 - 40.0 / n_plat   # 4→90, 5→92, 6→93.3, 9→95.6 …
+        else:
+            base_score = {1: 20, 2: 50, 3: 80}.get(n_plat, 90 if n_plat >= 4 else 0)
 
         # Bonus for spanning both niche AND mainstream
         if "niche" in tiers and "mainstream" in tiers:
@@ -1278,10 +3054,15 @@ class GravitationalAnomalyDetector:
             return 0.0, 0.0, False
 
         # ── First-Timer Ratio ──────────────────────────────────
-        reddit_sigs = [s for s in signals if s["platform"] == "reddit"]
-        if reddit_sigs:
-            first_timers = sum(1 for s in reddit_sigs if s["is_first_timer"])
-            ft_ratio = first_timers / len(reddit_sigs)
+        # Across ALL platforms that carry author identity (not Reddit-only —
+        # Reddit is off, which silently forced this to 0 on every topic). We
+        # require a minimum sample so a 1-author topic can't read a spurious
+        # 100%. Signals whose collector cannot resolve an author are excluded
+        # from the denominator rather than counted as non-first-timers.
+        MIN_FT_SAMPLE = 3
+        if len(signals) >= MIN_FT_SAMPLE:
+            first_timers = sum(1 for s in signals if s.get("is_first_timer"))
+            ft_ratio = first_timers / len(signals)
         else:
             ft_ratio = 0.0
 
@@ -1295,17 +3076,29 @@ class GravitationalAnomalyDetector:
         asymmetry_detected = asymmetry_count >= max(2, len(signals) * 0.20)
 
         # ── Score calculation ─────────────────────────────────
-        ft_score     = min(100, ft_ratio * 160)   # 62.5% = score 100
-        asym_score   = 70 if asymmetry_detected else 0
-        organic_score = min(100, sum(
-            1 for s in signals if s["is_organic"]
-        ) / len(signals) * 100)
+        # Dark matter = evidence of HIDDEN activity, expressed by the two real
+        # indicators: a first-timer surge and engagement asymmetry. With neither
+        # present there is no hidden-activity evidence, so the score is ~0.
+        #
+        # First-timer score uses a CONCAVE curve (100 * ratio^0.7) rather than a
+        # linear-with-hard-clip. The prior `ratio * 160` saturated at 62.5%, so a
+        # 62.5% surge and a 100% flood scored identically — the engine had no
+        # resolution at the high end. The power curve rewards early first-timers
+        # generously, preserves full resolution up to a true 100% flood, and is
+        # interpretable (100 is reserved for a total first-timer takeover).
+        ft_score   = round(100 * (ft_ratio ** 0.7), 2)
+        asym_score = 70 if asymmetry_detected else 0
+        evidence   = ft_score * 0.65 + asym_score * 0.35
 
-        dark_score = (
-            ft_score      * 0.50
-            + asym_score  * 0.35
-            + organic_score * 0.15
-        )
+        # Organic concentration is an AUTHENTICITY GATE, not an additive floor.
+        # It scales the evidence down when signals look manufactured (bots/spam),
+        # but it can never CREATE dark matter on its own. Previously it added a
+        # flat 15 to every organic topic, which made the score contradict the
+        # "0% first-timer / normal asymmetry" indicators shown to the user.
+        organic_ratio = (sum(1 for s in signals if s["is_organic"]) / len(signals)) if signals else 0.0
+        quality = 0.4 + 0.6 * organic_ratio   # fully organic → 1.0, fully inorganic → 0.4
+
+        dark_score = evidence * quality
 
         return round(min(100, dark_score), 2), round(ft_ratio, 4), asymmetry_detected
 
@@ -1582,6 +3375,12 @@ class GravitationalAnomalyDetector:
             # Confirmed trend: reached STRONG for at least 2 cycles
             confirmed = bool(lc.get("confirmed_trend")) or (above_s >= 2)
 
+            # Compute running peaks in Python (cross-engine: avoids SQLite's
+            # 2-arg MAX() vs Postgres GREATEST() incompatibility).
+            peak_overall = max(lc.get("peak_overall_score") or 0, overall)
+            peak_det     = max(lc.get("peak_detection_score") or 0, det)
+            peak_conf    = max(lc.get("peak_confidence_score") or 0, conf)
+
             conn.execute("""
                 UPDATE topic_lifecycle SET
                     last_scored_at          = ?,
@@ -1589,9 +3388,9 @@ class GravitationalAnomalyDetector:
                     cycles_above_emerging   = ?,
                     cycles_above_strong     = ?,
                     cycles_above_breakout   = ?,
-                    peak_overall_score      = MAX(COALESCE(peak_overall_score,0), ?),
-                    peak_detection_score    = MAX(COALESCE(peak_detection_score,0), ?),
-                    peak_confidence_score   = MAX(COALESCE(peak_confidence_score,0), ?),
+                    peak_overall_score      = ?,
+                    peak_detection_score    = ?,
+                    peak_confidence_score   = ?,
                     current_streak_cycles   = ?,
                     longest_streak_cycles   = ?,
                     persistence_rate        = ?,
@@ -1601,7 +3400,7 @@ class GravitationalAnomalyDetector:
                 WHERE topic_key = ?
             """, (
                 now_str, total, above_e, above_s, above_b,
-                overall, det, conf,
+                peak_overall, peak_det, peak_conf,
                 streak, longest, rate, age_hours,
                 1 if confirmed else 0,
                 tk,
@@ -1615,7 +3414,11 @@ class GravitationalAnomalyDetector:
         the 0-100 score shown in the app.
         """
         if len(signals) < MIN_TOPIC_APPEARANCES:
-            return None
+            # Admit a single mass-attention signal (e.g. a 777K-view discovery
+            # entity) even below the count floor — magnitude is its own evidence.
+            if not any(float(s.get("engagement_raw", 0) or 0) >= HIGH_MAGNITUDE_ENG
+                       for s in signals):
+                return None
 
         # ── Get best display name ──────────────────────────────
         all_names = [s.get("topic", topic_key.replace('_', ' '))
@@ -1631,6 +3434,29 @@ class GravitationalAnomalyDetector:
         P, lifecycle_data      = self.compute_persistence(topic_key)
         N, nowtrendin_data     = self.compute_nowtrendin_score(topic_key)
 
+        # ── Honest momentum (single source: the stored velocity_scores history) ──
+        # Replaces (a) an inertia calc that read ~100 on a FLAT trace and (b) a
+        # persistence value tied to a lifecycle counter that disagreed with the
+        # stored history — the root cause of the false "first collection cycle"
+        # message, persistence 0 on a 12-cycle-held topic, and inertia 100 on a
+        # flat one. Computed from prior cycles (current row not yet inserted), so
+        # both the displayed components AND the composite below use honest values.
+        momentum_signal_read = None
+        momentum_cycle_count = 0
+        if os.getenv("MOMENTUM_ENGINE", "1") == "1":
+            try:
+                import momentum_engine as _mom
+                _hist = _mom.read_scoring_history(topic_key, db_path=self.db_path)
+                momentum_cycle_count = len(_hist)
+                _in = _mom.compute_inertia(_hist)
+                _pe = _mom.compute_persistence(_hist)
+                if momentum_cycle_count >= 2:
+                    I = _in["inertia"]
+                    P = _pe["persistence"]
+                momentum_signal_read = _mom.generate_signal_read(_hist, _in, _pe)
+            except Exception as _mex:
+                print(f"  momentum: skipped ({_mex})")
+
         # ── FIX 3: Signal volume modifier — prevents floor effect ─
         # Without this, every topic with similar niche concentration
         # scores identically regardless of whether it has 3 or 30 signals.
@@ -1641,6 +3467,11 @@ class GravitationalAnomalyDetector:
                 G = apply_signal_count_modifier(G, len(signals), platform_count_for_modifier)
             except Exception:
                 pass  # non-fatal — G unchanged on error
+        # Re-cap G at 100 after the signal-count modifier (it's a MULTIPLIER and
+        # was pushing high-volume topics' Gradient Strength past 100, e.g.
+        # claude_code stored G=112 — a 0-100 component must never exceed its cap,
+        # and the uncapped value also inflated the Detection composite input).
+        G = max(0.0, min(100.0, G))
 
         # ── Composite scores (G·I·M·D·C·P·N) ──────────────────
         #
@@ -1650,39 +3481,59 @@ class GravitationalAnomalyDetector:
         #   N for Detection: if users are searching it = real-world demand validation
         #   N for Confidence: moderate weight — queries alone don't confirm a trend
 
-        # OVERALL — balanced across all seven
+        # ── N (internal demand) is DELIBERATELY EXCLUDED from the composite ──
+        # The Gradient Score measures EXTERNAL-WORLD attention only. Blending our
+        # own users' demand (N) would create a feedback loop (users search → score
+        # rises → they search more) and compromise the objectivity institutions pay
+        # for. N is computed and DISPLAYED as a separate "community demand" signal,
+        # never folded into Detection/Confidence/Overall. The six external
+        # components below are renormalized to sum to 1.0 (was 7-component w/ N).
+
+        # OVERALL — balanced across the six external components (was incl. N×0.10)
         overall = round(min(100,
-            G * 0.22   # Gradient — niche concentration
-            + I * 0.20  # Inertia — sustained acceleration
-            + M * 0.15  # Platform diversity
-            + D * 0.12  # Dark matter
-            + C * 0.07  # Decay
-            + P * 0.14  # Persistence — historical longevity
-            + N * 0.10  # NowTrendIn — internal demand signal
+            G * 0.244   # Gradient — niche concentration
+            + I * 0.222  # Inertia — sustained acceleration
+            + M * 0.167  # Platform diversity
+            + D * 0.133  # Dark matter
+            + C * 0.078  # Decay
+            + P * 0.156  # Persistence — historical longevity
         ), 2)
 
-        # DETECTION — speed first; N second-highest (user demand confirms early)
+        # DETECTION — speed first (was incl. N×0.12)
         detection = round(min(100,
-            G * 0.33   # Gradient — niche concentration fires first
-            + D * 0.19  # Dark matter — hidden private signal
-            + I * 0.16  # Inertia
-            + N * 0.12  # NowTrendIn — demand-side validation
-            + M * 0.09  # Platform spread
-            + C * 0.05  # Decay
-            + P * 0.06  # Persistence — minimal (want to catch early)
+            G * 0.375   # Gradient — niche concentration fires first
+            + D * 0.216  # Dark matter — hidden private signal
+            + I * 0.182  # Inertia
+            + M * 0.102  # Platform spread
+            + C * 0.057  # Decay
+            + P * 0.068  # Persistence — minimal (want to catch early)
         ), 2)
 
-        # CONFIDENCE — precision first; P is the strongest factor
-        # N moderate weight: consistent user interest over time = precision signal
+        # CONFIDENCE — precision first; P strongest (was incl. N×0.10)
         confidence = round(min(100,
-            I * 0.25   # Inertia — multi-window acceleration
-            + P * 0.24  # Persistence — historical consistency
-            + M * 0.20  # Platform spread
-            + N * 0.10  # NowTrendIn — sustained user demand
-            + G * 0.11  # Gradient
-            + C * 0.06  # Decay
-            + D * 0.04  # Dark matter — lowest weight for precision
+            I * 0.278   # Inertia — multi-window acceleration
+            + P * 0.267  # Persistence — historical consistency
+            + M * 0.222  # Platform spread
+            + G * 0.122  # Gradient
+            + C * 0.067  # Decay
+            + D * 0.044  # Dark matter — lowest weight for precision
         ), 2)
+
+        # ── Phase C: dual-pathway recalibration ───────────────────
+        # For mainstream-origin topics (consumer culture from discovery feeds),
+        # replace the expert-gradient detection — which is structurally ~0 for
+        # them — with one driven by absolute attention MAGNITUDE + breadth +
+        # acceleration. Expert-origin topics (mainstream_ratio ~ 0) are left
+        # IDENTICAL, so the tech early-detection moat is untouched. Diagnostics
+        # are surfaced on the row so the pathway is auditable.
+        # Dual-pathway diagnostics default here; the actual blend runs AFTER
+        # apply_calibration in score_all_topics (calibration recomputes
+        # detection, so blending at this point would be overwritten downstream).
+        pathway = "expert"
+        mainstream_ratio = 0.0
+        attention_magnitude = 0.0
+        mainstream_breadth = 0.0
+        n_mainstream_platforms = 0
 
         gap = round(detection - confidence, 1)
 
@@ -1740,6 +3591,12 @@ class GravitationalAnomalyDetector:
         return {
             "topic_key":     topic_key,
             "topic_display": display,
+            "category":      _topic_category(display),
+            "detection_pathway":   pathway,            # expert | blended | mainstream
+            "mainstream_ratio":    mainstream_ratio,   # effective mainstream weight (max of breadth, magnitude)
+            "attention_magnitude": attention_magnitude,
+            "mainstream_breadth":  mainstream_breadth, # cross-platform corroboration 0-1
+            "n_mainstream_platforms": n_mainstream_platforms,
             "scored_at":     datetime.now(timezone.utc).isoformat(),
 
             # Seven components (G·I·M·D·C·P·N)
@@ -1776,8 +3633,12 @@ class GravitationalAnomalyDetector:
             "is_gravitational_anomaly": 1 if is_anomaly else 0,
             "anomaly_reason":  " · ".join(anomaly_reason) if anomaly_reason else "",
 
-            # Persistence / lifecycle data (from topic_lifecycle table)
-            "persistence_cycles":  lifecycle_data["total_cycles"],
+            # Persistence / lifecycle data. cycle count prefers the momentum
+            # engine's real count (from stored history) over the lifecycle
+            # counter, which could lag and falsely trigger "first collection cycle".
+            "persistence_cycles":  max(lifecycle_data["total_cycles"], momentum_cycle_count),
+            "momentum_cycle_count": momentum_cycle_count,
+            "momentum_signal_read": json.dumps(momentum_signal_read) if momentum_signal_read else None,
             "persistence_streak":  lifecycle_data["current_streak"],
             "persistence_rate":    lifecycle_data["persistence_rate"],
             "trend_age_hours":     lifecycle_data["age_hours"],
@@ -1802,15 +3663,23 @@ class GravitationalAnomalyDetector:
     ) -> str:
         parts = []
 
+        # Express concentration via the MEASURED niche:mainstream ratio
+        # (== the component's raw_ratio field) so the narrative and the
+        # "Niche Concentration" component never cite conflicting numbers. The
+        # earlier "{G}% niche concentration" used the raw pre-calibration score,
+        # which disagreed with the calibrated value shown on the component bar.
+        ratio_txt = (f"about {gradient_ratio:.0f}x more discussion in expert/niche "
+                     f"than mainstream spaces") if gradient_ratio and gradient_ratio >= 2 \
+            else "concentrated in expert/niche spaces"
         if G >= 75:
             parts.append(
-                f"'{topic}' is almost entirely in expert/niche communities "
-                f"({round(G)}% gradient strength) — mainstream has not found it yet"
+                f"'{topic}' is heavily concentrated in expert/niche communities "
+                f"({ratio_txt}) — limited mainstream pickup in the sources we track so far"
             )
         elif G >= 50:
             parts.append(
-                f"'{topic}' is primarily in specialist spaces with early "
-                f"mainstream awareness building"
+                f"'{topic}' is concentrated in specialist spaces ({ratio_txt}) "
+                f"with early mainstream presence building"
             )
 
         if len(platforms) >= 2:
@@ -1881,14 +3750,35 @@ class GravitationalAnomalyDetector:
         conn = get_db(self.db_path)
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
 
-        # Get all unique topic keys active in this window
+        # Provenance promotion (runs before scoring): quarantined unverified-source
+        # news signals are promoted to their corroborated weight + routed to the
+        # right component (D vs M), or left inert at ~1% if uncorroborated. This is
+        # the integrity balance — broad sources earn weight only by independent
+        # confirmation, never standing alone.
+        try:
+            corroborate_unverified_news(conn, hours=hours)
+        except Exception as _ce:
+            print(f"  [score] corroboration skipped: {_ce}")
+
+        # Get unique topic keys active in this window that are actually
+        # SCOREABLE. score_topic() returns None for topics with fewer than
+        # MIN_TOPIC_APPEARANCES signals, so filtering at the SQL level (instead
+        # of iterating + discarding) is a pure performance fix — identical
+        # output, but it stops the scorer drowning in the ~200k single-mention
+        # fragment n-grams that the extractor produces. A high-magnitude single
+        # signal (e.g. a 777K-view Wikipedia entity) is also admitted via the
+        # MAX(engagement_raw) clause so genuine mass-attention discovery items
+        # are never starved by the count gate.
         rows = conn.execute("""
-            SELECT DISTINCT topic_key FROM topic_signals
+            SELECT topic_key FROM topic_signals
             WHERE extracted_at >= ?
-        """, (cutoff,)).fetchall()
+            GROUP BY topic_key
+            HAVING COUNT(*) >= ? OR MAX(engagement_raw) >= ?
+        """, (cutoff, MIN_TOPIC_APPEARANCES, HIGH_MAGNITUDE_ENG)).fetchall()
 
         topic_keys = [r["topic_key"] for r in rows]
-        print(f"\nScoring {len(topic_keys)} discovered topics...")
+        print(f"\nScoring {len(topic_keys)} scoreable topics "
+              f"(filtered from raw fragment pool)...")
 
         results = []
         anomalies = []
@@ -1910,6 +3800,61 @@ class GravitationalAnomalyDetector:
                 except Exception as _cal_exc:
                     print(f"[calibration] apply_calibration failed for {topic_key}: {_cal_exc}")
 
+            # ── Phase C: dual-pathway recalibration (runs LAST, after
+            # calibration, so it isn't overwritten). Mainstream-origin topics
+            # (broad cross-platform corroboration OR mass attention magnitude)
+            # are scored on magnitude+breadth instead of the expert gradient
+            # that is structurally ~0 for them; expert-origin topics are
+            # untouched (the moat). Stage is recomputed from the new overall. ──
+            if _DUAL_PATHWAY and _dual is not None:
+                try:
+                    # Baseline-relative inputs: the topic's OWN rolling footprint
+                    # (prior cycles only — the current row isn't written yet), so
+                    # mainstreaming is measured as deviation, not absolute (fame).
+                    _brd_base = _mag_base = None
+                    _base_cycles = 0
+                    try:
+                        _hist = conn.execute(
+                            "SELECT attention_magnitude, n_mainstream_platforms "
+                            "FROM velocity_scores WHERE topic_key = ? "
+                            "ORDER BY scored_at DESC LIMIT 12", (topic_key,)).fetchall()
+                        if _hist:
+                            _base_cycles = len(_hist)
+                            _mags = sorted(float(r["attention_magnitude"] or 0) for r in _hist)
+                            _brs = sorted(float(r["n_mainstream_platforms"] or 0) for r in _hist)
+                            _mag_base = _mags[len(_mags) // 2]   # median footprint
+                            _brd_base = _brs[len(_brs) // 2]
+                    except Exception:
+                        pass
+                    _b = _dual.blend(
+                        result.get("detection_score", 0) or 0,
+                        result.get("overall_score", 0) or 0,
+                        {"M": result.get("platform_diversity", 0) or 0,
+                         "I": result.get("inertia_score", 0) or 0,
+                         "P": result.get("persistence_score", 0) or 0},
+                        signals,
+                        breadth_baseline=_brd_base,
+                        magnitude_baseline=_mag_base,
+                        baseline_cycles=_base_cycles)
+                    result["detection_score"] = _b["detection"]
+                    result["overall_score"]   = _b["overall"]
+                    result["heisenberg_gap"]  = round(
+                        _b["detection"] - (result.get("confidence_score", 0) or 0), 1)
+                    result["detection_pathway"]      = _b["pathway"]
+                    result["mainstream_ratio"]       = _b["mainstream_ratio"]
+                    result["attention_magnitude"]    = _b["magnitude"]
+                    result["mainstream_breadth"]     = _b["breadth"]
+                    result["n_mainstream_platforms"] = _b["n_mainstream_platforms"]
+                    _ov = _b["overall"]
+                    result["signal_stage"] = (
+                        "BREAKOUT"  if _ov >= BREAKOUT_THRESHOLD else
+                        "STRONG"    if _ov >= STRONG_THRESHOLD   else
+                        "EMERGING"  if _ov >= EMERGING_THRESHOLD else
+                        "WATCHING"  if _ov >= WATCHING_THRESHOLD else
+                        "MONITORING")
+                except Exception as _de:
+                    print(f"  dual_pathway(post-cal) {topic_key}: skipped ({_de})")
+
             # ── Update lifecycle BEFORE computing P for next cycle ──
             # (P for this cycle was already computed using pre-update history)
             self._update_topic_lifecycle(conn, result)
@@ -1926,9 +3871,10 @@ class GravitationalAnomalyDetector:
                     total_mentions, niche_mentions, mainstream_mentions,
                     platforms_active, first_timer_ratio, engagement_asymmetry,
                     gradient_ratio, signal_stage, is_gravitational_anomaly,
-                    anomaly_reason, why_this_matters, what_to_watch
+                    anomaly_reason, why_this_matters, what_to_watch,
+                    attention_magnitude, n_mainstream_platforms
                 ) VALUES (
-                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
                 )
             """, (
                 score_id,
@@ -1958,6 +3904,8 @@ class GravitationalAnomalyDetector:
                 result["anomaly_reason"],
                 result["why_this_matters"],
                 result["what_to_watch"],
+                result.get("attention_magnitude", 0) or 0,
+                result.get("n_mainstream_platforms", 0) or 0,
             ))
 
             # Log anomalies separately
@@ -1990,9 +3938,9 @@ class GravitationalAnomalyDetector:
                 ON CONFLICT(topic_key) DO UPDATE SET
                     topic_display     = excluded.topic_display,
                     last_seen_at      = excluded.last_seen_at,
-                    total_mentions    = total_mentions + excluded.total_mentions,
-                    niche_mentions    = niche_mentions + excluded.niche_mentions,
-                    mainstream_mentions = mainstream_mentions + excluded.mainstream_mentions,
+                    total_mentions    = topic_registry.total_mentions + excluded.total_mentions,
+                    niche_mentions    = topic_registry.niche_mentions + excluded.niche_mentions,
+                    mainstream_mentions = topic_registry.mainstream_mentions + excluded.mainstream_mentions,
                     platforms_seen    = excluded.platforms_seen,
                     current_stage     = excluded.current_stage,
                     is_anomaly        = excluded.is_anomaly,
@@ -2053,6 +4001,308 @@ app.add_middleware(
 detector = GravitationalAnomalyDetector(DB_PATH)
 
 
+def _require_internal(x_internal_key: str = Header(None)):
+    """Gate expensive/write endpoints to our own backend. Enforces ONLY when
+    INTERNAL_API_KEY is set on the engine (so an unset key can never lock us
+    out); rejects mismatches with 403. Read endpoints are NOT gated."""
+    expected = os.getenv("INTERNAL_API_KEY", "")
+    if expected and x_internal_key != expected:
+        raise HTTPException(status_code=403, detail="Forbidden — internal endpoint")
+    return True
+
+# ── Enterprise intelligence layer (methodology versioning, per-component
+# audit attribution, scenario projections) — ported from the v1 extensions
+# layer onto the live 7-component Postgres engine. Read-only, no new tables.
+try:
+    from enterprise_intel import build_router as _build_ent_router
+    # Lambda defers the name lookup to request time (_calibrate_score_fields is
+    # defined later in this module than this mount point).
+    app.include_router(_build_ent_router(
+        get_db, DB_PATH, calibrate_fn=lambda r: _calibrate_score_fields(r)))
+    print("[startup] enterprise_intel loaded — methodology/audit/scenarios active")
+except Exception as _ent_exc:
+    print(f"[startup] enterprise_intel unavailable: {_ent_exc}")
+
+
+_SCHEDULER_STARTED = False
+
+
+def start_scheduler():
+    """Build and start the background APScheduler (collect+score every 30 min,
+    daily velocity recompute, twice-daily X scan, monthly retention). Runs on
+    the worker dyno by default; safe to call once per process."""
+    global _SCHEDULER_STARTED
+    if _SCHEDULER_STARTED:
+        return None
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+
+        def _scheduled_cycle():
+            try:
+                c = get_db(DB_PATH)
+                for _nm, _fn in (("reddit", collect_reddit),
+                                 ("github", collect_github),
+                                 ("hackernews", collect_hackernews),
+                                 ("newsapi_org", collect_newsapi_org),
+                                 ("newsapi_ai", collect_newsapi_ai),
+                                 ("newsdata_io", collect_newsdata_io),
+                                 ("yahoo_finance", collect_yahoo_finance_news),
+                                 ("bluesky", collect_bluesky),
+                                 ("lemmy", collect_lemmy),
+                                 ("mastodon", collect_mastodon),
+                                 ("gdelt", collect_gdelt_trends)):
+                    try:
+                        _n = _fn(c) or 0
+                        _log_health(_nm, _n, "success", conn=c)
+                    except Exception as _ce:
+                        _log_health(_nm, 0, "failure", conn=c)
+                        print(f"[scheduler] {_nm} error: {_ce}")
+                c.close()
+                if _BLOGS_AVAILABLE:
+                    try:
+                        # collect_all_blogs returns a per-platform RESULTS DICT,
+                        # not a count — passing the dict as the signal count made
+                        # the success _log_health insert throw on every cycle, so
+                        # health showed blogs as 'never recorded a successful run'
+                        # even when collection worked. Extract the real total.
+                        _blog_res = _bc.collect_all_blogs() or {}
+                        _bn = int((_blog_res.get("_total") or {}).get("signals", 0) or 0)
+                        _log_health("blogs", _bn, "success")
+                    except Exception as _be:
+                        _log_health("blogs", 0, "failure")
+                        print(f"[scheduler] blog collect error: {_be}")
+                detector.score_all_topics(hours=72)
+                _cache.invalidate()
+                print("[scheduler] collect+score cycle complete.")
+                # Start the accuracy clock: log the strongest current detections
+                # as PENDING ledger entries (every call, not just the winners).
+                try:
+                    _record_top_detections(limit=int(os.getenv("LEDGER_RECORD_TOP", "20")))
+                except Exception as _lre:
+                    print(f"[scheduler] ledger record error: {_lre}")
+                # Keep velocity_scores bounded so the latest-per-topic join in
+                # /scores stays fast (unbounded growth caused a 30s timeout
+                # outage). This is a per-cycle ROW cap per topic — it must be high
+                # enough not to undercut the 90-day time-based retention below
+                # (90d x ~48 cycles/day = 4320; 5000 leaves margin). The daily
+                # day-based prune + weekly VACUUM are the real size controls now
+                # that we're on the 10GB Essential-1 plan.
+                try:
+                    _prune_velocity_scores(int(os.getenv("KEEP_CYCLES_PER_TOPIC", "5000")))
+                    _prune_anomaly_log(int(os.getenv("KEEP_ANOMALY_DAYS", "30")))
+                except Exception as _pe:
+                    print(f"[scheduler] prune error: {_pe}")
+                # Precompute the calibrated serve rows so /scores reads them
+                # directly (cold /scores was 6–11s recalibrating per request).
+                try:
+                    _precompute_serve_payloads(int(os.getenv("PRECOMPUTE_TOP_N", "600")))
+                    _cache.invalidate()
+                except Exception as _ppe:
+                    print(f"[scheduler] precompute error: {_ppe}")
+                # Explainers are generated on-demand (cached) — the per-cycle
+                # backfill added DB/Perplexity load to the shared essential-0 PG
+                # and is disabled by default. Enable with EXPLAINER_BACKFILL_PER_CYCLE>0.
+                _exp_n = int(os.getenv("EXPLAINER_BACKFILL_PER_CYCLE", "0"))
+                if _exp_n > 0:
+                    try:
+                        _backfill_explainers(limit=_exp_n)
+                    except Exception as _ee:
+                        print(f"[scheduler] explainer backfill error: {_ee}")
+                eval_url = os.getenv("ALERT_EVAL_URL")
+                if eval_url:
+                    try:
+                        requests.post(
+                            eval_url,
+                            headers={"X-Internal-Key": os.getenv("INTERNAL_API_KEY", "dev-internal-key")},
+                            timeout=25,
+                        )
+                    except Exception as _ae:
+                        print(f"[scheduler] alert eval error: {_ae}")
+                if _RISK_AVAILABLE:
+                    try:
+                        # run_risk_collection returns a per-collector counts DICT
+                        # (same bug class as blogs): logging the dict as the int
+                        # signal count made the success insert throw → only
+                        # failures ever recorded → health showed 'risk DOWN' for
+                        # days while risk data was actually scoring every cycle
+                        # (and the false trust gate suppressed the LIVE badge).
+                        _rres = risk.run_risk_collection(DB_PATH) or {}
+                        _rn = sum(v for v in _rres.values()
+                                  if isinstance(v, (int, float)))
+                        risk.score_all_risks(DB_PATH)
+                        _log_health("risk", int(_rn), "success")
+                        print("[scheduler] risk cycle complete.")
+                    except Exception as _rce:
+                        _log_health("risk", 0, "failure")
+                        print(f"[scheduler] risk error: {_rce}")
+            except Exception as _ce:
+                print(f"[scheduler] cycle error: {_ce}")
+
+        def _scheduled_velocities():
+            try:
+                from signal_calibration_integration import recompute_velocities
+                recompute_velocities(DB_PATH)
+                print("[scheduler] velocities recomputed.")
+            except Exception as _ve:
+                print(f"[scheduler] velocity error: {_ve}")
+            if _ACCURACY_AVAILABLE:
+                try:
+                    accuracy.validate_recent_detections(DB_PATH)
+                except Exception as _ae:
+                    print(f"[scheduler] accuracy error: {_ae}")
+            # Honest-denominator ledger: resolve pending detections (breakout →
+            # LED/LAGGED; past deadline → FALSE_POSITIVE), capped per day to
+            # respect the Apify Trends budget.
+            if _LEDGER_PLUS_AVAILABLE:
+                try:
+                    ledger_plus.sweep_pending(
+                        DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
+                except Exception as _se:
+                    print(f"[scheduler] ledger sweep error: {_se}")
+
+        _sched = BackgroundScheduler(timezone="UTC")
+        _sched.add_job(_scheduled_cycle, "interval", minutes=30,
+                       id="collect_score", max_instances=1,
+                       coalesce=True, misfire_grace_time=600)
+        _sched.add_job(_scheduled_velocities, "cron", hour=6, minute=0,
+                       id="recompute_velocities", max_instances=1,
+                       coalesce=True)
+        # X velocity-trigger scan every 6h over the top-N topics. The volume
+        # scan (counts/recent) is FREE vs the post cap; deep author-gradient
+        # pulls are spent only on movers AND capped by the monthly post budget.
+        if _X_AVAILABLE and os.getenv("X_BEARER_TOKEN"):
+            def _scheduled_x_scan():
+                try:
+                    _x_velocity_scan(limit=int(os.getenv("X_SCAN_LIMIT", "100")))
+                except Exception as _xe:
+                    print(f"[scheduler] x-scan error: {_xe}")
+            # Fixed clock times (00:00 / 06:00 / 12:00 / 18:00 UTC) instead of a
+            # boot-relative interval, so the every-6h pull lands at predictable
+            # times and the external monitor can run a deterministic 10 minutes
+            # after each pull (00:10 / 06:10 / 12:10 / 18:10 UTC).
+            _sched.add_job(_scheduled_x_scan, "cron", hour="0,6,12,18", minute=0,
+                           id="x_velocity_scan", max_instances=1,
+                           coalesce=True, misfire_grace_time=600)
+        # Google realtime-trends discovery every 6h. One Apify actor run (~$0.57)
+        # returns all ~125 countries; at 6h cadence that's ~$68/mo. Discovered
+        # terms feed the scoring pipeline; the next collect+score cycle picks
+        # them up. (Trend validation stays capped at ACCURACY_BATCH per day.)
+        if os.getenv("APIFY_TOKEN") and os.getenv("GOOGLE_TRENDS_ENABLED", "1") == "1":
+            def _scheduled_google_trends():
+                try:
+                    c = get_db(DB_PATH)
+                    try:
+                        _gn = collect_google_trends(c) or 0
+                        _log_health("google_trends", _gn, "success", conn=c)
+                    except Exception as _gce:
+                        _log_health("google_trends", 0, "failure", conn=c)
+                        print(f"[scheduler] google-trends collect error: {_gce}")
+                    # Mainstream-tier coverage (YouTube, GDELT fallback) for the
+                    # top topics — runs on this 6h cadence to respect YouTube
+                    # quota. Gives broad topics a real mainstream denominator.
+                    try:
+                        _mn = collect_mainstream_news(c, limit=int(os.getenv("MAINSTREAM_NEWS_LIMIT", "12"))) or 0
+                        _log_health("youtube", _mn, "success", conn=c)
+                    except Exception as _mne:
+                        _log_health("youtube", 0, "failure", conn=c)
+                        print(f"[scheduler] mainstream-news error: {_mne}")
+                    try:
+                        _cn = collect_creator_trends(c) or 0
+                        _log_health("creators", _cn, "success", conn=c)
+                    except Exception as _cne:
+                        _log_health("creators", 0, "failure", conn=c)
+                        print(f"[scheduler] creator-trends error: {_cne}")
+                    try:
+                        _bn = collect_broadcast_trends(c) or 0
+                        _log_health("broadcast", _bn, "success", conn=c)
+                    except Exception as _bne:
+                        _log_health("broadcast", 0, "failure", conn=c)
+                        print(f"[scheduler] broadcast-trends error: {_bne}")
+                    c.close()
+                except Exception as _gte:
+                    print(f"[scheduler] google-trends error: {_gte}")
+            _sched.add_job(_scheduled_google_trends, "interval", hours=6,
+                           id="google_trends_discovery", max_instances=1,
+                           coalesce=True, misfire_grace_time=600)
+        # Daily 12-month pull-history snapshot (both feeds) + 12-month prune.
+        # Durable record of each topic's score + timestamp, retained 1 year.
+        def _scheduled_pull_history():
+            try:
+                archive_pull_history(DB_PATH)
+                prune_pull_history(DB_PATH, days=int(os.getenv("PULL_HISTORY_KEEP_DAYS", "365")))
+            except Exception as _phe:
+                print(f"[scheduler] pull-history error: {_phe}")
+        _sched.add_job(_scheduled_pull_history, "cron", hour=2, minute=15,
+                       id="pull_history_archive", max_instances=1, coalesce=True,
+                       misfire_grace_time=3600)
+        # Daily auto-theme extension — promote sustained BREAKOUT/STRONG
+        # topics into the trend_beneficiary THEMES dict so the beneficiary
+        # engine grows with trend discovery (instead of needing manual edits).
+        def _scheduled_theme_extension():
+            try:
+                import theme_extension as _te
+                result = _te.run_extension_cycle(DB_PATH)
+                print(f"[scheduler] theme-extension: {result}")
+            except Exception as _tee:
+                print(f"[scheduler] theme-extension error: {_tee}")
+        _sched.add_job(_scheduled_theme_extension, "cron", hour=3, minute=30,
+                       id="theme_extension", max_instances=1, coalesce=True,
+                       misfire_grace_time=3600)
+        # Monthly research snapshot + retention prune (1st of month, 03:00 UTC).
+        _sched.add_job(run_retention, "cron", day=1, hour=3, minute=0,
+                       id="retention", max_instances=1, coalesce=True)
+        # Daily signal-table retention (04:10 UTC) — keeps raw_signals/
+        # topic_signals bounded so the 1GB Postgres plan can't fill up again
+        # (they were unbounded; scoring only reads the last 72h).
+        def _scheduled_signal_retention():
+            try:
+                _prune_signal_tables()
+                # velocity_scores is the largest table on the 1GB plan: per-cycle
+                # rows are wide (many TEXT cols). On the 10GB Essential-1 plan we
+                # keep 90 days of per-cycle scores for backtesting/calibration
+                # (~5.4GB steady-state); weekly VACUUM FULL keeps the file true-
+                # sized. pull_history still carries the durable 12-month record.
+                prune_velocity_scores(
+                    DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "90")))
+            except Exception as _sre:
+                print(f"[scheduler] signal retention error: {_sre}")
+        _sched.add_job(_scheduled_signal_retention, "cron", hour=4, minute=10,
+                       id="signal_retention", max_instances=1, coalesce=True,
+                       misfire_grace_time=3600)
+        # Weekly VACUUM FULL (Sun 04:30 UTC) — DELETE marks rows dead but doesn't
+        # return space to the OS; only VACUUM FULL shrinks the file Heroku meters.
+        # Without this the file creeps up to the cap even with daily deletes (it
+        # hit 101% overnight). Briefly locks each table; Sunday-night quiet window.
+        def _scheduled_vacuum():
+            if not os.getenv("DATABASE_URL"):
+                return
+            try:
+                import psycopg2
+                vconn = psycopg2.connect(os.getenv("DATABASE_URL"))
+                vconn.autocommit = True
+                vcur = vconn.cursor()
+                for table in ("velocity_scores", "topic_signals", "raw_signals",
+                              "anomaly_log", "topic_queries"):
+                    try:
+                        vcur.execute(f"VACUUM FULL {table}")
+                    except Exception as _ve:
+                        print(f"[vacuum] {table}: {_ve}")
+                vconn.close()
+                print("[scheduler] weekly VACUUM FULL complete.")
+            except Exception as _vce:
+                print(f"[scheduler] vacuum error: {_vce}")
+        _sched.add_job(_scheduled_vacuum, "cron", day_of_week="sun", hour=4,
+                       minute=30, id="weekly_vacuum", max_instances=1,
+                       coalesce=True, misfire_grace_time=3600)
+        _sched.start()
+        _SCHEDULER_STARTED = True
+        print("[scheduler] APScheduler started — collect+score every 30 min.")
+        return _sched
+    except Exception as _sched_exc:
+        print(f"[scheduler] start error (non-fatal): {_sched_exc}")
+        return None
+
+
 @app.on_event("startup")
 async def startup_auto_collect():
     """Auto-collect on first launch if the database is empty."""
@@ -2068,6 +4318,59 @@ async def startup_auto_collect():
             print("[startup] Calibration DB initialised and known topics seeded.")
         except Exception as _cal_init_exc:
             print(f"[startup] Calibration init error (non-fatal): {_cal_init_exc}")
+
+    # Create auxiliary tables ONCE at startup (not per request) so the explainer
+    # endpoint never runs DDL under a concurrent feed load.
+    try:
+        _c = get_db(DB_PATH)
+        # NOTE: column is `full_text`, NOT `full` — `full` is a PostgreSQL
+        # reserved word (FULL OUTER JOIN) and breaks unquoted DDL/DML.
+        _c.execute("""CREATE TABLE IF NOT EXISTS topic_explainers (
+            topic_key TEXT PRIMARY KEY, topic_display TEXT,
+            short TEXT, full_text TEXT, created_at TEXT)""")
+        # Defensive migration: if an older table exists, ensure the column is
+        # present (idempotent — harmless if it already exists).
+        try:
+            _c.execute("ALTER TABLE topic_explainers ADD COLUMN full_text TEXT")
+            _c.commit()
+        except Exception:
+            pass
+        _c.execute("CREATE TABLE IF NOT EXISTS x_post_usage (month TEXT PRIMARY KEY, posts INTEGER)")
+        _c.execute("""CREATE TABLE IF NOT EXISTS ai_grade_costs (
+            id TEXT PRIMARY KEY, topic TEXT,
+            perplexity_cost REAL, anthropic_cost REAL, total_cost REAL, created_at TEXT)""")
+        _c.commit()
+        _c.close()
+        print("[startup] auxiliary tables ensured (explainers, x_post_usage, ai_grade_costs).")
+        if _HEALTH_AVAILABLE:
+            try:
+                _health.init_health_db(DB_PATH)
+                print("[startup] collector_health table ensured.")
+            except Exception as _he:
+                print(f"[startup] collector_health init error: {_he}")
+        # Ensure the auto-theme tables exist at startup (not only when the daily
+        # extension job first runs) — otherwise load_all_themes errors noisily on
+        # every beneficiary scoring with "relation themes_extension does not exist".
+        try:
+            import theme_extension as _te
+            _te.init_theme_db(DB_PATH)
+            print("[startup] themes_extension tables ensured.")
+        except Exception as _tee:
+            print(f"[startup] theme_extension init error: {_tee}")
+        try:
+            import market_signal_engine as _mse
+            _mse.init_market_signal_db(DB_PATH)
+            print("[startup] market_signal_history table ensured.")
+        except Exception as _msee:
+            print(f"[startup] market_signal init error: {_msee}")
+        if _LEDGER_PLUS_AVAILABLE:
+            try:
+                ledger_plus.init_pending_db(DB_PATH)
+                print("[startup] accuracy ledger (pending + ledger) tables ensured.")
+            except Exception as _le:
+                print(f"[startup] ledger init error: {_le}")
+    except Exception as _aux_exc:
+        print(f"[startup] aux table init error (non-fatal): {_aux_exc}")
 
     try:
         conn = get_db(DB_PATH)
@@ -2096,6 +4399,17 @@ async def startup_auto_collect():
             threading.Thread(target=_initial_collect, daemon=True).start()
     except Exception as exc:
         print(f"[startup] Startup check error: {exc}")
+
+    # ── Continuous collection scheduler ───────────────────────────────
+    # By default the scheduler runs on a SEPARATE worker dyno (Procfile
+    # `worker:` → --mode=worker) so background collection/scoring/scans never
+    # contend with web request serving. Set RUN_SCHEDULER_IN_WEB=1 to run it
+    # in-process on the web dyno (single-dyno / dev setups).
+    if os.getenv("RUN_SCHEDULER_IN_WEB", "").lower() in ("1", "true", "yes"):
+        start_scheduler()
+    else:
+        print("[startup] Scheduler NOT started on web dyno (handled by worker). "
+              "Set RUN_SCHEDULER_IN_WEB=1 to run it here.")
 
 
 @app.get("/health")
@@ -2177,16 +4491,19 @@ def get_accuracy():
     """
     conn = get_db(DB_PATH)
 
+    # NOTE: every non-grouped column must be aggregated — Postgres (production)
+    # rejects bare columns under GROUP BY that SQLite silently tolerates; the
+    # bare topic_display/signal_stage here were 500-ing the endpoint.
     rows = conn.execute("""
         SELECT
             v.topic_key,
-            v.topic_display,
+            MAX(v.topic_display)    AS topic_display,
             MIN(v.scored_at)        AS detected_at,
             MAX(v.overall_score)    AS overall_score,
             MAX(v.detection_score)  AS detection_score,
             MAX(v.confidence_score) AS confidence_score,
-            v.signal_stage          AS stage,
-            MAX(v.lead_time_estimate_days) AS lead_time_est_days,
+            MAX(v.signal_stage)     AS stage,
+            NULL                    AS lead_time_est_days,
             COUNT(*)                AS scoring_cycles
         FROM velocity_scores v
         WHERE v.overall_score >= 55
@@ -2217,7 +4534,7 @@ def get_accuracy():
 _collect_running = False
 
 
-@app.post("/collect")
+@app.post("/collect", dependencies=[Depends(_require_internal)])
 def run_collection(include_blogs: bool = Query(True)):
     """
     Start a full data collection + scoring cycle in a background thread and
@@ -2240,6 +4557,14 @@ def run_collection(include_blogs: bool = Query(True)):
             r = collect_reddit(conn)
             g = collect_github(conn)
             h = collect_hackernews(conn)
+            # Social/open-network collectors (keyless) — Reddit's replacement
+            # as the niche early-chatter tier + GDELT mainstream corroboration.
+            for _sfn in (collect_bluesky, collect_lemmy, collect_mastodon,
+                         collect_gdelt_trends):
+                try:
+                    _sfn(conn)
+                except Exception as _se:
+                    print(f"[collect] {_sfn.__name__} error: {_se}")
             conn.close()
             print(f"[collect] Core: reddit={r} github={g} hn={h}")
 
@@ -2248,6 +4573,14 @@ def run_collection(include_blogs: bool = Query(True)):
                     _bc.collect_all_blogs()
                 except Exception as exc:
                     print(f"[collect] Blog error: {exc}")
+
+            if _DISCOVERY_AVAILABLE:
+                try:
+                    conn2 = get_db(DB_PATH)
+                    _dc.collect_all_discovery(conn2)
+                    conn2.close()
+                except Exception as exc:
+                    print(f"[collect] Discovery error: {exc}")
 
             # Auto-score after collection; invalidate cache so /scores is fresh
             detector.score_all_topics(hours=72)
@@ -2268,7 +4601,7 @@ def run_collection(include_blogs: bool = Query(True)):
     }
 
 
-@app.post("/collect/blogs")
+@app.post("/collect/blogs", dependencies=[Depends(_require_internal)])
 def run_blog_collection(skip: str = Query("", description="Comma-separated platforms to skip")):
     """
     Run ONLY the blog collection cycle (DEV.to, Hashnode, Discourse,
@@ -2296,7 +4629,33 @@ def run_blog_collection(skip: str = Query("", description="Comma-separated platf
         raise HTTPException(500, f"Blog collection error: {exc}")
 
 
-@app.post("/score-all")
+@app.post("/collect/discovery", dependencies=[Depends(_require_internal)])
+def run_discovery_collection(geos: str = Query("US", description="Comma-separated geos, e.g. US,GB")):
+    """
+    Run ONLY the open-world discovery collectors (Google Trends trending-searches
+    + Wikipedia top pageviews). Category-agnostic intake that surfaces
+    general-culture trends (sports, entertainment, politics) the seeded tech
+    feeds miss. Run POST /score-all afterwards to recompute scores.
+    """
+    if not _DISCOVERY_AVAILABLE:
+        raise HTTPException(503, "discovery_collectors.py not found in project directory")
+    geo_list = tuple(g.strip() for g in geos.split(",") if g.strip()) or ("US",)
+    try:
+        conn = get_db(DB_PATH)
+        results = _dc.collect_all_discovery(conn, geos=geo_list)
+        conn.close()
+        return {
+            "status":        "collected",
+            "total_signals": results.pop("_total", 0),
+            "breakdown":     results,
+            "geos":          list(geo_list),
+            "message":       "Run POST /score-all to compute velocity scores.",
+        }
+    except Exception as exc:
+        raise HTTPException(500, f"Discovery collection error: {exc}")
+
+
+@app.post("/score-all", dependencies=[Depends(_require_internal)])
 def run_scoring():
     """
     Score every topic discovered in the last 72 hours.
@@ -2349,6 +4708,924 @@ def get_anomalies(limit: int = Query(20, ge=1, le=100)):
     return result
 
 
+@app.get("/risk/scores")
+def risk_scores(limit: int = Query(50, ge=1, le=200)):
+    """Risk Gradient Scores — emerging financial risks scored by diffusion stage."""
+    if not _RISK_AVAILABLE:
+        return {"count": 0, "results": []}
+    return risk.get_risk_scores(DB_PATH, limit)
+
+
+@app.get("/macro/leverage")
+def macro_leverage():
+    """OFR Short-Term Funding Monitor — systemic leverage + funding-stress read
+    from repo-market data (transaction volume + rates). Macro risk overlay."""
+    if not _OFR_AVAILABLE:
+        return {"available": False}
+    try:
+        return {"available": True, **ofr_stfm.leverage_snapshot()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/beneficiary/{ticker}")
+def beneficiary_lookup(ticker: str):
+    """Trend Beneficiary score — measures whether the COMPANY's business is
+    positioned to benefit from a Now TrendIn detected trend, and whether the
+    cycle is EARLY (window open) or LATE/REALIZED (move already done). The
+    SanDisk-pattern engine. Measurement, NOT investment advice."""
+    try:
+        import trend_beneficiary_wire as _tbw
+        out = _tbw.score_company_beneficiary(ticker.upper(), ticker.upper())
+        return out or {"available": False, "ticker": ticker.upper(),
+                       "reason": "no theme exposure detected for this company"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/convergence/{topic_key}")
+def signal_convergence(topic_key: str):
+    """Signal Convergence — downstream directional validation. Reads the Gradient
+    Score's recent trajectory + raw volume + niche concentration and reports
+    whether the score's direction is CONFIRMED / MIXED / CONFLICTING by the
+    underlying data. Read-only; never feeds the score; independent of N demand."""
+    try:
+        import now_trending_direction as _ntd
+        return _ntd.compute_convergence(topic_key, DB_PATH)
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/themes")
+def list_themes():
+    """List all THEMES the trend_beneficiary engine knows about — hand-curated
+    + auto-promoted. Auto-promoted themes are flagged."""
+    try:
+        import theme_extension as _te
+        themes = _te.load_all_themes(DB_PATH)
+        return {"count": len(themes),
+                "hand_curated": [k for k, v in themes.items() if not v.get("auto_promoted")],
+                "auto_promoted": [k for k, v in themes.items() if v.get("auto_promoted")],
+                "themes": themes}
+    except Exception as e:
+        return {"error": str(e), "themes": {}}
+
+
+@app.post("/themes/extend", dependencies=[Depends(_require_internal)])
+def themes_extend():
+    """Manually trigger the auto-theme extension cycle (founder-only).
+    Normally runs daily at 03:30 UTC via the scheduler."""
+    try:
+        import theme_extension as _te
+        return _te.run_extension_cycle(DB_PATH)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/beneficiary/backtest/{theme_key}")
+def beneficiary_backtest(theme_key: str, lookback_days: int = 365,
+                         tickers: str = ""):
+    """Backtest the Trend Beneficiary engine against historical pull_history.
+    For each ticker the caller supplies (comma-separated), replays the
+    beneficiary score against the theme's attention trajectory and reports
+    when (if ever) the company would have been flagged EARLY vs LATE.
+
+    THIS IS THE HONEST VALIDATION — without it, every weight is a guess."""
+    try:
+        import trend_beneficiary_wire as _tbw
+        import trend_beneficiary as _tb
+        if theme_key not in _tb.THEMES:
+            try:
+                import theme_extension as _te
+                merged = _te.load_all_themes(DB_PATH)
+                if theme_key not in merged:
+                    return {"error": f"unknown theme: {theme_key}",
+                            "known_themes": list(_tb.THEMES.keys())}
+            except Exception:
+                return {"error": f"unknown theme: {theme_key}"}
+
+        ticker_list = [t.strip().upper() for t in (tickers or "").split(",") if t.strip()]
+        if not ticker_list:
+            return {"error": "supply at least one ticker via ?tickers=AAPL,NVDA"}
+
+        conn = get_db(DB_PATH)
+        cutoff = (datetime.now(timezone.utc) -
+                  timedelta(days=lookback_days)).isoformat()
+        # Build the theme's attention trajectory over time
+        attention_curve = []
+        try:
+            kws = _tb.THEMES.get(theme_key, {}).get("keywords", [])
+            for kw in kws[:5]:
+                kkey = kw.lower().strip().replace(" ", "_")
+                rows = conn.execute(
+                    "SELECT scored_at, detection_score, stage FROM pull_history "
+                    "WHERE topic_key = ? AND scored_at > ? "
+                    "ORDER BY scored_at",
+                    (kkey, cutoff)
+                ).fetchall()
+                for r in rows:
+                    d = dict(r) if hasattr(r, "keys") else {
+                        "scored_at": r[0], "detection_score": r[1], "stage": r[2]
+                    }
+                    attention_curve.append(d)
+        except Exception as e:
+            print(f"[backtest] attention curve error: {e}")
+        conn.close()
+
+        # Score each ticker NOW (live), and report what the cycle stage would
+        # have implied at each point in the attention curve. Simplified — a
+        # full backtest needs historical financial snapshots which Finnhub
+        # gives via /stock/financials-reported across quarters.
+        results = []
+        for tkr in ticker_list:
+            live = _tbw.score_company_beneficiary(tkr, tkr)
+            if not live:
+                results.append({"ticker": tkr, "skipped": "no theme match"})
+                continue
+            # First-EARLY: earliest scored_at where stage was BREAKOUT/STRONG
+            earliest_breakout = None
+            for pt in attention_curve:
+                if pt["stage"] in ("BREAKOUT", "STRONG"):
+                    earliest_breakout = pt["scored_at"]
+                    break
+            results.append({
+                "ticker": tkr,
+                "live_exposure": live.get("exposure_score"),
+                "live_cycle_stage": live.get("cycle_stage"),
+                "would_have_flagged_early_at": earliest_breakout,
+                "live_attention_score": live.get("live_inputs", {}).get("theme_attention_score"),
+                "theme_attention_history_points": len(attention_curve),
+            })
+        return {"theme_key": theme_key, "lookback_days": lookback_days,
+                "attention_curve_size": len(attention_curve),
+                "results": results,
+                "caveat": "Live exposure score uses today's Finnhub data. "
+                          "Full historical backtest requires period-matched "
+                          "financial snapshots — this version shows whether "
+                          "the company would currently match the theme and "
+                          "when the attention signal first peaked."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/broadcast/topics")
+def broadcast_topics(hours: int = 24, min_sources: int = 3, limit: int = 25):
+    """Common topics being covered RIGHT NOW across the 22 broadcast channels
+    (CNBC, BBC, Bloomberg, Reuters, etc.). Surfaces what mainstream news is
+    aligned on — useful as a confirmation/divergence signal vs niche topics."""
+    try:
+        conn = get_db(DB_PATH)
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        rows = conn.execute(
+            # topic_signals has no author column — source_name carries the
+            # broadcast channel; Postgres (unlike SQLite) hard-errors on the
+            # missing column, which 500'd this endpoint.
+            "SELECT topic, topic_key, COUNT(DISTINCT source_name) AS sources, "
+            "COUNT(*) AS mentions, MAX(extracted_at) AS last_seen "
+            "FROM topic_signals "
+            "WHERE platform = 'broadcast' AND extracted_at > ? "
+            "GROUP BY topic, topic_key "
+            "HAVING COUNT(DISTINCT source_name) >= ? "
+            "ORDER BY sources DESC, mentions DESC LIMIT ?",
+            (cutoff, min_sources, limit)
+        ).fetchall()
+        conn.close()
+        topics = []
+        for r in rows:
+            d = dict(r) if hasattr(r, "keys") else {
+                "topic": r[0], "topic_key": r[1], "sources": r[2],
+                "mentions": r[3], "last_seen": r[4]
+            }
+            topics.append(d)
+        return {"hours": hours, "min_sources": min_sources,
+                "channel_pool": 22, "topics": topics,
+                "note": "Topics covered by >= N distinct broadcast channels "
+                        "in the lookback window — mainstream-consensus signal."}
+    except Exception as e:
+        return {"error": str(e), "topics": []}
+
+
+@app.post("/market/backfill", dependencies=[Depends(_require_internal)])
+def market_backfill():
+    """Founder-only: seed the Market Signal per-component baselines from FINRA
+    short-interest history so the baseline-relative scores aren't CALIBRATING for
+    days. Runs synchronously over the watchlist (small)."""
+    if not _RISK_AVAILABLE:
+        return {"status": "unavailable"}
+    try:
+        import market_signal_engine as _mse
+        wl = getattr(risk, "WATCHLIST_TICKERS", {}) or {}
+        items = [(risk._risk_key(disp) if hasattr(risk, "_risk_key") else disp, tkr)
+                 for disp, tkr in wl.items()]
+        finra = _mse.backfill_from_finra(items, DB_PATH)
+        finnhub = _mse.backfill_from_finnhub(items, DB_PATH)
+        return {"status": "ok", "finra": finra, "finnhub": finnhub}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/risk/collect", dependencies=[Depends(_require_internal)])
+def risk_collect():
+    """Run the risk collectors (SEC/GDELT/Reddit/FRED/YouTube) + score, in the background."""
+    if not _RISK_AVAILABLE:
+        return {"status": "unavailable"}
+
+    def _job():
+        try:
+            _rres = risk.run_risk_collection(DB_PATH) or {}
+            risk.score_all_risks(DB_PATH)
+            _cache.invalidate()
+            # Log health here too — this manual path (the app's Pull Market
+            # Trends button) previously never logged, so even successful manual
+            # collections left the risk collector looking DOWN.
+            _rn = sum(v for v in _rres.values() if isinstance(v, (int, float)))
+            if _HEALTH_AVAILABLE:
+                _log_health("risk", int(_rn), "success")
+            print("[risk] manual collect+score complete.")
+        except Exception as exc:
+            if _HEALTH_AVAILABLE:
+                _log_health("risk", 0, "failure")
+            print(f"[risk] collect error: {exc}")
+
+    import threading
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started", "message": "Risk collection running. Poll GET /risk/scores."}
+
+
+@app.get("/risk/{risk_topic}")
+def risk_detail(risk_topic: str):
+    if not _RISK_AVAILABLE:
+        raise HTTPException(404, "Risk module unavailable")
+    d = risk.get_risk_detail(risk_topic, DB_PATH)
+    if not d:
+        raise HTTPException(404, f"No risk score for {risk_topic}")
+    return d
+
+
+@app.get("/accuracy/ledger")
+def accuracy_ledger_report():
+    """The Accuracy Ledger — documented lead time vs Google Trends breakout.
+    Prefers the HONEST report (counts fizzles/false-positives in the
+    denominator); falls back to the base report, then empty-with-pending."""
+    if _LEDGER_PLUS_AVAILABLE:
+        try:
+            h = ledger_plus.generate_honest_report(DB_PATH)
+            if h.get("status") == "ok":
+                return {
+                    "status": "ok",
+                    "hitRate": h["honest_hit_rate_pct"],
+                    "naiveHitRate": h["naive_hit_rate_pct"],
+                    "avgLead": h["mean_lead_days"],
+                    "medianLead": h["median_lead_days"],
+                    "maxLead": h["max_lead_days"],
+                    "total": h["sample_size"],
+                    "led": h["hits_led"],
+                    "sameDay": h["same_day"],
+                    "lagged": h["misses_lagged"],
+                    "falsePositives": h["misses_false_positive"],
+                    "pending": h["still_pending"],
+                    "smallSample": h["small_sample_warning"],
+                    "best": [{"topic": b["topic"], "leadDays": b["lead_days"]}
+                             for b in h.get("best", [])],
+                }
+            # No resolved rows yet — surface the pending count so the empty
+            # state can honestly say "N calls in flight".
+            return {"status": "empty", "pending": h.get("pending", 0)}
+        except Exception as _hre:
+            print(f"[accuracy] honest report error: {_hre}")
+    if _ACCURACY_AVAILABLE:
+        return accuracy.generate_accuracy_report(DB_PATH)
+    return {"status": "unavailable"}
+
+
+@app.get("/accuracy/ledger/detail")
+def accuracy_ledger_detail(limit: int = Query(300, ge=1, le=1000),
+                           verdict: str = Query("", description="LED|SAME_DAY|LAGGED|FALSE_POSITIVE")):
+    """
+    Per-detection rows of the Accuracy Ledger — the institutional auditable
+    track record (topic, detection date+score, breakout date, lead time,
+    verdict, provider). Powers the flagship Ledger table in the terminal.
+    """
+    try:
+        conn = get_db(DB_PATH)
+        where = ""
+        params = []
+        if verdict.strip():
+            where = "WHERE verdict = ?"
+            params.append(verdict.strip().upper())
+        params.append(limit)
+        rows = [dict(r) for r in conn.execute(f"""
+            SELECT topic_key, topic_display, detection_date, detection_score,
+                   breakout_date, breakout_multiple, lead_time_days, verdict,
+                   validated_at, provider
+            FROM accuracy_ledger {where}
+            ORDER BY validated_at DESC
+            LIMIT ?
+        """, params).fetchall()]
+        conn.close()
+        return {"status": "ok", "count": len(rows), "rows": rows}
+    except Exception as e:
+        return {"status": "empty", "count": 0, "rows": [], "note": str(e)[:140]}
+
+
+@app.post("/accuracy/validate", dependencies=[Depends(_require_internal)])
+def accuracy_validate(sync: int = 0):
+    """Run a validation pass (checks top detections against Google Trends)."""
+    if not _ACCURACY_AVAILABLE:
+        return {"status": "unavailable"}
+
+    if sync:
+        return accuracy.validate_recent_detections(DB_PATH)
+
+    def _job():
+        try:
+            accuracy.validate_recent_detections(DB_PATH)
+        except Exception as exc:
+            print(f"[accuracy] validate error: {exc}")
+
+    import threading
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started", "provider": accuracy.TRENDS_PROVIDER}
+
+
+@app.get("/signal-x/{topic}")
+def signal_x(topic: str):
+    """Live X (Twitter) dual-role analysis for a topic (gated on X_BEARER_TOKEN).
+
+    Cached 12h per topic to conserve the X post-cap quota (Basic tier =
+    15,000 posts/month; each pull costs ~100). Repeated views of the same
+    topic within the window cost zero extra posts. Only successful pulls are
+    cached, so a rate-limited/empty response retries on the next request.
+    """
+    if not _X_AVAILABLE:
+        return {"available": False, "reason": "X module unavailable"}
+    cache_key = f"signal-x:{(topic or '').strip().lower()}"
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        return cached
+    # Budget guard + ledger (2026-06-12): this detail-page path spends a full
+    # ~100-post search pull but previously neither checked nor recorded budget —
+    # an uncounted leak against the monthly X post cap.
+    if _x_posts_spent_this_month() + _X_POSTS_PER_PULL > _X_MONTHLY_POST_BUDGET:
+        return {"available": False, "reason": "monthly X post budget exhausted"}
+    result = xsig.build_x_gradient_contribution(topic)
+    if isinstance(result, dict) and result.get("available"):
+        _cache.set(cache_key, result, CACHE_TTL_XSIGNAL)
+        _x_record_posts(_X_POSTS_PER_PULL)
+        _x_record_pull()
+    return result
+
+
+def _x_candidate_topics(limit: int = None) -> list:
+    """Universe the X velocity-trigger scan watches.
+
+    Was: top-N by detection only — which self-reinforced the existing leaders
+    (X could deepen topics already ranked but never diversify into new ones).
+    Now a three-way blend, sized by X_SCAN_UNIVERSE. Widening costs nothing:
+    the volume poll is FREE against the post cap, and deep pulls remain
+    hard-capped by the monthly budget.
+      • top third  — by detection (current leaders, unchanged behaviour)
+      • mid third  — recent gravitational anomalies (first-timer surges +
+        engagement asymmetry: the dark-matter-rich set where private chat
+        is leaking into public — the highest-value X targets)
+      • last third — newest first-detected topics (discovery tier: catches
+        cross-domain entrants like sports/news before they rank anywhere)"""
+    limit = int(limit or os.getenv("X_SCAN_UNIVERSE", "30"))
+    per = max(3, limit // 3)
+    out, seen = [], set()
+
+    def _add(rows):
+        for r in rows:
+            td = r["topic_display"]
+            key = (td or "").strip().lower()
+            if td and key not in seen:
+                seen.add(key)
+                out.append(td)
+
+    base = """
+        SELECT v.topic_display
+        FROM velocity_scores v
+        INNER JOIN (
+            SELECT topic_key, MAX(scored_at) AS m
+            FROM velocity_scores GROUP BY topic_key
+        ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
+        INNER JOIN (
+            SELECT topic_key, MIN(scored_at) AS f
+            FROM velocity_scores GROUP BY topic_key
+        ) fs ON v.topic_key = fs.topic_key
+        WHERE COALESCE(v.total_mentions, 0) >= 5
+    """
+    try:
+        conn = get_db(DB_PATH)
+        _add(conn.execute(base + " ORDER BY v.detection_score DESC LIMIT ?",
+                          (per,)).fetchall())
+        _add(conn.execute(base + " AND v.is_gravitational_anomaly = 1 "
+                          "ORDER BY v.scored_at DESC LIMIT ?",
+                          (per,)).fetchall())
+        _add(conn.execute(base + " ORDER BY fs.f DESC LIMIT ?",
+                          (per,)).fetchall())
+        conn.close()
+        return out[:limit]
+    except Exception as e:
+        print(f"[x-scan] candidate query error: {e}")
+        return out[:limit]
+
+
+# Monthly X post-budget guard. Each deep author-gradient pull (search/recent)
+# costs ~100 posts against X's 15,000/month cap. We hard-cap spend at this
+# budget so a 100-topic scan can never overrun the cap — once exhausted, the
+# scan keeps doing FREE volume checks but spends no more search pulls.
+_X_POSTS_PER_PULL      = int(os.getenv("X_POSTS_PER_PULL", "120"))
+# Cadence: 120 posts every 6h (1 pull/scan x 4 scans/day) = 480 posts/day.
+# 480 x 31 = 14,880 posts/mo — the most a 31-day month can spend, still under
+# the hard 15,000-post monthly cap (~120-post safety margin). Must match the
+# X module's X_SAMPLE_SIZE so budget accounting stays accurate.
+_X_MONTHLY_POST_BUDGET = int(os.getenv("X_MONTHLY_POST_BUDGET", "14880"))
+# Daily ceiling: 4 pulls/day x 120 = 480 posts/day. With per-scan cap of 1 and
+# 4 scans/day this is the natural rate; it also guards against bursts.
+_X_DAILY_PULL_CAP      = int(os.getenv("X_DAILY_PULL_CAP", "4"))
+
+
+def _x_pulls_today() -> int:
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_pull_usage "
+                     "(day TEXT PRIMARY KEY, pulls INTEGER)")
+        row = conn.execute("SELECT pulls FROM x_pull_usage WHERE day = ?",
+                           (day,)).fetchone()
+        conn.commit()
+        conn.close()
+        return int(row["pulls"]) if row and row["pulls"] is not None else 0
+    except Exception as e:
+        print(f"[x-budget] daily read error: {e}")
+        return 0
+
+
+def _x_record_pull() -> None:
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_pull_usage "
+                     "(day TEXT PRIMARY KEY, pulls INTEGER)")
+        conn.execute(
+            "INSERT INTO x_pull_usage (day, pulls) VALUES (?, 1) "
+            "ON CONFLICT(day) DO UPDATE SET pulls = x_pull_usage.pulls + 1",
+            (day,),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[x-budget] daily write error: {e}")
+
+
+def _x_posts_spent_this_month() -> int:
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_post_usage (month TEXT PRIMARY KEY, posts INTEGER)")
+        row = conn.execute("SELECT posts FROM x_post_usage WHERE month = ?", (month,)).fetchone()
+        conn.commit()
+        conn.close()
+        return int(row["posts"]) if row and row["posts"] is not None else 0
+    except Exception as e:
+        print(f"[x-budget] read error: {e}")
+        return 0
+
+
+def _x_record_posts(n: int) -> None:
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_post_usage (month TEXT PRIMARY KEY, posts INTEGER)")
+        conn.execute(
+            "INSERT INTO x_post_usage (month, posts) VALUES (?, ?) "
+            "ON CONFLICT(month) DO UPDATE SET posts = x_post_usage.posts + ?",
+            (month, n, n),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[x-budget] write error: {e}")
+
+
+@app.get("/x/budget")
+def x_budget():
+    """Monthly X post-budget status (guards the 15k post cap).
+    Note: path is /x/budget (NOT /signal-x/budget, which collides with the
+    /signal-x/{topic} route)."""
+    spent = _x_posts_spent_this_month()
+    return {"month": datetime.now(timezone.utc).strftime("%Y-%m"),
+            "posts_spent": spent, "budget": _X_MONTHLY_POST_BUDGET,
+            "remaining": max(0, _X_MONTHLY_POST_BUDGET - spent),
+            "posts_per_pull": _X_POSTS_PER_PULL}
+
+
+def _x_write_feed_signal(topic: str, res: dict) -> None:
+    """Write an X signal into the trends feed (raw_signals + topic_signals) so X
+    contributes to the topic's gradient like other platforms. Tier reflects the
+    dual role: expert-concentrated X = expert tier; viral/broad X = mainstream."""
+    raw = res.get("raw") or {}
+    vol = raw.get("volume") or {}
+    grad = raw.get("gradient") or {}
+    total = int(vol.get("total", 0) or 0)
+    engagement = round(math.log1p(float(grad.get("total_engagement", 0) or 0)), 4)
+    role = (res.get("x_role") or "").lower()
+    tier = "expert" if "expert" in role or "insider" in role else "mainstream"
+    # Spam/bot authenticity guard (mirrors the news writer): use the X signal-
+    # integrity assessment to flag manufactured/coordinated chatter as NON-organic
+    # so it cannot count toward dark matter. multiplier 1.0 = authentic, low = bot.
+    integ = res.get("signal_integrity") or {}
+    mult = integ.get("multiplier")
+    classification = (integ.get("classification") or "").lower()
+    is_organic = 1
+    if (mult is not None and mult < 0.5) or any(
+            w in classification for w in ("manufactured", "coordinated", "bot", "astroturf", "suspicious")):
+        is_organic = 0
+    tkey = _topic_key(topic)
+    now = datetime.now(timezone.utc).isoformat()
+    sig_id = hashlib.md5(f"x-{tkey}-{now[:13]}".encode()).hexdigest()[:16]  # hourly-deduped
+    conn = get_db(DB_PATH)
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO raw_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (sig_id, now, "x", tier, "search", topic[:500],
+             "https://x.com/search?q=" + topic.replace(" ", "%20"), "",
+             total, 0, engagement, 0.0, 0, is_organic, topic[:500]),
+        )
+        t_id = hashlib.md5(f"{sig_id}-{tkey}".encode()).hexdigest()[:16]
+        conn.execute(
+            "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (t_id, now, topic, tkey, sig_id, "x", tier, "search",
+             total, 0, engagement, 0, is_organic),
+        )
+        conn.commit()
+        if _HEALTH_AVAILABLE:
+            _log_health("x", total, "success", conn=conn)
+    finally:
+        conn.close()
+
+
+def _x_velocity_scan(topics=None, threshold=None, limit=10) -> dict:
+    """
+    Cheap-trigger / expensive-confirm X monitor with a monthly post-budget cap.
+
+    Polls counts/recent (FREE against the 15k post cap) for each candidate
+    topic's volume velocity, and only spends a ~100-post search/recent pull
+    when a topic is accelerating past `threshold`, isn't already cached, AND
+    the monthly post budget still has room. The free volume scan continues even
+    after the budget is exhausted, so the top-N are always monitored for $0.
+    """
+    if not _X_AVAILABLE:
+        return {"available": False}
+    # Trigger default lowered 40 → 25 (2026-06-12): with only ~7% of the monthly
+    # post budget being spent, the scan was too conservative — the hard budget
+    # cap below remains the real spend guard.
+    threshold = float(threshold if threshold is not None
+                      else os.getenv("X_VELOCITY_TRIGGER", "25"))
+    topics = topics or _x_candidate_topics(limit if limit != 10 else None)
+    spent = _x_posts_spent_this_month()
+    pulls_today = _x_pulls_today()
+    # Per-scan deep-pull cap. Runs every 6h, so 1 pull/scan = 100 posts/6h =
+    # 400 posts/day = ~12,400/mo — matching the planned budget under the 15k cap.
+    per_scan_cap = int(os.getenv("X_PULLS_PER_SCAN", "1"))
+    # Pace the free volume polls — hitting counts/recent for many topics
+    # back-to-back rate-limits after ~5 and silently shrinks the scan.
+    pace_s = float(os.getenv("X_SCAN_PACE_S", "2.5"))
+
+    # ── Phase 1: FREE volume/velocity poll for every candidate (counts/recent
+    # does NOT draw down the 15k post cap) ──
+    scanned = []
+    for i, t in enumerate(topics):
+        if i and pace_s > 0:
+            time.sleep(pace_s)
+        vol = xsig.collect_x_volume(t)
+        if not vol:
+            continue
+        scanned.append({"topic": t, "velocity": vol.get("velocity", 0) or 0,
+                        "total": vol.get("total", 0)})
+
+    # ── Phase 2: spend the limited deep pulls (~100 posts each) on the TOP
+    # trending movers — ranked by velocity desc so the per-scan/day/month budget
+    # always goes to the highest-accelerating topics first ──
+    movers = sorted([e for e in scanned if e["velocity"] >= threshold],
+                    key=lambda e: e["velocity"], reverse=True)
+    triggered, pulls, budget_skips = len(movers), 0, 0
+    for entry in movers:
+        t = entry["topic"]
+        cache_key = f"signal-x:{(t or '').strip().lower()}"
+        cached = _cache.get(cache_key)
+        if cached is not None:
+            entry["role"] = cached.get("x_role"); entry["pulled"] = False
+            entry["cached"] = True
+            continue
+        if (pulls >= per_scan_cap
+                or spent + _X_POSTS_PER_PULL > _X_MONTHLY_POST_BUDGET
+                or pulls_today + pulls >= _X_DAILY_PULL_CAP):
+            entry["budget_skipped"] = True; budget_skips += 1
+            continue
+        res = xsig.build_x_gradient_contribution(t)  # spends ~100 posts
+        if isinstance(res, dict) and res.get("available"):
+            _cache.set(cache_key, res, CACHE_TTL_XSIGNAL)
+            spent += _X_POSTS_PER_PULL
+            _x_record_posts(_X_POSTS_PER_PULL)
+            _x_record_pull()
+            entry["role"] = res.get("x_role"); entry["pulled"] = True; pulls += 1
+            # Write X into the TRENDS FEED so it contributes to this topic's
+            # gradient like any other platform.
+            try:
+                _x_write_feed_signal(t, res)
+            except Exception as _xfe:
+                print(f"[x-scan] feed write error '{t}': {_xfe}")
+    print(f"[x-scan] scanned={len(scanned)} triggered={triggered} pulls={pulls} "
+          f"per_scan_cap={per_scan_cap} budget_skips={budget_skips} "
+          f"spent_month={spent}/{_X_MONTHLY_POST_BUDGET}")
+    return {"available": True, "scanned": len(scanned), "triggered": triggered,
+            "search_pulls_spent": pulls, "budget_skipped": budget_skips,
+            "per_scan_cap": per_scan_cap,
+            "posts_spent_month": spent, "monthly_budget": _X_MONTHLY_POST_BUDGET,
+            "threshold": threshold, "results": scanned}
+
+
+@app.get("/explainer/{topic_key}")
+def topic_explainer(topic_key: str, topic: str = ""):
+    """Evergreen plain-English explainer for a topic (what it is + why it
+    matters), generated once via Perplexity and PERSISTED + in-memory cached so
+    it's reused for all users at ~zero cost. Returns {short, full}.
+
+    Connection-safe: in-memory cache avoids the DB on repeat calls (a 20-card
+    feed previously opened ~40 connections and exhausted the pool); the table is
+    created once at startup, not per call; connections use try/finally."""
+    cache_key = f"explainer:{topic_key}"
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # ── DB read (single pooled connection, always returned) ──
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        row = conn.execute(
+            "SELECT short, full_text FROM topic_explainers WHERE topic_key = ?", (topic_key,)
+        ).fetchone()
+        if row and row["short"]:
+            out = {"available": True, "short": row["short"], "full": row["full_text"] or "", "cached": True}
+            _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
+            return out
+    except Exception as e:
+        print(f"[explainer] read error: {e}")
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+    if not _AI_GRADE_AVAILABLE:
+        return {"available": False, "reason": "explainer unavailable"}
+    name = (topic or topic_key.replace("_", " ")).strip()
+    ex = ai_grade.explain_topic(name)   # no DB connection held during this call
+    if ex.get("available") and ex.get("short"):
+        conn = None
+        try:
+            conn = get_db(DB_PATH)
+            conn.execute(
+                "INSERT OR IGNORE INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
+                "VALUES (?,?,?,?,?)",
+                (topic_key, name, ex["short"], ex.get("full", ""),
+                 datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[explainer] persist error: {e}")
+        finally:
+            if conn is not None:
+                try: conn.close()
+                except Exception: pass
+        _cache.set(cache_key, ex, CACHE_TTL_XSIGNAL)
+    return ex
+
+
+def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:
+    """Generate + persist explainers for the highest-detection topics that don't
+    have one yet. Runs each cycle so new topics get explained automatically as
+    they appear in the scored list. Paced to respect Perplexity rate limits."""
+    if not _AI_GRADE_AVAILABLE:
+        return 0
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("""CREATE TABLE IF NOT EXISTS topic_explainers (
+            topic_key TEXT PRIMARY KEY, topic_display TEXT,
+            short TEXT, full_text TEXT, created_at TEXT)""")
+        conn.commit()
+        rows = conn.execute("""
+            SELECT v.topic_key, v.topic_display FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
+              ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            LEFT JOIN topic_explainers e ON v.topic_key = e.topic_key
+            WHERE e.topic_key IS NULL AND v.topic_display IS NOT NULL
+            ORDER BY v.detection_score DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"[explainer] backfill query error: {e}")
+        return 0
+
+    done = 0
+    for r in rows:
+        name = (r["topic_display"] or r["topic_key"].replace("_", " ")).strip()
+        try:
+            ex = ai_grade.explain_topic(name)
+            if ex.get("available") and ex.get("short"):
+                c = get_db(DB_PATH)
+                c.execute(
+                    "INSERT OR IGNORE INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
+                    "VALUES (?,?,?,?,?)",
+                    (r["topic_key"], name, ex["short"], ex.get("full", ""),
+                     datetime.now(timezone.utc).isoformat()),
+                )
+                c.commit()
+                c.close()
+                done += 1
+        except Exception as e:
+            print(f"[explainer] backfill error for '{name}': {e}")
+        time.sleep(pace)
+    if done:
+        print(f"[explainer] backfilled {done} explainers")
+    return done
+
+
+@app.post("/explainer/backfill", dependencies=[Depends(_require_internal)])
+def explainer_backfill(payload: dict = Body(default={})):
+    """Pre-generate explainers for top topics missing one (background)."""
+    if not _AI_GRADE_AVAILABLE:
+        return {"status": "unavailable"}
+    limit = int(payload.get("limit", 100))
+
+    def _job():
+        try:
+            n = _backfill_explainers(limit=limit)
+            print(f"[explainer] manual backfill complete: {n}")
+        except Exception as exc:
+            print(f"[explainer] backfill job error: {exc}")
+
+    import threading
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started", "limit": limit}
+
+
+@app.post("/grade", dependencies=[Depends(_require_internal)])
+def grade_topic_endpoint(payload: dict = Body(...)):
+    """AI Grade — research a topic on the open web (Perplexity) and synthesize a
+    PROPOSED Gradient Score with reasoning + citations (Claude). For topics not
+    in our data. Token metering is handled by the Django proxy."""
+    if not _AI_GRADE_AVAILABLE:
+        return {"available": False, "reason": "AI grade module unavailable"}
+    topic = (str(payload.get("topic") or "")).strip()
+    if not topic:
+        raise HTTPException(400, "topic is required")
+    cache_key = f"grade:{topic.lower()}"
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        return cached
+    result = ai_grade.grade_topic(topic)
+    # If the topic is a COMPANY, also attach the full Market Signal — the SAME
+    # market data + score the Market section produces — so the market read is
+    # consistent across Grade and Market. The AI estimate above stays the
+    # ATTENTION read; this is the MARKET read, clearly distinct.
+    if _RISK_AVAILABLE and isinstance(result, dict):
+        try:
+            tkr, disp = risk.resolve_ticker(topic)
+            if tkr:
+                ms = risk.market_signal_for_company(tkr, disp or topic, DB_PATH)
+                if ms and ms.get("available"):
+                    result["market_signal"] = ms
+        except Exception as _mse:
+            print(f"[grade] market signal attach error: {_mse}")
+    # Only cache a COMPLETE grade (research + proposed score). A research-only
+    # result (e.g. before the synthesis key is set) must not be cached, or it
+    # would serve the incomplete version for the whole TTL.
+    if isinstance(result, dict) and result.get("available") and result.get("proposed"):
+        _cache.set(cache_key, result, CACHE_TTL_XSIGNAL)  # 12h — research is stable
+        _record_grade_cost(topic, result.get("cost") or {})
+    return result
+
+
+def _record_grade_cost(topic: str, cost: dict) -> None:
+    """Persist per-provider AI grade cost for Anthropic-vs-Perplexity monitoring."""
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ai_grade_costs (
+                id TEXT PRIMARY KEY, topic TEXT,
+                perplexity_cost REAL, anthropic_cost REAL, total_cost REAL,
+                created_at TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT OR IGNORE INTO ai_grade_costs VALUES (?,?,?,?,?,?)",
+            (str(uuid.uuid4())[:24], topic,
+             float(cost.get("perplexity", 0) or 0), float(cost.get("anthropic", 0) or 0),
+             float(cost.get("total", 0) or 0), datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[grade] cost record error: {e}")
+
+
+@app.get("/grade/costs")
+def grade_costs():
+    """Cumulative AI grade cost by provider — to compare Anthropic vs Perplexity
+    and decide whether both are worth keeping."""
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ai_grade_costs (
+                id TEXT PRIMARY KEY, topic TEXT,
+                perplexity_cost REAL, anthropic_cost REAL, total_cost REAL,
+                created_at TEXT
+            )
+        """)
+        conn.commit()
+        row = conn.execute("""
+            SELECT COUNT(*) AS grades,
+                   COALESCE(SUM(perplexity_cost),0) AS perplexity,
+                   COALESCE(SUM(anthropic_cost),0)  AS anthropic,
+                   COALESCE(SUM(total_cost),0)      AS total
+            FROM ai_grade_costs
+        """).fetchone()
+        conn.close()
+        n = row["grades"] or 0
+        pplx, anth, total = row["perplexity"], row["anthropic"], row["total"]
+        return {
+            "grades": n,
+            "perplexity_total": round(pplx, 4),
+            "anthropic_total":  round(anth, 4),
+            "total":            round(total, 4),
+            "avg_per_grade":    round(total / n, 5) if n else 0,
+            "perplexity_share": round(pplx / total * 100, 1) if total else 0,
+            "anthropic_share":  round(anth / total * 100, 1) if total else 0,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/signal-x/scan", dependencies=[Depends(_require_internal)])
+def signal_x_scan(payload: dict = Body(default={})):
+    """Run the X velocity-trigger scan. Volume checks are free vs the post cap;
+    a full author pull is spent only on topics accelerating past the threshold."""
+    if not _X_AVAILABLE:
+        return {"available": False, "reason": "X module unavailable"}
+    return _x_velocity_scan(
+        topics=payload.get("topics"),
+        threshold=payload.get("velocity_threshold"),
+        limit=int(payload.get("limit", 10)),
+    )
+
+
+@app.post("/query", dependencies=[Depends(_require_internal)])
+def query_topic(payload: dict = Body(...)):
+    """
+    On-demand: collect signals for an arbitrary topic and score it
+    (Enterprise direct query). Persists the result so it then appears in /scores.
+    """
+    topic = (str(payload.get("topic") or "")).strip()
+    if not topic:
+        raise HTTPException(400, "topic is required")
+    tkey = _topic_key(topic)
+
+    conn = get_db(DB_PATH)
+    collected = collect_for_term(conn, topic)
+    signals = detector._get_topic_signals(tkey, hours=72)
+    result = detector.score_topic(tkey, signals)
+    if result is None:
+        conn.close()
+        return {
+            "found": False, "topic": topic, "topic_key": tkey,
+            "signals_collected": collected,
+            "detail": "Not enough signal to score this topic yet. Try a broader or more active term.",
+        }
+    if _CAL_AVAILABLE:
+        try:
+            result = apply_calibration(result, db_path=DB_PATH)
+        except Exception:
+            pass
+    try:
+        detector._update_topic_lifecycle(conn, result)
+    except Exception:
+        pass
+    persist_velocity_score(conn, result)
+    row = conn.execute(
+        "SELECT * FROM velocity_scores WHERE topic_key=? ORDER BY scored_at DESC LIMIT 1",
+        (tkey,),
+    ).fetchone()
+    conn.close()
+    _cache.invalidate()
+    formatted = _format_score_rows([row])
+    res = formatted["results"][0] if formatted.get("results") else dict(row)
+    return {"found": True, "topic": topic, "topic_key": tkey, "signals_collected": collected, "result": res}
+
+
 @app.get("/scores")
 def get_all_scores(
     min_score: float = Query(0.0),
@@ -2374,25 +5651,208 @@ def get_all_scores(
     conn = get_db(DB_PATH)
     stage_filter = "" if stage == "all" else f"AND v.signal_stage = '{stage.upper()}'"
 
+    # Over-fetch candidates: the noise filter in _format_score_rows drops
+    # single-word/bigram garbage (e.g. "natural", "hermesplugin") AFTER the
+    # SQL window. If we only pulled `limit` rows and they were all noise, the
+    # served feed would be empty even though plenty of meaningful topics exist
+    # just below them. Pull a larger candidate window, filter, then truncate.
+    # Cap default raised 200 → 600 (2026-06-12, matches the precompute top-N):
+    # with GitHub emitting ~6k signals/cycle the top-200-by-overall window was
+    # 100% tech — cross-domain topics (e.g. world_cup during FIFA 2026) were
+    # scored but never entered the serve window.
+    candidate_cap = max(limit, min(limit * 8, int(os.getenv("SCORES_CANDIDATE_CAP", "600"))))
+    # Mentions floor: topic extraction emits up to 12 candidate phrases per post,
+    # so blog/GitHub text fragments into thousands of ~3-mention micro-topics.
+    # Real trends carry far more volume (live: 30–97 mentions vs 3–4 for noise),
+    # so a small floor cleanly removes the long-tail fragments at the SQL level
+    # (also shrinks the candidate set → faster). Configurable / disablable via env.
+    mentions_floor = int(os.getenv("MENTIONS_FLOOR", "5"))
     rows = conn.execute(f"""
-        SELECT v.* FROM velocity_scores v
+        SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
+               COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
+        FROM velocity_scores v
         INNER JOIN (
             SELECT topic_key, MAX(scored_at) as max_at
             FROM velocity_scores GROUP BY topic_key
         ) latest ON v.topic_key = latest.topic_key
             AND v.scored_at = latest.max_at
+        INNER JOIN (
+            SELECT topic_key, MIN(scored_at) as first_at
+            FROM velocity_scores GROUP BY topic_key
+        ) fs ON v.topic_key = fs.topic_key
+        LEFT JOIN topic_lifecycle lc ON v.topic_key = lc.topic_key
         WHERE v.overall_score >= ?
+          AND COALESCE(v.total_mentions, 0) >= ?
         {stage_filter}
-        ORDER BY v.{sort_col} DESC
+        ORDER BY v.{sort_col} DESC, v.total_mentions DESC, v.scored_at DESC
         LIMIT ?
-    """, (min_score, limit)).fetchall()
+    """, (min_score, mentions_floor, candidate_cap)).fetchall()
     conn.close()
     result = _format_score_rows(rows)
+    # Truncate the noise-filtered, calibrated set down to the requested limit.
+    if len(result.get("results", [])) > limit:
+        result["results"] = result["results"][:limit]
+        result["count"] = len(result["results"])
     # Log each returned topic as a query event for the N component
     for item in result.get("results", []):
         if item.get("topic_key"):
             _log_topic_query(item["topic_key"], "/scores")
     _cache.set(cache_key, result, CACHE_TTL_SCORES)
+    return result
+
+
+@app.get("/history")
+def get_pull_history(
+    topic_key: str = Query(None),
+    feed: str = Query("attention", enum=["attention", "risk"]),
+    days: int = Query(365, ge=1, le=400),
+    limit: int = Query(400, ge=1, le=2000),
+):
+    """12-month pull history (daily score snapshots). Pass a topic_key for one
+    topic's time series, or omit it for the most recent rows across the feed."""
+    conn = get_db(DB_PATH)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    cols = ("snapshot_date, feed, topic_key, topic_display, detection_score, "
+            "confidence_score, overall_score, signal_stage, total_signals, scored_at")
+    try:
+        if topic_key:
+            rows = conn.execute(
+                f"SELECT {cols} FROM pull_history WHERE topic_key=? AND feed=? "
+                f"AND snapshot_date>=? ORDER BY snapshot_date DESC LIMIT ?",
+                (topic_key, feed, cutoff, limit)).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT {cols} FROM pull_history WHERE feed=? AND snapshot_date>=? "
+                f"ORDER BY snapshot_date DESC, overall_score DESC LIMIT ?",
+                (feed, cutoff, limit)).fetchall()
+    except Exception as e:
+        conn.close()
+        return {"count": 0, "results": [], "error": str(e)}
+    conn.close()
+    return {"count": len(rows), "results": [dict(r) for r in rows]}
+
+
+@app.get("/health/collectors")
+def get_collector_health():
+    """Collector-health report + a single trust gate the dashboard can use for
+    an honest 'LIVE DATA' badge. Surfaces half-blind collection before it
+    reaches a scored card."""
+    if not _HEALTH_AVAILABLE:
+        return {"available": False, "trust": True,
+                "reason": "health monitor not loaded"}
+    try:
+        report = _health.get_health_report(DB_PATH)
+        trust = _health.should_trust_scores(DB_PATH)
+        return {"available": True, **report, "trust": trust["trust"],
+                "trust_reason": trust["reason"]}
+    except Exception as e:
+        return {"available": False, "error": str(e), "trust": True}
+
+
+@app.get("/usage", dependencies=[Depends(_require_internal)])
+def api_usage_report():
+    """INTERNAL / founder-only: per-source external-API call counts (today / 7d /
+    30d / all-time) for cost + financial-viability monitoring. Gated by
+    X-Internal-Key — never exposed to app users."""
+    if not _HEALTH_AVAILABLE:
+        return {"available": False}
+    try:
+        return {"available": True, **_health.get_api_usage(DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+# ── Signal-table retention (added 2026-06-12, Heroku 1GB plan alert) ─────
+# raw_signals + topic_signals were UNBOUNDED (every other table had pruning).
+# Scoring reads only the last 72h of signals, so anything older is dead weight
+# except author_history (first-timer memory — separate table, untouched).
+
+def _prune_signal_tables(days: int = None) -> dict:
+    """DELETE raw_signals/topic_signals older than `days` (floor 4 to protect
+    the 72h scoring window) and topic_queries older than 45d (N uses 30d).
+    Returns per-table deleted row counts."""
+    days = max(4, int(days or os.getenv("SIGNAL_RETENTION_DAYS", "7")))
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    q_cutoff = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+    out = {"retention_days": days}
+    conn = get_db(DB_PATH)
+    try:
+        for table, col, cut in (("topic_signals", "extracted_at", cutoff),
+                                ("raw_signals", "collected_at", cutoff),
+                                ("topic_queries", "queried_at", q_cutoff)):
+            try:
+                cur = conn.execute(f"DELETE FROM {table} WHERE {col} < ?", (cut,))
+                out[table] = cur.rowcount
+            except Exception as e:
+                out[table] = f"error: {e}"
+        conn.commit()
+    finally:
+        conn.close()
+    print(f"[retention] signals pruned: {out}")
+    return out
+
+
+@app.get("/maint/db", dependencies=[Depends(_require_internal)])
+def maint_db_size():
+    """INTERNAL: per-table disk usage — shows what is eating the Postgres plan."""
+    if not os.getenv("DATABASE_URL"):
+        return {"available": False, "reason": "not running on Postgres"}
+    conn = get_db(DB_PATH)
+    try:
+        rows = conn.execute("""
+            SELECT c.relname AS table_name,
+                   pg_total_relation_size(c.oid) AS bytes
+            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
+            ORDER BY pg_total_relation_size(c.oid) DESC
+        """).fetchall()
+        db = conn.execute(
+            "SELECT pg_database_size(current_database()) AS b").fetchone()
+        return {"available": True,
+                "database_mb": round((db["b"] or 0) / 1048576.0, 1),
+                "tables": [{"table": r["table_name"],
+                            "mb": round((r["bytes"] or 0) / 1048576.0, 1)}
+                           for r in rows[:20]]}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
+@app.post("/maint/prune", dependencies=[Depends(_require_internal)])
+def maint_prune(days: int = Query(None, ge=4), vacuum: int = Query(0),
+                vel_days: int = Query(None, ge=3)):
+    """INTERNAL: prune the high-volume tables. Pass vacuum=1 to also
+    VACUUM FULL them (Postgres only) — DELETE alone frees space for reuse but
+    Heroku measures file size, which only VACUUM FULL shrinks. VACUUM briefly
+    locks each table; run during a quiet window.
+
+    velocity_scores (598MB at the 1GB alert) keeps per-cycle rows: the durable
+    12-month record lives in pull_history (daily snapshots), the app's
+    score-history view shows the last 30 CYCLES (~15h), and momentum reads
+    recent cycles only — so 14d of per-cycle detail is ample."""
+    result = {"pruned": _prune_signal_tables(days)}
+    try:
+        _vd = int(vel_days or os.getenv("VELOCITY_KEEP_DAYS", "90"))
+        result["velocity_scores"] = prune_velocity_scores(DB_PATH, days=_vd)
+    except Exception as e:
+        result["velocity_scores"] = f"error: {e}"
+    if vacuum and os.getenv("DATABASE_URL"):
+        try:
+            import psycopg2
+            vconn = psycopg2.connect(os.getenv("DATABASE_URL"))
+            vconn.autocommit = True  # VACUUM cannot run inside a transaction
+            vcur = vconn.cursor()
+            for table in ("velocity_scores", "topic_signals", "raw_signals",
+                          "topic_queries", "anomaly_log"):
+                try:
+                    vcur.execute(f"VACUUM FULL {table}")
+                    result[f"vacuum_{table}"] = "ok"
+                except Exception as ve:
+                    result[f"vacuum_{table}"] = f"error: {ve}"
+            vconn.close()
+        except Exception as e:
+            result["vacuum"] = f"error: {e}"
     return result
 
 
@@ -2445,6 +5905,7 @@ def get_topic_detail(topic_key: str):
     result = {
         "topic":        s["topic_display"],
         "topic_key":    topic_key,
+        "category":     _topic_category(s["topic_display"]),
         "scored_at":    s["scored_at"],
 
         # ── THE DUAL SCORE ──────────────────────────────────────
@@ -2459,11 +5920,12 @@ def get_topic_detail(topic_key: str):
             "confirmed_trend": bool(lc_dict.get("confirmed_trend")),
         },
 
-        # ── SEVEN COMPONENTS (G·I·M·D·C·P·N) ───────────────────
+        # ── SIX EXTERNAL COMPONENTS (G·I·M·D·C·P) — weights renormalized to 100%.
+        # N (internal demand) is shown below but is NOT part of the composite.
         "components": {
             "G_gradient_strength": {
                 "score":  s["gradient_strength"],
-                "weight_overall": "22%", "weight_detect": "33%", "weight_conf": "11%",
+                "weight_overall": "24%", "weight_detect": "38%", "weight_conf": "12%",
                 "raw_ratio": s.get("gradient_ratio"),
                 "niche_mentions": s.get("niche_mentions"),
                 "mainstream_mentions": s.get("mainstream_mentions"),
@@ -2471,12 +5933,12 @@ def get_topic_detail(topic_key: str):
             },
             "I_inertia": {
                 "score":  s["inertia_score"],
-                "weight_overall": "20%", "weight_detect": "16%", "weight_conf": "25%",
+                "weight_overall": "22%", "weight_detect": "18%", "weight_conf": "28%",
                 "plain_english": _explain_i(s["inertia_score"]),
             },
             "M_platform_diversity": {
                 "score":    s["platform_diversity"],
-                "weight_overall": "15%", "weight_detect": "9%", "weight_conf": "20%",
+                "weight_overall": "17%", "weight_detect": "10%", "weight_conf": "22%",
                 "platforms": s.get("platforms_active", []),
                 "plain_english": _explain_m(
                     s["platform_diversity"],
@@ -2485,7 +5947,7 @@ def get_topic_detail(topic_key: str):
             },
             "D_dark_matter": {
                 "score":              s["dark_matter_score"],
-                "weight_overall": "12%", "weight_detect": "19%", "weight_conf": "4%",
+                "weight_overall": "13%", "weight_detect": "22%", "weight_conf": "4%",
                 "first_timer_ratio":  s.get("first_timer_ratio"),
                 "asymmetry_detected": bool(s.get("engagement_asymmetry")),
                 "plain_english": _explain_d(
@@ -2496,12 +5958,12 @@ def get_topic_detail(topic_key: str):
             },
             "C_confidence_decay": {
                 "score":  s["confidence_decay"],
-                "weight_overall": "7%", "weight_detect": "5%", "weight_conf": "6%",
+                "weight_overall": "8%", "weight_detect": "6%", "weight_conf": "7%",
                 "plain_english": _explain_c(s["confidence_decay"]),
             },
             "P_persistence": {
                 "score":   p,
-                "weight_overall": "14%", "weight_detect": "6%", "weight_conf": "24%",
+                "weight_overall": "16%", "weight_detect": "7%", "weight_conf": "27%",
                 "total_cycles":    lc_dict.get("total_scoring_cycles", 0),
                 "current_streak":  lc_dict.get("current_streak_cycles", 0),
                 "longest_streak":  lc_dict.get("longest_streak_cycles", 0),
@@ -2519,7 +5981,11 @@ def get_topic_detail(topic_key: str):
             },
             "N_nowtrendin": {
                 "score":   n,
-                "weight_overall": "10%", "weight_detect": "12%", "weight_conf": "10%",
+                # Displayed-only signal — NOT part of the Gradient composite (kept
+                # external-only to preserve objectivity / avoid a demand feedback loop).
+                "weight_overall": "—", "weight_detect": "—", "weight_conf": "—",
+                "in_composite": False,
+                "label": "Community demand (separate signal)",
                 "total_queries_30d": s.get("nowtrendin_queries_30d", 0),
                 "queries_24h":       s.get("nowtrendin_queries_24h", 0),
                 "daily_rate_7d":     s.get("nowtrendin_daily_rate", 0),
@@ -2560,8 +6026,67 @@ def get_topic_detail(topic_key: str):
         # ── SCORE HISTORY ────────────────────────────────────────
         "score_history": [dict(h) for h in history],
     }
+
+    # ── Separate "Now Trending Gradient Score" (demand-inclusive what-if) ──
+    # The default dual score above stays N-free; this folds N in as an extra
+    # factor. Only the resulting numbers are exposed (N weighting stays internal).
+    _ntd, _ntc, _ndd = _now_trending_gradient(
+        s.get("detection_score"), s.get("confidence_score"), n, s.get("total_mentions"))
+    if _ntd is not None:
+        result["velocity_scores"]["nowtrending_gradient_detection"]  = _ntd
+        result["velocity_scores"]["nowtrending_gradient_confidence"] = _ntc
+        result["velocity_scores"]["nowtrending_gradient_demand_driven"] = _ndd
+
+    # ── Trade-secret hygiene: never expose the component weighting or the
+    # calibration false-positive rates over the public API. The app renders
+    # component SCORES, not weights, so dropping these is UI-safe. ──
+    for _comp in result.get("components", {}).values():
+        if isinstance(_comp, dict):
+            for _wk in ("weight_overall", "weight_detect", "weight_conf"):
+                _comp.pop(_wk, None)
+    _heis = result.get("heisenberg")
+    if isinstance(_heis, dict):
+        _heis.pop("false_positive_detect", None)
+        _heis.pop("false_positive_confirm", None)
+
     _cache.set(cache_key, result, CACHE_TTL_DETAIL)
     return result
+
+
+@app.get("/scores/{topic_key}/score-history")
+def get_topic_score_history(topic_key: str, limit: int = 30):
+    """
+    Per-collection-run scoring events for a topic (newest first).
+    Each row is a real scoring event from velocity_scores.
+    """
+    conn = get_db(DB_PATH)
+    # Select full rows so the SAME serve-time calibration applied to the headline
+    # score can be applied to each historical row — otherwise the history shows
+    # raw pre-calibration values (e.g. DET 10) that contradict the headline (43).
+    rows = conn.execute(
+        """
+        SELECT * FROM velocity_scores
+        WHERE topic_key = ?
+        ORDER BY scored_at DESC
+        LIMIT ?
+        """,
+        (topic_key, limit),
+    ).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        s = _parse_json_fields(dict(r))
+        s = _calibrate_score_fields(s)   # same calibration as /scores
+        det = round(s.get("detection_score") or 0)
+        conf = round(s.get("confidence_score") or 0)
+        out.append({
+            "scored_at": s.get("scored_at"),
+            "detection": det,
+            "confidence": conf,
+            "overall": round(s.get("overall_score") or 0),
+            "gap": abs(det - conf),
+        })
+    return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True}
 
 
 @app.get("/scores/{topic_key}/history")
@@ -2669,12 +6194,13 @@ def get_topic_history(topic_key: str):
         "SELECT * FROM topic_lifecycle WHERE topic_key = ?", (topic_key,)
     ).fetchone()
 
-    # Get all scoring cycles (newest first)
+    # Get all scoring cycles (newest first) — include all fields needed for calibration
     history = conn.execute("""
         SELECT scored_at, overall_score, detection_score, confidence_score,
                persistence_score, gradient_strength, inertia_score,
                platform_diversity, dark_matter_score, confidence_decay,
-               heisenberg_gap, signal_stage, is_gravitational_anomaly
+               heisenberg_gap, signal_stage, is_gravitational_anomaly,
+               topic_key, topic_display, total_mentions, platforms_active
         FROM velocity_scores
         WHERE topic_key = ?
         ORDER BY scored_at DESC
@@ -2693,12 +6219,73 @@ def get_topic_history(topic_key: str):
     if not history and not lc:
         raise HTTPException(404, f"No history found for topic: {topic_key}")
 
+    # Apply the same calibration pipeline used by /scores so history scores
+    # match what the user sees on the main dashboard (raw DB values differ
+    # from served values because calibration is applied at serve time).
+    def _calibrate_history_row(h: dict) -> dict:
+        try:
+            # Parse platforms_active for signal count modifier
+            pa = h.get("platforms_active")
+            if isinstance(pa, str):
+                try:
+                    h["platforms_active"] = json.loads(pa or "[]")
+                except Exception:
+                    h["platforms_active"] = []
+
+            # 1. Maturity-aware score multiplier
+            if _CAL_AVAILABLE:
+                try:
+                    h = apply_calibration(h)
+                except Exception:
+                    pass
+
+            # 2. AI tier-aware score overrides
+            if _AI_INTEL_AVAILABLE:
+                try:
+                    if not h.get("times_scored"):
+                        cal = h.get("calibration", {})
+                        if isinstance(cal, dict):
+                            h["times_scored"] = cal.get("times_scored", 0) or 0
+                    if not h.get("platform_count"):
+                        plat = h.get("platforms_active", [])
+                        h["platform_count"] = len(plat) if isinstance(plat, list) else 1
+                    h = _apply_ai_intelligence(h)
+                except Exception:
+                    pass
+
+            # 3. AI minimum score floor
+            if _CORRECTIONS_AVAILABLE:
+                try:
+                    new_det, new_conf, floored = apply_ai_floor(
+                        h.get("topic_display", ""),
+                        h.get("detection_score", 0) or 0,
+                        h.get("confidence_score", 0) or 0,
+                        h.get("total_mentions", 0) or 0,
+                    )
+                    if floored:
+                        h["detection_score"]  = new_det
+                        h["confidence_score"] = new_conf
+                        h["heisenberg_gap"]   = round(new_det - new_conf, 1)
+                except Exception:
+                    pass
+
+            # Recompute gap after all adjustments
+            det  = h.get("detection_score",  0) or 0
+            conf = h.get("confidence_score", 0) or 0
+            h["heisenberg_gap"] = round(abs(det - conf), 1)
+
+        except Exception:
+            pass
+        return h
+
+    calibrated_history = [_calibrate_history_row(dict(h)) for h in history]
+
     result = {
         "topic_key":   topic_key,
         "topic":       latest["topic_display"] if latest else topic_key.replace("_", " "),
         "lifecycle":   dict(lc) if lc else None,
-        "cycle_count": len(history),
-        "history":     [dict(h) for h in history],
+        "cycle_count": len(calibrated_history),
+        "history":     calibrated_history,
     }
     _cache.set(cache_key, result, CACHE_TTL_HISTORY)
     return result
@@ -2750,8 +6337,11 @@ def get_trending(
         s["heisenberg_gap"] = round(
             (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1
         )
+        if not _is_quality_topic(s.get("topic_display", "")):
+            continue   # drop profanity / bare-generic junk
         s["gap_label"]  = _gap_label(s["heisenberg_gap"])
         s["is_anomaly"] = bool(s.get("is_gravitational_anomaly"))
+        s["category"]   = _topic_category(s.get("topic_display", ""))
         results.append(s)
 
     result = {"count": len(results), "results": results}
@@ -2767,10 +6357,24 @@ def get_trending(
 def list_topics(
     limit: int = Query(100, ge=1, le=500),
     anomalies_only: bool = Query(False),
+    category: str = Query("", description="Filter by content category, e.g. sports, technology"),
 ):
-    """List all discovered topics with their latest scores."""
+    """
+    List discovered topics with their latest scores.
+
+    Pass ?category=sports to filter to one content category. Because category
+    is classified at serve-time (not stored), filtering scans a larger
+    candidate set then returns the top `limit` of the requested category —
+    so low-scored but on-topic items (e.g. an emerging sports story) still
+    surface under their chip even when buried below tech/news in the global rank.
+    """
+    cat = category.strip().lower()
     conn = get_db(DB_PATH)
     filter_str = "AND r.is_anomaly = 1" if anomalies_only else ""
+    # When filtering by category, scan a wide candidate set before classifying
+    # so on-topic but low-scored entities (e.g. an emerging sports story buried
+    # under fragmented tech/news n-grams) still surface under their chip.
+    scan = 2000 if cat else limit
     rows = conn.execute(f"""
         SELECT r.topic_key, r.topic_display, r.current_stage,
                r.total_mentions, r.is_anomaly, r.last_seen_at,
@@ -2785,9 +6389,65 @@ def list_topics(
         WHERE 1=1 {filter_str}
         ORDER BY v.overall_score DESC NULLS LAST
         LIMIT ?
-    """, (limit,)).fetchall()
+    """, (scan,)).fetchall()
     conn.close()
-    return {"count": len(rows), "topics": [dict(r) for r in rows]}
+    topics = []
+    for r in rows:
+        d = dict(r)
+        if not _is_quality_topic(d.get("topic_display", "")):
+            continue   # drop profanity / bare-generic junk from the institutional grid
+        d["category"] = _topic_category(d.get("topic_display", ""))
+        if cat and d["category"] != cat:
+            continue
+        topics.append(d)
+        if len(topics) >= limit:
+            break
+    return {"count": len(topics), "topics": topics, "category": cat or "all"}
+
+
+@app.get("/categories")
+def list_categories():
+    """
+    Canonical content categories (Now TrendIn 1.0 taxonomy) with live topic
+    counts, for building the category chip row + customization UI. Counts are
+    over the most recently scored topics (classified at serve-time).
+    """
+    cached = _cache.get("categories")
+    if cached is not None:
+        return cached
+    from collections import Counter
+    conn = get_db(DB_PATH)
+    rows = conn.execute("""
+        SELECT r.topic_display
+        FROM topic_registry r
+        LEFT JOIN (
+            SELECT topic_key, MAX(scored_at) as max_at
+            FROM velocity_scores GROUP BY topic_key
+        ) latest ON r.topic_key = latest.topic_key
+        LEFT JOIN velocity_scores v
+            ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
+        ORDER BY v.overall_score DESC NULLS LAST
+        LIMIT 2000
+    """).fetchall()
+    conn.close()
+    counts = Counter(_topic_category(r["topic_display"]) for r in rows
+                     if _is_quality_topic(r["topic_display"]))
+    cats = []
+    try:
+        from topic_categories import CATEGORIES, CATEGORY_LABELS
+        ordered = CATEGORIES + ["news", "general"]
+        seen = set()
+        for k in ordered:
+            if k in seen:
+                continue
+            seen.add(k)
+            cats.append({"key": k, "label": CATEGORY_LABELS.get(k, k.title()),
+                         "count": counts.get(k, 0)})
+    except Exception:
+        cats = [{"key": k, "label": k.title(), "count": n} for k, n in counts.most_common()]
+    result = {"categories": cats, "total_classified": sum(counts.values())}
+    _cache.set("categories", result, CACHE_TTL_SCORES)
+    return result
 
 
 @app.get("/stats")
@@ -2832,6 +6492,7 @@ def get_stats():
         ).fetchone()["a"] or 0),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "blog_collectors_active": _BLOGS_AVAILABLE,
+        "discovery_collectors_active": _DISCOVERY_AVAILABLE,
     }
 
     # ── Per-platform breakdown ────────────────────────────────────
@@ -2872,79 +6533,153 @@ def get_stats():
 
 # ── Helper functions for API responses ────────────────────────────
 
+# Internal-demand (N) weighting for the SEPARATE "Now Trending Gradient Score".
+# TRADE SECRET — kept server-side, never serialized as a breakdown to clients.
+# The DEFAULT Detection/Confidence deliberately EXCLUDE N (external-world only,
+# no demand feedback loop). This alternate pair folds N in as an extra factor:
+#   score_with_n = score * (1 - w_N) + N * w_N
+# which is the proper renormalized blend (the base score already sums to 1.0).
+_N_DET_WEIGHT  = float(os.getenv("N_DET_WEIGHT", "0.12"))
+_N_CONF_WEIGHT = float(os.getenv("N_CONF_WEIGHT", "0.10"))
+# External-evidence count at which N earns its FULL weight. Below this, N's
+# weight scales down linearly toward 0 so a topic with little/no external
+# footprint cannot be lifted by internal demand alone (thin-data reflexivity
+# guard — a fixed % of a near-zero base would otherwise be dominated by N).
+_N_SUFFICIENCY_FULL = float(os.getenv("N_SUFFICIENCY_FULL", "30"))
+
+
+def _now_trending_gradient(detection, confidence, n_val, total_mentions=None):
+    """Demand-inclusive 'Now Trending Gradient Score'. N's weight is scaled DOWN
+    when external evidence is thin, so internal demand cannot inflate a topic with
+    little external footprint. Returns (det_with_n, conf_with_n, demand_driven) —
+    (None, None, False) on bad input. `demand_driven` flags a thin-evidence topic
+    where demand exceeds the external read (show a transparency note)."""
+    if n_val is None or detection is None or confidence is None:
+        return None, None, False
+    try:
+        n = max(0.0, min(100.0, float(n_val)))
+        det = max(0.0, min(100.0, float(detection)))
+        conf = max(0.0, min(100.0, float(confidence)))
+        # External-evidence sufficiency 0..1 (full once a topic carries enough
+        # independent external mentions; →0 for thin data).
+        suff = max(0.0, min(1.0, float(total_mentions or 0) / _N_SUFFICIENCY_FULL))
+        wd, wc = _N_DET_WEIGHT * suff, _N_CONF_WEIGHT * suff
+        demand_driven = suff < 0.5 and n > det
+        return (round(det * (1 - wd) + n * wd, 1),
+                round(conf * (1 - wc) + n * wc, 1),
+                demand_driven)
+    except Exception:
+        return None, None, False
+
+
+def _calibrate_score_fields(s: dict) -> dict:
+    """Apply the full serve-time calibration pipeline to one score row dict:
+    calibration → AI taxonomy → AI floor → 0-100 clamp. Used for both the
+    headline /scores rows and per-cycle scoring history so they stay consistent."""
+    s["heisenberg_gap"] = round(
+        (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1
+    )
+    s["gap_label"]    = _gap_label(s["heisenberg_gap"])
+    s["is_anomaly"]   = bool(s.get("is_gravitational_anomaly"))
+
+    # ── Re-apply calibration at serve time ────────────────────
+    if _CAL_AVAILABLE:
+        try:
+            if "gradient_strength_detection" not in s:
+                s["gradient_strength_detection"] = s.get("gradient_strength", 0) or 0
+            if "gradient_strength_confidence" not in s:
+                s["gradient_strength_confidence"] = s.get("gradient_strength", 0) or 0
+            if "platform_count" not in s:
+                plat_active = s.get("platforms_active", [])
+                s["platform_count"] = len(plat_active) if isinstance(plat_active, list) else 0
+            if "engagement_asymmetry_detected" not in s:
+                s["engagement_asymmetry_detected"] = bool(s.get("engagement_asymmetry", False))
+            s = apply_calibration(s, db_path=DB_PATH)
+        except Exception:
+            pass  # non-fatal
+
+    # ── AI Topic Intelligence — tier-aware taxonomy scoring ────
+    if _AI_INTEL_AVAILABLE:
+        try:
+            if not s.get("times_scored"):
+                cal = s.get("calibration", {})
+                if isinstance(cal, dict):
+                    s["times_scored"] = cal.get("times_scored", 0) or 0
+            if not s.get("platform_count"):
+                plat = s.get("platforms_active", [])
+                s["platform_count"] = len(plat) if isinstance(plat, list) else 1
+            s = _apply_ai_intelligence(s)
+        except Exception:
+            pass  # non-fatal
+
+    # ── AI score floor ────────────────────────────────────────
+    if _CORRECTIONS_AVAILABLE:
+        try:
+            total_sigs = s.get("total_mentions", 0) or 0
+            new_det, new_conf, floored = apply_ai_floor(
+                s.get("topic_display", ""),
+                s.get("detection_score",  0) or 0,
+                s.get("confidence_score", 0) or 0,
+                total_sigs,
+            )
+            if floored:
+                s["detection_score"]  = new_det
+                s["confidence_score"] = new_conf
+                s["floor_applied"]    = True
+                s["heisenberg_gap"] = round(new_det - new_conf, 1)
+        except Exception:
+            pass  # non-fatal
+
+    # Clamp 0-100 fields so calibration can't surface an impossible value.
+    for _f in ("gradient_strength", "platform_diversity", "inertia_score",
+               "dark_matter_score", "confidence_decay", "persistence_score",
+               "detection_score", "confidence_score", "overall_score"):
+        if s.get(_f) is not None:
+            try:
+                s[_f] = max(0.0, min(100.0, float(s[_f])))
+            except Exception:
+                pass
+
+    # Separate "Now Trending Gradient Score" — demand-inclusive what-if read.
+    # Computed from the FINAL (post-floor, post-clamp) Detection/Confidence so it
+    # stays consistent with the served headline scores. Only the resulting numbers
+    # are serialized — the N weighting itself is never exposed.
+    _ntd, _ntc, _ndd = _now_trending_gradient(
+        s.get("detection_score"), s.get("confidence_score"),
+        s.get("nowtrendin_score"), s.get("total_mentions"))
+    if _ntd is not None:
+        s["nowtrending_gradient_detection"]  = _ntd
+        s["nowtrending_gradient_confidence"] = _ntc
+        s["nowtrending_gradient_demand_driven"] = _ndd
+    return s
+
+
 def _format_score_rows(rows) -> dict:
     results = []
     for r in rows:
         s = dict(r)
-        s = _parse_json_fields(s)
-        s["heisenberg_gap"] = round(
-            (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1
-        )
-        s["gap_label"]    = _gap_label(s["heisenberg_gap"])
-        s["is_anomaly"]   = bool(s.get("is_gravitational_anomaly"))
-
-        # ── Re-apply calibration at serve time ────────────────────
-        # apply_calibration() adds maturity-aware fields that are not
-        # stored in velocity_scores: what_to_do_action, component_groups,
-        # calibration, gap_meaning, show_lead_time, etc.
-        # Map DB column names to what apply_calibration() expects,
-        # then merge the calibration output back into the response.
-        if _CAL_AVAILABLE:
+        # Fast path: the worker precomputes the fully-calibrated serve row into
+        # serve_payload each cycle (see _precompute_serve_payloads). Reading it
+        # back is a cheap json.loads instead of re-running the per-row
+        # calibration + AI pipeline (which made cold /scores 6–11s).
+        payload = s.get("serve_payload")
+        if payload:
             try:
-                # Field-name bridge: DB uses different names for some fields
-                if "gradient_strength_detection" not in s:
-                    s["gradient_strength_detection"] = s.get("gradient_strength", 0) or 0
-                if "gradient_strength_confidence" not in s:
-                    s["gradient_strength_confidence"] = s.get("gradient_strength", 0) or 0
-                if "platform_count" not in s:
-                    plat_active = s.get("platforms_active", [])
-                    s["platform_count"] = len(plat_active) if isinstance(plat_active, list) else 0
-                if "engagement_asymmetry_detected" not in s:
-                    s["engagement_asymmetry_detected"] = bool(s.get("engagement_asymmetry", False))
-                s = apply_calibration(s, db_path=DB_PATH)
-            except Exception as _ce:
-                pass  # non-fatal — row still serves without calibration fields
-
-        # ── AI Topic Intelligence — tier-aware taxonomy scoring ────
-        # Applies floors/boosts based on actual viral status (Tier 1–4).
-        # Also adds ai_tier, variations[], research{} fields for the UI.
-        # Applied BEFORE the AI floor fix so the floor only fires if
-        # the taxonomy engine hasn't already raised the score.
-        if _AI_INTEL_AVAILABLE:
-            try:
-                # Bridge times_scored from nested calibration if needed
-                if not s.get("times_scored"):
-                    cal = s.get("calibration", {})
-                    if isinstance(cal, dict):
-                        s["times_scored"] = cal.get("times_scored", 0) or 0
-                # Bridge platform_count
-                if not s.get("platform_count"):
-                    plat = s.get("platforms_active", [])
-                    s["platform_count"] = len(plat) if isinstance(plat, list) else 1
-                s = _apply_ai_intelligence(s)
-            except Exception as _aie:
-                pass  # non-fatal — row served without AI taxonomy fields
-
-        # ── FIX 4: AI score floor — prevents established AI topics
-        # becoming invisible after calibration discount ────────────
-        if _CORRECTIONS_AVAILABLE:
-            try:
-                total_sigs = s.get("total_mentions", 0) or 0
-                new_det, new_conf, floored = apply_ai_floor(
-                    s.get("topic_display", ""),
-                    s.get("detection_score",  0) or 0,
-                    s.get("confidence_score", 0) or 0,
-                    total_sigs,
-                )
-                if floored:
-                    s["detection_score"]  = new_det
-                    s["confidence_score"] = new_conf
-                    s["floor_applied"]    = True
-                    # Recalculate gap after floor adjustment
-                    s["heisenberg_gap"] = round(new_det - new_conf, 1)
+                p = json.loads(payload)
+                # The precomputed payload omits first_scored_at (added later for
+                # tier data-aging). Inject the true first-seen from the joined row
+                # so Consumer/Business tiers age in correctly — without it the
+                # fast path returned None and every topic looked "fresh", locking
+                # lower tiers out of all data.
+                fsa = s.get("first_scored_at")
+                if fsa:
+                    p["first_scored_at"] = fsa
+                results.append(p)
+                continue
             except Exception:
-                pass  # non-fatal
-
+                pass  # corrupt/absent → fall through to live calibration
+        s = _parse_json_fields(s)
+        s = _calibrate_score_fields(s)
         results.append(s)
 
     # ── FIX 2: Topic noise filter — remove bigram garbage before serving ─
@@ -2957,15 +6692,78 @@ def _format_score_rows(rows) -> dict:
                 topic   = s.get("topic_display", "") or s.get("topic", "")
                 sigs    = s.get("total_mentions", 0) or 0
                 sources = len(s.get("platforms_active") or []) or 1
-                if is_meaningful_topic(topic, sigs, sources):
+                if is_meaningful_topic(topic, sigs, sources) and not _is_generic_topic(topic):
                     filtered.append(s)
                 else:
-                    pass  # silently drop noise bigrams
+                    pass  # silently drop noise bigrams + generic evergreen topics
             results = filtered
         except Exception:
             pass  # non-fatal — serve unfiltered on error
 
     return {"count": len(results), "results": results}
+
+
+def _precompute_serve_payloads(top_n: int = 600) -> int:
+    """Precompute the fully-calibrated /scores row for the top `top_n` latest
+    topics and store it in velocity_scores.serve_payload as JSON.
+
+    Run once per worker cycle. The /scores serve path then reads serve_payload
+    directly (cheap json.loads) instead of recalibrating 160–200 candidate rows
+    per request, which is what made cold /scores 6–11s. Long-tail topics without
+    a payload fall back to live calibration in _format_score_rows.
+
+    First clears ALL existing payloads so none can go stale: topics that drop out
+    of the top-N (e.g. AI-taxonomy topics that rank high on display but low on raw
+    score) would otherwise keep an old cached payload forever. Cleared rows simply
+    fall back to live calibration until the next cycle refreshes them.
+    """
+    pconn = get_db(DB_PATH)
+    try:
+        pconn.execute("UPDATE velocity_scores SET serve_payload = NULL WHERE serve_payload IS NOT NULL")
+        pconn.commit()
+    finally:
+        pconn.close()
+    conn = get_db(DB_PATH)
+    try:
+        rows = conn.execute(
+            """
+            SELECT v.* FROM velocity_scores v
+            INNER JOIN (
+                SELECT topic_key, MAX(scored_at) AS m
+                FROM velocity_scores GROUP BY topic_key
+            ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            ORDER BY (CASE WHEN v.overall_score >= v.detection_score
+                           THEN v.overall_score ELSE v.detection_score END) DESC
+            LIMIT ?
+            """,
+            (top_n,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    updates = []
+    for r in rows:
+        s = _parse_json_fields(dict(r))
+        s.pop("serve_payload", None)  # don't nest the column inside its own payload
+        try:
+            s = _calibrate_score_fields(s)
+            updates.append((json.dumps(s, default=str), r["topic_key"], r["scored_at"]))
+        except Exception:
+            continue
+
+    if not updates:
+        return 0
+    w = get_db(DB_PATH)
+    try:
+        w.executemany(
+            "UPDATE velocity_scores SET serve_payload = ? WHERE topic_key = ? AND scored_at = ?",
+            updates,
+        )
+        w.commit()
+    finally:
+        w.close()
+    print(f"[precompute] serve_payload written for {len(updates)} topics")
+    return len(updates)
 
 
 def _parse_json_fields(s: dict) -> dict:
@@ -3007,12 +6805,12 @@ def _gap_interpretation(gap: float) -> str:
 
 def _explain_g(score: float) -> str:
     if score >= 80:
-        return ("Almost entirely in expert/niche communities — "
-                "mainstream has not discovered it yet. Maximum runway ahead.")
+        return ("Heavily concentrated in expert/niche communities, with limited "
+                "mainstream pickup in the sources we track so far.")
     elif score >= 55:
-        return "Primarily specialist communities with early mainstream awareness building."
+        return "Primarily specialist communities with some mainstream presence."
     else:
-        return "Spreading to mainstream. Gradient flattening — window narrowing."
+        return "Meaningful mainstream presence — niche/mainstream gradient is flattening."
 
 
 def _explain_i(score: float) -> str:
@@ -3023,7 +6821,7 @@ def _explain_i(score: float) -> str:
         return "Moderate acceleration. 1–2 windows confirmed. Building but not yet proven."
     else:
         return ("Inertia not confirmed. Could be a single-event spike. "
-                "Wait for more collection cycles before acting.")
+                "More collection cycles needed before the trend is confirmed.")
 
 
 def _explain_m(score: float, platforms: list) -> str:
@@ -3185,7 +6983,7 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["collect", "score", "full", "api"],
+        choices=["collect", "score", "full", "api", "archive", "risk", "validate", "worker"],
         default="api",
     )
     args = parser.parse_args()
@@ -3204,6 +7002,50 @@ def main():
 
     elif args.mode == "full":
         run_full_cycle()
+
+    elif args.mode == "archive":
+        run_retention()
+
+    elif args.mode == "risk":
+        if _RISK_AVAILABLE:
+            risk.run_risk_collection(DB_PATH)
+            risk.score_all_risks(DB_PATH)
+        else:
+            print("Risk module unavailable")
+
+    elif args.mode == "validate":
+        if _ACCURACY_AVAILABLE:
+            print(accuracy.validate_recent_detections(DB_PATH))
+            print(accuracy.generate_accuracy_report(DB_PATH))
+        else:
+            print("Accuracy module unavailable")
+
+    elif args.mode == "worker":
+        # Dedicated worker dyno: runs ONLY the scheduler (collect/score/scan),
+        # so the web dyno stays free to serve requests. No HTTP server here.
+        import time as _time
+        print("\nNow TrendIn — Scheduler Worker")
+        # Ensure calibration tables exist (web dyno normally seeds them, but the
+        # worker may boot first).
+        if _CAL_AVAILABLE:
+            try:
+                _init_cal_db(DB_PATH)
+                seed_known_topics(DB_PATH)
+                print("[worker] Calibration DB initialised.")
+            except Exception as _wexc:
+                print(f"[worker] calibration init error (non-fatal): {_wexc}")
+        sched = start_scheduler()
+        if sched is None:
+            print("[worker] Scheduler failed to start — exiting.")
+            return
+        print("[worker] Scheduler running. Jobs: collect+score 30m · velocities 06:00 UTC · "
+              "X scan 1am/1pm PT · retention monthly.")
+        try:
+            while True:
+                _time.sleep(3600)
+        except (KeyboardInterrupt, SystemExit):
+            print("[worker] shutting down scheduler.")
+            sched.shutdown(wait=False)
 
     elif args.mode == "api":
         port = int(os.getenv("PORT", 8000))

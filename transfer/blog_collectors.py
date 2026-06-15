@@ -52,6 +52,16 @@ INSTALL:
 
 import os, re, sys, json, math, time, uuid, hashlib, sqlite3, argparse
 import xml.etree.ElementTree as ET
+
+# Use the shared SQLite/Postgres shim so blog signals land in the SAME database
+# the scorer reads. On Heroku (DATABASE_URL set) this writes to Postgres; without
+# it, falls back to local SQLite. Critical: with raw sqlite3 the blog signals
+# went to an ephemeral local file and never reached the scored data.
+try:
+    import db_compat as _db_compat
+    _DBCOMPAT = True
+except Exception:
+    _DBCOMPAT = False
 from datetime import datetime, timezone, timedelta
 from collections import Counter, defaultdict
 from typing import Optional
@@ -133,6 +143,21 @@ NEWSLETTER_FEEDS = [
     {"name": "The Sequence",           "url": "https://thesequence.substack.com/feed",                   "tier": "expert"},
     {"name": "Ars Technica Tech",      "url": "https://feeds.arstechnica.com/arstechnica/technology-lab","tier": "mainstream"},
     {"name": "Wired AI",               "url": "https://www.wired.com/feed/tag/artificial-intelligence/rss","tier":"mainstream"},
+    # ── Sports + culture desks (added 2026-06-12) — with Reddit disabled these
+    #    are the niche-tier sensors for non-tech domains. "Tier" is per-domain:
+    #    a dedicated football/music desk is the devotee tier relative to general
+    #    news, so domain-specialist feeds are niche; broad-brand sport/culture
+    #    sections are mainstream. All free, keyless RSS. ──
+    {"name": "Guardian Football",      "url": "https://www.theguardian.com/football/rss",               "tier": "niche"},
+    {"name": "ESPN Soccer",            "url": "https://www.espn.com/espn/rss/soccer/news",              "tier": "niche"},
+    {"name": "Football365",            "url": "https://www.football365.com/feed",                       "tier": "niche"},
+    {"name": "BBC Sport Football",     "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",        "tier": "mainstream"},
+    {"name": "Sky Sports News",        "url": "https://www.skysports.com/rss/12040",                    "tier": "mainstream"},
+    {"name": "Guardian Sport",         "url": "https://www.theguardian.com/sport/rss",                  "tier": "mainstream"},
+    {"name": "Pitchfork News",         "url": "https://pitchfork.com/feed/feed-news/rss",               "tier": "niche"},
+    {"name": "Variety",                "url": "https://variety.com/feed/",                              "tier": "mainstream"},
+    {"name": "Billboard",              "url": "https://www.billboard.com/feed/",                        "tier": "mainstream"},
+    {"name": "Hollywood Reporter",     "url": "https://www.hollywoodreporter.com/feed/",                "tier": "mainstream"},
 ]
 
 GHOST_FEEDS = [
@@ -233,10 +258,18 @@ CREATE INDEX IF NOT EXISTS idx_ts_plat ON topic_signals (platform, extracted_at)
 
 
 def get_conn(path=DB_PATH):
-    """Open (or create) the shared SQLite DB with WAL mode for concurrent access."""
+    """Open the SHARED database (Postgres on Heroku via db_compat, else SQLite).
+    Routing through db_compat is what makes blog signals actually reach the
+    scored data instead of an ephemeral local SQLite file."""
+    if _DBCOMPAT:
+        c = _db_compat.connect(path)
+        try:
+            c.executescript(SCHEMA)   # CREATE TABLE IF NOT EXISTS — no-op when present
+        except Exception:
+            pass
+        return c
     c = sqlite3.connect(path, check_same_thread=False, timeout=30)
     c.row_factory = sqlite3.Row
-    # WAL mode is persistent; if the main detector already set it, this is a no-op
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("PRAGMA cache_size=-32768")
     c.execute("PRAGMA synchronous=NORMAL")
