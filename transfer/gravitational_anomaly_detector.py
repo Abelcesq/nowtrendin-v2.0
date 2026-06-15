@@ -4219,10 +4219,16 @@ def start_scheduler():
         _score_min = int(os.getenv("SCORE_INTERVAL_MIN", "30"))
         _soon = datetime.now(timezone.utc) + timedelta(seconds=20)  # fire shortly after boot
         if _w_collect:
-            _sched.add_job(_collect_phase, "interval", minutes=_collect_min,
+            # Score WITH collect (default): scoring runs only when fresh data is
+            # pulled (every COLLECT_INTERVAL_MIN, default 6h) — not on its own
+            # frequent cadence. On-demand Enterprise pulls hit /collect, which
+            # also collects+scores. Set SCORE_WITH_COLLECT=0 to collect only.
+            _score_with = os.getenv("SCORE_WITH_COLLECT", "1").lower() in ("1", "true", "yes")
+            _collect_fn = _scheduled_cycle if _score_with else _collect_phase
+            _sched.add_job(_collect_fn, "interval", minutes=_collect_min,
                            id="collect", max_instances=1, coalesce=True,
                            misfire_grace_time=600, next_run_time=_soon)
-            print(f"[scheduler] COLLECT job every {_collect_min}m")
+            print(f"[scheduler] COLLECT job every {_collect_min}m" + (" + SCORE" if _score_with else ""))
         if _w_score in ("1", "true", "yes"):
             _sched.add_job(_score_phase, "interval", minutes=_score_min,
                            id="score", max_instances=1, coalesce=True,
