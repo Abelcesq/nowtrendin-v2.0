@@ -6682,6 +6682,19 @@ def _format_score_rows(rows) -> dict:
         s = _calibrate_score_fields(s)
         results.append(s)
 
+    # Inject content category + quality filter on EVERY served row. The /scores
+    # list powers the mobile feed, so the content-category chips and the
+    # profanity/junk cleanup must apply here too (consistent with /topics).
+    cleaned = []
+    for s in results:
+        disp = s.get("topic_display") or s.get("topic") or ""
+        if not _is_quality_topic(disp):
+            continue
+        if not s.get("category"):
+            s["category"] = _topic_category(disp)
+        cleaned.append(s)
+    results = cleaned
+
     # ── FIX 2: Topic noise filter — remove bigram garbage before serving ─
     # Applied after all rows processed so calibration fields are present.
     # Stores nothing to DB — only affects what the API serves.
