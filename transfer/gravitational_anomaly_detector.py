@@ -4818,16 +4818,21 @@ def beneficiary_backtest(theme_key: str, lookback_days: int = 365,
             for kw in kws[:5]:
                 kkey = kw.lower().strip().replace(" ", "_")
                 rows = conn.execute(
-                    "SELECT scored_at, detection_score, stage FROM pull_history "
+                    "SELECT scored_at, detection_score, signal_stage FROM pull_history "
                     "WHERE topic_key = ? AND scored_at > ? "
                     "ORDER BY scored_at",
                     (kkey, cutoff)
                 ).fetchall()
                 for r in rows:
-                    d = dict(r) if hasattr(r, "keys") else {
-                        "scored_at": r[0], "detection_score": r[1], "stage": r[2]
+                    rd = dict(r) if hasattr(r, "keys") else {
+                        "scored_at": r[0], "detection_score": r[1], "signal_stage": r[2]
                     }
-                    attention_curve.append(d)
+                    # Normalize to "stage"; pull_history stores it as signal_stage.
+                    attention_curve.append({
+                        "scored_at": rd.get("scored_at"),
+                        "detection_score": rd.get("detection_score"),
+                        "stage": rd.get("signal_stage") or "",
+                    })
         except Exception as e:
             print(f"[backtest] attention curve error: {e}")
         conn.close()
