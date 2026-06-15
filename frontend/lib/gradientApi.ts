@@ -3,7 +3,7 @@
 import { Signal, Stage, BreakdownGroup, stageFromScore } from './signals';
 
 export const GRADIENT_API =
-  process.env.EXPO_PUBLIC_GRADIENT_API || 'https://nowtrendin-e62dcb9ecb69.herokuapp.com';
+  process.env.EXPO_PUBLIC_GRADIENT_API || 'https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com';
 
 function normalizeStage(raw: string | undefined): Stage {
   const s = (raw || '').toUpperCase();

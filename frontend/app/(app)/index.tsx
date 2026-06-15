@@ -136,51 +136,14 @@ export default function Dashboard() {
         />
       </View>
 
-      {/* Content-category filter (the WHAT axis — Now TrendIn 1.0 taxonomy).
-          Primary navigation for the widened topic pool: filters the list to one
-          content area. Orthogonal to the signal-STAGE tiles below (the HOW axis).
-          "All" leads; each chip shows its live count and de-emphasizes when empty. */}
-      <View style={{ height: 38 }} className="mb-3">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
-            const on = contentCat === c.key;
-            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
-            const empty = c.key !== 'all' && count === 0;
-            return (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => setContentCat(c.key)}
-                disabled={empty}
-                className="px-3.5 rounded-full flex-row items-center"
-                style={{
-                  height: 32,
-                  backgroundColor: on ? c.color : '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: on ? c.color : '#E4E7EC',
-                  opacity: empty ? 0.4 : 1,
-                }}
-              >
-                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
-                  {c.label}
-                </Text>
-                {count > 0 && (
-                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>
-                    {count}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
       {/* Enterprise: token-metered Pull Trends (renders only for enterprise tier) */}
       <PullTrendsButton />
 
-      {/* Category chips — each navigates to a focused category page.
-          "Now TrendIn" leads with brand colors; "All Signals" is the in-place
-          default. Order matches CATEGORY_DEFS so chip + tile rows stay in sync. */}
-      <View style={{ height: 40 }} className="mb-4">
+      {/* ── ROW 1: SIGNAL chips (the HOW axis — strength/stage). These navigate
+          to a focused signal page and are different IN KIND from the content
+          categories below, so they get their own labelled row. */}
+      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1.5">Signal</Text>
+      <View style={{ height: 40 }} className="mb-3">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
           {CATEGORY_DEFS.map((c) => {
             const isNT = c.key === 'nowtrendin';
@@ -206,6 +169,45 @@ export default function Dashboard() {
                 ) : (
                   <Text className="text-xs font-semibold" style={{ color: '#5B6472' }}>
                     {c.label}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ── ROW 2: CATEGORY chips (the WHAT axis — content area). Separate
+          labelled row, distinct in kind from the Signal chips above. These
+          filter the list in place; "All" leads, each shows its live count and
+          dims when empty. */}
+      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1.5">Category</Text>
+      <View style={{ height: 38 }} className="mb-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
+            const on = contentCat === c.key;
+            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
+            const empty = c.key !== 'all' && count === 0;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => setContentCat(c.key)}
+                disabled={empty}
+                className="px-3.5 rounded-full flex-row items-center"
+                style={{
+                  height: 32,
+                  backgroundColor: on ? c.color : '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: on ? c.color : '#E4E7EC',
+                  opacity: empty ? 0.4 : 1,
+                }}
+              >
+                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
+                  {c.label}
+                </Text>
+                {count > 0 && (
+                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>
+                    {count}
                   </Text>
                 )}
               </TouchableOpacity>
