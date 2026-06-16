@@ -58,6 +58,25 @@ export async function loginWithGoogle(idToken: string): Promise<User> {
 
 export function logout() { clearTokens() }
 
+// ── Watchlists — backend-synced per-user lists (same API the mobile app uses),
+// so the SAME lists appear on web, desktop, and mobile. Items hold key/display/
+// kind only; the view looks up live scores by key. ──
+export type WatchKind = 'topic' | 'market'
+export interface WatchItem { id: number; key: string; display: string; kind: WatchKind; added_at: string }
+export interface WatchlistT { id: number; name: string; created_at: string; items: WatchItem[] }
+
+export const listWatchlists = () => call('/api/watchlists/', {}, true) as Promise<WatchlistT[]>
+export const createWatchlist = (name: string) =>
+  call('/api/watchlists/', { method: 'POST', body: JSON.stringify({ name }) }, true) as Promise<WatchlistT>
+export const renameWatchlist = (id: number, name: string) =>
+  call(`/api/watchlists/${id}/`, { method: 'PATCH', body: JSON.stringify({ name }) }, true) as Promise<WatchlistT>
+export const deleteWatchlist = (id: number) =>
+  call(`/api/watchlists/${id}/`, { method: 'DELETE' }, true)
+export const addWatchItem = (id: number, item: { key: string; display?: string; kind?: WatchKind }) =>
+  call(`/api/watchlists/${id}/items/`, { method: 'POST', body: JSON.stringify(item) }, true) as Promise<WatchItem>
+export const removeWatchItem = (id: number, itemId: number) =>
+  call(`/api/watchlists/${id}/items/${itemId}/`, { method: 'DELETE' }, true)
+
 // ── Tier-gating — mirrors constants/tiers.ts so entitlements are identical
 // across platforms. The engine/backend remain the source of truth; this only
 // gates UI affordances. ──

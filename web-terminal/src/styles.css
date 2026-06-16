@@ -298,6 +298,24 @@ td.r{text-align:right}
 .footer .foot-link{color:inherit; text-decoration:none}
 .footer .foot-link:hover{color:#fff; text-decoration:underline}
 
+/* ---------- Watchlists ---------- */
+.wl-tabs{display:flex; gap:6px; padding:12px 0 0; flex-wrap:wrap}
+.wl-tab{display:flex; align-items:center; gap:6px; padding:7px 13px; border:1px solid var(--line); border-radius:8px 8px 0 0; background:var(--canvas); font-size:12.5px; font-weight:550; color:var(--text-2); cursor:pointer; border-bottom-color:transparent}
+.wl-tab .wc{font-family:var(--mono); font-size:11px; color:var(--text-3)}
+.wl-tab.on{background:var(--surface); color:var(--text); border-color:var(--line); position:relative; top:1px}
+.wl-tab.add{color:var(--det); font-weight:600}
+.wl-tab.add:hover{background:var(--det-soft)}
+.wl-del{color:var(--text-3); font-size:11px; padding:0 2px; border-radius:4px}
+.wl-del:hover{color:var(--down); background:#f4d6d6}
+.add-row{display:flex; gap:8px; padding:14px 20px; background:var(--surface); border-bottom:1px solid var(--line)}
+.add-row input{flex:1; max-width:380px; height:34px; border:1px solid var(--line); border-radius:8px; padding:0 12px; font-size:13px; font-family:var(--sans)}
+.add-row input:focus{outline:none; border-color:var(--early); box-shadow:0 0 0 3px var(--early-soft)}
+.add-row .add-btn{height:34px; padding:0 16px; border:0; border-radius:8px; background:var(--ink); color:#fff; font-weight:600; font-size:13px; cursor:pointer}
+.add-row .add-btn:hover{background:var(--ink-3)} .add-row .add-btn:disabled{opacity:.6; cursor:default}
+.rm{border:0; background:transparent; color:var(--text-3); cursor:pointer; font-size:13px; padding:3px 7px; border-radius:5px}
+.rm:hover{background:#f4d6d6; color:var(--down)}
+.center-state .big{font-size:14px; color:var(--text-2); font-weight:600}
+
 /* ---------- Methodology ---------- */
 .mth{flex:1; overflow:auto; padding:22px 24px 56px}
 .mth-lede{max-width:760px; font-size:14px; line-height:1.6; color:var(--text-2)}
