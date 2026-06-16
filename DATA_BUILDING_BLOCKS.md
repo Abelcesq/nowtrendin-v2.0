@@ -221,14 +221,18 @@ All skills point at the **v2** engine (`nowtrendin-v2-engine`).
 Each agent owns blocks, runs on a cadence, reads the listed endpoints, and raises
 a typed alert. (These are specs to build; the checks already exist as endpoints.)
 
-### A. Source Watchdog — owns **B1, B2**
+> **Status: A + B are LIVE** (`monitoring_agents.py`). Endpoints: `GET /monitor`
+> (combined), `/monitor/sources`, `/monitor/pipeline` — public, read-only, no AI.
+> Invoke via the **`/data-watchdog`** skill. C/D/E still to build.
+
+### A. Source Watchdog — owns **B1, B2** ✅ LIVE
 - **Every cycle (6h):** `GET /health/collectors`, `/usage`.
 - **Alert if:** any `critical` collector DOWN; any source DEGRADED ≥2 cycles; a
   paid source at 0 calls; freshness past SLA.
 - **Action:** name the source, the last-success age, and the likely cause
   (cron-not-fired / quota / key / datacenter-block) from the failure-mode list (§2).
 
-### B. Pipeline Integrity Monitor — owns **B3, B4, B8**
+### B. Pipeline Integrity Monitor — owns **B3, B4, B8** ✅ LIVE
 - **Each score cycle:** sample `/scores?limit=15` + `/topics?limit=200`.
 - **Alert if:** junk/common-word or duplicate keys appear; `last_score` stale >1
   cycle; `/scores` returns 0 or errors; a topic's `category`/audit fields missing.
