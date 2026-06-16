@@ -2997,6 +2997,32 @@ class GravitationalAnomalyDetector:
         conn.close()
         return [dict(r) for r in rows]
 
+    def _consolidate_window_keys(self, conn, cutoff: str) -> int:
+        """Fold morphological/entity VARIANT keys in the scoring window onto their
+        canonical key (japanese→japan, japan's→japan, gpt→chatgpt) so a trend is
+        scored ONCE. New pulls already write canonical keys; this self-heals the
+        existing pool collected before the rule existed. Bounded to distinct keys
+        active in the window. Returns the number of keys remapped."""
+        rows = conn.execute(
+            "SELECT DISTINCT topic_key FROM topic_signals WHERE extracted_at >= ?",
+            (cutoff,)).fetchall()
+        remapped = 0
+        for r in rows:
+            old = r["topic_key"]
+            if not old:
+                continue
+            # recompute the canonical key from the de-underscored surface form
+            canon = _topic_key(old.replace("_", " "))
+            if canon and canon != old:
+                conn.execute(
+                    "UPDATE topic_signals SET topic_key = ? WHERE topic_key = ? AND extracted_at >= ?",
+                    (canon, old, cutoff))
+                remapped += 1
+        if remapped:
+            conn.commit()
+            print(f"  [score] consolidated {remapped} variant topic keys → canonical")
+        return remapped
+
     def compute_gradient_strength(self, signals: list[dict]) -> tuple[float, float]:
         """
         G — Gradient Strength (30% weight)
@@ -3866,6 +3892,15 @@ class GravitationalAnomalyDetector:
             corroborate_unverified_news(conn, hours=hours)
         except Exception as _ce:
             print(f"  [score] corroboration skipped: {_ce}")
+
+        # ── Consolidate variant keys in the window BEFORE scoring ──
+        # New pulls already write canonical keys (_topic_key), but the existing
+        # 72h pool can still hold variants (japanese vs japan) collected before
+        # the rule existed. Fold them now so the dyno scores each trend ONCE.
+        try:
+            self._consolidate_window_keys(conn, cutoff)
+        except Exception as _cwe:
+            print(f"  [score] key consolidation skipped: {_cwe}")
 
         # Get unique topic keys active in this window that are actually
         # SCOREABLE. score_topic() returns None for topics with fewer than
