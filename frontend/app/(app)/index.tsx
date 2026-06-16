@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, Zap, Briefcase, Building2, Search } from 'lucide-react-native';
+import { Bell, Zap, Briefcase, Building2, Search, Printer } from 'lucide-react-native';
+import { printSignalsReport } from '../../lib/printReport';
 import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
@@ -178,7 +179,7 @@ export default function Dashboard() {
       </View>
 
       {/* Trends header (SIGNAL big tiles below) */}
-      <View className="flex-row items-center mb-3">
+      <View className="flex-row items-center justify-between mb-3">
         <View className="flex-row items-center gap-2">
           <View className="w-1 h-5 rounded-full bg-brandMaroon" />
           <Text className="text-textPrimary text-xl font-black">Trends</Text>
@@ -186,9 +187,21 @@ export default function Dashboard() {
             <Text className="text-textMuted text-[11px] font-bold">{filtered.length}</Text>
           </View>
         </View>
-        {/* The token-metered "Pull Trends" action lives in <PullTrendsButton /> above —
-            the yellow CTA that clearly states it costs 1 token. A second unlabeled
-            refetch button here was redundant and confusing, so it was removed. */}
+        {/* Print / export-to-PDF the FULL list (web only). The browser's native
+            print captures only the visible viewport because the app scrolls inside
+            an RN ScrollView; this renders the entire list as a paginating report. */}
+        {Platform.OS === 'web' && filtered.length > 0 && (
+          <TouchableOpacity
+            onPress={() => printSignalsReport(filtered, {
+              subtitle: `${filtered.length} signals · ${cfg.label} tier · ${dataWindowLabel(tier)}`,
+            })}
+            className="flex-row items-center px-3 py-1.5 rounded-full border border-border bg-surface"
+            activeOpacity={0.7}
+          >
+            <Printer size={14} color="#5B6472" />
+            <Text className="text-textSecondary text-[11px] font-bold ml-1.5">Print / PDF</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Stat tiles — 3 cols × 2 rows, each tappable → focused category page.
