@@ -6256,6 +6256,28 @@ def monitor_pipeline():
             except Exception: pass
 
 
+@app.get("/monitor/cost")
+def monitor_cost():
+    """Cost Sentinel — AI ($/mo) + X (posts/mo) budgets vs cap. (block B7)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    try:
+        return {"available": True, **_monitor.cost_sentinel()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/monitor/calibration")
+def monitor_calibration():
+    """Calibration Auditor — Accuracy Ledger honest + denominator-backed? (block B5)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    try:
+        return {"available": True, **_monitor.calibration_auditor()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 @app.get("/usage", dependencies=[Depends(_require_internal)])
 def api_usage_report():
     """INTERNAL / founder-only: per-source external-API call counts (today / 7d /

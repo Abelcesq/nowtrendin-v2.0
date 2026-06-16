@@ -194,9 +194,78 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     }
 
 
+# ── Agent D: COST SENTINEL (B7 budgets) ─────────────────────────────────────
+def cost_sentinel() -> dict:
+    """Are paid budgets within cap? AI ($/mo), X posts (/mo). (R14 dyno memory is
+    watched via Heroku metrics, not from inside the process.)"""
+    import gravitational_anomaly_detector as g
+    alerts, summary = [], {}
+    try:
+        mtd = g._ai_spend_this_month()
+        budget = g.AI_MONTHLY_BUDGET_USD
+        spent = mtd.get("total", 0.0)
+        pct = (spent / budget * 100) if budget else 0
+        summary["ai_spent_usd"] = round(spent, 4)
+        summary["ai_budget_usd"] = budget
+        summary["ai_pct"] = round(pct, 1)
+        if budget and spent >= budget:
+            alerts.append({"level": "critical", "block": "B7",
+                           "msg": f"AI budget EXHAUSTED ${spent:.2f}/${budget:.0f} — paid AI calls are being skipped"})
+        elif pct >= 80:
+            alerts.append({"level": "warn", "block": "B7",
+                           "msg": f"AI spend at {pct:.0f}% of ${budget:.0f}/mo"})
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B7", "msg": f"AI cost read failed: {e}"})
+    try:
+        xs = g._x_posts_spent_this_month()
+        xb = g._X_MONTHLY_POST_BUDGET
+        xpct = (xs / xb * 100) if xb else 0
+        summary["x_posts"] = xs
+        summary["x_budget"] = xb
+        summary["x_pct"] = round(xpct, 1)
+        if xb and xs >= xb:
+            alerts.append({"level": "critical", "block": "B7",
+                           "msg": f"X post budget EXHAUSTED {xs}/{xb}"})
+        elif xpct >= 80:
+            alerts.append({"level": "warn", "block": "B7",
+                           "msg": f"X posts at {xpct:.0f}% of {xb}/mo"})
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B7", "msg": f"X budget read failed: {e}"})
+    return {"agent": "cost_sentinel", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
+# ── Agent C: CALIBRATION AUDITOR (B5 accuracy honesty) ──────────────────────
+def calibration_auditor() -> dict:
+    """Is the Accuracy Ledger honest + denominator-backed? Flags small-sample so
+    no one publishes a hit-rate we can't defend (guardrail 5). (Backtest-before-
+    ship is a deploy gate, run separately — not a runtime poll.)"""
+    import gravitational_anomaly_detector as g
+    alerts, summary = [], {}
+    led = {}
+    try:
+        if getattr(g, "_LEDGER_PLUS_AVAILABLE", False):
+            led = g.ledger_plus.generate_honest_report(g.DB_PATH) or {}
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B5", "msg": f"ledger read failed: {e}"})
+    total = led.get("total", 0) or 0
+    pending = led.get("pending", 0) or 0
+    hit = led.get("hitRate")
+    small = bool(led.get("smallSample")) or total < 30
+    summary.update({"evaluated": total, "pending": pending,
+                    "hit_rate": hit, "small_sample": small})
+    if small:
+        alerts.append({"level": "warn", "block": "B5",
+                       "msg": f"Accuracy ledger small-sample (evaluated={total}, pending={pending}) "
+                              "— do NOT publish a hit-rate yet (guardrail 5: denominator-backed only)"})
+    return {"agent": "calibration_auditor", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
-    agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn)]
+    agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
+              cost_sentinel(), calibration_auditor()]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
