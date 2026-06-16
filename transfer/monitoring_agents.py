@@ -194,43 +194,95 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     }
 
 
-# ── Agent D: COST SENTINEL (B7 budgets) ─────────────────────────────────────
+# ── Agent D: COST SENTINEL (B7 budgets) — TOTAL cost of running Now TrendIn ──
+# LIVE-metered: AI (Perplexity+Anthropic) + Apify (platform usage, via API).
+# CONFIGURED (env, set to your actuals — not API-readable in real time):
+#   COST_HEROKU_USD          monthly Heroku dynos (engine standard-2x $50 + backend
+#                            $7 + nowtrendin-web $7 ≈ $64; terminal is Pages=$0)
+#   COST_SUBSCRIPTIONS_USD   paid data APIs (NewsAPI ×2, NewsData, Finnhub,
+#                            WhaleWisdom, Alpha Vantage, X) — set your monthly total
+#   COST_GITHUB_USD          GitHub (Pages/Actions) — $0 on public repo
+#   COST_TOTAL_MONTHLY_CAP   optional grand cap to alert on
 def cost_sentinel() -> dict:
-    """Are paid budgets within cap? AI ($/mo), X posts (/mo). (R14 dyno memory is
-    watched via Heroku metrics, not from inside the process.)"""
+    import os
+    import requests
     import gravitational_anomaly_detector as g
-    alerts, summary = [], {}
+    alerts, lines = [], []
+    total = 0.0
+
+    # 1) AI — LIVE ($/mo vs the $20 cap)
     try:
         mtd = g._ai_spend_this_month()
-        budget = g.AI_MONTHLY_BUDGET_USD
-        spent = mtd.get("total", 0.0)
-        pct = (spent / budget * 100) if budget else 0
-        summary["ai_spent_usd"] = round(spent, 4)
-        summary["ai_budget_usd"] = budget
-        summary["ai_pct"] = round(pct, 1)
-        if budget and spent >= budget:
+        ai_budget = g.AI_MONTHLY_BUDGET_USD
+        ai_spent = float(mtd.get("total", 0.0) or 0)
+        total += ai_spent
+        lines.append({"item": "AI (Perplexity+Anthropic)", "usd": round(ai_spent, 2),
+                      "budget": ai_budget, "source": "live"})
+        if ai_budget and ai_spent >= ai_budget:
             alerts.append({"level": "critical", "block": "B7",
-                           "msg": f"AI budget EXHAUSTED ${spent:.2f}/${budget:.0f} — paid AI calls are being skipped"})
-        elif pct >= 80:
+                           "msg": f"AI budget EXHAUSTED ${ai_spent:.2f}/${ai_budget:.0f} — paid AI calls skipped"})
+        elif ai_budget and ai_spent / ai_budget >= 0.8:
             alerts.append({"level": "warn", "block": "B7",
-                           "msg": f"AI spend at {pct:.0f}% of ${budget:.0f}/mo"})
+                           "msg": f"AI spend at {ai_spent / ai_budget * 100:.0f}% of ${ai_budget:.0f}/mo"})
     except Exception as e:
         alerts.append({"level": "warn", "block": "B7", "msg": f"AI cost read failed: {e}"})
+
+    # 2) Apify — LIVE (platform monthly usage vs the custom limit) via API
+    tok = os.getenv("APIFY_TOKEN")
+    if tok:
+        try:
+            r = requests.get(f"https://api.apify.com/v2/users/me/limits?token={tok}", timeout=12)
+            data = (r.json() or {}).get("data", {})
+            used = data.get("current", {}).get("monthlyUsageUsd")
+            cap = data.get("limits", {}).get("maxMonthlyUsageUsd")
+            if used is not None:
+                used = float(used); total += used
+                lines.append({"item": "Apify (Google-Trends actor)", "usd": round(used, 2),
+                              "budget": cap, "source": "live"})
+                if cap and used >= cap:
+                    alerts.append({"level": "critical", "block": "B7",
+                                   "msg": f"Apify usage EXHAUSTED ${used:.2f}/${cap:.0f} — platform will pause"})
+                elif cap and used / cap >= 0.8:
+                    alerts.append({"level": "warn", "block": "B7",
+                                   "msg": f"Apify usage at {used / cap * 100:.0f}% of ${cap:.0f}/mo"})
+        except Exception as e:
+            alerts.append({"level": "warn", "block": "B7", "msg": f"Apify billing read failed: {e}"})
+
+    # 3) Fixed infra — CONFIGURED (env, set to your actuals)
+    fixed = [
+        ("Heroku dynos", float(os.getenv("COST_HEROKU_USD", "64"))),
+        ("Data API subscriptions", float(os.getenv("COST_SUBSCRIPTIONS_USD", "0"))),
+        ("GitHub (Pages/Actions)", float(os.getenv("COST_GITHUB_USD", "0"))),
+    ]
+    for name, usd in fixed:
+        total += usd
+        lines.append({"item": name, "usd": round(usd, 2), "source": "configured"})
+
+    # 4) X posts — operational budget (posts, not $)
+    x_line = {}
     try:
-        xs = g._x_posts_spent_this_month()
-        xb = g._X_MONTHLY_POST_BUDGET
-        xpct = (xs / xb * 100) if xb else 0
-        summary["x_posts"] = xs
-        summary["x_budget"] = xb
-        summary["x_pct"] = round(xpct, 1)
+        xs = g._x_posts_spent_this_month(); xb = g._X_MONTHLY_POST_BUDGET
+        x_line = {"posts": xs, "budget": xb, "pct": round(xs / xb * 100, 1) if xb else 0}
         if xb and xs >= xb:
-            alerts.append({"level": "critical", "block": "B7",
-                           "msg": f"X post budget EXHAUSTED {xs}/{xb}"})
-        elif xpct >= 80:
-            alerts.append({"level": "warn", "block": "B7",
-                           "msg": f"X posts at {xpct:.0f}% of {xb}/mo"})
-    except Exception as e:
-        alerts.append({"level": "warn", "block": "B7", "msg": f"X budget read failed: {e}"})
+            alerts.append({"level": "critical", "block": "B7", "msg": f"X post budget EXHAUSTED {xs}/{xb}"})
+        elif xb and xs / xb >= 0.8:
+            alerts.append({"level": "warn", "block": "B7", "msg": f"X posts at {xs / xb * 100:.0f}% of {xb}/mo"})
+    except Exception:
+        pass
+
+    grand_cap = float(os.getenv("COST_TOTAL_MONTHLY_CAP", "0") or 0)
+    if grand_cap and total >= grand_cap:
+        alerts.append({"level": "critical", "block": "B7",
+                       "msg": f"TOTAL monthly cost ${total:.2f} ≥ cap ${grand_cap:.0f}"})
+
+    summary = {
+        "total_monthly_usd": round(total, 2),
+        "total_cap_usd": grand_cap or None,
+        "lines": lines,
+        "x_posts": x_line,
+        "note": "AI + Apify are live-metered; Heroku/subscriptions/GitHub are env-configured "
+                "(set COST_HEROKU_USD / COST_SUBSCRIPTIONS_USD / COST_GITHUB_USD / COST_TOTAL_MONTHLY_CAP).",
+    }
     return {"agent": "cost_sentinel", "status": _roll_up(alerts),
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
