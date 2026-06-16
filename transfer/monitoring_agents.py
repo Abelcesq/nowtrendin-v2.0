@@ -143,12 +143,18 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     summary["sampled"] = len(rows)
 
     # B3 — extraction integrity: no junk common-words, no canonical duplicates.
-    junk, canon_map = [], {}
+    # Split SINGLE-word junk (high-confidence real junk, e.g. "destroyed") from
+    # MULTI-word (lower confidence — the lowercase filter can't tell a proper-noun
+    # name like "Michael Chandler" from generic phrasing). Only single-word junk
+    # raises the alert; multi-word is surfaced as review-only. These rows are
+    # filtered at SERVE (users don't see them) but are scored+stored — the alert
+    # means the quality gate should also run at scoring / old rows pruned.
+    junk_single, junk_multi, canon_map = [], [], {}
     for r in rows:
         disp = r["topic_display"] or r["topic_key"] or ""
         try:
             if not g._is_quality_topic(disp):
-                junk.append(disp)
+                (junk_single if len(disp.split()) == 1 else junk_multi).append(disp)
         except Exception:
             pass
         try:
@@ -157,11 +163,13 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
         except Exception:
             pass
     dupes = {k: sorted(v) for k, v in canon_map.items() if len(v) > 1}
-    summary["junk_count"] = len(junk)
+    summary["junk_single"] = len(junk_single)
+    summary["junk_multiword_review"] = len(junk_multi)
     summary["dupe_groups"] = len(dupes)
-    if junk:
+    if junk_single:
         alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"{len(junk)} junk/common-word topics served (e.g. {junk[:5]})"})
+                       "msg": f"{len(junk_single)} single common-word topics scored+stored "
+                              f"(filtered at serve) — apply quality gate at scoring/prune: {junk_single[:5]}"})
     if dupes:
         ex = list(dupes.values())[:3]
         alerts.append({"level": "warn", "block": "B3",
