@@ -70,4 +70,7 @@ export const api = {
   categories: () =>
     get<{ categories: { key: string; label: string; count: number }[] }>('/categories'),
   score: (key: string) => get<any>(`/scores/${encodeURIComponent(key)}`),
+  // Source-aware AI definition (short + full) — same /explainer the mobile app uses.
+  explainer: (key: string) => get<{ available: boolean; short?: string; full?: string }>(
+    `/explainer/${encodeURIComponent(key)}`),
 }

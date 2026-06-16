@@ -62,9 +62,16 @@ function gapInterp(d: number): [string, boolean, string] {
 function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const [d, setD] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
+  const [exLoading, setExLoading] = useState(true)
+  const [showFull, setShowFull] = useState(false)
   useEffect(() => {
-    let alive = true; setLoading(true)
+    let alive = true; setLoading(true); setExLoading(true); setShowFull(false)
     api.score(row.topic_key).then((x) => alive && setD(x)).catch(() => {}).finally(() => alive && setLoading(false))
+    // Source-aware AI definition (same /explainer the mobile app shows).
+    api.explainer(row.topic_key)
+      .then((x) => alive && setEx(x?.available ? x : null))
+      .catch(() => {}).finally(() => alive && setExLoading(false))
     return () => { alive = false }
   }, [row.topic_key])
 
@@ -74,6 +81,9 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const comps: [string, number][] = d?.components
     ? Object.entries(d.components).map(([k, val]: any) => [k.replace(/_/g, ' '), Math.round(val?.score ?? 0)])
     : []
+  const platforms: string[] = Array.isArray(d?.platforms_active) ? d.platforms_active : []
+  const why = d?.why_this_matters || ''
+  const watch = d?.what_to_watch || ''
 
   return (
     <aside className="rail">
@@ -95,6 +105,26 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="gauge conf">{ring(conf, 'var(--conf)')}<div className="gv" style={{ marginTop: -50 }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">&lt;9% FP · precision</div></div>
       </div>
 
+      {/* AI Context — source-aware definition (preview + full), parity with mobile */}
+      <div className="sect">
+        <h4>AI Context</h4>
+        {ex?.short ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{ex.short}</div>
+            {ex.full && ex.full.trim() !== ex.short.trim() && (
+              showFull
+                ? <div className="ai-full">{ex.full}</div>
+                : <button className="ai-more" onClick={() => setShowFull(true)}>Read full definition ↓</button>
+            )}
+          </div>
+        ) : (
+          <div className="narr muted">
+            {exLoading ? 'Generating a source-aware definition…'
+              : 'No AI definition yet — it generates on first view and is cached.'}
+          </div>
+        )}
+      </div>
+
       <div className="sect">
         <h4>Detection–Confidence Gap</h4>
         <div className={'gapband' + (tight ? ' tight' : '')}>
@@ -114,6 +144,19 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
               <span className="cv">{val}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {(platforms.length > 0 || why) && (
+        <div className="sect">
+          <h4>Source &amp; Why</h4>
+          {platforms.length > 0 && (
+            <div className="src-row">
+              {platforms.map((p) => <span className="src-chip" key={p}>{p}</span>)}
+            </div>
+          )}
+          {why && <div className="narr">{why}</div>}
+          {watch && <div className="narr" style={{ marginTop: 8 }}>{watch}</div>}
         </div>
       )}
 
@@ -150,27 +193,33 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
   const [pulling, setPulling] = useState(false)
   const [pullMsg, setPullMsg] = useState<string | null>(null)
 
+  // When a SIGNAL chip is active we screen the top-ranked set client-side; when a
+  // CATEGORY chip is active we ask the engine for THAT category server-side, so the
+  // chip count (global, from /categories) matches the rows shown — fixes "Business 5
+  // but empty" (the 5 ranked below the top-200 default load).
+  const catParam = SIGNAL_FILTERS.some((f) => f.k === filter) ? '' : filter
+
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
-    Promise.all([api.topics(200), api.categories().catch(() => ({ categories: [] }))])
+    Promise.all([api.topics(200, catParam), api.categories().catch(() => ({ categories: [] }))])
       .then(([t, c]) => {
         if (!alive) return
         setRows((t.topics || []).map((r) => {
           const det = Math.round(r.detection_score ?? 0), conf = Math.round(r.confidence_score ?? 0)
           return { ...r, det, conf, gap: det - conf, stage: (r.current_stage || stageOf(det)).toUpperCase(), ageMin: minsSince(r.last_seen_at) }
         }))
-        setCats((c.categories || []).filter((x) => x.count > 0))
+        if ((c.categories || []).length) setCats((c.categories || []).filter((x) => x.count > 0))
       })
       .catch((e) => alive && setErr(String(e.message || e)))
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
-  }, [])
+  }, [catParam])
 
   const view = useMemo(() => {
     let r = rows.slice()
     const sig = SIGNAL_FILTERS.find((f) => f.k === filter)
     if (sig) { if (sig.test) r = r.filter(sig.test) }     // nowtrendin/all = no filter
-    else r = r.filter((x) => (x.category || '').toLowerCase() === filter)  // category chip
+    // category rows already filtered server-side (catParam) — no client re-filter
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string') return String(va).localeCompare(String(vb)) * sortDir
