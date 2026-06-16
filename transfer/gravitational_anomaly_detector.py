@@ -1054,6 +1054,8 @@ GENERIC_JUNK = {
     "friend","friends","family","car","cars","food","water","money","part",
     "parts","case","point","points","line","lines","side","fact","facts",
     "idea","ideas","reason","kind","sort","type","number","group","area",
+    # stray abbreviations / non-English fragments observed leaking into the feed
+    "dept","asi","gov","sen","rep","inc","ltd","corp","mln","bln","pct",
 }
 
 
@@ -1278,6 +1280,17 @@ _TOPIC_ALIASES = {
     "gpt": "chatgpt", "openai gpt": "chatgpt",
     "us": "united states", "usa": "united states", "u s": "united states",
     "uk": "united kingdom",
+    # High-profile people — fold FULL NAME onto the surname the feed uses, so
+    # "Donald Trump" and "trump" are one topic. Curated/current on purpose
+    # (blind surname-stemming would mis-merge common surnames).
+    "donald trump": "trump", "president trump": "trump",
+    "joe biden": "biden", "kamala harris": "harris", "barack obama": "obama",
+    "elon musk": "musk", "vladimir putin": "putin",
+    "volodymyr zelensky": "zelensky", "volodymyr zelenskyy": "zelensky",
+    "zelenskyy": "zelensky", "benjamin netanyahu": "netanyahu",
+    "jerome powell": "powell", "narendra modi": "modi",
+    "zohran mamdani": "mamdani", "xi jinping": "xi jinping",
+    "keir starmer": "starmer", "emmanuel macron": "macron",
 }
 
 
@@ -4471,9 +4484,15 @@ def start_scheduler():
                     c.close()
                 except Exception as _gte:
                     print(f"[scheduler] google-trends error: {_gte}")
-            _sched.add_job(_scheduled_google_trends, "interval", hours=6,
+            # Fixed clock times (00:30/06:30/12:30/18:30 UTC), NOT a boot-relative
+            # interval. An "interval, hours=6" job first fires 6h AFTER boot, so a
+            # dyno restart (deploy or Heroku's ~daily cycle) before that resets the
+            # timer and the job can stall for a day+ — exactly what stranded these
+            # four collectors. Cron fires at the next clock slot regardless of
+            # restarts; the 15-min grace catches a restart landing near a slot.
+            _sched.add_job(_scheduled_google_trends, "cron", hour="0,6,12,18", minute=30,
                            id="google_trends_discovery", max_instances=1,
-                           coalesce=True, misfire_grace_time=600)
+                           coalesce=True, misfire_grace_time=900)
         # Daily 12-month pull-history snapshot (both feeds) + 12-month prune.
         # Durable record of each topic's score + timestamp, retained 1 year.
         def _scheduled_pull_history():
