@@ -6304,6 +6304,24 @@ def monitor_calibration():
         return {"available": False, "error": str(e)}
 
 
+@app.get("/monitor/quality")
+def monitor_quality():
+    """Topic Quality Auditor — news-filler/multi-word fragments + geo/country
+    category mis-sorts + category clarity (block B3 deep)."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.fragment_category_auditor(conn)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/usage", dependencies=[Depends(_require_internal)])
 def api_usage_report():
     """INTERNAL / founder-only: per-source external-API call counts (today / 7d /

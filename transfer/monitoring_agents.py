@@ -319,10 +319,88 @@ def calibration_auditor() -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+# ── Agent G: TOPIC QUALITY AUDITOR (B3 deep) — fragments + geo/category sort ─
+# Watches the failure modes that make category views messy + sources unclear:
+#   (1) news-filler / multi-word headline fragments ("iran deal", "leaders meet")
+#   (2) geo/country topics mis-sorted into Business/Economy (should be
+#       current-events/politics) — the "iran deal → Business" bug class
+#   (3) category clarity — too many topics in the catch-all "news"/"general"
+# Reuses the engine's own NEWS_FILLER + _topic_category so the audit matches the
+# live pipeline exactly.
+_GEO_TERMS = {
+    "iran", "israel", "gaza", "ukraine", "russia", "syria", "hamas", "hezbollah",
+    "taiwan", "palestine", "lebanon", "yemen", "sudan", "venezuela",
+    "north korea", "war", "ceasefire", "missile", "sanctions", "troops",
+    "invasion", "hostage", "coup", "airstrike", "geopolitical", "nato",
+}
+_MISSORT_CATS = {"business", "economy"}
+
+
+def fragment_category_auditor(conn, sample: int = 400) -> dict:
+    import gravitational_anomaly_detector as g
+    alerts, summary = [], {}
+    rows = []
+    try:
+        rows = conn.execute(
+            """
+            SELECT v.topic_key, v.topic_display
+            FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
+                        GROUP BY topic_key) l
+              ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            ORDER BY (CASE WHEN v.overall_score >= v.detection_score
+                           THEN v.overall_score ELSE v.detection_score END) DESC
+            LIMIT ?
+            """, (sample,)).fetchall()
+    except Exception as e:
+        return {"agent": "fragment_category_auditor", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3", "msg": f"query failed: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+
+    fragments, geo_missort, news_catch = [], [], 0
+    nf = getattr(g, "NEWS_FILLER", set())
+    for r in rows:
+        disp = (r["topic_display"] or r["topic_key"] or "")
+        toks = disp.lower().split()
+        # (1) news-filler fragment — multi-word anchored by a filler token
+        if len(toks) >= 2 and (toks[0] in nf or toks[-1] in nf):
+            fragments.append(disp)
+        # category (computed the same way serve does)
+        try:
+            cat = g._topic_category(disp) or ""
+        except Exception:
+            cat = ""
+        if cat in ("news", "general", ""):
+            news_catch += 1
+        # (2) geo/country term but sorted into Business/Economy → likely mis-sort
+        if cat in _MISSORT_CATS and any(t in _GEO_TERMS for t in toks):
+            geo_missort.append(f"{disp} → {cat}")
+
+    n = len(rows) or 1
+    news_pct = round(news_catch / n * 100, 1)
+    summary = {"sampled": len(rows), "fragments": len(fragments),
+               "geo_missorted": len(geo_missort), "news_catchall_pct": news_pct}
+    if fragments:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"{len(fragments)} news-filler/multi-word fragments served "
+                              f"(e.g. {fragments[:5]}) — tighten NEWS_FILLER / re-score"})
+    if geo_missort:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"{len(geo_missort)} geo/country topics mis-sorted to "
+                              f"Business/Economy (e.g. {geo_missort[:5]}) — should be "
+                              "current-events/politics"})
+    if news_pct >= 70:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"{news_pct}% of topics in the 'news'/general catch-all — "
+                              "category sorting is thin; sources read unclear"})
+    return {"agent": "fragment_category_auditor", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
-              cost_sentinel(), calibration_auditor()]
+              fragment_category_auditor(conn), cost_sentinel(), calibration_auditor()]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
