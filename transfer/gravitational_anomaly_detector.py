@@ -341,6 +341,14 @@ except Exception as _h_exc:
     _HEALTH_AVAILABLE = False
     print(f"[startup] collector_health unavailable: {_h_exc}")
 
+try:
+    import monitoring_agents as _monitor
+    _MONITOR_AVAILABLE = True
+    print("[startup] monitoring_agents loaded — Source Watchdog + Pipeline Integrity active")
+except Exception as _mon_exc:
+    _MONITOR_AVAILABLE = False
+    print(f"[startup] monitoring_agents unavailable: {_mon_exc}")
+
 
 def _log_health(name, count, status="success", conn=None):
     """Best-effort collector-health logging (never breaks a collection cycle)."""
@@ -6190,6 +6198,62 @@ def get_collector_health():
                 "trust_reason": trust["reason"]}
     except Exception as e:
         return {"available": False, "error": str(e), "trust": True}
+
+
+# ── Monitoring agents (DATA_BUILDING_BLOCKS.md) — automated checks for the two
+# recurring failure classes: data not pulling (Source Watchdog) and scores
+# wrong/absent (Pipeline Integrity). Public read-only health, no secrets. ──
+@app.get("/monitor")
+def monitor_all():
+    """Combined monitoring report — overall status + every agent's alerts. The
+    one call an agent/dashboard polls to know if data + scoring are healthy."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.run_all(conn, db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
+@app.get("/monitor/sources")
+def monitor_sources():
+    """Source Watchdog — are all sources pulling within SLA? (blocks B1, B2)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.source_watchdog(conn=conn, db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
+@app.get("/monitor/pipeline")
+def monitor_pipeline():
+    """Pipeline Integrity Monitor — scoring fresh? topics clean + deduped? serve
+    fields present? (blocks B3, B4, B8)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.pipeline_integrity(conn)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 
 @app.get("/usage", dependencies=[Depends(_require_internal)])
