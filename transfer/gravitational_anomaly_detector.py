@@ -2998,35 +2998,39 @@ class GravitationalAnomalyDetector:
         return [dict(r) for r in rows]
 
     def _consolidate_window_keys(self, conn, cutoff: str) -> int:
-        """Fold morphological/entity VARIANT keys in the scoring window onto their
-        canonical key (japanese→japan, japan's→japan, gpt→chatgpt) so a trend is
-        scored ONCE. New pulls already write canonical keys; this self-heals the
-        existing pool collected before the rule existed. Bounded to distinct keys
-        active in the window. Returns the number of keys remapped."""
-        rows = conn.execute(
-            "SELECT DISTINCT topic_key FROM topic_signals WHERE extracted_at >= ?",
-            (cutoff,)).fetchall()
-        remapped = 0
-        for r in rows:
+        """Fold morphological/entity VARIANT keys onto their canonical key
+        (japanese→japan, japan's→japan, gpt→chatgpt) so a trend is scored — and
+        served — ONCE. New pulls already write canonical keys; this self-heals the
+        pool collected before the rule existed. Returns the number of keys folded.
+
+        Two independent passes (the second is essential): variant signals may have
+        been remapped in a PRIOR cycle, leaving an orphaned variant row in
+        velocity_scores that no longer appears in topic_signals — so we clean
+        velocity_scores by its OWN keys, not only the ones still in topic_signals."""
+        folded = 0
+        # ── 1) Fold variant SIGNALS in the window onto the canonical key ──
+        for r in conn.execute(
+                "SELECT DISTINCT topic_key FROM topic_signals WHERE extracted_at >= ?",
+                (cutoff,)).fetchall():
             old = r["topic_key"]
             if not old:
                 continue
-            # recompute the canonical key from the de-underscored surface form
             canon = _topic_key(old.replace("_", " "))
             if canon and canon != old:
-                # fold the variant's signals onto the canonical key …
-                conn.execute(
-                    "UPDATE topic_signals SET topic_key = ? WHERE topic_key = ?",
-                    (canon, old))
-                # … and drop the now-orphaned variant SCORE rows so the stale
-                # duplicate (e.g. 'japanese') stops being served. The canonical
-                # key ('japan') is rescored this cycle with the merged signals.
+                conn.execute("UPDATE topic_signals SET topic_key = ? WHERE topic_key = ?",
+                             (canon, old))
+                folded += 1
+        # ── 2) Drop ALL non-canonical SCORE rows (catches prior-cycle orphans) ──
+        # so the stale duplicate ('japanese', 'dutch') stops being served; the
+        # canonical key is rescored this cycle with the merged signals.
+        for r in conn.execute("SELECT DISTINCT topic_key FROM velocity_scores").fetchall():
+            old = r["topic_key"]
+            if old and _topic_key(old.replace("_", " ")) != old:
                 conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (old,))
-                remapped += 1
-        if remapped:
-            conn.commit()
-            print(f"  [score] consolidated {remapped} variant topic keys → canonical")
-        return remapped
+        conn.commit()
+        if folded:
+            print(f"  [score] consolidated {folded} variant topic keys → canonical")
+        return folded
 
     def compute_gradient_strength(self, signals: list[dict]) -> tuple[float, float]:
         """
