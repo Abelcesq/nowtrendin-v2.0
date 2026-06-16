@@ -81,13 +81,49 @@ _EXPLAINER_PROMPT = (
     "fast it is moving right now."
 )
 
+# Source-aware variant: when we know HOW the word is actually appearing across the
+# sources, define the SPECIFIC trend driving attention right now (e.g. "japan" in
+# World-Cup blog posts = the national team's run, not the country in general) —
+# never a generic dictionary definition of the bare word.
+_EXPLAINER_CONTEXT_PROMPT = (
+    "A trend-detection engine is currently surfacing the term \"{topic}\". Below "
+    "is a sample of how it is ACTUALLY appearing right now — real headlines/posts "
+    "and the platforms/communities they came from:\n\n"
+    "{context}\n\n"
+    "Using THIS evidence, explain what is driving attention to \"{topic}\" RIGHT "
+    "NOW — the specific event, story, product, match, release, or controversy the "
+    "sources point to. Do NOT give a generic dictionary definition of the bare "
+    "word; if the sources show \"{topic}\" refers to a specific thing (a sports "
+    "team's match, a company, a person, a launch), explain THAT specific thing.\n\n"
+    "Return ONLY valid JSON, no prose, with two keys: "
+    "\"short\" — 1-2 plain sentences on what is driving attention and why it "
+    "matters; \"full\" — 3-5 short markdown paragraphs on what it is (in this "
+    "context), what is happening, and why it matters.\n\n"
+    "STRICT RULES (shown next to a live measured score — never contradict the "
+    "engine or invent data):\n"
+    "- Ground the explanation in the sample above; if the evidence is thin, say so "
+    "qualitatively rather than inventing specifics.\n"
+    "- Do NOT state unverifiable quantitative metrics (counts, percentages, "
+    "user/market numbers).\n"
+    "- Do NOT assert momentum/direction (accelerating, cooling, surging) — the "
+    "engine reports velocity separately."
+)
 
-def explain_topic(topic: str) -> dict:
+
+def explain_topic(topic: str, context: str = "") -> dict:
     """Evergreen plain-English explainer for a topic (cached/persisted by the
-    caller). One Perplexity call → {short, full, citations}. Cheap because the
-    definition doesn't change — generated once per topic, reused for all users."""
+    caller). One Perplexity call → {short, full, citations}.
+
+    When `context` is supplied (a sample of the real headlines/posts + their
+    source platforms where this term is currently appearing), the explainer is
+    SOURCE-AWARE: it defines the specific trend driving attention right now rather
+    than a generic dictionary definition of the bare word — so "japan" surfacing
+    from World-Cup blog posts is explained as the team's run, not the country."""
     if not PERPLEXITY_API_KEY:
         return {"available": False}
+    ctx = (context or "").strip()
+    prompt = (_EXPLAINER_CONTEXT_PROMPT.format(topic=topic, context=ctx[:2500])
+              if ctx else _EXPLAINER_PROMPT.format(topic=topic))
     try:
         _api("perplexity")
         r = requests.post(
@@ -95,8 +131,7 @@ def explain_topic(topic: str) -> dict:
             headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
                      "Content-Type": "application/json"},
             json={"model": PPLX_MODEL,
-                  "messages": [{"role": "user",
-                                "content": _EXPLAINER_PROMPT.format(topic=topic)}]},
+                  "messages": [{"role": "user", "content": prompt}]},
             timeout=45,
         )
         r.raise_for_status()
