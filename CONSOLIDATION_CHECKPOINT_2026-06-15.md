@@ -181,16 +181,18 @@ Web-only "Print / PDF" button in the Trends header. *Committed; needs a
   baselines ≈ 0 → most topics currently read `path=mainstream`. Baselines accumulate
   over the next few 6-h cycles, after which perennial entities settle to baseline and
   genuine movers stand out. Expected, self-correcting.
-- **Deeper entity resolution:** `trump` vs `Donald Trump` (surname vs full name) and
-  stray short tokens (`asi`, `dept`) aren't yet folded — needs a name/alias gazetteer
-  beyond the demonym/possessive rules.
-- **Slow collectors** (google_trends/youtube/creators/broadcast) still stalled ~23h —
-  pre-existing on both engines; investigate why their jobs stop firing in prod.
 - **Accuracy ledger** small-sample (850 pending) — re-run weekly as it ages in.
-- **`nowtrendin-web`** needs a rebuild to pick up the Print button (no git remote on
-  this machine; last deployed 6/10 from the laptop).
-- ✅ *Resolved this session:* residual common-word noise (now a real dictionary);
-  AI-spend was untracked (now capped); generic AI definitions (now source-aware).
+- Residual long-tail entity variants (`president donald trump`, `haitian`) — the
+  gazetteer is curated; extend as new variants surface.
+- ✅ *Resolved this session:* residual common-word noise (real dictionary); untracked
+  AI-spend (now $20/mo capped); generic AI definitions (now source-aware); **`trump`
+  vs `Donald Trump`** (person gazetteer — merged, verified); **stalled slow-collectors**
+  (`google_trends/youtube/creators/broadcast` — root cause: an `interval, hours=6` job
+  with no `next_run_time` reset by dyno restarts; fixed with a fixed-clock cron
+  00:30/06:30/12:30/18:30 UTC); **`nowtrendin-web` rebuilt + deployed** (v6, Print
+  button live — deploy dir `web-deploy/` has the heroku remote); **skills repointed**
+  to the v2 engine (data-health / accuracy-sweep / beneficiary-backtest / risk-verify;
+  risk-verify also updated for the v2 risk schema).
 
 ---
 
