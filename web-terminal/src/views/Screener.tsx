@@ -189,18 +189,26 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
             <button className="btn primary">↧ Export</button>
           </div>
         </div>
-        <div className="chips">
+        {/* Row 1 — SIGNAL filters (stage / gap) */}
+        <div className="chips tight">
+          <span className="chip-label">Signal</span>
           <div className={'chip' + (filter === 'all' ? ' active' : '')} onClick={() => setFilter('all')}>All</div>
           <div className={'chip early' + (filter === 'early' ? ' active' : '')} onClick={() => { setFilter('early'); setSortKey('gap'); setSortDir(-1) }}>⟡ Early Signals</div>
           <div className={'chip' + (filter === 'breakout' ? ' active' : '')} onClick={() => setFilter('breakout')}>Breakout ≥85</div>
           <div className={'chip' + (filter === 'strong' ? ' active' : '')} onClick={() => setFilter('strong')}>Strong ≥70</div>
           <div className={'chip' + (filter === 'cooling' ? ' active' : '')} onClick={() => setFilter('cooling')}>Cooling</div>
-          {cats.slice(0, 8).map((c) => (
-            <div key={c.key} className={'chip' + (filter === c.key ? ' active' : '')} onClick={() => setFilter(c.key)}>
-              {c.label} <span className="c-cnt">{c.count}</span>
-            </div>
-          ))}
         </div>
+        {/* Row 2 — CATEGORY filters (the WHAT axis) */}
+        {cats.length > 0 && (
+          <div className="chips">
+            <span className="chip-label">Category</span>
+            {cats.slice(0, 12).map((c) => (
+              <div key={c.key} className={'chip' + (filter === c.key ? ' active' : '')} onClick={() => setFilter(c.key)}>
+                {c.label} <span className="c-cnt">{c.count}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid-wrap">
