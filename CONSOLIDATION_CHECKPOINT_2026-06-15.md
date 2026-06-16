@@ -47,6 +47,8 @@ Deploy flow: commit → GitHub → Heroku (engine via `git subtree push --prefix
 - **Mobile**: `frontend/lib/gradientApi.ts` → `nowtrendin-v2-engine` (was previously hitting the v1 URL directly — corrected today).
 - **Backend proxy** (mobile token-metered actions): `GRADIENT_API` config var → `nowtrendin-v2-engine`.
 
+**Terminal views live (web + desktop):** Login (enterprise-gated) · Signal Screener (Signal+Category rows) · Market Signal (live `/risk/scores`, finance-native dual score, mobile-consistent tiers) · Accuracy Ledger · Methodology (+legal) · **Watchlists** (backend-synced). **Watchlists API** added to `backend/` (Django): `Watchlist`/`WatchlistItem` models + `/api/watchlists/` CRUD (JWT, per-user) — one source of truth so the same lists appear on web/desktop/mobile; items store key/display/kind and clients look up live scores. Deploy backend via `git subtree push --prefix backend heroku main` then `heroku run python manage.py migrate -a nowtrendin-backend`.
+
 ---
 
 ## 3. Consolidation actions completed today
