@@ -6335,6 +6335,18 @@ def monitor_quality():
             except Exception: pass
 
 
+@app.get("/monitor/subscriptions")
+def monitor_subscriptions():
+    """Data Subscriptions — every external data API: configured?, billing class,
+    and whether each paid one has a tracked cost (block B7)."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    try:
+        return {"available": True, **_monitor.data_subscriptions()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 @app.get("/usage", dependencies=[Depends(_require_internal)])
 def api_usage_report():
     """INTERNAL / founder-only: per-source external-API call counts (today / 7d /

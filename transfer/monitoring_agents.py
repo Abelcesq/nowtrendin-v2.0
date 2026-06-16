@@ -249,6 +249,12 @@ def cost_sentinel() -> dict:
             alerts.append({"level": "warn", "block": "B7", "msg": f"Apify billing read failed: {e}"})
 
     # 3) Fixed infra — CONFIGURED (env, set to your actuals)
+    # Data-API subscriptions are now ITEMIZED per provider (data_subscriptions);
+    # prefer that sum, but honour a legacy lump COST_SUBSCRIPTIONS_USD if the
+    # per-provider vars aren't set yet.
+    subs_itemized = data_subscriptions_total()
+    subs_legacy = float(os.getenv("COST_SUBSCRIPTIONS_USD", "0") or 0)
+    subs_usd = subs_itemized if subs_itemized > 0 else subs_legacy
     fixed = [
         ("Heroku dynos", float(os.getenv("COST_HEROKU_USD", "64"))),
         # X (Twitter) Developer API monthly subscription — distinct from the post
@@ -256,12 +262,13 @@ def cost_sentinel() -> dict:
         # X Basic = $200/mo; migrating to Pay-Per-Use 2026-06-21 — update then.
         ("X Developer API", float(os.getenv("COST_X_API_USD", "200"))),
         ("AWS", float(os.getenv("COST_AWS_USD", "104"))),
-        ("Data API subscriptions", float(os.getenv("COST_SUBSCRIPTIONS_USD", "0"))),
+        ("Data API subscriptions", subs_usd),
         ("GitHub (Pages/Actions)", float(os.getenv("COST_GITHUB_USD", "0"))),
     ]
     for name, usd in fixed:
         total += usd
-        lines.append({"item": name, "usd": round(usd, 2), "source": "configured"})
+        src = "itemized" if (name == "Data API subscriptions" and subs_itemized > 0) else "configured"
+        lines.append({"item": name, "usd": round(usd, 2), "source": src})
 
     # 4) X posts — operational budget (posts, not $)
     x_line = {}
@@ -397,10 +404,134 @@ def fragment_category_auditor(conn, sample: int = 400) -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+# ── Agent H: DATA SUBSCRIPTIONS (B7 — paid data-API spend & config) ─────────
+# Investigates + monitors every external DATA API the engine integrates with.
+# Each entry: (display, key_env, cost_env, billing_class, note). billing_class:
+#   "paid"    — a paid subscription; contributes to the data-subscription total.
+#             A cost_env of $0 while the key IS configured = UNTRACKED spend → warn.
+#   "free"    — free / free-tier API (key present, $0 expected). Listed, not billed.
+#   "metered" — usage-billed and tracked on its OWN cost line elsewhere
+#             (AI ledger / Apify live / X line). Listed here for the full map,
+#             NEVER added to the subs total (would double-count).
+# We deliberately default every COST_*_USD to 0 — the engine must not assert a
+# dollar figure it can't verify (integrity). The agent's job is to flag WHERE a
+# real number is owed, not to invent one.
+DATA_SUBSCRIPTIONS = [
+    # paid data APIs (set the real monthly $ on each COST_*_USD)
+    ("Alpha Vantage",        "ALPHAVANTAGE_API_KEY", "COST_ALPHAVANTAGE_USD", "paid",
+     "market fundamentals (free tier exists — set $0 if on free)"),
+    ("Finnhub",              "FINNHUB_API_KEY",      "COST_FINNHUB_USD",      "paid",
+     "market/risk metrics (free tier exists — set $0 if on free)"),
+    ("NewsAPI.ai",           "NEWSAPI_AI_KEY",       "COST_NEWSAPI_AI_USD",   "paid",
+     "Event Registry news"),
+    ("NewsAPI.org",          "NEWSAPI_ORG_KEY",      "COST_NEWSAPI_ORG_USD",  "paid",
+     "news headlines (commercial use is paid)"),
+    ("NewsData.io",          "NEWSDATA_IO_KEY",      "COST_NEWSDATA_IO_USD",  "paid",
+     "news feed (free tier exists — set $0 if on free)"),
+    ("RapidAPI (Yahoo Fin.)", "RAPIDAPI_YF_KEY",     "COST_RAPIDAPI_USD",     "paid",
+     "Yahoo Finance via RapidAPI"),
+    ("WhaleWisdom",          "WHALEWISDOM_SHARED_KEY", "COST_WHALEWISDOM_USD", "paid",
+     "13F institutional holdings"),
+    # free / free-tier data APIs (configured, $0 expected)
+    ("FRED",                 "FRED_API_KEY",         None, "free", "Federal Reserve econ data (free)"),
+    ("FINRA",                "FINRA_API_KEY",        None, "free", "FINRA short/market data (free)"),
+    ("YouTube Data API",     "YOUTUBE_API_KEY",      None, "free", "Google API (free, quota-limited)"),
+    ("The Guardian",         "GUARDIAN_API_KEY",     None, "free", "Guardian Open Platform (free)"),
+    ("GitHub API",           "GITHUB_TOKEN",         None, "free", "repo/trends (free)"),
+    ("Blogger",              "BLOGGER_API_KEY",      None, "free", "Google Blogger (free)"),
+    ("Hashnode",             "HASHNODE_TOKEN",       None, "free", "dev blogs (free)"),
+    ("Dev.to",               "DEVTO_API_KEY",        None, "free", "dev blogs (free)"),
+    # usage-metered — tracked on their own cost lines (do NOT add to subs total)
+    ("Perplexity",           "PERPLEXITY_API_KEY",   None, "metered", "AI research — on AI ledger line"),
+    ("Anthropic",            "ANTHROPIC_API_KEY",    None, "metered", "AI synthesis — on AI ledger line"),
+    ("Apify",                "APIFY_TOKEN",          None, "metered", "Google-Trends actor — live Apify line"),
+    ("X (Twitter) API",      "X_BEARER_TOKEN",       None, "metered", "social — on X Developer API line"),
+]
+
+
+def data_subscriptions_total() -> float:
+    """Sum of the PAID data-API cost env vars (each defaults to 0). This is the
+    itemized replacement for the legacy lump COST_SUBSCRIPTIONS_USD."""
+    import os
+    t = 0.0
+    for _name, _kenv, cenv, klass, _note in DATA_SUBSCRIPTIONS:
+        if klass == "paid" and cenv:
+            try:
+                t += float(os.getenv(cenv, "0") or 0)
+            except (TypeError, ValueError):
+                pass
+    return round(t, 2)
+
+
+def data_subscriptions() -> dict:
+    """Investigate + monitor every external data-API subscription: which are
+    configured, how each is billed, and whether paid ones have a tracked cost.
+    Honest-by-default: never invents a dollar amount — flags where one is owed."""
+    import os
+    alerts, items = [], []
+    paid_total = 0.0
+    paid_n = free_n = metered_n = 0
+    untracked = []  # paid + configured + $0
+    orphan_cost = []  # cost set but key missing
+
+    for name, kenv, cenv, klass, note in DATA_SUBSCRIPTIONS:
+        configured = bool(os.getenv(kenv))
+        cost = None
+        if cenv:
+            try:
+                cost = float(os.getenv(cenv, "0") or 0)
+            except (TypeError, ValueError):
+                cost = 0.0
+        row = {"name": name, "key_env": kenv, "configured": configured,
+               "billing": klass, "note": note}
+        if cenv:
+            row["cost_env"] = cenv
+            row["usd"] = round(cost or 0, 2)
+        items.append(row)
+
+        if klass == "paid":
+            paid_n += 1
+            paid_total += (cost or 0)
+            if configured and (cost or 0) == 0:
+                untracked.append(f"{name} (set {cenv})")
+            if (cost or 0) > 0 and not configured:
+                orphan_cost.append(f"{name} (${cost:.2f} on {cenv}, no key)")
+        elif klass == "free":
+            free_n += 1
+        else:
+            metered_n += 1
+
+    paid_total = round(paid_total, 2)
+    if untracked:
+        alerts.append({"level": "warn", "block": "B7",
+                       "msg": f"{len(untracked)} paid data API(s) configured with NO tracked cost "
+                              f"(untracked spend): {untracked} — set the COST_*_USD env so the "
+                              "Cost Sentinel reflects real monthly spend"})
+    if orphan_cost:
+        alerts.append({"level": "warn", "block": "B7",
+                       "msg": f"{len(orphan_cost)} cost set but API key missing "
+                              f"(paying for nothing?): {orphan_cost}"})
+
+    summary = {
+        "paid_subscriptions": paid_n,
+        "free_apis": free_n,
+        "metered_elsewhere": metered_n,
+        "paid_total_usd": paid_total,
+        "untracked_paid": len(untracked),
+        "items": items,
+        "note": "paid_total feeds the Cost Sentinel 'Data API subscriptions' line. "
+                "Metered APIs (AI/Apify/X) are billed on their own lines — excluded here "
+                "to avoid double-counting. Costs default to $0 until set per provider.",
+    }
+    return {"agent": "data_subscriptions", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
-              fragment_category_auditor(conn), cost_sentinel(), calibration_auditor()]
+              fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
+              data_subscriptions()]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
