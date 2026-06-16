@@ -14,8 +14,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, Alert, GradeHistory
-from .serializers import SignupSerializer, UserSerializer, AlertSerializer
+from .models import Profile, Alert, GradeHistory, Watchlist, WatchlistItem
+from .serializers import (
+    SignupSerializer, UserSerializer, AlertSerializer,
+    WatchlistSerializer, WatchlistItemSerializer,
+)
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
 # Monthly AI-grade credits per tier (grade ≈ $0.012 each; caps the exposure).
@@ -587,3 +590,57 @@ class VerifyPhoneView(APIView):
         profile.otp_expires = None
         profile.save()
         return Response({'user': UserSerializer(request.user).data})
+
+
+# ── Watchlists — per-user, backend-synced so the SAME lists appear on web,
+# desktop, and mobile. Items store only a key/display/kind; the client looks up
+# the live Detection/Confidence so scores are never stale. ──
+class WatchlistListCreate(generics.ListCreateAPIView):
+    serializer_class = WatchlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Watchlist.objects.filter(user=self.request.user).prefetch_related('items')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class WatchlistDetail(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = WatchlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Watchlist.objects.filter(user=self.request.user).prefetch_related('items')
+
+
+class WatchlistItemCreate(APIView):
+    """POST /api/watchlists/<id>/items/  — add an item to one of the user's lists."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            wl = Watchlist.objects.get(pk=pk, user=request.user)
+        except Watchlist.DoesNotExist:
+            return Response({'detail': 'Watchlist not found.'}, status=404)
+        key = (request.data.get('key') or '').strip()
+        if not key:
+            return Response({'detail': 'key is required.'}, status=400)
+        item, _ = WatchlistItem.objects.get_or_create(
+            watchlist=wl, key=key,
+            defaults={'display': (request.data.get('display') or '').strip(),
+                      'kind': request.data.get('kind') or 'topic'},
+        )
+        return Response(WatchlistItemSerializer(item).data, status=201)
+
+
+class WatchlistItemDetail(APIView):
+    """DELETE /api/watchlists/<id>/items/<item_id>/  — remove an item."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk, item_id):
+        deleted, _ = WatchlistItem.objects.filter(
+            id=item_id, watchlist__id=pk, watchlist__user=request.user).delete()
+        if not deleted:
+            return Response({'detail': 'Item not found.'}, status=404)
+        return Response(status=204)

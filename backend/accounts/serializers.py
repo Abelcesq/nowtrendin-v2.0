@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Profile, Alert
+from .models import Profile, Alert, Watchlist, WatchlistItem
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -80,3 +80,19 @@ class AlertSerializer(serializers.ModelSerializer):
             'notify_email', 'notify_push', 'active', 'last_triggered_at', 'created_at',
         ]
         read_only_fields = ['id', 'last_triggered_at', 'created_at']
+
+
+class WatchlistItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WatchlistItem
+        fields = ['id', 'key', 'display', 'kind', 'added_at']
+        read_only_fields = ['id', 'added_at']
+
+
+class WatchlistSerializer(serializers.ModelSerializer):
+    items = WatchlistItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Watchlist
+        fields = ['id', 'name', 'created_at', 'items']
+        read_only_fields = ['id', 'created_at', 'items']

@@ -1,13 +1,17 @@
 from django.contrib import admin
 from django.urls import path, include
 
-from accounts.views import AlertListCreate, AlertDetail, DirectQueryView, EvaluateAlertsView, PullTrendsView, PullMarketView, GradeView, GradeHistoryView, GradedAllView, ResetCreditsView
+from accounts.views import AlertListCreate, AlertDetail, DirectQueryView, EvaluateAlertsView, PullTrendsView, PullMarketView, GradeView, GradeHistoryView, GradedAllView, ResetCreditsView, WatchlistListCreate, WatchlistDetail, WatchlistItemCreate, WatchlistItemDetail
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/alerts/', AlertListCreate.as_view()),
     path('api/alerts/<int:pk>/', AlertDetail.as_view()),
+    path('api/watchlists/', WatchlistListCreate.as_view()),
+    path('api/watchlists/<int:pk>/', WatchlistDetail.as_view()),
+    path('api/watchlists/<int:pk>/items/', WatchlistItemCreate.as_view()),
+    path('api/watchlists/<int:pk>/items/<int:item_id>/', WatchlistItemDetail.as_view()),
     path('api/query/', DirectQueryView.as_view()),
     path('api/pull-trends/', PullTrendsView.as_view()),
     path('api/pull-market/', PullMarketView.as_view()),

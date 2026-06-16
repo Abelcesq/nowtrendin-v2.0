@@ -59,3 +59,36 @@ class Alert(models.Model):
 
     def __str__(self):
         return f"{self.topic_display or self.topic_key} >= {self.threshold} ({self.user.email})"
+
+
+class Watchlist(models.Model):
+    """A user's saved list of topics/instruments to track. Per-user, synced via
+    the backend so the SAME lists appear on web, desktop, and mobile."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='watchlists')
+    name = models.CharField(max_length=80)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"
+
+
+class WatchlistItem(models.Model):
+    """One tracked entry inside a watchlist. `kind` distinguishes an attention
+    Trend ('topic') from a Market Signal instrument ('market'); the client looks
+    up the live score by `key`, so we never store stale scores."""
+    KINDS = [('topic', 'topic'), ('market', 'market')]
+    watchlist = models.ForeignKey(Watchlist, on_delete=models.CASCADE, related_name='items')
+    key = models.CharField(max_length=120)            # topic_key or risk_topic
+    display = models.CharField(max_length=160, blank=True)
+    kind = models.CharField(max_length=12, choices=KINDS, default='topic')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['added_at']
+        unique_together = ('watchlist', 'key')
+
+    def __str__(self):
+        return f"{self.display or self.key} in {self.watchlist.name}"
