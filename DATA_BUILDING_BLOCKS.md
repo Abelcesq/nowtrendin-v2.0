@@ -221,9 +221,12 @@ All skills point at the **v2** engine (`nowtrendin-v2-engine`).
 Each agent owns blocks, runs on a cadence, reads the listed endpoints, and raises
 a typed alert. (These are specs to build; the checks already exist as endpoints.)
 
-> **Status: A + B are LIVE** (`monitoring_agents.py`). Endpoints: `GET /monitor`
-> (combined), `/monitor/sources`, `/monitor/pipeline` — public, read-only, no AI.
-> Invoke via the **`/data-watchdog`** skill. C/D/E still to build.
+> **Status: ALL agents LIVE.** Runtime pollers in `monitoring_agents.py` →
+> `GET /monitor` (combined), `/monitor/sources`, `/monitor/pipeline`,
+> `/monitor/cost`, `/monitor/calibration` (public, read-only, no AI). Invokable
+> skills: **`/data-watchdog`** (A+B), **`/frontend-consistency`** (F),
+> **`/integrity-reviewer`** (E gate). A 6th agent — **Frontend Consistency** —
+> watches terminal↔mobile UI parity.
 
 ### A. Source Watchdog — owns **B1, B2** ✅ LIVE
 - **Every cycle (6h):** `GET /health/collectors`, `/usage`.
@@ -237,19 +240,24 @@ a typed alert. (These are specs to build; the checks already exist as endpoints.
 - **Alert if:** junk/common-word or duplicate keys appear; `last_score` stale >1
   cycle; `/scores` returns 0 or errors; a topic's `category`/audit fields missing.
 
-### C. Calibration Auditor — owns **B5**
-- **Before any calibration deploy:** run `backtest_dual_pathway.py` — block ship on
-  any fail.
-- **Weekly:** `/accuracy/ledger` — report hit-rate **with denominator**; flag if a
-  claim anywhere lacks one (ties to B6/guardrail 5).
+### C. Calibration Auditor — owns **B5** ✅ LIVE (`/monitor/calibration`)
+- **Runtime:** `/accuracy/ledger` honesty — flags small-sample so no undefendable
+  hit-rate is published. **Deploy gate:** run `backtest_dual_pathway.py` before any
+  calibration ship (block on fail).
 
-### D. Cost Sentinel — owns **B7**
-- **Daily:** `/ai/costs`, `/x/budget`, Heroku R14.
-- **Alert if:** AI `over_budget`, X budget >80%, or R14 memory warnings.
+### D. Cost Sentinel — owns **B7** ✅ LIVE (`/monitor/cost`)
+- AI $/mo (vs $20 cap) + X posts/mo: warn at 80%, critical at exhausted. (R14
+  dyno memory watched via Heroku metrics, outside the process.)
 
-### E. Integrity Reviewer — owns **B6** (gate, not a poller)
-- **On every new source/metric/claim/PR:** run the 5 guardrails; block + propose
+### E. Integrity Reviewer — owns **B6** ✅ LIVE (gate skill `/integrity-reviewer`)
+- On every new source/metric/claim/PR: run the 5 guardrails; block + propose
   clean alternative on any violation.
+
+### F. Frontend Consistency — owns **B8 (UI parity)** ✅ LIVE (skill `/frontend-consistency`)
+- Both sites up (Pages terminal + mobile-web); terminal `SIGNAL_FILTERS` ==
+  mobile `CATEGORY_DEFS`; same category chips + key actions (Pull Trends, Trends
+  label, Watchlists). Web may add MORE filtration; it must not DIVERGE on shared
+  labels/filters/actions.
 
 ---
 
