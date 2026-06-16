@@ -251,6 +251,10 @@ def cost_sentinel() -> dict:
     # 3) Fixed infra — CONFIGURED (env, set to your actuals)
     fixed = [
         ("Heroku dynos", float(os.getenv("COST_HEROKU_USD", "64"))),
+        # X (Twitter) Developer API monthly subscription — distinct from the post
+        # BUDGET below (posts are the in-plan cap; this is the plan's $ fee).
+        # X Basic = $200/mo; migrating to Pay-Per-Use 2026-06-21 — update then.
+        ("X Developer API", float(os.getenv("COST_X_API_USD", "200"))),
         ("Data API subscriptions", float(os.getenv("COST_SUBSCRIPTIONS_USD", "0"))),
         ("GitHub (Pages/Actions)", float(os.getenv("COST_GITHUB_USD", "0"))),
     ]
