@@ -42,6 +42,11 @@ def _mins_since(iso_str):
         return None
 
 
+# Sources intentionally OFF (licensing) — DEGRADED/0-signal is expected, not an
+# alert. Mirrors collector_health's sentinel window for reddit.
+_OFF_SOURCES = {"reddit"}
+
+
 def _roll_up(alerts):
     if any(a["level"] == "critical" for a in alerts):
         return "critical"
@@ -63,6 +68,8 @@ def source_watchdog(conn=None, db_path=None) -> dict:
     cols = rep.get("collectors", {})
     alerts = []
     for name, c in cols.items():
+        if name in _OFF_SOURCES:        # intentionally off — never alert
+            continue
         st, crit, detail = c.get("status"), c.get("critical"), c.get("detail", "")
         if st == "DOWN" and crit:
             alerts.append({"level": "critical", "block": "B2", "source": name,
@@ -116,9 +123,12 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     # Pull the latest row per topic (top by score) for the integrity sample.
     rows = []
     try:
+        # NOTE: `category` is injected at serve-time (_format_score_rows), NOT a
+        # velocity_scores column — so we audit detection_pathway (a real stored
+        # audit field) for serve-readiness instead.
         rows = conn.execute(
             """
-            SELECT v.topic_key, v.topic_display, v.category, v.detection_pathway,
+            SELECT v.topic_key, v.topic_display, v.detection_pathway,
                    v.scored_at, v.overall_score, v.detection_score
             FROM velocity_scores v
             INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
@@ -157,16 +167,15 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"{len(dupes)} unconsolidated duplicate groups (e.g. {ex})"})
 
-    # B8 — serve consistency: served rows carry category + the dual-pathway audit
-    # field, so every client renders the same enriched data.
+    # B8 — serve consistency: scored rows carry the dual-pathway audit field, so
+    # every client renders the same enriched data (category is added at serve).
     if rows:
-        no_cat = sum(1 for r in rows if not r["category"])
         no_path = sum(1 for r in rows if not r["detection_pathway"])
-        summary["missing_category"] = no_cat
         summary["missing_pathway"] = no_path
-        if no_cat > len(rows) * 0.5:
+        if no_path > len(rows) * 0.5:
             alerts.append({"level": "warn", "block": "B8",
-                           "msg": f"{no_cat}/{len(rows)} served rows missing category"})
+                           "msg": f"{no_path}/{len(rows)} scored rows missing detection_pathway "
+                                  "(audit field) — re-score may be needed"})
 
     return {
         "agent": "pipeline_integrity",
