@@ -82,6 +82,22 @@ body{
 .chips{display:flex; align-items:center; gap:7px; padding-bottom:13px; overflow-x:auto}
 .chips.tight{padding-bottom:8px}
 .chip-label{flex:0 0 auto; min-width:64px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; color:var(--text-3)}
+.chip-search{flex:0 0 auto; height:28px; width:180px; margin-left:auto; border:1px solid var(--line); border-radius:8px; padding:0 11px; font-size:12px; font-family:var(--sans); color:var(--text); background:var(--surface)}
+.chip-search:focus{outline:none; border-color:var(--early); box-shadow:0 0 0 3px var(--early-soft)}
+
+/* ---------- Market Signal ---------- */
+.tier{font-size:9.5px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px; text-transform:uppercase}
+.tier.ELEVATED{background:#fdeadc; color:#c2410c}
+.tier.ACTIVE{background:var(--early-soft); color:#b35a18}
+.tier.BUILDING{background:var(--st-b); color:var(--st-t)}
+.tier.ROUTINE{background:var(--wa-b); color:var(--wa-t)}
+.tier.DORMANT{background:var(--mo-b); color:var(--mo-t)}
+.tier.WATCH,.tier.UNUSUAL{background:#fdeadc; color:#c2410c}
+.pct{font-family:var(--mono); font-size:12px; font-weight:600}
+.pct.up{color:var(--up)} .pct.down{color:var(--down)} .pct.flat,.pct.na{color:var(--text-3)}
+.cal-chip{margin-left:7px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--early); background:var(--early-soft); border:1px solid #f1d6bd; padding:1px 6px; border-radius:5px; vertical-align:middle}
+.cal-banner{display:flex; align-items:center; gap:8px; background:var(--early-soft); border-bottom:1px solid #f1d6bd; color:#8a4a1c; font-size:11.5px; padding:9px 20px; line-height:1.4}
+.cal-banner b{font-weight:700}
 .chip{flex:0 0 auto; height:28px; padding:0 13px; border-radius:15px; border:1px solid var(--line); background:var(--surface); font-size:12px; color:var(--text-2); cursor:pointer; display:flex; align-items:center; gap:7px; white-space:nowrap}
 .chip:hover{border-color:#cfd6df}
 .chip.active{background:var(--ink); color:#fff; border-color:var(--ink)}

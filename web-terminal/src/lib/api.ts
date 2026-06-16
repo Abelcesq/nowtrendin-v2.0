@@ -37,8 +37,30 @@ export interface TopicRow {
   total_mentions?: number; last_seen_at?: string; is_anomaly?: number
 }
 
+// ── Market Signal (the finance-native dual score — same data the mobile Market
+// tab renders, via /risk/scores). The Market Gradient is distinct from attention:
+// detection = analyst sentiment + smart-money positioning; tier vocab is
+// ELEVATED / ACTIVE / BUILDING / ROUTINE / DORMANT (NOT BREAKOUT/STRONG). ──
+export interface MarketComponent { score: number; feeds?: string; z?: number }
+export interface MarketGradient {
+  detection?: number; confidence?: number; gap?: number
+  tier?: string; gap_state?: string; interpretation?: string
+  leverage_health?: number | null; calibrating?: boolean
+  components?: Record<string, MarketComponent>
+}
+export interface RiskRow {
+  risk_topic: string; risk_display: string
+  detection_score?: number; confidence_score?: number
+  classification?: string; risk_stage?: string
+  total_signals?: number; scored_at?: string
+  percent_delta?: number | null; abnormality?: number | null
+  baseline_cycles?: number; sufficient_baseline?: boolean
+  interpretation?: string; market_gradient?: MarketGradient
+}
+
 export const api = {
   ledger: () => get<LedgerSummary>('/accuracy/ledger'),
+  risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   ledgerDetail: (verdict = '') =>
     get<{ status: string; count: number; rows: LedgerRow[] }>(
       `/accuracy/ledger/detail?limit=500${verdict ? `&verdict=${verdict}` : ''}`),

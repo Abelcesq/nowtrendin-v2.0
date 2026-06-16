@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Shell, type NavKey } from './components/Shell'
 import { Ledger } from './views/Ledger'
 import { Screener } from './views/Screener'
+import { MarketSignal } from './views/MarketSignal'
 import { Methodology } from './views/Methodology'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
@@ -49,12 +50,13 @@ export function App() {
 
   let body: ReactNode
   if (nav === 'trends') body = <Screener onRail={setRail} />
+  else if (nav === 'market') body = <MarketSignal onRail={setRail} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 
   return (
-    <Shell nav={nav} onNav={go} rail={nav === 'trends' ? rail : null} user={user} onSignOut={signOut}>
+    <Shell nav={nav} onNav={go} rail={nav === 'trends' || nav === 'market' ? rail : null} user={user} onSignOut={signOut}>
       {body}
     </Shell>
   )
