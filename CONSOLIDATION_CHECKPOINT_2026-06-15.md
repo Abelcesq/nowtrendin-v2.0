@@ -98,6 +98,104 @@ Deploy flow: commit → GitHub → Heroku (engine via `git subtree push --prefix
 
 ---
 
+---
+
+# Session 2 (2026-06-15, later) — Calibration, Data Quality & AI Cost Cap
+
+## 6. News → mainstream calibration (the founder's model, now live)
+
+**Problem found:** news headlines carry a low per-article weight (`engagement_raw ≈
+log1p(120)=4.79`), but the magnitude scale floors at `7.0` — so a topic living
+*purely* in the news registered magnitude ≈ 0. And cold-start (calibrating) mode
+hard-zeroed breadth, so multi-outlet news corroboration was **dropped entirely** on
+a topic's first cycles. A story breaking across many reputable outlets scored as
+expert dark-matter — the opposite of "multiple outlets = mainstream."
+
+**Fix (`dual_pathway.py`):**
+- Count **distinct reputable news outlets** carrying a topic → `news_outlets`.
+  `NEWS_MAINSTREAM_MIN = 3` distinct outlets ⇒ `mainstream_confirmed`.
+- Cold-start now uses **absolute breadth** — broad simultaneous outlet/community
+  corroboration *is* the mainstream signal on day one (moat preserved: an early
+  EXPERT signal sits in expert communities, breadth ≈ 0 → `w` stays ≈ 0).
+- `mainstream_detection` gains a **cross-outlet corroboration term** so a pure-news
+  topic (magnitude ≈ 0) still surfaces.
+- `mainstream_confirmed` = absolute "it has arrived", kept **distinct** from the
+  baseline-relative "it's *moving*" (`w`). A perennial topic reads confirmed-but-
+  not-moving; a genuine spike reads moving.
+- **Persisted + surfaced** as columns: `detection_pathway`, `mainstream_ratio`,
+  `mainstream_breadth`, `news_outlets`, `mainstream_confirmed`, `tier_migration`.
+
+**Backtest:** `backtest_dual_pathway.py` — **13/13 pass** (breaking-news cold-start
+18→37 mainstream/confirmed; single outlet stays niche; multi-outlet-at-baseline =
+confirmed-but-not-moving). **Live verified:** every news topic now `path=mainstream`
+with outlet counts (trump 110, iran 148, knicks 60).
+
+## 7. Data quality — common words, consolidation, source-aware definitions
+
+1. **Common-word filter** (`common_words.txt`, ~10.3k frequent English words from
+   `wordfreq`, proper nouns subtracted — countries/demonyms/orgs/brands). A single
+   common word is **never a trend regardless of volume**. `suffering`, `saying`,
+   `exclusive`, `feeling` rejected; `japan`/`fifa`/`apple`/`chatgpt` kept. Applies at
+   extraction **and serve-time** (cleans the existing pool with no re-collection).
+   **Live verified:** junk gone from `/scores`.
+2. **Pre-score consolidation** — `_canonicalize_topic` folds variants to one key
+   (demonym→country `japanese→japan`, possessive `japan's→japan`, alias `gpt→chatgpt`)
+   at write-time, plus a **self-heal pass** each score cycle that folds existing
+   variant signals and drops orphaned non-canonical score rows. **Live verified:**
+   `japanese`→`japan`, `dutch`→`netherlands` (duplicates gone).
+3. **Source-aware AI explainer** — `_topic_source_context()` samples the real
+   headlines + their platforms/communities; `explain_topic(topic, context=…)` now
+   describes the *specific* trend driving attention (e.g. "japan" from World-Cup
+   blogs = the team's run), not a generic dictionary definition.
+
+## 8. AI cost cap — $20/month, both providers
+
+All paid AI calls — topic **definitions** (Perplexity) and **grades** (Perplexity +
+Anthropic) — are metered in a unified `ai_costs` ledger and checked against a hard
+monthly budget (`AI_MONTHLY_BUDGET_USD`, default **$20**). Once month-to-date spend
+≥ budget, the explainer endpoint, the per-cycle backfill, and `/grade` **skip new
+paid calls** (cached/persisted results still serve). New endpoint **`GET /ai/costs`**:
+month-to-date spent vs budget, remaining, %, by provider + by kind.
+**Live verified:** `/ai/costs` = `$0.00 / $20.00`.
+
+## 9. Print-to-PDF (mobile/web app)
+
+`printSignalsReport()` renders the **entire** scored list into a fresh paginating
+HTML report (the browser previously printed only the visible RN ScrollView viewport).
+Web-only "Print / PDF" button in the Trends header. *Committed; needs a
+`nowtrendin-web` rebuild to appear on that deployment.*
+
+## 10. Skills health check — 2026-06-15 (Session 2, v2 engine)
+
+| Skill | Result |
+|---|---|
+| **data-health** | 18 collectors: 13 HEALTHY/fresh; **4 STALE** (google_trends/youtube/creators/broadcast ~23h) + reddit DEGRADED (0 signals) — pre-existing slow-collector issue, not a regression. Costs tracked per source. |
+| **accuracy-sweep** | Validation triggered (Apify, async). Ledger **young**: 5 evaluated (all lagged), 850 pending, `smallSample=true` — accuracy not yet claimable (honest). |
+| **beneficiary-backtest** | `ai_infrastructure` live (NVDA EARLY/29.6, SNDK LATE/42.8, VST EARLY/24.2, CEG EARLY/24.7); `energy_transition` empty → INCONCLUSIVE (theme attention curve not populated). `would_have_flagged_early_at` null (25-pt history, young). |
+| **tier-gate-audit** | ✅ **PASS** — 17 gates, 0 access-control violations; data-aging all via `isDataAccessible`. |
+| **risk-verify** | Beneficiary layer live (NVDA 28.9/EARLY/AI Infrastructure). `/risk/scores` keyed by risk-topic not ticker in v2 — skill's ticker-match needs a field-name update. |
+| **AI cost cap** | ✅ `/ai/costs` = `$0.00 / $20.00`. |
+
+## 11. Known issues / follow-ups (updated)
+- **Calibration warm-up:** the news/baseline columns are new, so historical breadth
+  baselines ≈ 0 → most topics currently read `path=mainstream`. Baselines accumulate
+  over the next few 6-h cycles, after which perennial entities settle to baseline and
+  genuine movers stand out. Expected, self-correcting.
+- **Deeper entity resolution:** `trump` vs `Donald Trump` (surname vs full name) and
+  stray short tokens (`asi`, `dept`) aren't yet folded — needs a name/alias gazetteer
+  beyond the demonym/possessive rules.
+- **Slow collectors** (google_trends/youtube/creators/broadcast) still stalled ~23h —
+  pre-existing on both engines; investigate why their jobs stop firing in prod.
+- **Accuracy ledger** small-sample (850 pending) — re-run weekly as it ages in.
+- **`nowtrendin-web`** needs a rebuild to pick up the Print button (no git remote on
+  this machine; last deployed 6/10 from the laptop).
+- ✅ *Resolved this session:* residual common-word noise (now a real dictionary);
+  AI-spend was untracked (now capped); generic AI definitions (now source-aware).
+
+---
+
 *All scoring/calibration lives in the engine (see `transfer/`): dual-pathway detection,
-baseline-relative mainstreaming (fame vs. diffusion), community-level tiers, tier-migration,
-content-category classifier, Phase A discovery, Phase B entity resolution. Clients never re-score.*
+baseline-relative mainstreaming (fame vs. diffusion), **news-outlet corroboration +
+mainstream-confirmed**, community-level tiers, tier-migration, **common-word filter**,
+**topic consolidation**, content-category classifier, Phase A discovery, Phase B entity
+resolution, **source-aware AI explainer**, **$20/mo AI cost cap**. Clients never re-score.*
