@@ -103,8 +103,12 @@ export function Shell({
         <span className="live">●</span>
         <span>Measurement, not investment advice — not a recommendation or risk rating.</span>
         <span className="sep">|</span>
-        <span>Sources: GitHub · HackerNews · DEV.to · GDELT · Wikipedia · Google Trends · Finnhub</span>
-        <span className="right">Engine v2.4 · as of {clock}</span>
+        <a className="foot-link" href="https://nowtrendin.com/terms/" target="_blank" rel="noopener noreferrer">Terms</a>
+        <a className="foot-link" href="https://nowtrendin.com/privacy/" target="_blank" rel="noopener noreferrer">Privacy</a>
+        <a className="foot-link" href="https://nowtrendin.com/disclaimer/" target="_blank" rel="noopener noreferrer">Disclaimer</a>
+        <span className="sep">|</span>
+        <span>Sources: GitHub · HackerNews · GDELT · Wikipedia · Google Trends · Finnhub</span>
+        <span className="right">Engine v2.0 · as of {clock}</span>
       </footer>
     </div>
   )

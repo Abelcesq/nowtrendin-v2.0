@@ -56,7 +56,7 @@ export default function Profile() {
       <Row icon={<Target size={18} color="#94A3B8" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
-      <Row icon={<FileText size={18} color="#94A3B8" />} label="Terms & Conditions" />
+      <Row icon={<FileText size={18} color="#94A3B8" />} label="Legal Documents" onPress={() => router.push('/profile/legal')} />
 
       <TouchableOpacity onPress={signOut} className="flex-row items-center gap-3 py-4 mt-4">
         <LogOut size={18} color="#DC2626" />

@@ -153,7 +153,10 @@ export function Login({ onAuthed }: { onAuthed: (u: User) => void }) {
           <a className="lg-link" href="mailto:enterprise@nowtrendin.com?subject=Terminal%20access%20request">Request access</a>
           <div className="lg-legal">
             By signing in you agree that all Gradient Scores, analyses, and signal data are
-            proprietary to Now TrendIn LLC. <a href="#">Terms</a> · <a href="#">Privacy</a>
+            proprietary to Now TrendIn LLC.{' '}
+            <a href="https://nowtrendin.com/terms/" target="_blank" rel="noopener noreferrer">Terms</a> ·{' '}
+            <a href="https://nowtrendin.com/privacy/" target="_blank" rel="noopener noreferrer">Privacy</a> ·{' '}
+            <a href="https://nowtrendin.com/disclaimer/" target="_blank" rel="noopener noreferrer">Disclaimer</a>
           </div>
         </div>
       </section>
