@@ -43,7 +43,7 @@ guarantees the *same* signals, scores, calibration, and integrity on every surfa
 Deploy flow: commit → GitHub → Heroku (engine via `git subtree push --prefix transfer heroku-v2engine main`).
 
 ### How each platform points at the one engine
-- **Website / Desktop**: `web-terminal/src/lib/api.ts` → `nowtrendin-v2-engine` (auth via backend `lib/auth.ts`).
+- **Website / Desktop**: `web-terminal/src/lib/api.ts` → `nowtrendin-v2-engine` (auth via backend `lib/auth.ts`). **Institutional website deployed** at Heroku **`nowtrendin-terminal`** (https://nowtrendin-terminal-1183c0ac00c4.herokuapp.com) — Express static-serve of the `web-terminal` build via `web-deploy-terminal/` (its own git → `heroku` remote), mirroring the `web-deploy/` pattern used for `nowtrendin-web`. **Enterprise-only** login gate. Desktop = Tauri wrapping the same build.
 - **Mobile**: `frontend/lib/gradientApi.ts` → `nowtrendin-v2-engine` (was previously hitting the v1 URL directly — corrected today).
 - **Backend proxy** (mobile token-metered actions): `GRADIENT_API` config var → `nowtrendin-v2-engine`.
 
