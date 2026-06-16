@@ -3014,9 +3014,14 @@ class GravitationalAnomalyDetector:
             # recompute the canonical key from the de-underscored surface form
             canon = _topic_key(old.replace("_", " "))
             if canon and canon != old:
+                # fold the variant's signals onto the canonical key …
                 conn.execute(
-                    "UPDATE topic_signals SET topic_key = ? WHERE topic_key = ? AND extracted_at >= ?",
-                    (canon, old, cutoff))
+                    "UPDATE topic_signals SET topic_key = ? WHERE topic_key = ?",
+                    (canon, old))
+                # … and drop the now-orphaned variant SCORE rows so the stale
+                # duplicate (e.g. 'japanese') stops being served. The canonical
+                # key ('japan') is rescored this cycle with the merged signals.
+                conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (old,))
                 remapped += 1
         if remapped:
             conn.commit()
