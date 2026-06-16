@@ -902,7 +902,21 @@ def get_db(path: str = DB_PATH) -> sqlite3.Connection:
         for _col, _ddl in (("attention_magnitude",
                             "ALTER TABLE velocity_scores ADD COLUMN attention_magnitude REAL DEFAULT 0"),
                            ("n_mainstream_platforms",
-                            "ALTER TABLE velocity_scores ADD COLUMN n_mainstream_platforms INTEGER DEFAULT 0")):
+                            "ALTER TABLE velocity_scores ADD COLUMN n_mainstream_platforms INTEGER DEFAULT 0"),
+                           # Dual-pathway audit fields — make the news/mainstream
+                           # calibration visible & auditable (and surfaceable to clients).
+                           ("detection_pathway",
+                            "ALTER TABLE velocity_scores ADD COLUMN detection_pathway TEXT DEFAULT 'expert'"),
+                           ("mainstream_ratio",
+                            "ALTER TABLE velocity_scores ADD COLUMN mainstream_ratio REAL DEFAULT 0"),
+                           ("mainstream_breadth",
+                            "ALTER TABLE velocity_scores ADD COLUMN mainstream_breadth REAL DEFAULT 0"),
+                           ("news_outlets",
+                            "ALTER TABLE velocity_scores ADD COLUMN news_outlets INTEGER DEFAULT 0"),
+                           ("mainstream_confirmed",
+                            "ALTER TABLE velocity_scores ADD COLUMN mainstream_confirmed INTEGER DEFAULT 0"),
+                           ("tier_migration",
+                            "ALTER TABLE velocity_scores ADD COLUMN tier_migration INTEGER DEFAULT 0")):
             try:
                 conn.execute(f"SELECT {_col} FROM velocity_scores LIMIT 1")
             except Exception:
@@ -3845,6 +3859,10 @@ class GravitationalAnomalyDetector:
                     result["attention_magnitude"]    = _b["magnitude"]
                     result["mainstream_breadth"]     = _b["breadth"]
                     result["n_mainstream_platforms"] = _b["n_mainstream_platforms"]
+                    result["news_outlets"]           = _b.get("news_outlets", 0)
+                    result["mainstream_confirmed"]   = _b.get("mainstream_confirmed", False)
+                    result["tier_migration"]         = _b.get("tier_migration", False)
+                    result["n_expert_communities"]   = _b.get("n_expert_communities", 0)
                     _ov = _b["overall"]
                     result["signal_stage"] = (
                         "BREAKOUT"  if _ov >= BREAKOUT_THRESHOLD else
@@ -3872,9 +3890,12 @@ class GravitationalAnomalyDetector:
                     platforms_active, first_timer_ratio, engagement_asymmetry,
                     gradient_ratio, signal_stage, is_gravitational_anomaly,
                     anomaly_reason, why_this_matters, what_to_watch,
-                    attention_magnitude, n_mainstream_platforms
+                    attention_magnitude, n_mainstream_platforms,
+                    detection_pathway, mainstream_ratio, mainstream_breadth,
+                    news_outlets, mainstream_confirmed, tier_migration
                 ) VALUES (
-                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                    ?,?,?,?,?,?
                 )
             """, (
                 score_id,
@@ -3906,6 +3927,12 @@ class GravitationalAnomalyDetector:
                 result["what_to_watch"],
                 result.get("attention_magnitude", 0) or 0,
                 result.get("n_mainstream_platforms", 0) or 0,
+                result.get("detection_pathway", "expert") or "expert",
+                result.get("mainstream_ratio", 0) or 0,
+                result.get("mainstream_breadth", 0) or 0,
+                int(result.get("news_outlets", 0) or 0),
+                1 if result.get("mainstream_confirmed") else 0,
+                1 if result.get("tier_migration") else 0,
             ))
 
             # Log anomalies separately

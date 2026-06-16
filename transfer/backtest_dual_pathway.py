@@ -91,6 +91,39 @@ CASES = [
      + sig("mainstream", LOG(8000), "youtube", "trending", 1)
      + sig("mainstream", LOG(7000), "wikipedia_hot", "top", 1),
      1, 8, 10),
+
+    # ── News-outlet corroboration (the founder's model) ──────────────────────
+    # BREAKING story, cold-start: carried across 6 DISTINCT reputable outlets but
+    # NO search/view traffic yet (news engagement is below the magnitude floor ->
+    # magnitude ~0). BEFORE this fix it was invisible (calibrating dropped breadth
+    # -> w=0 -> scored as expert/dark-matter). It must now read mainstream-
+    # CONFIRMED and surface on the mainstream pathway. "Multiple outlets = mainstream."
+    ("news_breaking_coldstart", 18, 18, {"M": 55, "I": 25, "P": 15},
+     sig("mainstream", LOG(120), "newsapi_org", "reuters", 1)
+     + sig("mainstream", LOG(120), "newsapi_org", "bbc", 1)
+     + sig("mainstream", LOG(120), "newsapi_ai", "ap", 1)
+     + sig("mainstream", LOG(120), "newsapi_ai", "bloomberg", 1)
+     + sig("mainstream", LOG(120), "newsdata_io", "the guardian", 1)
+     + sig("mainstream", LOG(120), "gdelt", "nytimes", 1),
+     None, None, 0),
+
+    # ONE outlet, cold-start: a single source can still be niche/early. Must NOT
+    # be mainstream-confirmed and must stay on the expert pathway (w~0).
+    ("news_single_outlet", 20, 20, {"M": 20, "I": 15, "P": 10},
+     sig("mainstream", LOG(120), "newsapi_org", "reuters", 1),
+     None, None, 0),
+
+    # ESTABLISHED multi-outlet topic AT its own baseline (always covered by ~5
+    # outlets, not expanding). It IS mainstream-confirmed ("has arrived") but is
+    # NOT newly mainstreaming -> w~0, so the Gradient Score does not flag movement.
+    # This is the fame-vs-diffusion distinction applied to news.
+    ("news_confirmed_baseline", 22, 22, {"M": 50, "I": 8, "P": 60},
+     sig("mainstream", LOG(120), "newsapi_org", "reuters", 1)
+     + sig("mainstream", LOG(120), "newsapi_org", "bbc", 1)
+     + sig("mainstream", LOG(120), "newsapi_ai", "ap", 1)
+     + sig("mainstream", LOG(120), "newsdata_io", "cnn", 1)
+     + sig("mainstream", LOG(120), "gdelt", "the washington post", 1),
+     5, 0, 10),
 ]
 
 print(f"{'case':<22}{'pathway':<11}{'mode':<18}{'w':>6}{'mag':>7}{'OLD':>6}{'NEW':>7}")
@@ -116,6 +149,18 @@ checks = [
     ("Mainstream noise low (<35)", res["mainstream_noise"]["detection"] < 35),
     ("Tier migration detected (expert->mainstream crossing)",
         res["tech_crossing"]["tier_migration"] and res["tech_crossing"]["pathway"] in ("mainstream", "blended")),
+    # ── News-outlet corroboration ──
+    ("News breaking (6 outlets, no views) surfaces mainstream (det>30)",
+        res["news_breaking_coldstart"]["detection"] > 30
+        and res["news_breaking_coldstart"]["pathway"] in ("mainstream", "blended")),
+    ("News breaking is mainstream-CONFIRMED (multiple outlets)",
+        res["news_breaking_coldstart"]["mainstream_confirmed"] is True),
+    ("Single outlet NOT confirmed mainstream, stays expert (w<0.2)",
+        res["news_single_outlet"]["mainstream_confirmed"] is False
+        and res["news_single_outlet"]["mainstream_ratio"] < 0.2),
+    ("Established multi-outlet at baseline: CONFIRMED but NOT moving (w<0.2)",
+        res["news_confirmed_baseline"]["mainstream_confirmed"] is True
+        and res["news_confirmed_baseline"]["mainstream_ratio"] < 0.2),
 ]
 ok = True
 for label, passed in checks:

@@ -76,6 +76,19 @@ MIN_BASELINE_CYCLES = 3
 _BREADTH_DELTA_FULL = 3.0   # mainstream platforms ABOVE baseline for full mainstreaming
 _MAG_DELTA_FULL = 35.0      # magnitude points ABOVE baseline for full mainstreaming
 
+# ── News-outlet corroboration (the founder's model) ──────────────────────────
+# "One news source can be niche; multiple news sources + other platforms = it is
+#  mainstream." News carries low per-article ENGAGEMENT (≈log1p(120)=4.79, below
+# the magnitude floor of 7.0) — so a topic living PURELY in the news registers
+# near-zero MAGNITUDE and would never surface on the magnitude pathway. The honest
+# news signal is therefore BREADTH: how many DISTINCT reputable outlets carry it.
+# A topic corroborated across this many distinct reputable outlets is mainstream-
+# CONFIRMED ("it has arrived"), independent of view-count magnitude or baseline.
+_NEWS_PLATFORMS = {
+    "newsapi_org", "newsapi_ai", "newsdata_io", "gdelt", "guardian",
+}
+NEWS_MAINSTREAM_MIN = 3     # distinct reputable outlets that == mainstream-confirmed
+
 
 def attention_magnitude(signals: list) -> dict:
     """
@@ -131,25 +144,43 @@ def mainstream_breadth(signals: list) -> dict:
     expert_comms = comms(expert)
     n_main = len(main_comms)
     n_expert = len(expert_comms)
+
+    # Distinct reputable NEWS OUTLETS carrying the topic (mainstream-tier rows on
+    # a news platform). This is the founder's news-corroboration count: 1 = can be
+    # niche, NEWS_MAINSTREAM_MIN+ = mainstream-confirmed. Quarantined/unverified
+    # rows never reach here (they are tier 'unverified', excluded from `main`).
+    news_outlets = comms([s for s in main
+                          if (s.get("platform") or "").lower() in _NEWS_PLATFORMS])
+    n_news = len(news_outlets)
+
     factor = max(0.0, min(1.0, (n_main - 1) / (_BREADTH_FULL - 1)))
     return {"breadth": round(factor, 3),
             "n_platforms": n_main,          # mainstream COMMUNITY count (name kept for compat)
             "n_expert": n_expert,
+            "n_news_outlets": n_news,
             "n_sources": n_main}
 
 
-def mainstream_detection(magnitude: float, M: float, I: float, P: float) -> float:
+def mainstream_detection(magnitude: float, M: float, I: float, P: float,
+                         breadth: float = 0.0) -> float:
     """
-    Detection for a mainstream-origin topic: dominated by absolute attention
-    MAGNITUDE, supported by platform breadth (M), acceleration (I), and
-    persistence (P). Deliberately ignores G/D (expert-ratio metrics that are
-    ~0 and meaningless for consumer-origin trends).
+    Detection for a mainstream-origin topic: absolute attention MAGNITUDE
+    (views / search traffic) PLUS cross-outlet/community CORROBORATION breadth,
+    supported by platform diversity (M), acceleration (I), persistence (P).
+    Deliberately ignores G/D (expert-ratio metrics that are ~0 and meaningless
+    for consumer-origin trends).
+
+    The `breadth` term (0-1, distinct mainstream communities incl. news outlets)
+    is what lets a PURELY-NEWS topic surface: news engagement is below the
+    magnitude floor, so without this a story across a dozen reputable outlets
+    would read magnitude ~0. Broad outlet corroboration IS mainstream attention.
     """
     return round(min(100.0,
         magnitude * 0.55   # absolute attention now (views / search traffic)
-        + M * 0.20         # breadth — appears across many surfaces = real
-        + I * 0.15         # acceleration — is the magnitude rising
-        + P * 0.10         # persistence — has it held
+        + breadth * 28.0   # cross-outlet / cross-community corroboration (news!)
+        + M * 0.10         # platform diversity
+        + I * 0.10         # acceleration — is it rising
+        + P * 0.07         # persistence — has it held
     ), 2)
 
 
@@ -180,11 +211,23 @@ def blend(expert_detection: float, expert_overall: float,
     mag = am["magnitude"]
     cur_n = br["n_platforms"]
 
+    n_news = br.get("n_news_outlets", 0)
+    # Mainstream-CONFIRMED is an ABSOLUTE classification ("it has arrived"),
+    # independent of baseline/magnitude: corroborated across many distinct
+    # reputable outlets, OR broadly across mainstream communities. This is the
+    # founder's "multiple news sources + other platforms = mainstream" rule.
+    mainstream_confirmed = (n_news >= NEWS_MAINSTREAM_MIN) or (cur_n >= _BREADTH_FULL)
+
     calibrating = baseline_cycles < MIN_BASELINE_CYCLES or breadth_baseline is None
     if calibrating:
-        # No trustworthy baseline yet — use absolute magnitude so genuine spikes
-        # surface, but do NOT let absolute breadth (ambient fame) count.
-        breadth_factor = 0.0
+        # No trustworthy baseline yet. Use absolute magnitude for view-count
+        # spikes AND absolute breadth for news-outlet corroboration — on a topic's
+        # first cycles, broad simultaneous outlet/community corroboration is itself
+        # the best mainstream signal (a story across 8 outlets but with no
+        # Wikipedia/Trends views has magnitude ~0 and would otherwise be invisible).
+        # The moat is preserved: an early EXPERT signal sits in expert communities,
+        # so its mainstream breadth is ~0 and w stays ~0 regardless.
+        breadth_factor = br["breadth"]
         magnitude_factor = mag / 100.0
         breadth_mode = "calibrating"
     else:
@@ -213,11 +256,14 @@ def blend(expert_detection: float, expert_overall: float,
     I = float(components.get("I", 0) or 0)
     P = float(components.get("P", 0) or 0)
 
-    md = mainstream_detection(mag, M, I, P)
+    abs_breadth = br["breadth"]   # ABSOLUTE corroboration (how mainstream it IS),
+                                  # vs. breadth_factor above (how much it's MOVING)
+    md = mainstream_detection(mag, M, I, P, breadth=abs_breadth)
 
-    # Mainstream OVERALL leans on magnitude + persistence + breadth (a real,
-    # held, broad consumer trend), parallel to mainstream_detection.
-    mo = round(min(100.0, mag * 0.45 + P * 0.25 + M * 0.20 + I * 0.10), 2)
+    # Mainstream OVERALL leans on magnitude + corroboration breadth + persistence
+    # (a real, held, broadly-carried consumer/news trend), parallel to md.
+    mo = round(min(100.0,
+        mag * 0.45 + abs_breadth * 28.0 + P * 0.18 + M * 0.15 + I * 0.08), 2)
 
     detection = round((1 - w) * expert_detection + w * md, 2)
     overall = round((1 - w) * expert_overall + w * mo, 2)
@@ -237,6 +283,8 @@ def blend(expert_detection: float, expert_overall: float,
         "breadth_baseline": breadth_baseline,
         "magnitude_baseline": magnitude_baseline,
         "n_expert_communities": br.get("n_expert", 0),
+        "news_outlets": n_news,
+        "mainstream_confirmed": bool(mainstream_confirmed),
         "tier_migration": bool(tier_migration),
         "mainstream_detection": md,
         "expert_detection": round(expert_detection, 2),
