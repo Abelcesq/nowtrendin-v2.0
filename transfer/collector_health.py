@@ -28,19 +28,22 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 # max_gap_minutes = how long since last success before "stale".
 # critical = its absence makes the scores half-blind (only enabled+licensed ones).
 COLLECTOR_EXPECTATIONS = {
-    # Active attention collectors (every ~30 min)
-    "github":        {"max_gap_minutes": 120, "mode": "attention", "critical": True},
-    "hackernews":    {"max_gap_minutes": 120, "mode": "attention", "critical": True},
-    "blogs":         {"max_gap_minutes": 180, "mode": "attention", "critical": False},
-    "newsapi_org":   {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    "newsapi_ai":    {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    "newsdata_io":   {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    "yahoo_finance": {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    # Social/open-network collectors (added 2026-06-12, keyless) — the niche
-    # early-chatter tier replacing Reddit. Non-critical while they prove out.
-    "bluesky":       {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    "lemmy":         {"max_gap_minutes": 120, "mode": "attention", "critical": False},
-    "mastodon":      {"max_gap_minutes": 120, "mode": "attention", "critical": False},
+    # Main collect cycle runs every COLLECT_INTERVAL_MIN (default 360 = 6h), so a
+    # collector's freshness window MUST exceed the cadence + margin or it flaps
+    # STALE between cycles. 7h (420m) = 6h cadence + 1h margin. (Earlier 120m
+    # windows assumed a ~30-min cadence that no longer exists — the cause of the
+    # false "STALE" on news/github/etc.)
+    "github":        {"max_gap_minutes": 420, "mode": "attention", "critical": True},
+    "hackernews":    {"max_gap_minutes": 420, "mode": "attention", "critical": True},
+    "blogs":         {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "newsapi_org":   {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "newsapi_ai":    {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "newsdata_io":   {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "yahoo_finance": {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    # Social/open-network collectors (keyless) — niche early-chatter tier.
+    "bluesky":       {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "lemmy":         {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    "mastodon":      {"max_gap_minutes": 420, "mode": "attention", "critical": False},
     # Discovery + mainstream (every 6 h)
     "google_trends": {"max_gap_minutes": 8 * 60,  "mode": "attention", "critical": True},
     "youtube":       {"max_gap_minutes": 8 * 60,  "mode": "attention", "critical": False},

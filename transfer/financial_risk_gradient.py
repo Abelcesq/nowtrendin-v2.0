@@ -1570,29 +1570,59 @@ _CREATOR_CACHE: dict = {}
 _CREATOR_TTL = int(os.getenv("CREATOR_TTL_SEC", "21600"))  # 6h
 
 
+# ── FREE YouTube uploads via channel RSS (0 API quota) ───────────────────────
+# Channel uploads are public RSS at feeds/videos.xml?channel_id=ID — no quota,
+# no key, far more reliable than the search/playlistItems API path (which kept
+# the broadcast/creator collectors DOWN on quota). We still resolve handle→id
+# via the cheap forHandle endpoint (1 unit), cached permanently so it costs ~27
+# units total, ever.
+_CHANNEL_ID_CACHE: dict = {}
+
+
+def _resolve_channel_id_cached(handle: str) -> Optional[str]:
+    if handle in _CHANNEL_ID_CACHE:
+        return _CHANNEL_ID_CACHE[handle]
+    cid = None
+    try:
+        cid = resolve_channel_id(handle)
+    except Exception as e:
+        print(f"[youtube] resolve {handle} error: {e}")
+    if cid:
+        _CHANNEL_ID_CACHE[handle] = cid
+    return cid
+
+
+def _youtube_rss_recent(channel_id: str, max_videos: int = 30) -> list:
+    """Recent uploads for a channel via its public RSS feed — FREE (no quota)."""
+    import feedparser
+    out = []
+    try:
+        feed = feedparser.parse(
+            f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
+        for e in (feed.entries or [])[:max_videos]:
+            out.append({
+                "title": e.get("title", "") or "",
+                "desc": (e.get("summary", "") or "")[:300],
+                "published": e.get("published", "") or "",
+                "url": e.get("link", "") or "",
+            })
+    except Exception as e:
+        print(f"[youtube] RSS {channel_id} error: {e}")
+    return out
+
+
 def _creator_recent(handle: str, max_videos: int = 40) -> list:
-    """Recent uploads (title/desc/date/url) for a creator handle, cached ~6h."""
+    """Recent uploads (title/desc/date/url) for a creator handle, cached ~6h.
+    Uses the FREE channel RSS feed (0 quota)."""
     import time as _t
     c = _CREATOR_CACHE.get(handle)
     if c is not None and (_t.time() - c.get("ts", 0) < _CREATOR_TTL):
         return c.get("videos", [])
     vids = []
     try:
-        channel_id = resolve_channel_id(handle)
+        channel_id = _resolve_channel_id_cached(handle)
         if channel_id:
-            ch = _youtube_get("channels", {"part": "contentDetails", "id": channel_id})
-            up = ch["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"] if ch and ch.get("items") else None
-            if up:
-                pl = _youtube_get("playlistItems", {"part": "snippet", "playlistId": up, "maxResults": max_videos})
-                for it in (pl or {}).get("items", []):
-                    sn = it.get("snippet", {})
-                    vid = (sn.get("resourceId") or {}).get("videoId", "")
-                    vids.append({
-                        "title": sn.get("title", ""),
-                        "desc": (sn.get("description", "") or "")[:300],
-                        "published": sn.get("publishedAt", ""),
-                        "url": f"https://www.youtube.com/watch?v={vid}" if vid else f"https://www.youtube.com/@{handle}",
-                    })
+            vids = _youtube_rss_recent(channel_id, max_videos)
     except Exception as e:
         print(f"[creator] {handle} fetch error: {e}")
         return c.get("videos", []) if c else []
@@ -1663,21 +1693,9 @@ def _broadcast_recent(handle: str, max_videos: int = 30) -> list:
         return c.get("videos", [])
     vids = []
     try:
-        channel_id = resolve_channel_id(handle)
+        channel_id = _resolve_channel_id_cached(handle)
         if channel_id:
-            ch = _youtube_get("channels", {"part": "contentDetails", "id": channel_id})
-            up = ch["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"] if ch and ch.get("items") else None
-            if up:
-                pl = _youtube_get("playlistItems", {"part": "snippet", "playlistId": up, "maxResults": max_videos})
-                for it in (pl or {}).get("items", []):
-                    sn = it.get("snippet", {})
-                    vid = (sn.get("resourceId") or {}).get("videoId", "")
-                    vids.append({
-                        "title": sn.get("title", ""),
-                        "desc": (sn.get("description", "") or "")[:300],
-                        "published": sn.get("publishedAt", ""),
-                        "url": f"https://www.youtube.com/watch?v={vid}" if vid else f"https://www.youtube.com/@{handle}",
-                    })
+            vids = _youtube_rss_recent(channel_id, max_videos)
     except Exception as e:
         print(f"[broadcast] {handle} fetch error: {e}")
         return c.get("videos", []) if c else []

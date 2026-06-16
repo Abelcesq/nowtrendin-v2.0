@@ -4276,13 +4276,26 @@ def start_scheduler():
                                  ("bluesky", collect_bluesky),
                                  ("lemmy", collect_lemmy),
                                  ("mastodon", collect_mastodon),
-                                 ("gdelt", collect_gdelt_trends)):
+                                 ("gdelt", collect_gdelt_trends),
+                                 # YouTube trend collectors — now FREE (channel RSS,
+                                 # 0 API quota), so they run in the reliable main
+                                 # cycle (boot + every 6h) instead of a fragile
+                                 # quota-bound cron that kept them DOWN.
+                                 ("creators", collect_creator_trends),
+                                 ("broadcast", collect_broadcast_trends)):
                     try:
                         _n = _fn(c) or 0
                         _log_health(_nm, _n, "success", conn=c)
                     except Exception as _ce:
                         _log_health(_nm, 0, "failure", conn=c)
                         print(f"[scheduler] {_nm} error: {_ce}")
+                # Mainstream-news/YouTube coverage for top topics (separate arg).
+                try:
+                    _mn = collect_mainstream_news(c, limit=int(os.getenv("MAINSTREAM_NEWS_LIMIT", "12"))) or 0
+                    _log_health("youtube", _mn, "success", conn=c)
+                except Exception as _mne:
+                    _log_health("youtube", 0, "failure", conn=c)
+                    print(f"[scheduler] mainstream-news error: {_mne}")
                 c.close()
                 if _BLOGS_AVAILABLE:
                     try:
@@ -4452,6 +4465,11 @@ def start_scheduler():
         # them up. (Trend validation stays capped at ACCURACY_BATCH per day.)
         if os.getenv("APIFY_TOKEN") and os.getenv("GOOGLE_TRENDS_ENABLED", "1") == "1":
             def _scheduled_google_trends():
+                # ONLY the paid Apify Google-Trends discovery here (kept on a
+                # controlled clock cadence to bound cost). The YouTube collectors
+                # (creators/broadcast/mainstream-news) moved to the main collect
+                # cycle now that they're free (RSS) — so they fire reliably on
+                # boot + every 6h instead of only at these clock slots.
                 try:
                     c = get_db(DB_PATH)
                     try:
@@ -4460,27 +4478,6 @@ def start_scheduler():
                     except Exception as _gce:
                         _log_health("google_trends", 0, "failure", conn=c)
                         print(f"[scheduler] google-trends collect error: {_gce}")
-                    # Mainstream-tier coverage (YouTube, GDELT fallback) for the
-                    # top topics — runs on this 6h cadence to respect YouTube
-                    # quota. Gives broad topics a real mainstream denominator.
-                    try:
-                        _mn = collect_mainstream_news(c, limit=int(os.getenv("MAINSTREAM_NEWS_LIMIT", "12"))) or 0
-                        _log_health("youtube", _mn, "success", conn=c)
-                    except Exception as _mne:
-                        _log_health("youtube", 0, "failure", conn=c)
-                        print(f"[scheduler] mainstream-news error: {_mne}")
-                    try:
-                        _cn = collect_creator_trends(c) or 0
-                        _log_health("creators", _cn, "success", conn=c)
-                    except Exception as _cne:
-                        _log_health("creators", 0, "failure", conn=c)
-                        print(f"[scheduler] creator-trends error: {_cne}")
-                    try:
-                        _bn = collect_broadcast_trends(c) or 0
-                        _log_health("broadcast", _bn, "success", conn=c)
-                    except Exception as _bne:
-                        _log_health("broadcast", 0, "failure", conn=c)
-                        print(f"[scheduler] broadcast-trends error: {_bne}")
                     c.close()
                 except Exception as _gte:
                     print(f"[scheduler] google-trends error: {_gte}")
