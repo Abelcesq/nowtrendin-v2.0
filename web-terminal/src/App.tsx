@@ -28,7 +28,15 @@ export function App() {
   const [nav, setNav] = useState<NavKey>('trends')
   const [rail, setRail] = useState<ReactNode | null>(null)
 
-  useEffect(() => { fetchMe().then((u) => { setUser(u); setBooting(false) }) }, [])
+  // Enterprise-only web build: a restored session must be Enterprise tier, else
+  // clear it (Consumer/Business belong on the mobile app). The Login screen
+  // enforces the same gate on sign-in.
+  useEffect(() => {
+    fetchMe().then((u) => {
+      if (u && u.tier !== 'enterprise') { logout(); u = null }
+      setUser(u); setBooting(false)
+    })
+  }, [])
 
   if (booting) {
     return <div style={{ display: 'grid', placeItems: 'center', height: '100vh' }}><div className="spinner" /></div>
