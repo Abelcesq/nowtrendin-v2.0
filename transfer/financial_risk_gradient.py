@@ -1979,7 +1979,20 @@ def compute_market_gradient(payload: dict, diffusion_score: dict,
         confidence_basis = "diffusion confirmation (no ticker fundamentals)"
 
     avg = (detection + confidence) / 2
-    tier = next(name for thr, name in MARKET_TIERS if avg >= thr)
+    abs_tier = next(name for thr, name in MARKET_TIERS if avg >= thr)
+    # ── Deviation-aware tier (recalibration) ───────────────────────────────
+    # The absolute composite is baseline-relative and realistically sits ~30-45
+    # in normal conditions, so an absolute-only cut left everything in ROUTINE.
+    # An item that is genuinely UNUSUAL VS ITS OWN BASELINE is what Market Signal
+    # exists to surface — so promote the tier by the baseline-abnormality score
+    # (`ba`), using the SAME 25/50/72 thresholds as the topic classification so
+    # the two stay consistent. Take the higher of the two (never demote). This
+    # surfaces real relative movement; it does NOT manufacture signal — a flat,
+    # at-baseline item still reads ROUTINE/DORMANT.
+    _dev_tier = ("ELEVATED" if ba >= 72 else "ACTIVE" if ba >= 50
+                 else "BUILDING" if ba >= 25 else abs_tier)
+    _RANK = {"DORMANT": 0, "ROUTINE": 1, "BUILDING": 2, "ACTIVE": 3, "ELEVATED": 4}
+    tier = abs_tier if _RANK.get(abs_tier, 1) >= _RANK.get(_dev_tier, 1) else _dev_tier
     gap = round(detection - confidence, 1)
 
     components = {
