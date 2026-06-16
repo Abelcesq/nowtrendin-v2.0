@@ -58,6 +58,11 @@ export async function loginWithGoogle(idToken: string): Promise<User> {
 
 export function logout() { clearTokens() }
 
+// Enterprise "Pull Trends" — fresh attention collect, token-metered by the
+// backend (1 token). Same endpoint the mobile app uses, so behaviour matches.
+export const pullTrends = () =>
+  call('/api/pull-trends/', { method: 'POST' }, true) as Promise<any>
+
 // ── Watchlists — backend-synced per-user lists (same API the mobile app uses),
 // so the SAME lists appear on web, desktop, and mobile. Items hold key/display/
 // kind only; the view looks up live scores by key. ──

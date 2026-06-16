@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type TopicRow } from '../lib/api'
+import { pullTrends } from '../lib/auth'
+
+// Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
+// so the two surfaces match. `gap` here is abs(detection − confidence), matching
+// mobile's scoreGap. Default view is "Now TrendIn" (everything, by Detection desc).
+const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean }[] = [
+  { k: 'nowtrendin', label: 'Now TrendIn' },
+  { k: 'all', label: 'All Signals' },
+  { k: 'breakout', label: 'Breakout ≥85', test: (r) => r.det >= 85 },
+  { k: 'strong', label: 'Strong ≥70', test: (r) => r.det >= 70 && r.det < 85 },
+  { k: 'emerging', label: 'Emerging', test: (r) => r.det >= 55 && r.det < 70 },
+  { k: 'lowrisk', label: 'Low Risk', test: (r) => Math.abs(r.gap) <= 6 },
+  { k: 'anomalies', label: 'Anomalies', test: (r) => Math.abs(r.gap) >= 18 },
+]
 
 interface Row extends TopicRow { det: number; conf: number; gap: number; stage: string; ageMin: number }
 type SortKey = 'topic_display' | 'det' | 'conf' | 'gap' | 'stage' | 'category' | 'total_mentions' | 'ageMin'
@@ -129,10 +143,12 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
   const [cats, setCats] = useState<{ key: string; label: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState('nowtrendin')   // mobile default = Now TrendIn
   const [sortKey, setSortKey] = useState<SortKey>('det')
   const [sortDir, setSortDir] = useState(-1)
   const [sel, setSel] = useState<string | null>(null)
+  const [pulling, setPulling] = useState(false)
+  const [pullMsg, setPullMsg] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
@@ -152,11 +168,9 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
 
   const view = useMemo(() => {
     let r = rows.slice()
-    if (filter === 'early') r = r.filter((x) => x.gap >= 20)
-    else if (filter === 'breakout') r = r.filter((x) => x.det >= 85)
-    else if (filter === 'strong') r = r.filter((x) => x.det >= 70)
-    else if (filter === 'cooling') r = r.filter((x) => x.gap < 0)
-    else if (filter !== 'all') r = r.filter((x) => (x.category || '').toLowerCase() === filter)
+    const sig = SIGNAL_FILTERS.find((f) => f.k === filter)
+    if (sig) { if (sig.test) r = r.filter(sig.test) }     // nowtrendin/all = no filter
+    else r = r.filter((x) => (x.category || '').toLowerCase() === filter)  // category chip
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string') return String(va).localeCompare(String(vb)) * sortDir
@@ -171,6 +185,16 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
   }
   const arrow = (k: SortKey) => (k === sortKey ? (sortDir < 0 ? '▼' : '▲') : '▼')
 
+  const doPull = async () => {
+    setPulling(true); setPullMsg(null)
+    try {
+      const r = await pullTrends()
+      setPullMsg(r?.message || 'Pull queued — fresh signals arrive next cycle.')
+    } catch (e: any) {
+      setPullMsg(e?.data?.detail || e?.message || 'Pull failed.')
+    } finally { setPulling(false) }
+  }
+
   const select = (key: string) => {
     if (key === sel) { setSel(null); onRail(null); return }
     setSel(key)
@@ -182,21 +206,23 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
     <>
       <div className="main-head">
         <div className="main-title-row">
-          <div className="main-title">Signal Screener</div>
-          <div className="main-sub"><b>{view.length}</b> topics · diffusion-scored · {filter === 'all' ? 'all categories' : filter}</div>
+          <div className="main-title">Trends</div>
+          <div className="main-sub"><b>{view.length}</b> topics · diffusion-scored{pullMsg ? ` · ${pullMsg}` : ''}</div>
           <div className="main-actions">
+            <button className="btn primary" onClick={doPull} disabled={pulling} title="Enterprise — costs 1 token">
+              {pulling ? '⟳ Pulling…' : '⚡ Pull Trends · 1 token'}
+            </button>
             <button className="btn">▦ Columns</button>
-            <button className="btn primary">↧ Export</button>
+            <button className="btn">↧ Export</button>
           </div>
         </div>
-        {/* Row 1 — SIGNAL filters (stage / gap) */}
+        {/* Row 1 — TRENDS (signal) filters — EXACT mobile parity (CATEGORY_DEFS) */}
         <div className="chips tight">
-          <span className="chip-label">Signal</span>
-          <div className={'chip' + (filter === 'all' ? ' active' : '')} onClick={() => setFilter('all')}>All</div>
-          <div className={'chip early' + (filter === 'early' ? ' active' : '')} onClick={() => { setFilter('early'); setSortKey('gap'); setSortDir(-1) }}>⟡ Early Signals</div>
-          <div className={'chip' + (filter === 'breakout' ? ' active' : '')} onClick={() => setFilter('breakout')}>Breakout ≥85</div>
-          <div className={'chip' + (filter === 'strong' ? ' active' : '')} onClick={() => setFilter('strong')}>Strong ≥70</div>
-          <div className={'chip' + (filter === 'cooling' ? ' active' : '')} onClick={() => setFilter('cooling')}>Cooling</div>
+          <span className="chip-label">Trends</span>
+          {SIGNAL_FILTERS.map((f) => (
+            <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')}
+              onClick={() => setFilter(f.k)}>{f.label}</div>
+          ))}
         </div>
         {/* Row 2 — CATEGORY filters (the WHAT axis) */}
         {cats.length > 0 && (
