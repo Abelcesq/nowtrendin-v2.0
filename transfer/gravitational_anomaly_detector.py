@@ -3041,16 +3041,22 @@ class GravitationalAnomalyDetector:
                 conn.execute("UPDATE topic_signals SET topic_key = ? WHERE topic_key = ?",
                              (canon, old))
                 folded += 1
-        # ── 2) Drop ALL non-canonical SCORE rows (catches prior-cycle orphans) ──
-        # so the stale duplicate ('japanese', 'dutch') stops being served; the
-        # canonical key is rescored this cycle with the merged signals.
+        # ── 2) Drop non-canonical SCORE rows (prior-cycle orphans) + single-word
+        # common-word JUNK rows ('destroyed', 'novel') that were scored before the
+        # quality gate ran at scoring. Multi-word keys are left alone (may be names).
+        pruned = 0
         for r in conn.execute("SELECT DISTINCT topic_key FROM velocity_scores").fetchall():
             old = r["topic_key"]
-            if old and _topic_key(old.replace("_", " ")) != old:
+            if not old:
+                continue
+            non_canon = _topic_key(old.replace("_", " ")) != old
+            single_junk = ("_" not in old) and not _is_quality_topic(old.replace("_", " "))
+            if non_canon or single_junk:
                 conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (old,))
+                pruned += 1
         conn.commit()
-        if folded:
-            print(f"  [score] consolidated {folded} variant topic keys → canonical")
+        if folded or pruned:
+            print(f"  [score] consolidated {folded} variant keys; pruned {pruned} stale/junk score rows")
         return folded
 
     def compute_gradient_strength(self, signals: list[dict]) -> tuple[float, float]:
@@ -3949,8 +3955,17 @@ class GravitationalAnomalyDetector:
         """, (cutoff, MIN_TOPIC_APPEARANCES, HIGH_MAGNITUDE_ENG)).fetchall()
 
         topic_keys = [r["topic_key"] for r in rows]
+        # Skip SINGLE-word common-word junk at SCORING (not just serve), so junk
+        # ("destroyed", "novel") never gets scored/stored. Only single-token keys
+        # are gated — multi-word keys may be proper-noun names (e.g. "michael_
+        # chandler") the lowercase filter can't distinguish, so they pass through.
+        _pre = len(topic_keys)
+        topic_keys = [tk for tk in topic_keys
+                      if ("_" in tk) or _is_quality_topic((tk or "").replace("_", " "))]
+        _skipped = _pre - len(topic_keys)
         print(f"\nScoring {len(topic_keys)} scoreable topics "
-              f"(filtered from raw fragment pool)...")
+              f"(filtered from raw fragment pool"
+              f"{f'; skipped {_skipped} single-word junk' if _skipped else ''})...")
 
         results = []
         anomalies = []
