@@ -56,6 +56,19 @@ export const alertsApi = {
   remove: (id: number) => api.delete(`/api/alerts/${id}/`),
 };
 
+// Backend-synced watchlists — the SAME /api/watchlists/ the web/desktop terminal
+// uses, so a member's lists are identical across every platform. Items store
+// key/display/kind only; the live Detection/Confidence is looked up client-side.
+export const watchlistApi = {
+  list: () => api.get('/api/watchlists/'),
+  create: (name: string) => api.post('/api/watchlists/', { name }),
+  rename: (id: number, name: string) => api.patch(`/api/watchlists/${id}/`, { name }),
+  remove: (id: number) => api.delete(`/api/watchlists/${id}/`),
+  addItem: (id: number, item: { key: string; display?: string; kind?: 'topic' | 'market' }) =>
+    api.post(`/api/watchlists/${id}/items/`, item),
+  removeItem: (id: number, itemId: number) => api.delete(`/api/watchlists/${id}/items/${itemId}/`),
+};
+
 export const signalsApi = {
   list: (params?: Record<string, string>) => {
     const q = params ? `?${new URLSearchParams(params).toString()}` : '';
