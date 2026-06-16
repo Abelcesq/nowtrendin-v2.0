@@ -30,6 +30,7 @@ export function App() {
   const [booting, setBooting] = useState(true)
   const [nav, setNav] = useState<NavKey>('trends')
   const [rail, setRail] = useState<ReactNode | null>(null)
+  const [q, setQ] = useState('')   // top-bar search → filters the Trends grid
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
   // clear it (Consumer/Business belong on the mobile app). The Login screen
@@ -50,7 +51,7 @@ export function App() {
   const signOut = () => { logout(); setUser(null) }
 
   let body: ReactNode
-  if (nav === 'trends') body = <Screener onRail={setRail} />
+  if (nav === 'trends') body = <Screener onRail={setRail} query={q} />
   else if (nav === 'market') body = <MarketSignal onRail={setRail} />
   else if (nav === 'watchlists') body = <Watchlists />
   else if (nav === 'ledger') body = <Ledger />
@@ -58,7 +59,7 @@ export function App() {
   else body = <Placeholder title={titleFor(nav)} />
 
   return (
-    <Shell nav={nav} onNav={go} rail={nav === 'trends' || nav === 'market' ? rail : null} user={user} onSignOut={signOut}>
+    <Shell nav={nav} onNav={go} rail={nav === 'trends' || nav === 'market' ? rail : null} user={user} onSignOut={signOut} search={q} onSearch={setQ}>
       {body}
     </Shell>
   )

@@ -181,7 +181,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 }
 
-export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) => void }) {
+export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNode | null) => void; query?: string }) {
   const [rows, setRows] = useState<Row[]>([])
   const [cats, setCats] = useState<{ key: string; label: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
@@ -220,13 +220,15 @@ export function Screener({ onRail }: { onRail: (node: React.ReactNode | null) =>
     const sig = SIGNAL_FILTERS.find((f) => f.k === filter)
     if (sig) { if (sig.test) r = r.filter(sig.test) }     // nowtrendin/all = no filter
     // category rows already filtered server-side (catParam) — no client re-filter
+    const ql = query.trim().toLowerCase()
+    if (ql) r = r.filter((x) => (x.topic_display || '').toLowerCase().includes(ql) || (x.topic_key || '').toLowerCase().includes(ql))
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string') return String(va).localeCompare(String(vb)) * sortDir
       return ((va ?? -1) - (vb ?? -1)) * sortDir
     })
     return r
-  }, [rows, filter, sortKey, sortDir])
+  }, [rows, filter, sortKey, sortDir, query])
 
   const sort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => -d)

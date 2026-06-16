@@ -30,7 +30,7 @@ function useEtClock() {
 }
 
 export function Shell({
-  nav, onNav, children, rail, user, onSignOut,
+  nav, onNav, children, rail, user, onSignOut, search, onSearch,
 }: {
   nav: NavKey
   onNav: (k: NavKey) => void
@@ -38,6 +38,8 @@ export function Shell({
   rail?: ReactNode
   user?: User | null
   onSignOut?: () => void
+  search?: string
+  onSearch?: (v: string) => void
 }) {
   const clock = useEtClock()
   const initials = (user?.name || user?.email || 'NT').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'NT'
@@ -59,7 +61,9 @@ export function Shell({
         </div>
         <div className="search">
           <svg className="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
-          <input id="search" type="text" placeholder="Search topics, tickers, screens…" autoComplete="off" />
+          <input id="search" type="text" placeholder="Search topics, tickers, screens…" autoComplete="off"
+            value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)}
+            onFocus={() => nav !== 'trends' && onNav('trends')} />
           <span className="kbd">⌘K</span>
         </div>
         <div className="top-right">
