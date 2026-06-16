@@ -3060,9 +3060,12 @@ class GravitationalAnomalyDetector:
             old = r["topic_key"]
             if not old:
                 continue
-            non_canon = _topic_key(old.replace("_", " ")) != old
-            single_junk = ("_" not in old) and not _is_quality_topic(old.replace("_", " "))
-            if non_canon or single_junk:
+            d = old.replace("_", " ")
+            toks = d.split()
+            non_canon = _topic_key(d) != old
+            single_junk = (len(toks) <= 1) and not _is_quality_topic(d)
+            frag = len(toks) >= 2 and (toks[0] in NEWS_FILLER or toks[-1] in NEWS_FILLER)
+            if non_canon or single_junk or frag:
                 conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (old,))
                 pruned += 1
         conn.commit()
@@ -3966,13 +3969,23 @@ class GravitationalAnomalyDetector:
         """, (cutoff, MIN_TOPIC_APPEARANCES, HIGH_MAGNITUDE_ENG)).fetchall()
 
         topic_keys = [r["topic_key"] for r in rows]
-        # Skip SINGLE-word common-word junk at SCORING (not just serve), so junk
-        # ("destroyed", "novel") never gets scored/stored. Only single-token keys
-        # are gated — multi-word keys may be proper-noun names (e.g. "michael_
-        # chandler") the lowercase filter can't distinguish, so they pass through.
+        # Quality gate at SCORING (not just serve), so junk never gets stored:
+        #   • single-word common-word junk ("destroyed", "novel")
+        #   • multi-word HEADLINE FRAGMENTS anchored by a news-filler token
+        #     ("end iran war", "media starmer announces")
+        # Multi-word NON-fragment keys pass (may be proper-noun names like
+        # "michael chandler" the lowercase filter can't disambiguate — let serve
+        # decide those).
+        def _scoreable(tk: str) -> bool:
+            d = (tk or "").replace("_", " ")
+            toks = d.split()
+            if len(toks) >= 2 and (toks[0] in NEWS_FILLER or toks[-1] in NEWS_FILLER):
+                return False
+            if len(toks) <= 1:
+                return _is_quality_topic(d)
+            return True
         _pre = len(topic_keys)
-        topic_keys = [tk for tk in topic_keys
-                      if ("_" in tk) or _is_quality_topic((tk or "").replace("_", " "))]
+        topic_keys = [tk for tk in topic_keys if _scoreable(tk)]
         _skipped = _pre - len(topic_keys)
         print(f"\nScoring {len(topic_keys)} scoreable topics "
               f"(filtered from raw fragment pool"
