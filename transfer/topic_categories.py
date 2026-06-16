@@ -91,9 +91,12 @@ _LEX = {
         ["ipo", "merger", "acquisition", "earnings", "quarterly results",
          "layoffs", "bankruptcy", "valuation", "venture capital", "private equity",
          "stock split", "shareholder", "ceo", "startup funding"],
+        # NOTE: "deal" deliberately NOT here — it routed geopolitical "X deal"
+        # (Iran deal, trade deal, peace deal) to Business. M&A is still caught by
+        # the strong list (ipo/merger/acquisition) + "merge".
         ["company", "stock", "market", "shares", "revenue", "profit", "brand",
          "retail", "funding", "investor", "business", "corporate", "firm",
-         "executive", "deal", "merge"],
+         "executive", "merge"],
     ),
     "economy": (
         ["inflation", "interest rate", "federal reserve", "gdp", "recession",
@@ -139,10 +142,16 @@ _LEX = {
     "current_events": (
         ["earthquake", "hurricane", "wildfire", "mass shooting", "terror attack",
          "plane crash", "mid-air collision", "natural disaster", "state of emergency",
-         "evacuation"],
+         "evacuation", "nuclear deal", "peace deal", "ceasefire", "war crimes"],
         ["protest", "disaster", "flood", "fire", "crash", "shooting", "attack",
          "crisis", "emergency", "rescue", "storm", "explosion", "accident",
-         "kidnapping", "murder", "missing"],
+         "kidnapping", "murder", "missing",
+         # geopolitics / conflict — genuinely current-events (and what made
+         # "iran deal" land in Business via the bare "deal" keyword)
+         "war", "conflict", "missile", "strike", "troops", "military", "border",
+         "refugee", "hostage", "coup", "invasion", "nuclear", "sanctions",
+         "iran", "israel", "gaza", "ukraine", "syria", "hamas", "hezbollah",
+         "taiwan", "north korea", "geopolitical"],
     ),
     # "news" and "general" are fallbacks — no lexicon; assigned when nothing
     # else scores. "economy"/"business" and "politics"/"current_events" overlap

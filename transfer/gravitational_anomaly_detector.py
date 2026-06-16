@@ -1010,6 +1010,12 @@ NEWS_FILLER = {
     "finds", "told", "tell", "tells", "add", "adds", "put", "puts", "expect",
     "expects", "could", "would", "amid", "latest", "live", "update", "updates",
     "video", "watch", "photos", "news", "today", "week", "year", "day",
+    # verbs/nouns that anchor headline fragments ("iran deal signed",
+    # "leaders meet", "nuclear talks", "ceo eyes deal")
+    "sign", "signs", "signed", "agree", "agrees", "agreed", "agreement",
+    "meet", "meets", "met", "talk", "talks", "visit", "visits", "eye", "eyes",
+    "seek", "seeks", "launch", "launches", "launched", "unveil", "unveils",
+    "reach", "reaches", "reached", "near", "nears", "weigh", "weighs",
 }
 
 # Profanity / slurs — never surface as topics in an institutional product.
@@ -1116,11 +1122,16 @@ def _is_quality_topic(display: str) -> bool:
         # reject curated junk OR any frequent common word — a single common word
         # is never a trend, no matter how many times it is posted.
         return not (w in GENERIC_JUNK or _is_common_word(w))
-    # multi-word: a real entity/anchor usually carries a non-common proper token
-    # ("fifa world cup", "openai gpt"), so keep the phrase UNLESS every token is
-    # generic vocabulary (stop / junk / common word): "every single",
-    # "feeling good", "world news" → noise. (Proper-noun tokens like "fifa" are
-    # excluded from the common-word list, so they keep the phrase.)
+    # multi-word: reject HEADLINE FRAGMENTS anchored by a news-filler verb/noun at
+    # either end ("iran deal", "says iran deal", "iran deal signed", "leaders
+    # meet") — these are clauses, not topics; the real entity ("iran") survives as
+    # its own unigram. Enforced here so it applies at BOTH extraction AND serve
+    # (incl. capitalized entities from _extract_entities, which skip the n-gram
+    # filler check). Then keep the phrase UNLESS every token is generic vocabulary.
+    if toks[0] in NEWS_FILLER or toks[-1] in NEWS_FILLER:
+        return False
+    if any(w in DOMAIN_TERMS for w in toks):
+        return True
     return not all((w in STOP_WORDS or w in GENERIC_JUNK or _is_common_word(w))
                    for w in toks)
 
