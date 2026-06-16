@@ -255,6 +255,7 @@ def cost_sentinel() -> dict:
         # BUDGET below (posts are the in-plan cap; this is the plan's $ fee).
         # X Basic = $200/mo; migrating to Pay-Per-Use 2026-06-21 — update then.
         ("X Developer API", float(os.getenv("COST_X_API_USD", "200"))),
+        ("AWS", float(os.getenv("COST_AWS_USD", "104"))),
         ("Data API subscriptions", float(os.getenv("COST_SUBSCRIPTIONS_USD", "0"))),
         ("GitHub (Pages/Actions)", float(os.getenv("COST_GITHUB_USD", "0"))),
     ]
