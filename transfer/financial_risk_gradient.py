@@ -1570,12 +1570,12 @@ _CREATOR_CACHE: dict = {}
 _CREATOR_TTL = int(os.getenv("CREATOR_TTL_SEC", "21600"))  # 6h
 
 
-# ── FREE YouTube uploads via channel RSS (0 API quota) ───────────────────────
-# Channel uploads are public RSS at feeds/videos.xml?channel_id=ID — no quota,
-# no key, far more reliable than the search/playlistItems API path (which kept
-# the broadcast/creator collectors DOWN on quota). We still resolve handle→id
-# via the cheap forHandle endpoint (1 unit), cached permanently so it costs ~27
-# units total, ever.
+# handle→channel_id resolution, cached permanently (the only quota cost is one
+# cheap forHandle call per channel, ever). NOTE: YouTube's public RSS feed
+# (feeds/videos.xml) returns HTTP 500 from datacenter IPs (Heroku), so uploads
+# are fetched via the official Data API (channels + playlistItems, ~2 units each,
+# well within quota) — the reliability problem was the collector not FIRING
+# (fixed by moving it into the main collect cycle), not the API.
 _CHANNEL_ID_CACHE: dict = {}
 
 
@@ -1592,28 +1592,29 @@ def _resolve_channel_id_cached(handle: str) -> Optional[str]:
     return cid
 
 
-def _youtube_rss_recent(channel_id: str, max_videos: int = 30) -> list:
-    """Recent uploads for a channel via its public RSS feed — FREE (no quota)."""
-    import feedparser
+def _youtube_uploads(channel_id: str, max_videos: int = 30) -> list:
+    """Recent uploads via the official Data API (channels → uploads playlist →
+    playlistItems). Cheap (~2 units) and works from datacenter IPs."""
     out = []
-    try:
-        feed = feedparser.parse(
-            f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}")
-        for e in (feed.entries or [])[:max_videos]:
+    ch = _youtube_get("channels", {"part": "contentDetails", "id": channel_id})
+    up = (ch["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+          if ch and ch.get("items") else None)
+    if up:
+        pl = _youtube_get("playlistItems", {"part": "snippet", "playlistId": up, "maxResults": max_videos})
+        for it in (pl or {}).get("items", []):
+            sn = it.get("snippet", {})
+            vid = (sn.get("resourceId") or {}).get("videoId", "")
             out.append({
-                "title": e.get("title", "") or "",
-                "desc": (e.get("summary", "") or "")[:300],
-                "published": e.get("published", "") or "",
-                "url": e.get("link", "") or "",
+                "title": sn.get("title", ""),
+                "desc": (sn.get("description", "") or "")[:300],
+                "published": sn.get("publishedAt", ""),
+                "url": f"https://www.youtube.com/watch?v={vid}" if vid else "",
             })
-    except Exception as e:
-        print(f"[youtube] RSS {channel_id} error: {e}")
     return out
 
 
 def _creator_recent(handle: str, max_videos: int = 40) -> list:
-    """Recent uploads (title/desc/date/url) for a creator handle, cached ~6h.
-    Uses the FREE channel RSS feed (0 quota)."""
+    """Recent uploads (title/desc/date/url) for a creator handle, cached ~6h."""
     import time as _t
     c = _CREATOR_CACHE.get(handle)
     if c is not None and (_t.time() - c.get("ts", 0) < _CREATOR_TTL):
@@ -1622,7 +1623,7 @@ def _creator_recent(handle: str, max_videos: int = 40) -> list:
     try:
         channel_id = _resolve_channel_id_cached(handle)
         if channel_id:
-            vids = _youtube_rss_recent(channel_id, max_videos)
+            vids = _youtube_uploads(channel_id, max_videos)
     except Exception as e:
         print(f"[creator] {handle} fetch error: {e}")
         return c.get("videos", []) if c else []
@@ -1695,7 +1696,7 @@ def _broadcast_recent(handle: str, max_videos: int = 30) -> list:
     try:
         channel_id = _resolve_channel_id_cached(handle)
         if channel_id:
-            vids = _youtube_rss_recent(channel_id, max_videos)
+            vids = _youtube_uploads(channel_id, max_videos)
     except Exception as e:
         print(f"[broadcast] {handle} fetch error: {e}")
         return c.get("videos", []) if c else []
