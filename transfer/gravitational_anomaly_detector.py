@@ -5636,12 +5636,18 @@ def topic_explainer(topic_key: str, topic: str = ""):
 
     if not _AI_GRADE_AVAILABLE:
         return {"available": False, "reason": "explainer unavailable"}
+    # Monthly AI-spend cap: once the budget is reached, do NOT make new paid
+    # definition calls — only cached/persisted explainers are served.
+    if not _ai_budget_ok():
+        return {"available": False, "reason": "monthly AI budget reached",
+                "budget": AI_MONTHLY_BUDGET_USD}
     name = (topic or topic_key.replace("_", " ")).strip()
     # Source-aware: feed the real headlines/posts + their platforms so the
     # explainer describes the SPECIFIC trend, not a dictionary definition.
     _ctx = _topic_source_context(topic_key)
     ex = ai_grade.explain_topic(name, context=_ctx)   # no DB connection held during this call
     if ex.get("available") and ex.get("short"):
+        _record_ai_cost("definition", name, ex.get("cost") or {})
         conn = None
         try:
             conn = get_db(DB_PATH)
@@ -5690,10 +5696,17 @@ def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:
 
     done = 0
     for r in rows:
+        # Stop backfilling the moment the monthly AI budget is reached.
+        if not _ai_budget_ok():
+            print(f"[explainer] backfill halted — monthly AI budget "
+                  f"${AI_MONTHLY_BUDGET_USD} reached")
+            break
         name = (r["topic_display"] or r["topic_key"].replace("_", " ")).strip()
         try:
-            ex = ai_grade.explain_topic(name)
+            # Source-aware: same context the on-demand endpoint uses.
+            ex = ai_grade.explain_topic(name, context=_topic_source_context(r["topic_key"]))
             if ex.get("available") and ex.get("short"):
+                _record_ai_cost("definition", name, ex.get("cost") or {})
                 c = get_db(DB_PATH)
                 c.execute(
                     "INSERT OR IGNORE INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
@@ -5745,6 +5758,12 @@ def grade_topic_endpoint(payload: dict = Body(...)):
     cached = _cache.get(cache_key)
     if cached is not None:
         return cached
+    # Monthly AI-spend cap: block new paid grades once the budget is hit (cached
+    # grades above are still served). 1 grade credit is only charged on success.
+    if not _ai_budget_ok():
+        return {"available": False, "reason": "monthly AI budget reached",
+                "budget": AI_MONTHLY_BUDGET_USD,
+                "spent": round(_ai_spend_this_month().get("total", 0), 4)}
     result = ai_grade.grade_topic(topic)
     # If the topic is a COMPANY, also attach the full Market Signal — the SAME
     # market data + score the Market section produces — so the market read is
@@ -5768,8 +5787,77 @@ def grade_topic_endpoint(payload: dict = Body(...)):
     return result
 
 
+# ── AI spend ledger + monthly budget cap ─────────────────────────────────────
+# ALL paid AI calls (topic DEFINITIONS via Perplexity + GRADES via Perplexity &
+# Anthropic) are metered here against a hard monthly budget so spend never
+# exceeds the cap. Default $20/mo, override with AI_MONTHLY_BUDGET_USD.
+AI_MONTHLY_BUDGET_USD = float(os.getenv("AI_MONTHLY_BUDGET_USD", "20"))
+
+
+def _ai_costs_table(conn) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_costs (
+            id TEXT PRIMARY KEY, kind TEXT, topic TEXT,
+            perplexity_cost REAL, anthropic_cost REAL, total_cost REAL,
+            created_at TEXT
+        )
+    """)
+
+
+def _month_start_iso() -> str:
+    now = datetime.now(timezone.utc)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+
+def _record_ai_cost(kind: str, topic: str, cost: dict) -> None:
+    """Persist one paid AI call (kind = 'definition' | 'grade') by provider."""
+    try:
+        p = float((cost or {}).get("perplexity", 0) or 0)
+        a = float((cost or {}).get("anthropic", 0) or 0)
+        t = float((cost or {}).get("total", 0) or 0) or (p + a)
+        conn = get_db(DB_PATH)
+        _ai_costs_table(conn)
+        conn.execute(
+            "INSERT OR IGNORE INTO ai_costs VALUES (?,?,?,?,?,?,?)",
+            (str(uuid.uuid4())[:24], kind, topic, p, a, t,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[ai-cost] record error: {e}")
+
+
+def _ai_spend_this_month() -> dict:
+    """Month-to-date AI spend by provider (UTC calendar month)."""
+    try:
+        conn = get_db(DB_PATH)
+        _ai_costs_table(conn)
+        conn.commit()
+        row = conn.execute(
+            "SELECT COALESCE(SUM(perplexity_cost),0) p, COALESCE(SUM(anthropic_cost),0) a, "
+            "COALESCE(SUM(total_cost),0) t, COUNT(*) n FROM ai_costs WHERE created_at >= ?",
+            (_month_start_iso(),)).fetchone()
+        conn.close()
+        return {"perplexity": float(row["p"] or 0), "anthropic": float(row["a"] or 0),
+                "total": float(row["t"] or 0), "calls": int(row["n"] or 0)}
+    except Exception as e:
+        print(f"[ai-cost] month read error: {e}")
+        return {"perplexity": 0.0, "anthropic": 0.0, "total": 0.0, "calls": 0}
+
+
+def _ai_budget_ok() -> bool:
+    """True if month-to-date AI spend is still under the monthly budget. New paid
+    AI calls (definitions/grades) are SKIPPED once this returns False — cached/
+    persisted results are still served, so the cap never breaks the product."""
+    if AI_MONTHLY_BUDGET_USD <= 0:
+        return True
+    return _ai_spend_this_month().get("total", 0.0) < AI_MONTHLY_BUDGET_USD
+
+
 def _record_grade_cost(topic: str, cost: dict) -> None:
-    """Persist per-provider AI grade cost for Anthropic-vs-Perplexity monitoring."""
+    """Persist per-provider AI grade cost (unified ledger + legacy table)."""
+    _record_ai_cost("grade", topic, cost)
     try:
         conn = get_db(DB_PATH)
         conn.execute("""
@@ -5826,6 +5914,43 @@ def grade_costs():
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/ai/costs")
+def ai_costs():
+    """Month-to-date AI spend (topic DEFINITIONS + GRADES, Perplexity + Anthropic)
+    against the monthly budget. This is the cap that keeps AI spend under control —
+    once `over_budget` is true, new paid AI calls are skipped (cached results still
+    serve)."""
+    mtd = _ai_spend_this_month()
+    budget = AI_MONTHLY_BUDGET_USD
+    total = round(mtd.get("total", 0.0), 4)
+    # Per-kind breakdown for the current month.
+    by_kind = {}
+    try:
+        conn = get_db(DB_PATH)
+        _ai_costs_table(conn)
+        conn.commit()
+        for r in conn.execute(
+            "SELECT kind, COALESCE(SUM(total_cost),0) t, COUNT(*) n FROM ai_costs "
+            "WHERE created_at >= ? GROUP BY kind", (_month_start_iso(),)).fetchall():
+            by_kind[r["kind"] or "unknown"] = {"total": round(float(r["t"] or 0), 4),
+                                               "calls": int(r["n"] or 0)}
+        conn.close()
+    except Exception as e:
+        print(f"[ai-cost] by-kind error: {e}")
+    return {
+        "month": _month_start_iso()[:7],
+        "budget_usd": budget,
+        "spent_usd": total,
+        "remaining_usd": round(max(0.0, budget - total), 4) if budget > 0 else None,
+        "pct_used": round(total / budget * 100, 1) if budget > 0 else None,
+        "over_budget": (budget > 0 and total >= budget),
+        "calls": mtd.get("calls", 0),
+        "perplexity_usd": round(mtd.get("perplexity", 0.0), 4),
+        "anthropic_usd": round(mtd.get("anthropic", 0.0), 4),
+        "by_kind": by_kind,
+    }
 
 
 @app.post("/signal-x/scan", dependencies=[Depends(_require_internal)])

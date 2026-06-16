@@ -138,13 +138,17 @@ def explain_topic(topic: str, context: str = "") -> dict:
         data = r.json()
         content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
         citations = data.get("citations", []) or []
+        # Perplexity reports per-call cost in usage.cost.total_cost — capture it so
+        # the engine can meter monthly AI-definition spend against the budget.
+        cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
+        _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
         parsed = _extract_json(content)
         if parsed and parsed.get("short"):
             return {"available": True, "short": str(parsed.get("short", ""))[:400],
-                    "full": str(parsed.get("full", "")), "citations": citations}
+                    "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
         # Fallback: model didn't return clean JSON — use the prose directly.
         return {"available": True, "short": content[:240], "full": content,
-                "citations": citations}
+                "citations": citations, "cost": _c}
     except Exception as e:
         print(f"[ai_grade] explain error for '{topic}': {e}")
         return {"available": False, "error": str(e)}
