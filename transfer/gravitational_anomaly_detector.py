@@ -6712,6 +6712,32 @@ def get_topic_detail(topic_key: str):
         result["velocity_scores"]["nowtrending_gradient_confidence"] = _ntc
         result["velocity_scores"]["nowtrending_gradient_demand_driven"] = _ndd
 
+    # ── Rich parity payload: attach the SAME serialized row the mobile /scores
+    # list renders, so the web detail can show maturity / AI tier / variations /
+    # N + Now-Trending-Gradient / dark-matter detail without a second shape.
+    # Best-effort — a failure here must never break the core detail response. ──
+    try:
+        conn2 = get_db(DB_PATH)
+        rrow = conn2.execute("""
+            SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
+                   COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
+            FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) max_at FROM velocity_scores
+                        WHERE topic_key = ? GROUP BY topic_key) latest
+              ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
+            INNER JOIN (SELECT topic_key, MIN(scored_at) first_at FROM velocity_scores
+                        WHERE topic_key = ? GROUP BY topic_key) fs
+              ON v.topic_key = fs.topic_key
+            LEFT JOIN topic_lifecycle lc ON v.topic_key = lc.topic_key
+            WHERE v.topic_key = ? ORDER BY v.scored_at DESC LIMIT 1
+        """, (topic_key, topic_key, topic_key)).fetchall()
+        conn2.close()
+        _rich = _format_score_rows(rrow)
+        if _rich.get("results"):
+            result["rich"] = _rich["results"][0]
+    except Exception as _re:
+        print(f"[detail] rich attach skipped for {topic_key}: {_re}")
+
     # ── Trade-secret hygiene: never expose the component weighting or the
     # calibration false-positive rates over the public API. The app renders
     # component SCORES, not weights, so dropping these is UI-safe. ──
