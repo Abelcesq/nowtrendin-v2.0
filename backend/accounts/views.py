@@ -335,11 +335,20 @@ class GradeView(APIView):
         except Exception as exc:
             return Response({'detail': f'AI grade engine unavailable: {exc}'}, status=503)
 
-        # Charge a grade token only when a proposed score actually came back.
-        if data.get('available') and data.get('proposed'):
+        # The Grade Agent searches our data pool first. A 'measured' result is the
+        # engine's OWN score (no AI ran) — it is FREE (charge_token=False). Only an
+        # AI-PROPOSED grade burns a credit. Honour the agent's charge_token flag,
+        # falling back to the legacy "proposed score returned" rule.
+        charge = data.get('charge_token')
+        if charge is None:
+            charge = bool(data.get('available') and data.get('proposed')
+                          and data.get('source') != 'measured')
+        if charge:
             profile.grade_tokens = max(0, (profile.grade_tokens or 0) - 1)
             profile.save()
-            # Persist to the user's grade history (powers History + Graded tabs).
+        # Persist to history whenever a real score came back (measured OR proposed),
+        # so both populate the History + Graded tabs.
+        if data.get('available') and data.get('proposed'):
             try:
                 GradeHistory.objects.create(
                     user=request.user, topic=topic[:200],

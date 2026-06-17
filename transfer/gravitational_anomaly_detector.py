@@ -318,6 +318,14 @@ except Exception as _ag_exc:
     print(f"[startup] ai_grade unavailable: {_ag_exc}")
 
 try:
+    import grade_agent
+    _GRADE_AGENT_AVAILABLE = True
+    print("[startup] grade_agent loaded — pool-first grading (measured Gradient + N)")
+except Exception as _gax:
+    _GRADE_AGENT_AVAILABLE = False
+    print(f"[startup] grade_agent unavailable: {_gax}")
+
+try:
     import news_collectors as _news
     _NEWS_AVAILABLE = True
     print("[startup] news_collectors loaded — GDELT (Stage 4) media coverage active")
@@ -5911,11 +5919,12 @@ def explainer_backfill(payload: dict = Body(default={})):
 
 @app.post("/grade", dependencies=[Depends(_require_internal)])
 def grade_topic_endpoint(payload: dict = Body(...)):
-    """AI Grade — research a topic on the open web (Perplexity) and synthesize a
-    PROPOSED Gradient Score with reasoning + citations (Claude). For topics not
-    in our data. Token metering is handled by the Django proxy."""
-    if not _AI_GRADE_AVAILABLE:
-        return {"available": False, "reason": "AI grade module unavailable"}
+    """GRADE AGENT — pool-first grading. Searches the live data pool FIRST: if the
+    topic is already scored, returns the MEASURED Gradient Score + N (no AI cost,
+    charge_token=False); otherwise runs the AI grade (PROPOSED score + research +
+    citations) and attaches the live N. Always returns a Gradient Score AND an N
+    score with `source` ('measured'|'ai_proposed'). Serves all 3 platforms; token
+    metering handled by the Django proxy (honour `charge_token`)."""
     topic = (str(payload.get("topic") or "")).strip()
     if not topic:
         raise HTTPException(400, "topic is required")
@@ -5923,31 +5932,30 @@ def grade_topic_endpoint(payload: dict = Body(...)):
     cached = _cache.get(cache_key)
     if cached is not None:
         return cached
-    # Monthly AI-spend cap: block new paid grades once the budget is hit (cached
-    # grades above are still served). 1 grade credit is only charged on success.
-    if not _ai_budget_ok():
-        return {"available": False, "reason": "monthly AI budget reached",
-                "budget": AI_MONTHLY_BUDGET_USD,
-                "spent": round(_ai_spend_this_month().get("total", 0), 4)}
-    result = ai_grade.grade_topic(topic)
-    # If the topic is a COMPANY, also attach the full Market Signal — the SAME
-    # market data + score the Market section produces — so the market read is
-    # consistent across Grade and Market. The AI estimate above stays the
-    # ATTENTION read; this is the MARKET read, clearly distinct.
-    if _RISK_AVAILABLE and isinstance(result, dict):
-        try:
-            tkr, disp = risk.resolve_ticker(topic)
-            if tkr:
-                ms = risk.market_signal_for_company(tkr, disp or topic, DB_PATH)
-                if ms and ms.get("available"):
-                    result["market_signal"] = ms
-        except Exception as _mse:
-            print(f"[grade] market signal attach error: {_mse}")
-    # Only cache a COMPLETE grade (research + proposed score). A research-only
-    # result (e.g. before the synthesis key is set) must not be cached, or it
-    # would serve the incomplete version for the whole TTL.
-    if isinstance(result, dict) and result.get("available") and result.get("proposed"):
-        _cache.set(cache_key, result, CACHE_TTL_XSIGNAL)  # 12h — research is stable
+
+    if _GRADE_AGENT_AVAILABLE:
+        result = grade_agent.resolve_grade(topic)
+    else:
+        # Fallback to the raw AI grade if the agent module didn't load.
+        if not _AI_GRADE_AVAILABLE:
+            return {"available": False, "reason": "AI grade module unavailable"}
+        if not _ai_budget_ok():
+            return {"available": False, "reason": "monthly AI budget reached"}
+        result = ai_grade.grade_topic(topic)
+        if isinstance(result, dict):
+            result.setdefault("source", "ai_proposed")
+            result.setdefault("charge_token", bool(result.get("available") and result.get("proposed")))
+
+    if not isinstance(result, dict):
+        return {"available": False, "reason": "grade failed"}
+
+    src = result.get("source")
+    if src == "measured" and result.get("available"):
+        # Live data — short cache so it tracks the engine (no AI cost recorded).
+        _cache.set(cache_key, result, CACHE_TTL_DETAIL)
+    elif result.get("available") and result.get("proposed"):
+        # AI research is stable — cache 12h + record the paid-call cost.
+        _cache.set(cache_key, result, CACHE_TTL_XSIGNAL)
         _record_grade_cost(topic, result.get("cost") or {})
     return result
 

@@ -215,6 +215,9 @@ function ProposedCard({ result }: { result: Proposed }) {
   const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
   const band = GAP_BANDS[gapBandIndex(gap)];
   const ms = result.market_signal?.market_gradient;
+  // Grade Agent: measured (already in our data pool) vs AI-proposed; live N score.
+  const measured = (result as any).source === 'measured';
+  const nScore = (result as any).n_score != null ? Math.round((result as any).n_score) : null;
   return (
     <>
     {/* MARKET read for companies — identical to the Market section, pulled from
@@ -252,11 +255,19 @@ function ProposedCard({ result }: { result: Proposed }) {
 
     <View className="bg-surface rounded-2xl border border-border p-5 mb-4">
       <View className="flex-row items-center justify-between mb-1">
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">{ms ? 'Attention estimate · AI' : 'Proposed · AI estimate'}</Text>
-        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
-          <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
+        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">
+          {measured ? 'Gradient Score · measured' : (ms ? 'Attention estimate · AI' : 'Proposed · AI estimate')}
+        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${measured ? '#00C896' : '#D4A017'}1A` }}>
+            <Text className="text-[9px] font-bold" style={{ color: measured ? '#00C896' : '#D4A017' }}>{measured ? 'IN DATA POOL' : 'AI ESTIMATE'}</Text>
+          </View>
+          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
+            <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
+          </View>
         </View>
       </View>
+      {!!(result as any).note && <Text className="text-textMuted text-[10px] leading-4 mb-2">{(result as any).note}</Text>}
       <View className="flex-row justify-around items-start mt-2 mb-3">
         <View className="items-center">
           <GradientScoreRing score={Math.round(result.detection_score)} color="#2D7EEF" size="md" caption="/100" />
@@ -298,12 +309,14 @@ function ProposedCard({ result }: { result: Proposed }) {
           signal section. N is a separate, measured signal; the Gradient Score
           itself stays demand-free (no internal-demand feedback loop). */}
       <View className="mt-3 pt-3 border-t border-border">
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#EE6A2A' }}>Now Trending (N)</Text>
+        <View className="flex-row items-center justify-between mb-1">
+          <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#EE6A2A' }}>N Score · Now Trending</Text>
+          <Text className="text-base font-black" style={{ color: '#EE6A2A' }}>{nScore != null && nScore > 0 ? nScore : '—'}</Text>
+        </View>
         <Text className="text-textMuted text-[11px] leading-4">
-          On-platform demand (N) — how often Now TrendIn users ask about a topic — is
-          tracked as a separate signal, not folded into this score. It registers once
-          the topic is scored in the live engine, where the trend signal page also shows
-          a demand-inclusive "Now Trending Gradient Score" alongside the demand-free one.
+          On-platform demand (N) — how often Now TrendIn users ask about a topic — is a
+          separate signal, never folded into the Gradient (no demand feedback loop).
+          {measured ? ' Measured live from the engine.' : ' Registers once demand accrues; this grade query logs it.'}
         </Text>
       </View>
       <Text className="text-textMuted text-[10px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
