@@ -212,4 +212,33 @@ dark text #1A1A2E. Green #00C896 = accents/active states. Wordmark: "Now" brandO
 brandMaroon. Flame logo preserved from v1.0 — rendered via components/ui/Logo.tsx (SVG stand-in;
 swap for the original logo.png in assets/ when available). StatusBar = dark-content.
 
-*Last updated: 2026-06-10 — Phases 1–7 live, real JWT auth, 22 broadcast + 5 creator feeds, Trend Beneficiary + auto-theme extension shipped*
+## 12. WEB TERMINAL + DESKTOP (3-platform parity)
+The enterprise **web terminal** (`web-terminal/`, React+Vite, Heroku app
+`nowtrendin-terminal`) and the **desktop** app (`tauri-desktop/`, Tauri over the
+same web build) are the institutional surfaces; the **mobile app** (`frontend/`)
+is consumer/business. The trend **signal-detail** and **market-analysis** pages
+present the SAME sections, data points, and color scheme on all three (web may add
+MORE — denser filters, extra columns). Mobile color scheme mirrored for the web
+detail rails in `web-terminal/src/lib/mobileTheme.ts` (Detection #2D7EEF,
+Confidence #00C896, stage/tier/maturity/feed palettes). The avatar opens a full
+Account view (edit profile, change password, **Authorized Users** = the Enterprise
+5-seat / 100,000 shared-token entitlement, admin identified). Parity is enforced by
+the **Frontend Consistency** agent (`/frontend-consistency`).
+
+## 13. DATA-QUALITY + MONITORING (the engine guardrails)
+- **Catch-all corroboration floor** (`CATCHALL_MIN_SOURCES`, default 2): a topic
+  classifying into news/general must have ≥2 distinct sources to score, with hard
+  exemptions (expert-tier signal, high magnitude, ledger/pending). De-congests the
+  catch-all without losing early signals. NOT a raw post-volume floor (that would
+  break the before-it-arrives thesis).
+- **Fragment gate**: single-word junk + multi-word filler-anchored fragments
+  rejected at scoring + pruned each cycle.
+- **Topic maturity** (NEW/EMERGING/ESTABLISHED) derived from the maintained
+  `topic_lifecycle` table (cycles + age); ESTABLISHED topics discounted.
+- **Stage from Detection** (`stageOf`) everywhere; `Now TrendIn` view ranks by the
+  proprietary **N** (`nowtrendin_score`), `All Signals` by Detection.
+- **7 monitoring agents** (`monitoring_agents.py` → `/monitor`): Source Watchdog,
+  Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD), Cost
+  Sentinel, Data Subscriptions, Calibration Auditor. Full spec: `DATA_BUILDING_BLOCKS.md`.
+
+*Last updated: 2026-06-16 — 3-platform comprehensive trend+market detail parity (mobile colors), web Account/Authorized-Users flow, catch-all corroboration floor + classifier cleanup, maturity-from-lifecycle fix, 7-agent monitoring fleet + daily catch-all EOD report*

@@ -221,12 +221,13 @@ All skills point at the **v2** engine (`nowtrendin-v2-engine`).
 Each agent owns blocks, runs on a cadence, reads the listed endpoints, and raises
 a typed alert. (These are specs to build; the checks already exist as endpoints.)
 
-> **Status: ALL agents LIVE.** Runtime pollers in `monitoring_agents.py` →
-> `GET /monitor` (combined), `/monitor/sources`, `/monitor/pipeline`,
-> `/monitor/cost`, `/monitor/calibration` (public, read-only, no AI). Invokable
-> skills: **`/data-watchdog`** (A+B), **`/frontend-consistency`** (F),
-> **`/integrity-reviewer`** (E gate). A 6th agent — **Frontend Consistency** —
-> watches terminal↔mobile UI parity.
+> **Status: ALL agents LIVE — 7 runtime pollers in `monitoring_agents.py`.**
+> `GET /monitor` (combined, all 7), `/monitor/sources`, `/monitor/pipeline`,
+> `/monitor/quality`, `/monitor/catchall`, `/monitor/cost`, `/monitor/subscriptions`,
+> `/monitor/calibration` (public, read-only, no AI). Invokable skills:
+> **`/data-watchdog`** (A+B), **`/topic-quality-audit`** (G), **`/catchall-audit`** (I,
+> daily EOD report), **`/data-subscriptions`** (H), **`/frontend-consistency`** (F),
+> **`/integrity-reviewer`** (E gate).
 
 ### A. Source Watchdog — owns **B1, B2** ✅ LIVE
 - **Every cycle (6h):** `GET /health/collectors`, `/usage`.
@@ -253,11 +254,29 @@ a typed alert. (These are specs to build; the checks already exist as endpoints.
 - On every new source/metric/claim/PR: run the 5 guardrails; block + propose
   clean alternative on any violation.
 
-### F. Frontend Consistency — owns **B8 (UI parity)** ✅ LIVE (skill `/frontend-consistency`)
-- Both sites up (Pages terminal + mobile-web); terminal `SIGNAL_FILTERS` ==
-  mobile `CATEGORY_DEFS`; same category chips + key actions (Pull Trends, Trends
-  label, Watchlists). Web may add MORE filtration; it must not DIVERGE on shared
-  labels/filters/actions.
+### F. Frontend Consistency — owns **B8 (UI parity, all 3 platforms)** ✅ LIVE (skill `/frontend-consistency`)
+- Parity across **mobile app · web terminal · desktop** (desktop = Tauri over the
+  web build). Terminal `SIGNAL_FILTERS` == mobile `CATEGORY_DEFS`; Stage column
+  derives from Detection (`stageOf`); `Now TrendIn` ranks by N. **Trend signal
+  detail** + **market-analysis detail** sections + data points must match mobile
+  (`signal/[id].tsx`, `risk/[key].tsx`), and the web detail rails use the mobile
+  color scheme via `web-terminal/src/lib/mobileTheme.ts`. Web may add MORE; must
+  not DIVERGE on shared labels/filters/sections/colors.
+
+### G. Topic Quality Auditor — owns **B3 (deep)** ✅ LIVE (`/monitor/quality`, skill `/topic-quality-audit`)
+- News-filler / multi-word headline fragments (gated at scoring + pruned), geo/country
+  mis-sorts into Business/Economy, and category-clarity (catch-all %). Fragments ≈ 0.
+
+### H. Data Subscriptions — owns **B7 (paid data-API spend)** ✅ LIVE (`/monitor/subscriptions`, skill `/data-subscriptions`)
+- Inventories every external data API (paid/free/metered); flags paid APIs configured
+  with no tracked `COST_*_USD` (untracked spend) or a cost set with no key. Feeds the
+  Cost Sentinel "Data API subscriptions" line.
+
+### I. Catch-All Auditor — owns **B3 (catch-all specialist)** ✅ LIVE (`/monitor/catchall`, skill `/catchall-audit`, daily EOD)
+- The dedicated daily monitor for news/general catch-all congestion: catch-all %,
+  corroboration-floor health (`CATCHALL_MIN_SOURCES`, ≥2 distinct sources; single-source
+  LEAK = floor disabled/purge overdue), misclassified tracked calls (ledger/pending stuck
+  in catch-all), and the top lexicon-candidate terms to reclassify into `topic_categories._LEX`.
 
 ---
 
