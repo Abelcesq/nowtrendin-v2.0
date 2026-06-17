@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type RiskRow } from '../lib/api'
+import { MC, marketTierColor, FEEDS_COLOR, MARKET_TIERS, RISK_PIPELINE, BASELINE_META } from '../lib/mobileTheme'
 
 // Market Signal — the finance-native dual score, wired to the live /risk/scores
 // (the SAME data the mobile Market tab renders). Detection = analyst sentiment +
@@ -12,6 +13,7 @@ interface MRow {
   tier: string; cls: string; pct: number | null; lev: number | null
   sigs: number; ageMin: number; calibrating: boolean
   interp: string; comps: [string, number, string][]
+  raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
 type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
 
@@ -73,21 +75,47 @@ function toRow(r: RiskRow): MRow {
     sigs: r.total_signals ?? 0, ageMin: minsSince(r.scored_at),
     calibrating: !!mg.calibrating || r.sufficient_baseline === false,
     interp: mg.interpretation || r.interpretation || '',
-    comps,
+    comps, raw: r,
   }
 }
 
+function bar(label: string, val: number | null, color: string) {
+  return (
+    <div className="comp-row" key={label}>
+      <span className="cl">{label}</span>
+      <span className="comp-bar"><i style={{ width: `${Math.max(0, Math.min(100, val ?? 0))}%`, background: color }} /></span>
+      <span className="cv">{val == null ? 'n/a' : Math.round(val)}</span>
+    </div>
+  )
+}
+
 function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
+  const raw = row.raw
+  const tcol = marketTierColor(row.tier)
+  const mg = raw.market_gradient || {}
+  const sust = raw.sustainability
+  const av = raw.alpha_vantage
+  const cc = raw.creator_coverage
+  const bc = raw.broadcast_coverage
+  const si = raw.short_interest
+  const macro = raw.macro_leverage
+  const inst = raw.institutional_holdings
+  const sustTone = (v: number) => v >= 75 ? MC.confidence : v >= 50 ? MC.detection : v >= 30 ? MC.gold : MC.red
+  const sources = String(raw.source_provenance || '').split('·').map((s) => s.trim()).filter(Boolean)
+  const diffusion: any = raw.diffusion || {}
+  const stageCount = (k: string) => {
+    const x = diffusion[k]; return typeof x === 'number' ? x : (x?.count ?? null)
+  }
+  const hasPipeline = RISK_PIPELINE.some((s) => stageCount(s.key) != null)
+  const maxStage = Math.max(1, ...RISK_PIPELINE.map((s) => stageCount(s.key) ?? 0))
+
   return (
     <aside className="rail">
       <div className="detail-head">
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.name}</div>
-            <div className="detail-cat">
-              Market Signal · <span className={'tier ' + row.tier}>{row.tier}</span>
-              {row.calibrating && <span className="cal-chip">calibrating</span>}
-            </div>
+            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -96,34 +124,205 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         </div>
       </div>
 
+      {/* Market Gradient — dual score, mobile colors */}
       <div className="gauges">
-        <div className="gauge det">{ring(row.det, 'var(--det)')}<div className="gv" style={{ marginTop: -50 }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">analyst + positioning</div></div>
-        <div className="gauge conf">{ring(row.conf, 'var(--conf)')}<div className="gv" style={{ marginTop: -50 }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">fundamentals + price</div></div>
+        <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">analysts + positioning</div></div>
+        <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">fundamentals + price</div></div>
+      </div>
+      <div className="sect">
+        <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
+          <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : (mg.gap_state || `${Math.abs(row.gap)}-pt gap`)}{!mg.calibrating && ` · ${Math.abs(row.gap)}-pt gap`}</b>
+          {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
+        </div>
+        <div className="disc">Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). The gap shows how early the move is. Measurement only — not financial advice.</div>
       </div>
 
-      {row.interp && (
-        <div className="sect"><h4>Market Read</h4><div className="narr">{row.interp}</div></div>
-      )}
-
+      {/* Market factors — colored by which score they feed */}
       {row.comps.length > 0 && (
         <div className="sect">
-          <h4>Market Components</h4>
-          {row.comps.map(([k, val, feeds]) => (
-            <div className="comp-row" key={k}>
-              <span className="cl" title={k}>{k.replace(/\s*\(.*\)$/, '')}</span>
-              <span className="comp-bar"><i style={{ width: `${Math.min(100, val)}%`, background: feeds === 'confidence' ? 'var(--conf)' : 'var(--det)' }} /></span>
-              <span className="cv">{val}</span>
-            </div>
-          ))}
+          <h4>Market Factors</h4>
+          {Object.entries(mg.components || {}).map(([label, c]: [string, any]) => {
+            const col = FEEDS_COLOR[c?.feeds] ?? MC.muted
+            return (
+              <div className="comp-row" key={label} title={label}>
+                <span className="cl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 3, background: col, flex: '0 0 auto' }} />
+                  {label.replace(/\s*\(.*\)$/, '')}{c?.baseline_relative ? ' ✓' : ''}
+                </span>
+                <span className="comp-bar"><i style={{ width: `${Math.max(4, Math.min(100, c?.score ?? 0))}%`, background: col }} /></span>
+                <span className="cv">{Math.round(c?.score ?? 0)}</span>
+              </div>
+            )
+          })}
+          <div className="div-legend"><span style={{ color: MC.detection }}>●</span> leading · <span style={{ color: MC.confidence }}>●</span> confirming · <span style={{ color: MC.purple }}>●</span> both · ✓ = scored vs own history</div>
         </div>
       )}
 
-      {row.lev != null && (
+      {/* Tier legend */}
+      <div className="sect">
+        <h4>What the Tiers Mean</h4>
+        <div className="tier-legend">
+          {MARKET_TIERS.map((t) => {
+            const c = marketTierColor(t.key)
+            return (
+              <div key={t.key} className="tier-cell" style={{ borderColor: c + '55', background: c + '12' }}>
+                <div style={{ color: c, fontWeight: 800, fontSize: 11 }}>{t.key}</div>
+                <div style={{ fontSize: 9.5, color: 'var(--text-3)' }}>{t.range}</div>
+                <div style={{ color: c, fontSize: 10, fontWeight: 600 }}>{t.desc}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Financial Sustainability */}
+      {sust && (() => {
+        const sc = sustTone(sust.score)
+        const hasAdj = sust.sector_adjusted_score != null && sust.sector_adjusted_score !== sust.score
+        const adj = sust.sector_adjusted_score ?? sust.score
+        const m = sust.metrics || {}
+        return (
+          <div className="sect">
+            <h4>Financial Sustainability</h4>
+            <div className="sust-pair">
+              <div className="sust-cell" style={{ background: sc + '12' }}><div className="sust-k">SCORE</div><div className="sust-n" style={{ color: sc }}>{sust.score}<span className="sust-u">/100</span></div><div style={{ color: sc, fontSize: 10.5, fontWeight: 700 }}>{sust.label}</div><div className="sust-vs">vs all companies</div></div>
+              <div className="sust-cell" style={{ background: sustTone(adj) + '12' }}><div className="sust-k">SECTOR-ADJ</div><div className="sust-n" style={{ color: sustTone(adj) }}>{adj}<span className="sust-u">/100</span></div><div style={{ color: sustTone(adj), fontSize: 10.5, fontWeight: 700 }}>{sust.sector_adjusted_label || sust.label}</div><div className="sust-vs">vs {sust.sector || 'sector'}</div></div>
+            </div>
+            {sust.sector_explanation && <div className="narr" style={{ margin: '8px 0' }}>{sust.sector_explanation}</div>}
+            {bar('Profitability (margin · ROE)', sust.profitability, sc)}
+            {bar('Cash & liquidity', sust.liquidity, sc)}
+            {bar(hasAdj ? 'Leverage health (raw)' : 'Leverage health', sust.leverage_health, sc)}
+            {hasAdj && bar(`Leverage health (vs ${sust.sector || 'sector'})`, sust.leverage_health_sector, sc)}
+            <div className="metrics">
+              {m.net_profit_margin_pct != null && <span>Net margin {m.net_profit_margin_pct}%</span>}
+              {m.roe_pct != null && <span>ROE {m.roe_pct}%</span>}
+              {m.current_ratio != null && <span>Current ratio {m.current_ratio}</span>}
+              {m.debt_to_equity != null && <span>Debt/equity {m.debt_to_equity}</span>}
+            </div>
+            <div className="disc">From {sust.ticker}'s reported financials. Descriptive only — not a recommendation.</div>
+          </div>
+        )
+      })()}
+
+      {/* Retail & media coverage */}
+      {(av || cc || bc) && (
         <div className="sect">
-          <h4>Macro Leverage</h4>
-          <div className="comp-row"><span className="cl">Leverage health</span><span className="comp-bar"><i style={{ width: `${Math.min(100, row.lev)}%`, background: 'var(--early)' }} /></span><span className="cv">{Math.round(row.lev)}</span></div>
+          <h4>Retail &amp; Media Coverage</h4>
+          {av && (
+            <div className="cov-block">
+              <div className="cov-h">{av.article_count} news article{av.article_count === 1 ? '' : 's'}{av.sentiment_label ? ` · ${av.sentiment_label}` : ''}</div>
+              {(av.recent || []).slice(0, 3).map((a: any, i: number) => <div className="cov-i" key={i}>▸ {a.title}<span className="cov-m"> {a.source}</span></div>)}
+            </div>
+          )}
+          {(cc?.creators || []).map((cr: any) => (
+            <div className="cov-block" key={cr.handle}>
+              <div className="cov-h" style={{ color: MC.red }}>{cr.name}: {cr.covered ? `${cr.count} recent video${cr.count === 1 ? '' : 's'}` : 'not in recent uploads'}</div>
+              {cr.covered && (cr.recent || []).slice(0, 2).map((vd: any, i: number) => <div className="cov-i" key={i}>▸ {vd.title}</div>)}
+            </div>
+          ))}
+          {bc && bc.channels?.length > 0 && (
+            <div className="cov-block">
+              <div className="cov-h">Broadcast media ({bc.channels.length}/{bc.total_channels} channels)</div>
+              {bc.channels.slice(0, 4).map((ch: any) => <div className="cov-i" key={ch.handle}>▸ {ch.name}{ch.region ? ` · ${ch.region}` : ''}: {ch.count} video{ch.count === 1 ? '' : 's'}</div>)}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Leverage & funding */}
+      {(si || macro || inst) && (
+        <div className="sect">
+          <h4>Leverage &amp; Funding</h4>
+          {si && (
+            <div className="cov-block">
+              <div className="cov-h">{si.label}</div>
+              <div className="metrics">
+                {si.short_position != null && <span>Short {(si.short_position / 1e6).toFixed(1)}M sh</span>}
+                {si.change_pct != null && <span>{si.change_pct >= 0 ? '+' : ''}{si.change_pct}% vs prior</span>}
+                {si.days_to_cover != null && <span>{si.days_to_cover} days to cover</span>}
+              </div>
+              <div className="disc">FINRA short interest{si.settlement_date ? ` · ${si.settlement_date}` : ''}</div>
+            </div>
+          )}
+          {macro && (
+            <div className="cov-block">
+              <div className="kv"><span>Market funding</span><b>{macro.leverage?.label}{macro.funding_stress?.label ? ` · ${macro.funding_stress.label}` : ''}</b></div>
+              <div className="disc">OFR Short-Term Funding Monitor (repo){macro.as_of ? ` · ${macro.as_of}` : ''}</div>
+            </div>
+          )}
+          {inst && (
+            <div className="cov-block">
+              <div className="cov-h">{inst.label || 'Institutional positioning'}</div>
+              <div className="metrics">
+                {inst.holders_count != null && <span>{inst.holders_count} holders</span>}
+                {inst.shares_change_pct != null && <span>{inst.shares_change_pct >= 0 ? '+' : ''}{inst.shares_change_pct}% avg change</span>}
+              </div>
+              {inst.top_holders?.length > 0 && <div className="disc">Top: {inst.top_holders.slice(0, 4).map((h: any) => h.name).join(', ')}</div>}
+              <div className="disc">WhaleWisdom 13F institutional holdings</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Market tenure */}
+      {!!raw.maturity && (
+        <div className="sect"><h4>Market Tenure</h4>
+          <div className="kv"><span>Maturity</span><b>{raw.maturity}</b></div>
+          {raw.maturity_note && <div className="narr" style={{ marginTop: 6 }}>{raw.maturity_note}</div>}
+        </div>
+      )}
+
+      {/* Vs own baseline */}
+      {!!raw.baseline_status && (() => {
+        const bm = BASELINE_META[raw.baseline_status!] ?? BASELINE_META.INSUFFICIENT_HISTORY
+        const insuff = raw.baseline_status === 'INSUFFICIENT_HISTORY'
+        const abn = raw.abnormality ?? 0
+        return (
+          <div className="sect"><h4>Vs. Its Own Baseline</h4>
+            <div className="mkt-gapband" style={{ borderColor: bm.color + '55' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <b style={{ color: bm.color, fontSize: 12 }}>{bm.label}</b>
+                {!insuff && <b style={{ color: bm.color, fontSize: 15 }}>{abn > 0 ? '+' : ''}{abn}%</b>}
+              </div>
+              {!insuff && <div className="disc" style={{ marginTop: 4 }}>Now {row.sigs} signals vs a {raw.baseline_signals}-signal baseline over {raw.baseline_cycles} prior cycles.</div>}
+              {raw.baseline_note && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{raw.baseline_note}</div>}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Diffusion pipeline */}
+      {hasPipeline && (
+        <div className="sect"><h4>Diffusion Pipeline</h4>
+          {RISK_PIPELINE.map((s) => {
+            const cnt = stageCount(s.key) ?? 0
+            return (
+              <div className="comp-row" key={s.key} title={s.desc}>
+                <span className="cl">{s.label}{s.detect ? ' ●' : ''}</span>
+                <span className="comp-bar"><i style={{ width: `${Math.round((cnt / maxStage) * 100)}%`, background: cnt > 0 ? tcol : 'var(--line)' }} /></span>
+                <span className="cv">{cnt}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Score components */}
+      {raw.components && Object.keys(raw.components).length > 0 && (
+        <div className="sect"><h4>Score Components</h4>
+          {Object.entries(raw.components).map(([k, val]) => bar(k.replace(/_/g, ' '), Number(val), tcol))}
+        </div>
+      )}
+
+      {/* Sources */}
+      {sources.length > 0 && (
+        <div className="sect"><h4>Sources</h4>
+          <div className="src-row">{sources.map((s) => <span className="src-chip" key={s}>{s}</span>)}</div>
+          <div className="disc">Public filings, government data, or official APIs. Results proprietary to Now TrendIn.</div>
+        </div>
+      )}
+
+      <div className="disc" style={{ padding: '0 16px 14px', textAlign: 'center' }}>Positioning analysis for informational purposes only — not financial, investment, or legal advice, and not a risk rating.</div>
 
       <div className="detail-actions">
         <button className="btn">★ Watchlist</button>

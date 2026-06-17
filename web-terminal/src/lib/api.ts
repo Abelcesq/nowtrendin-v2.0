@@ -55,8 +55,16 @@ export interface RiskRow {
   classification?: string; risk_stage?: string
   total_signals?: number; scored_at?: string
   percent_delta?: number | null; abnormality?: number | null
-  baseline_cycles?: number; sufficient_baseline?: boolean
+  baseline_cycles?: number; baseline_signals?: number; sufficient_baseline?: boolean
+  baseline_status?: string; baseline_note?: string
   interpretation?: string; market_gradient?: MarketGradient
+  positioning_score?: number; maturity?: string; maturity_note?: string
+  source_provenance?: string
+  components?: Record<string, number>
+  diffusion?: Record<string, { count?: number; z?: number | null }>
+  sustainability?: any; short_interest?: any; institutional_holdings?: any
+  creator_coverage?: any; broadcast_coverage?: any; alpha_vantage?: any
+  macro_leverage?: any
 }
 
 export const api = {
@@ -74,4 +82,9 @@ export const api = {
   // Source-aware AI definition (short + full) — same /explainer the mobile app uses.
   explainer: (key: string) => get<{ available: boolean; short?: string; full?: string }>(
     `/explainer/${encodeURIComponent(key)}`),
+  // Lazy trend-detail panels — same endpoints the mobile signal page uses.
+  convergence: (key: string) => get<any>(`/convergence/${encodeURIComponent(key)}`),
+  xsignal: (topic: string) => get<any>(`/signal-x/${encodeURIComponent(topic)}`),
+  scoreHistory: (key: string) => get<any>(`/scores/${encodeURIComponent(key)}/score-history`),
+  researchHistory: (key: string) => get<any>(`/scores/${encodeURIComponent(key)}/history`),
 }
