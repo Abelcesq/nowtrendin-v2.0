@@ -718,6 +718,61 @@ def get_topic_maturity_state(
                 "velocity_trend":        "unknown",
             }
 
+    # ── Lifecycle fallback ────────────────────────────────────────
+    # The topic_maturity table is only seeded for ~48 known topics, but the live
+    # pipeline maintains topic_lifecycle for EVERY topic (total_scoring_cycles +
+    # first_detected_at). Without this fallback every un-seeded topic defaulted to
+    # NEW / "first detection" forever — even after hundreds of cycles. Derive real
+    # maturity from the maintained lifecycle counters. Self-contained: no
+    # dependency on the (also-dormant) baseline-history table.
+    try:
+        lc_conn = db_compat.connect(db_path)
+        lc_conn.row_factory = sqlite3.Row
+        lc = lc_conn.execute(
+            "SELECT total_scoring_cycles, first_detected_at FROM topic_lifecycle "
+            "WHERE topic_key = ?", (topic_key,)).fetchone()
+        lc_conn.close()
+    except Exception:
+        lc = None
+    if lc:
+        cycles = int(lc["total_scoring_cycles"] or 0)
+        days = 0
+        fda = lc["first_detected_at"]
+        if fda:
+            try:
+                from datetime import datetime as _dt, timezone as _tz
+                _first = _dt.fromisoformat(str(fda).replace("Z", "+00:00"))
+                days = max(0, (_dt.now(_tz.utc) - _first).days)
+            except Exception:
+                days = 0
+        if cycles < 5 or days < 1:
+            _cls, _mult, _reason = "NEW", 0.80, (
+                f"First cycles scored ({cycles} cycle(s), {days} day(s)) — the gradient is "
+                "still stabilizing and not yet calibrated against a baseline.")
+        elif days >= 10 and cycles >= 40:
+            _cls, _mult, _reason = "ESTABLISHED", 0.55, (
+                f"Long-running topic — {days} days in system across {cycles} scoring cycles. "
+                "High gradient reflects a permanent expert/attention base, not a new surge, so "
+                "the score is discounted to avoid over-reading an old topic as breaking news.")
+        else:
+            _cls, _mult, _reason = "EMERGING", 0.85, (
+                f"Gaining across cycles ({cycles} cycles over {days} day(s)) — momentum is "
+                "forming and calibration is still building confidence; not yet a permanent base.")
+        return {
+            "source":                "lifecycle",
+            "maturity_class":        _cls,
+            "maturity_reason":       _reason,
+            "calibration_multiplier": _mult,
+            "anomaly_gate_passed":   False,
+            "days_in_system":        days,
+            "times_scored":          cycles,
+            "gradient_velocity":     None,
+            "score_velocity":        None,
+            "baseline_gradient":     None,
+            "baseline_overall":      None,
+            "velocity_trend":        "unknown",
+        }
+
     # True new topic — no prior knowledge
     return {
         "source":                "default",
