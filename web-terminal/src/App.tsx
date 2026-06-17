@@ -5,6 +5,7 @@ import { Screener } from './views/Screener'
 import { MarketSignal } from './views/MarketSignal'
 import { Watchlists } from './views/Watchlists'
 import { Methodology } from './views/Methodology'
+import { Account } from './views/Account'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
 
@@ -31,6 +32,7 @@ export function App() {
   const [nav, setNav] = useState<NavKey>('trends')
   const [rail, setRail] = useState<ReactNode | null>(null)
   const [q, setQ] = useState('')   // top-bar search → filters the Trends grid
+  const [account, setAccount] = useState(false)   // avatar → account view
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
   // clear it (Consumer/Business belong on the mobile app). The Login screen
@@ -47,11 +49,12 @@ export function App() {
   }
   if (!user) return <Login onAuthed={setUser} />
 
-  const go = (k: NavKey) => { setRail(null); setNav(k) }
+  const go = (k: NavKey) => { setRail(null); setAccount(false); setNav(k) }
   const signOut = () => { logout(); setUser(null) }
 
   let body: ReactNode
-  if (nav === 'trends') body = <Screener onRail={setRail} query={q} />
+  if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
+  else if (nav === 'trends') body = <Screener onRail={setRail} query={q} />
   else if (nav === 'market') body = <MarketSignal onRail={setRail} />
   else if (nav === 'watchlists') body = <Watchlists />
   else if (nav === 'ledger') body = <Ledger />
@@ -59,7 +62,9 @@ export function App() {
   else body = <Placeholder title={titleFor(nav)} />
 
   return (
-    <Shell nav={nav} onNav={go} rail={nav === 'trends' || nav === 'market' ? rail : null} user={user} onSignOut={signOut} search={q} onSearch={setQ}>
+    <Shell nav={nav} onNav={go} rail={!account && (nav === 'trends' || nav === 'market') ? rail : null}
+      user={user} onSignOut={signOut} onAccount={() => { setRail(null); setAccount(true) }}
+      search={q} onSearch={setQ} alertCount={0}>
       {body}
     </Shell>
   )

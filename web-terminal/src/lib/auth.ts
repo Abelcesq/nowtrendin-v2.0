@@ -58,6 +58,19 @@ export async function loginWithGoogle(idToken: string): Promise<User> {
 
 export function logout() { clearTokens() }
 
+// Account management — SAME Django endpoints the mobile profile screen uses, so
+// edits propagate across web, desktop, and mobile.
+export async function updateProfile(fields: { name?: string; email?: string }): Promise<User> {
+  const d = await call('/api/auth/me/', { method: 'PATCH', body: JSON.stringify(fields) }, true)
+  return normalizeUser(d.user ?? d)
+}
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return call('/api/auth/change-password/', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  }, true)
+}
+
 // Enterprise "Pull Trends" — fresh attention collect, token-metered by the
 // backend (1 token). Same endpoint the mobile app uses, so behaviour matches.
 export const pullTrends = () =>

@@ -5,13 +5,13 @@ export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'grade'
   | 'watchlists' | 'alerts' | 'ledger' | 'methodology'
 
-const NAV: { key: NavKey; icon: string; label: string; badge?: string }[] = [
+const NAV: { key: NavKey; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '▦', label: 'Dashboard' },
   { key: 'trends', icon: '▲', label: 'Trends' },
   { key: 'market', icon: '$', label: 'Market Signal' },
   { key: 'grade', icon: '◎', label: 'Grade' },
   { key: 'watchlists', icon: '★', label: 'Watchlists' },
-  { key: 'alerts', icon: '⚑', label: 'Alerts', badge: '3' },
+  { key: 'alerts', icon: '⚑', label: 'Alerts' },
   { key: 'ledger', icon: '✓', label: 'Accuracy Ledger' },
   { key: 'methodology', icon: '❋', label: 'Methodology' },
 ]
@@ -30,7 +30,7 @@ function useEtClock() {
 }
 
 export function Shell({
-  nav, onNav, children, rail, user, onSignOut, search, onSearch,
+  nav, onNav, children, rail, user, onSignOut, onAccount, search, onSearch, alertCount = 0,
 }: {
   nav: NavKey
   onNav: (k: NavKey) => void
@@ -38,8 +38,10 @@ export function Shell({
   rail?: ReactNode
   user?: User | null
   onSignOut?: () => void
+  onAccount?: () => void
   search?: string
   onSearch?: (v: string) => void
+  alertCount?: number
 }) {
   const clock = useEtClock()
   const initials = (user?.name || user?.email || 'NT').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'NT'
@@ -68,12 +70,13 @@ export function Shell({
         </div>
         <div className="top-right">
           <div className="asof"><span className="live">●</span> Live · as of<br /><b>{clock}</b></div>
-          <div className="bell" title="Alerts">
+          <div className="bell" title={alertCount > 0 ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'Alerts'}
+            onClick={() => onNav('alerts')} style={{ cursor: 'pointer' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            <span className="dot">3</span>
+            {alertCount > 0 && <span className="dot">{alertCount}</span>}
           </div>
           <span className="plan">{plan}</span>
-          <div className="avatar" title={`${user?.name || ''} — sign out`} onClick={onSignOut} style={{ cursor: 'pointer' }}>{initials}</div>
+          <div className="avatar" title={`${user?.name || ''} — account`} onClick={onAccount} style={{ cursor: 'pointer' }}>{initials}</div>
         </div>
       </header>
 
@@ -86,7 +89,7 @@ export function Shell({
                 className={'nav-item' + (nav === n.key ? ' active' : '')}
                 onClick={() => onNav(n.key)}>
                 <span className="ni">{n.icon}</span> {n.label}
-                {n.badge && <span className="badge">{n.badge}</span>}
+                {n.key === 'alerts' && alertCount > 0 && <span className="badge">{alertCount}</span>}
               </div>
             ))}
           </div>
