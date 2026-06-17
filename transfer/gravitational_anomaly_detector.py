@@ -326,6 +326,15 @@ except Exception as _gax:
     print(f"[startup] grade_agent unavailable: {_gax}")
 
 try:
+    import market_signal_diagnostic as _mkt_diag
+    import trend_signal_diagnostic as _trd_diag
+    _DIAG_AVAILABLE = True
+    print("[startup] signal diagnostics loaded — market + trend calibration agents")
+except Exception as _dx:
+    _DIAG_AVAILABLE = False
+    print(f"[startup] signal diagnostics unavailable: {_dx}")
+
+try:
     import news_collectors as _news
     _NEWS_AVAILABLE = True
     print("[startup] news_collectors loaded — GDELT (Stage 4) media coverage active")
@@ -6418,6 +6427,44 @@ def monitor_catchall():
         if conn is not None:
             try: conn.close()
             except Exception: pass
+
+
+@app.get("/diagnostic/market/{symbol}")
+def diagnostic_market(symbol: str):
+    """Market Signal Diagnostic — audits ONE instrument's scoring: baseline depth,
+    stdev-floor binding, provenance, and tier/deviation contradiction. Read-only;
+    catches cold-start artifacts like SPCX (INSUFFICIENT_HISTORY)."""
+    if not _DIAG_AVAILABLE:
+        return {"available": False, "reason": "diagnostics not loaded"}
+    try:
+        return {"available": True, **_mkt_diag.run(symbol)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/diagnostic/trend/{topic}")
+def diagnostic_trend(topic: str):
+    """Trend Signal Diagnostic — audits ONE topic's Gradient Score: saturation,
+    N-discipline reconcile (expert pathway), what-if-N inversion, frozen range.
+    Read-only."""
+    if not _DIAG_AVAILABLE:
+        return {"available": False, "reason": "diagnostics not loaded"}
+    try:
+        return {"available": True, **_trd_diag.run(topic)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/diagnostic/trend-distribution")
+def diagnostic_trend_distribution(limit: int = Query(30, ge=5, le=200)):
+    """Trend Signal cross-topic distribution — is Detection/Confidence actually
+    separating topics, or collapsing them onto shared values? Read-only."""
+    if not _DIAG_AVAILABLE:
+        return {"available": False, "reason": "diagnostics not loaded"}
+    try:
+        return {"available": True, **_trd_diag.run_distribution(limit)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
 
 
 @app.get("/monitor/market-coverage")
