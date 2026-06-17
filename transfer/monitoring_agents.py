@@ -527,11 +527,118 @@ def data_subscriptions() -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+# ── Agent I: CATCH-ALL AUDITOR (B3 — the news/general catch-all, specialised) ─
+# A dedicated specialist for the topic/post catch-all congestion. Where the Topic
+# Quality Auditor reports a single news_catchall_pct, this agent DIAGNOSES it:
+#   • catch-all % + counts (the headline metric, tracked daily for trend)
+#   • FLOOR HEALTH — single-source catch-all topics that leaked past the
+#     CATCHALL_MIN_SOURCES corroboration floor (should be ~0; a climb means the
+#     floor is disabled or a purge is overdue)
+#   • MISCLASSIFIED TRACKED CALLS — accuracy-ledger / pending detections stuck in
+#     the catch-all (real signals the thin lexicon mis-sorted — highest priority)
+#   • LEXICON CANDIDATES — the most frequent meaningful tokens across catch-all
+#     topics (common words / filler / numbers excluded). These are the terms to
+#     add to topic_categories._LEX so the topics leave the catch-all for their
+#     true category — the real lever on the catch-all %.
+# Designed to be run end-of-day: its summary is a worklist, not just a number.
+def catchall_auditor(conn) -> dict:
+    import datetime, collections
+    import gravitational_anomaly_detector as g
+    alerts = []
+    nf = getattr(g, "NEWS_FILLER", set())
+    min_src = getattr(g, "CATCHALL_MIN_SOURCES", 2)
+    catch_cats = getattr(g, "_CATCHALL_CATS", ("news", "general", ""))
+
+    # corroboration per topic (distinct sources + any expert-tier signal), 72h
+    agg = {}
+    try:
+        cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=72)).isoformat()
+        for r in conn.execute(
+            "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
+            "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
+            "FROM topic_signals WHERE extracted_at >= ? GROUP BY topic_key", (cut,)).fetchall():
+            agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0))
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B3", "msg": f"corroboration read failed: {e}"})
+
+    # tracked calls (never legitimately catch-all junk) — for misclassified detect
+    protect = set()
+    for t in ("accuracy_ledger", "pending_detections"):
+        try:
+            for r in conn.execute(f"SELECT DISTINCT topic_key FROM {t}").fetchall():
+                protect.add(r["topic_key"])
+        except Exception:
+            pass
+
+    try:
+        rows = conn.execute(
+            "SELECT v.topic_key, v.topic_display FROM velocity_scores v "
+            "INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
+            "GROUP BY topic_key) l ON v.topic_key=l.topic_key AND v.scored_at=l.m").fetchall()
+    except Exception as e:
+        return {"agent": "catchall_auditor", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3", "msg": f"scored read failed: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+
+    total = len(rows) or 1
+    catch = single_src = 0
+    misclassified_real, samples = [], []
+    token_freq = collections.Counter()
+    for r in rows:
+        k = r["topic_key"]
+        disp = (r["topic_display"] or k or "")
+        try:
+            cat = g._topic_category(disp) or ""
+        except Exception:
+            cat = ""
+        if cat not in catch_cats:
+            continue
+        catch += 1
+        nsrc, hasx = agg.get(k, (0, 0))
+        if nsrc < min_src and not hasx and k not in protect:
+            single_src += 1                       # floor leak (≈0 expected)
+        if k in protect:
+            misclassified_real.append(disp)       # tracked call stuck in catch-all
+        for tok in disp.lower().split():          # lexicon-candidate tally
+            tok = tok.strip(".,:;!?\"'()[]")
+            if (len(tok) >= 4 and not tok.isdigit()
+                    and tok not in nf and not g._is_common_word(tok)):
+                token_freq[tok] += 1
+        if len(samples) < 15:
+            samples.append(disp)
+
+    catch_pct = round(catch / total * 100, 1)
+    top_terms = token_freq.most_common(25)
+    summary = {
+        "total_scored": total, "catchall_count": catch, "catchall_pct": catch_pct,
+        "floor_min_sources": min_src,
+        "single_source_catchall_leak": single_src,
+        "misclassified_tracked": len(misclassified_real),
+        "misclassified_examples": misclassified_real[:15],
+        "lexicon_candidates": [{"term": t, "count": c} for t, c in top_terms],
+        "samples": samples,
+    }
+    if catch_pct >= 70:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"catch-all at {catch_pct}% ({catch}/{total}) — still congested. "
+                              f"Top lexicon candidates to reclassify: {[t for t, _ in top_terms[:10]]}"})
+    if single_src > 50:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"{single_src} single-source catch-all topics leaked past the "
+                              f"corroboration floor (min_sources={min_src}) — floor disabled or purge overdue"})
+    if misclassified_real:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"{len(misclassified_real)} TRACKED call(s) (ledger/pending) stuck in the "
+                              f"catch-all — reclassify first: {misclassified_real[:8]}"})
+    return {"agent": "catchall_auditor", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
-              data_subscriptions()]
+              data_subscriptions(), catchall_auditor(conn)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

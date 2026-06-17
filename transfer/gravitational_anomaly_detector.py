@@ -6393,6 +6393,25 @@ def monitor_quality():
             except Exception: pass
 
 
+@app.get("/monitor/catchall")
+def monitor_catchall():
+    """Catch-All Auditor — specialist for the news/general catch-all congestion:
+    catch-all %, corroboration-floor health, misclassified tracked calls, and the
+    top lexicon-candidate terms to reclassify (block B3)."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.catchall_auditor(conn)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/monitor/subscriptions")
 def monitor_subscriptions():
     """Data Subscriptions — every external data API: configured?, billing class,
