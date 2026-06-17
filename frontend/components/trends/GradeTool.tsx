@@ -283,6 +283,20 @@ function ProposedCard({ result }: { result: Proposed }) {
       </View>
       {!!result.action && <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#1A1A2E' }}>{result.action}</Text>}
       {!!result.reasoning && <Text className="text-textSecondary text-[13px] leading-5 mb-3">{result.reasoning}</Text>}
+      {!!(result as any).mainstream_vs_niche && (() => {
+        const mv = (result as any).mainstream_vs_niche;
+        const col = mv.label === 'mainstream' ? '#00C896' : mv.label === 'emerging' ? '#D4A017' : mv.label === 'fading' ? '#94A3B8' : '#2D7EEF';
+        return (
+          <View className="mb-3">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-textSecondary text-xs uppercase tracking-wider">Mainstream vs Niche</Text>
+              <Text className="text-sm font-black capitalize" style={{ color: col }}>{mv.label}</Text>
+            </View>
+            {!!mv.note && <Text className="text-textMuted text-[11px] leading-4 mt-1">{mv.note}</Text>}
+            <Text className="text-textMuted text-[10px] mt-1">Determined from: {mv.source}</Text>
+          </View>
+        );
+      })()}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal quality</Text>
       <View className="gap-2 mb-3">
         <Bar label="Niche Concentration" value={result.gradient_strength} />

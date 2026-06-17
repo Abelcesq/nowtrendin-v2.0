@@ -209,7 +209,12 @@ _SCORE_SYSTEM = (
     "Return ONLY valid JSON, no prose, with keys: niche_concentration, "
     "platform_diversity, momentum, dark_matter, persistence, freshness (numbers "
     "0-100), stage (one of BREAKOUT, STRONG, EMERGING, WATCHING, MONITORING), "
-    "action (short imperative), reasoning (2-4 sentences citing the evidence). "
+    "action (short imperative), reasoning (2-4 sentences citing the evidence), "
+    "classification (ONE of: 'mainstream' = already widely known across general "
+    "platforms; 'emerging' = expert/insider attention leading mainstream, crossing "
+    "over now; 'niche' = confined to specialist/expert communities; 'fading' = past "
+    "its peak), and reach_note (1 sentence on WHERE the conversation lives and "
+    "whether experts lead the public — the basis for the classification). "
     "Optionally also include holistic_detection and holistic_confidence (0-100) — "
     "your own direct read, which the app shows alongside the computed score."
 )
@@ -329,6 +334,9 @@ def grade_topic(topic: str) -> dict:
         "stage":  score.get("stage", "MONITORING"),
         "action": score.get("action", ""),
         "reasoning": score.get("reasoning", ""),
+        # Internet-researched mainstream/niche read (from the open web, not our pool).
+        "classification": str(score.get("classification") or "").lower() or None,
+        "reach_note": score.get("reach_note", ""),
         "research": research.get("summary", ""),
         "citations": research.get("citations", []),
         "provenance": "ai_grade:perplexity+claude (engine-weighted)",

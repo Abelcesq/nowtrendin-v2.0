@@ -36,6 +36,43 @@ def _num(x, nd=0):
         return 0
 
 
+def _measured_mainstream(s: dict) -> dict:
+    """Mainstream-vs-niche from OUR OWN data — the dual-pathway scoring agent's
+    determination (detection_pathway / mainstream_ratio / mainstream_confirmed).
+    This is the 'communicate with other data agents' path for in-pool topics."""
+    pathway = (s.get("detection_pathway") or "").lower()
+    try:
+        ratio = float(s.get("mainstream_ratio") or 0)
+    except (TypeError, ValueError):
+        ratio = 0.0
+    confirmed = bool(s.get("mainstream_confirmed"))
+    if confirmed or pathway == "mainstream" or ratio >= 0.6:
+        label = "mainstream"
+        note = "Confirmed across many distinct mainstream communities / reputable outlets."
+    elif pathway == "blended" or ratio >= 0.2:
+        label = "emerging"
+        note = "Crossing from expert communities into the mainstream (highest-confidence mainstreaming)."
+    else:
+        label = "niche"
+        note = "Concentrated in expert/specialist communities — the public hasn't caught on yet."
+    return {"label": label, "note": note, "source": "engine · dual-pathway",
+            "mainstream_ratio": round(ratio, 3), "mainstream_confirmed": confirmed,
+            "detection_pathway": pathway or "expert"}
+
+
+def _ai_mainstream(result: dict) -> dict:
+    """Mainstream-vs-niche for a topic NOT in our pool — from the OPEN-WEB research
+    (Perplexity classified WHERE the conversation lives + whether experts lead)."""
+    cls = (result.get("classification") or "").lower()
+    if cls in ("mainstream", "emerging", "niche", "fading"):
+        label = cls
+    else:  # fall back to the AI-estimated niche concentration (G)
+        g = _num(result.get("gradient_strength"))
+        label = "niche" if g >= 55 else ("mainstream" if g <= 35 else "emerging")
+    return {"label": label, "note": result.get("reach_note") or "",
+            "source": "open-web research (Perplexity)"}
+
+
 def _measured_from_row(g, s: dict) -> dict:
     """Build a grade result from a live, measured velocity_scores row (already
     run through _format_score_rows so calibration/components/N are present)."""
@@ -81,6 +118,17 @@ def _measured_from_row(g, s: dict) -> dict:
         "citations": [],
         "maturity": cal.get("maturity_class"),
         "maturity_reason": cal.get("maturity_reason"),
+        # mainstream-vs-niche from OUR data (dual-pathway agent) + what we consulted
+        "mainstream_vs_niche": _measured_mainstream(s),
+        "data_pool": {
+            "in_pool": True,
+            "category": s.get("category"),
+            "detection_pathway": s.get("detection_pathway"),
+            "mainstream_ratio": s.get("mainstream_ratio"),
+            "mainstream_confirmed": bool(s.get("mainstream_confirmed")),
+        },
+        "consulted": ["data pool (velocity_scores)", "topic classifier",
+                      "dual-pathway agent (expert vs mainstream)"],
         "measured_row": s,                     # full live row for rich rendering
         "note": ("This topic is already in the Now TrendIn data pool — returning the "
                  "MEASURED Gradient Score and N score from the live engine (no AI "
@@ -190,6 +238,16 @@ def resolve_grade(topic: str) -> dict:
             "confidence": _num(result.get("confidence_score")),
             "stage": (result.get("stage") or "").upper(),
         }
+    # mainstream-vs-niche from the OPEN WEB (the topic isn't in our pool) + the
+    # classifier's category, and what the agent consulted.
+    result["mainstream_vs_niche"] = _ai_mainstream(result)
+    try:
+        cat = g._topic_category(raw)
+    except Exception:
+        cat = None
+    result["data_pool"] = {"in_pool": False, "category": cat}
+    result["consulted"] = ["data pool (velocity_scores · miss → web)", "topic classifier",
+                           "open-web research (Perplexity)", "AI synthesis (Claude)"]
     _attach_market(g, raw, result)
     return result
 
