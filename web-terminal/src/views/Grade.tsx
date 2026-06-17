@@ -46,17 +46,17 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
     ['Dark Matter', result.dark_matter],
     ['Persistence', result.persistence],
   ]
+  const measured = result.source === 'measured'
+  // N score comes straight from the Grade Agent now (live engine value).
+  const nScore = result.n_score != null ? Math.round(result.n_score) : null
   // AI Context — source-aware definition for the graded topic (best-effort).
   const [ctx, setCtx] = useState<string | null>(null)
-  // Live N for the topic if it's already in the engine; else 'not yet registered'.
-  const [liveN, setLiveN] = useState<number | null>(null)
   useEffect(() => {
     let alive = true
-    const key = topic.trim().toLowerCase().replace(/\s+/g, '_')
+    const key = (result.topic_key || topic).trim().toLowerCase().replace(/\s+/g, '_')
     api.explainer(key).then((x) => alive && setCtx(x?.available ? (x.full || x.short || null) : null)).catch(() => {})
-    api.score(key).then((x) => alive && setLiveN(Math.round(x?.rich?.nowtrendin_score ?? x?.components?.N_nowtrendin?.score ?? 0))).catch(() => {})
     return () => { alive = false }
-  }, [topic])
+  }, [topic, result.topic_key])
 
   return (
     <div className="grade-result">
@@ -78,10 +78,15 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         )
       })()}
 
-      {/* Attention estimate (AI) */}
+      {/* Gradient read — MEASURED (from data pool) or AI-PROPOSED */}
       <div className="g-card">
-        <div className="g-kicker">{ms ? 'Attention estimate · AI' : 'Proposed · AI estimate'}
-          <span className="g-tier" style={{ background: scol + '1A', color: scol }}>{result.stage}</span></div>
+        <div className="g-kicker">
+          {measured ? 'Gradient Score · measured' : (ms ? 'Attention estimate · AI' : 'Proposed · AI estimate')}
+          <span className="g-tier" style={{ background: (measured ? MC.confidence : GOLD) + '1A', color: measured ? MC.confidence : GOLD }}>
+            {measured ? 'IN DATA POOL' : 'AI ESTIMATE'}</span>
+          <span className="g-tier" style={{ background: scol + '1A', color: scol }}>{result.stage}</span>
+        </div>
+        {result.note && <div className="disc" style={{ marginTop: -4, marginBottom: 8 }}>{result.note}</div>}
         <div className="g-rings">
           <div className="g-ring">{ring(det, MC.detection)}<div className="g-rl">DETECTION</div></div>
           <div className="g-ring">{ring(conf, MC.confidence)}<div className="g-rl">CONFIDENCE</div></div>
@@ -110,9 +115,9 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         })}
 
         {/* (3) N score — Now Trending (on-platform demand) */}
-        <h4 className="g-h" style={{ color: MC.orange }}>Now Trending (N)</h4>
-        <div className="kv"><span>N (on-platform demand)</span><b style={{ color: MC.orange }}>{liveN != null && liveN > 0 ? liveN : 'not yet registered'}</b></div>
-        <div className="disc">Demand (N) — how often Now TrendIn users ask about a topic — is tracked as a SEPARATE signal and never folded into the Gradient (no demand feedback loop). It registers once the topic is scored in the live engine.</div>
+        <h4 className="g-h" style={{ color: MC.orange }}>N Score · Now Trending</h4>
+        <div className="kv"><span>N (on-platform demand)</span><b style={{ color: MC.orange }}>{nScore != null && nScore > 0 ? nScore : 'not yet registered'}</b></div>
+        <div className="disc">Demand (N) — how often Now TrendIn users ask about a topic — is a SEPARATE signal, never folded into the Gradient (no demand feedback loop). {measured ? 'Measured live from the engine.' : 'Registers once demand accrues; this grade query logs it.'}</div>
 
         {Array.isArray(result.citations) && result.citations.length > 0 && (
           <>
