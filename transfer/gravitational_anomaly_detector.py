@@ -7053,7 +7053,8 @@ def list_topics(
     rows = conn.execute(f"""
         SELECT r.topic_key, r.topic_display, r.current_stage,
                r.total_mentions, r.is_anomaly, r.last_seen_at,
-               v.overall_score, v.detection_score, v.confidence_score
+               v.overall_score, v.detection_score, v.confidence_score,
+               v.nowtrendin_score
         FROM topic_registry r
         LEFT JOIN (
             SELECT topic_key, MAX(scored_at) as max_at
