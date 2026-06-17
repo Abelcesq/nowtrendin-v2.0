@@ -278,6 +278,30 @@ td.r{text-align:right}
 .cov-h{font-size:12px; font-weight:700; color:var(--text); margin-bottom:3px}
 .cov-i{font-size:11px; color:var(--text-2); line-height:1.45; margin-bottom:2px}
 .cov-m{color:var(--text-3); font-size:10px}
+/* Grade view */
+.g-grade-box{background:var(--surface); border:1px solid #D4A01766; background:#D4A0170D; border-radius:12px; padding:14px; margin-bottom:16px}
+.g-grade-meta{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-3); margin-bottom:10px; gap:10px}
+.g-tok{font-weight:700; color:var(--text-2); white-space:nowrap}
+.g-pull{width:100%; justify-content:center; height:40px}
+.g-err{color:var(--down); font-size:12px; margin-top:8px}
+.grade-result{display:flex; flex-direction:column; gap:14px}
+.g-card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px}
+.g-kicker{font-size:10px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.g-tier{margin-left:auto; font-size:10px; font-weight:800; padding:3px 9px; border-radius:20px}
+.g-rings{display:flex; justify-content:space-around; align-items:flex-start; margin:4px 0 12px}
+.g-ring{display:flex; flex-direction:column; align-items:center; gap:5px}
+.g-rl{font-size:11px; font-weight:700; color:var(--text)}
+.g-rf{font-size:9px; color:var(--text-3)}
+.g-lev{font-size:11px; font-weight:700; color:#10B981; text-align:center; margin-bottom:8px}
+.g-gapband{border:1px solid; border-radius:9px; padding:8px 11px; font-size:12.5px; margin-bottom:10px}
+.g-action{font-size:15px; font-weight:900; margin-bottom:6px}
+.g-h{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:14px 0 8px; font-weight:700}
+.g-cite{font-size:10.5px; color:var(--text-3); line-height:1.45; margin-bottom:3px; word-break:break-all}
+.g-row{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px; margin-bottom:8px}
+.g-row-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.g-row-name{font-size:13px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.g-row-sc{display:flex; align-items:center; gap:12px; margin-top:5px; font-size:11px; font-weight:600}
+.g-row-age{margin-left:auto; color:var(--text-3); font-weight:400}
 .narr{font-size:12px; color:var(--text-2); line-height:1.55; background:var(--canvas); border-radius:8px; padding:12px}
 .narr.muted{color:var(--text-3); font-style:italic}
 /* AI Context — source-aware definition (preview + full), parity with mobile */

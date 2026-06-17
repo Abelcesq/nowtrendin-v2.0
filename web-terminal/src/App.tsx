@@ -6,6 +6,7 @@ import { MarketSignal } from './views/MarketSignal'
 import { Watchlists } from './views/Watchlists'
 import { Methodology } from './views/Methodology'
 import { Account } from './views/Account'
+import { Grade } from './views/Grade'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
 
@@ -57,6 +58,7 @@ export function App() {
   else if (nav === 'trends') body = <Screener onRail={setRail} query={q} />
   else if (nav === 'market') body = <MarketSignal onRail={setRail} />
   else if (nav === 'watchlists') body = <Watchlists />
+  else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />

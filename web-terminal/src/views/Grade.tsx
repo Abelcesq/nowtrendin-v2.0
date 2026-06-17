@@ -1,0 +1,237 @@
+import { useEffect, useState, useCallback } from 'react'
+import { grade as gradeApi, gradeHistory, gradedAll, type User } from '../lib/auth'
+import { api } from '../lib/api'
+import { MC, stageColor, marketTierColor, GAP_BANDS, gapBandIndex } from '../lib/mobileTheme'
+
+// GRADE — the AI Grade tool, web parity with the mobile GradeTool. Three tabs:
+// New Grade (token-metered AI proposed score), History (this member's grades,
+// free), Graded (all members' graded topics, free). The result page carries the
+// three required reads: AI Context definition, Signal Quality analysis, N score.
+
+const GOLD = '#D4A017'
+type Tab = 'new' | 'history' | 'graded'
+
+function timeAgo(iso: string) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (isNaN(mins)) return ''
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const h = Math.floor(mins / 60); if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24); return d < 30 ? `${d}d ago` : new Date(iso).toLocaleDateString()
+}
+
+function ring(val: number, color: string) {
+  const r = 22, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, val)) / 100)
+  return (
+    <svg width="60" height="60" viewBox="0 0 60 60">
+      <circle cx="30" cy="30" r={r} fill="none" stroke="var(--line)" strokeWidth="5" />
+      <circle cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={off} transform="rotate(-90 30 30)" />
+      <text x="30" y="34" textAnchor="middle" fontSize="15" fontWeight="800" fill={color}>{Math.round(val)}</text>
+    </svg>
+  )
+}
+
+function ProposedCard({ result, topic }: { result: any; topic: string }) {
+  const det = Math.round(result.detection_score ?? 0)
+  const conf = Math.round(result.confidence_score ?? 0)
+  const gap = Math.abs(Math.round(result.heisenberg_gap ?? (det - conf)))
+  const band = GAP_BANDS[gapBandIndex(gap)]
+  const ms = result.market_signal?.market_gradient
+  const scol = stageColor(result.stage)
+  const quality: [string, number][] = [
+    ['Niche Concentration', result.gradient_strength],
+    ['Platform Diversity', result.platform_diversity],
+    ['Momentum', result.inertia],
+    ['Dark Matter', result.dark_matter],
+    ['Persistence', result.persistence],
+  ]
+  // AI Context — source-aware definition for the graded topic (best-effort).
+  const [ctx, setCtx] = useState<string | null>(null)
+  // Live N for the topic if it's already in the engine; else 'not yet registered'.
+  const [liveN, setLiveN] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    const key = topic.trim().toLowerCase().replace(/\s+/g, '_')
+    api.explainer(key).then((x) => alive && setCtx(x?.available ? (x.full || x.short || null) : null)).catch(() => {})
+    api.score(key).then((x) => alive && setLiveN(Math.round(x?.rich?.nowtrendin_score ?? x?.components?.N_nowtrendin?.score ?? 0))).catch(() => {})
+    return () => { alive = false }
+  }, [topic])
+
+  return (
+    <div className="grade-result">
+      {/* Market read first (companies) */}
+      {ms && (() => {
+        const tc = marketTierColor(ms.tier)
+        return (
+          <div className="g-card" style={{ borderColor: tc + '44' }}>
+            <div className="g-kicker" style={{ color: MC.amber }}>Market Signal · measured
+              <span className="g-tier" style={{ background: tc + '1A', color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</span></div>
+            <div className="g-rings">
+              <div className="g-ring">{ring(ms.detection, MC.detection)}<div className="g-rl">DETECTION</div><div className="g-rf">analysts + positioning</div></div>
+              <div className="g-ring">{ring(ms.confidence, MC.confidence)}<div className="g-rl">CONFIDENCE</div><div className="g-rf">fundamentals + price</div></div>
+            </div>
+            {ms.leverage_health != null && <div className="g-lev">Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</div>}
+            {ms.interpretation && <div className="narr">{ms.interpretation}</div>}
+            <div className="disc">Measured MARKET read — same as the Market section. The AI estimate below is the separate ATTENTION read.</div>
+          </div>
+        )
+      })()}
+
+      {/* Attention estimate (AI) */}
+      <div className="g-card">
+        <div className="g-kicker">{ms ? 'Attention estimate · AI' : 'Proposed · AI estimate'}
+          <span className="g-tier" style={{ background: scol + '1A', color: scol }}>{result.stage}</span></div>
+        <div className="g-rings">
+          <div className="g-ring">{ring(det, MC.detection)}<div className="g-rl">DETECTION</div></div>
+          <div className="g-ring">{ring(conf, MC.confidence)}<div className="g-rl">CONFIDENCE</div></div>
+        </div>
+        <div className="g-gapband" style={{ borderColor: band.color + '55', background: band.color + '0F' }}>
+          <b style={{ color: band.color }}>{gap}-point gap — {band.label}</b>
+        </div>
+        {result.action && <div className="g-action" style={{ color: scol }}>{result.action}</div>}
+        {result.reasoning && <div className="narr" style={{ marginBottom: 10 }}>{result.reasoning}</div>}
+
+        {/* (1) AI Context definition */}
+        <h4 className="g-h">AI Context</h4>
+        <div className="narr">{ctx || result.research || 'A source-aware definition generates on first view; the AI reasoning above summarizes what this topic is and why it scores here.'}</div>
+
+        {/* (2) Signal Quality analysis */}
+        <h4 className="g-h">Signal Quality Analysis</h4>
+        {quality.map(([label, val]) => {
+          const v = Math.max(0, Math.min(100, Math.round(val ?? 0)))
+          return (
+            <div className="comp-row" key={label}>
+              <span className="cl">{label}</span>
+              <span className="comp-bar"><i style={{ width: `${v}%`, background: GOLD }} /></span>
+              <span className="cv">{v}</span>
+            </div>
+          )
+        })}
+
+        {/* (3) N score — Now Trending (on-platform demand) */}
+        <h4 className="g-h" style={{ color: MC.orange }}>Now Trending (N)</h4>
+        <div className="kv"><span>N (on-platform demand)</span><b style={{ color: MC.orange }}>{liveN != null && liveN > 0 ? liveN : 'not yet registered'}</b></div>
+        <div className="disc">Demand (N) — how often Now TrendIn users ask about a topic — is tracked as a SEPARATE signal and never folded into the Gradient (no demand feedback loop). It registers once the topic is scored in the live engine.</div>
+
+        {Array.isArray(result.citations) && result.citations.length > 0 && (
+          <>
+            <h4 className="g-h">Sources</h4>
+            {result.citations.slice(0, 8).map((c: string, i: number) => <div className="g-cite" key={i}>• {c}</div>)}
+          </>
+        )}
+        <div className="disc">Proposed score — an AI estimate from public web evidence, not a measured engine score.</div>
+      </div>
+    </div>
+  )
+}
+
+function GradeList({ kind }: { kind: 'history' | 'graded' }) {
+  const [q, setQ] = useState('')
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const load = useCallback(async (query: string) => {
+    setLoading(true)
+    try {
+      const d = kind === 'history' ? await gradeHistory(query) : await gradedAll(query)
+      setRows(Array.isArray(d?.grades) ? d.grades : [])
+    } catch { setRows([]) } finally { setLoading(false) }
+  }, [kind])
+  useEffect(() => { const t = setTimeout(() => load(q.trim()), 350); return () => clearTimeout(t) }, [q, load])
+
+  return (
+    <div>
+      <div className="add-row" style={{ margin: '0 0 10px' }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder={kind === 'history' ? 'Search your graded topics…' : 'Search all graded topics…'} />
+      </div>
+      <div className="disc" style={{ marginBottom: 10 }}>
+        {kind === 'history' ? 'Your AI grades from the last 12 months. No token charge to view.'
+          : 'Topics graded by Now TrendIn members across all plans. No token charge to view.'}
+      </div>
+      {loading ? <div className="center-state"><div className="spinner" />Loading…</div>
+        : rows.length === 0 ? <div className="center-state">{q ? 'No graded topics match.' : (kind === 'history' ? 'You haven’t graded any topics yet.' : 'No topics graded yet.')}</div>
+          : rows.map((g) => {
+            const col = stageColor(g.stage)
+            return (
+              <div className="g-row" key={g.id}>
+                <div className="g-row-top"><span className="g-row-name">{g.topic}</span>
+                  {g.stage && <span className="g-tier" style={{ background: col + '1A', color: col }}>{g.stage}</span>}</div>
+                <div className="g-row-sc">
+                  <span style={{ color: MC.detection }}>DET {Math.round(g.detection)}</span>
+                  <span style={{ color: MC.confidence }}>CONF {Math.round(g.confidence)}</span>
+                  <span className="g-row-age">{timeAgo(g.createdAt)}</span>
+                </div>
+              </div>
+            )
+          })}
+    </div>
+  )
+}
+
+export function Grade({ user, onUser }: { user: User; onUser?: (u: User) => void }) {
+  const [tab, setTab] = useState<Tab>('new')
+  const [topic, setTopic] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [result, setResult] = useState<any | null>(null)
+  const [tokens, setTokens] = useState(user.gradeTokens ?? 0)
+  const canGrade = !!user.tier
+
+  const doGrade = async () => {
+    setMsg(null); setResult(null); setBusy(true)
+    try {
+      const d: any = await gradeApi(topic.trim())
+      if (d?.gradeTokens != null) { setTokens(d.gradeTokens); onUser?.({ ...user, gradeTokens: d.gradeTokens }) }
+      if (d?.available && d?.proposed) setResult(d)
+      else setMsg(d?.detail ?? d?.reason ?? 'AI grading is not available yet.')
+    } catch (e: any) { setMsg(e?.data?.detail ?? 'Grade failed. Try again.') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <>
+      <div className="main-head">
+        <div className="main-title-row">
+          <div className="main-title">Grade</div>
+          <div className="main-sub">Propose a Gradient Score for any topic — AI researches the open web and returns a score with the evidence</div>
+        </div>
+        <div className="chips tight">
+          <span className="chip-label">Grade</span>
+          <div className={'chip' + (tab === 'new' ? ' active' : '')} onClick={() => setTab('new')}>+ New Grade</div>
+          <div className={'chip' + (tab === 'history' ? ' active' : '')} onClick={() => setTab('history')}>History</div>
+          <div className={'chip' + (tab === 'graded' ? ' active' : '')} onClick={() => setTab('graded')}>Graded</div>
+        </div>
+      </div>
+
+      <div className="grid-wrap" style={{ maxWidth: 760 }}>
+        {tab === 'new' && (
+          !canGrade ? (
+            <div className="center-state">Choose a plan<div className="muted">AI grading is included on every plan with a monthly credit allowance.</div></div>
+          ) : (
+            <>
+              <div className="g-grade-box">
+                <div className="add-row" style={{ margin: '0 0 10px' }}>
+                  <input value={topic} onChange={(e) => setTopic(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && topic.trim() && tokens > 0) doGrade() }}
+                    placeholder="Enter any word or topic to grade…" />
+                </div>
+                <div className="g-grade-meta">
+                  <span>Researches the open web and proposes a score with citations — uses 1 grade token.</span>
+                  <span className="g-tok">{tokens} grade tokens left</span>
+                </div>
+                <button className="btn primary g-pull" disabled={busy || !topic.trim() || tokens <= 0} onClick={doGrade}>
+                  {busy ? '⟳ Researching… ~20–40s' : tokens <= 0 ? 'No grade tokens remaining this month' : '⚡ Grade · Pull · 1 token'}
+                </button>
+                {msg && <div className="g-err">{msg}</div>}
+              </div>
+              {result && <ProposedCard result={result} topic={topic.trim()} />}
+            </>
+          )
+        )}
+        {tab === 'history' && <GradeList kind="history" />}
+        {tab === 'graded' && <GradeList kind="graded" />}
+      </div>
+    </>
+  )
+}

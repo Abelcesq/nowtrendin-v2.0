@@ -76,6 +76,21 @@ export async function changePassword(currentPassword: string, newPassword: strin
 export const pullTrends = () =>
   call('/api/pull-trends/', { method: 'POST' }, true) as Promise<any>
 
+// "Pull Market" — fresh risk/positioning collect (FINRA, OFR, WhaleWisdom,
+// creator/broadcast, Alpha Vantage), 1 token. Falls back to pull-trends if the
+// dedicated endpoint isn't wired (same behaviour as the mobile PullMarketButton).
+export const pullMarket = () =>
+  call('/api/pull-market/', { method: 'POST' }, true).catch(() => pullTrends()) as Promise<any>
+
+// ── Grade — the AI Grade tool (Perplexity research + Claude synthesis), 1 grade
+// credit per proposed score. Same backend endpoints the mobile GradeTool uses. ──
+export const grade = (topic: string) =>
+  call('/api/grade/', { method: 'POST', body: JSON.stringify({ topic }) }, true) as Promise<any>
+export const gradeHistory = (q = '') =>
+  call(`/api/grade/history/${q ? `?q=${encodeURIComponent(q)}` : ''}`, {}, true) as Promise<any>
+export const gradedAll = (q = '') =>
+  call(`/api/grade/all/${q ? `?q=${encodeURIComponent(q)}` : ''}`, {}, true) as Promise<any>
+
 // ── Watchlists — backend-synced per-user lists (same API the mobile app uses),
 // so the SAME lists appear on web, desktop, and mobile. Items hold key/display/
 // kind only; the view looks up live scores by key. ──

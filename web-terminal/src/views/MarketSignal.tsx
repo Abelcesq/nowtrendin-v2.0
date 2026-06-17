@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type RiskRow } from '../lib/api'
+import { pullMarket } from '../lib/auth'
 import { MC, marketTierColor, FEEDS_COLOR, MARKET_TIERS, RISK_PIPELINE, BASELINE_META } from '../lib/mobileTheme'
 
 // Market Signal — the finance-native dual score, wired to the live /risk/scores
@@ -342,6 +343,18 @@ export function MarketSignal({ onRail }: { onRail: (node: React.ReactNode | null
   const [sortKey, setSortKey] = useState<SortKey>('det')
   const [sortDir, setSortDir] = useState(-1)
   const [sel, setSel] = useState<string | null>(null)
+  const [pulling, setPulling] = useState(false)
+  const [pullMsg, setPullMsg] = useState<string | null>(null)
+
+  const doPull = async () => {
+    setPulling(true); setPullMsg(null)
+    try {
+      const r = await pullMarket()
+      setPullMsg(r?.message || 'Market pull queued — fresh positioning arrives next cycle.')
+    } catch (e: any) {
+      setPullMsg(e?.data?.detail || e?.message || 'Pull failed.')
+    } finally { setPulling(false) }
+  }
 
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
@@ -394,8 +407,11 @@ export function MarketSignal({ onRail }: { onRail: (node: React.ReactNode | null
       <div className="main-head">
         <div className="main-title-row">
           <div className="main-title">Market Signal</div>
-          <div className="main-sub"><b>{view.length}</b> instruments · finance-native dual score · baseline-relative</div>
+          <div className="main-sub"><b>{view.length}</b> instruments · finance-native dual score · baseline-relative{pullMsg ? ` · ${pullMsg}` : ''}</div>
           <div className="main-actions">
+            <button className="btn primary" onClick={doPull} disabled={pulling} title="Enterprise — fresh FINRA/OFR/WhaleWisdom/creator/news pull, costs 1 token">
+              {pulling ? '⟳ Pulling…' : '⚡ Pull Market · 1 token'}
+            </button>
             <button className="btn" onClick={csv}>↧ Export CSV</button>
           </div>
         </div>
