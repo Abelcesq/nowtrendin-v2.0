@@ -46,7 +46,13 @@ except Exception:
 import sqlite3
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
-MIN_BASELINE_CYCLES = 3
+MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
+# Cold-start guard (Fix #1, market diagnostic): a baseline of 3–9 cycles passes the
+# MIN_BASELINE_CYCLES gate but is too thin to trust — the 0.05 stdev floor dominates
+# and fabricates the z (SPCX = 5 cycles, floor-bound on 6/7 components). Until a
+# component has this many cycles it stays "baseline forming", so a fresh IPO reads
+# CALIBRATING, never a confident ROUTINE the data can't support.
+MIN_BASELINE_TRUSTWORTHY = int(os.getenv("MARKET_MIN_BASELINE", "10"))
 
 DETECTION_WEIGHTS = {
     "dark_positioning":          0.30,
@@ -108,16 +114,26 @@ def _z_to_unit(z: float) -> float:
 
 
 def score_component(current: float, baseline: Optional[dict]) -> dict:
-    if baseline and baseline.get("samples", 0) >= MIN_BASELINE_CYCLES:
+    samples = baseline.get("samples", 0) if baseline else 0
+    if baseline and samples >= MIN_BASELINE_CYCLES:
         mean = baseline["mean"]
         # Components are 0-1, so the stdev floor must be small — a count-scale
         # floor (0.5) would crush every z-score (the bug caught in the design review).
-        stdev = max(0.05, baseline.get("stdev", max(0.08, mean * 0.3)))
+        raw_stdev = baseline.get("stdev", max(0.08, mean * 0.3))
+        stdev = max(0.05, raw_stdev)
         z = (current - mean) / stdev
+        # Cold-start guard: a thin baseline (< MIN_BASELINE_TRUSTWORTHY cycles) yields
+        # a floor-fabricated z. Keep the z for transparency but flag it calibrating so
+        # the OVERALL read is "baseline forming", not a confident tier the data can't
+        # support. Sample counts are uniform across an item's components (all recorded
+        # each cycle), so an established name's deep baseline never false-triggers.
+        calibrating = samples < MIN_BASELINE_TRUSTWORTHY
         return {"score": round(_z_to_unit(z), 3), "z": round(z, 2),
-                "baseline_relative": True, "current": current}
+                "baseline_relative": not calibrating,
+                "calibrating": calibrating,
+                "baseline_samples": samples, "current": current}
     return {"score": round(_norm(current) * 0.6, 3), "baseline_relative": False,
-            "calibrating": True, "current": current}
+            "calibrating": True, "baseline_samples": samples, "current": current}
 
 
 def _feeds(component: str) -> str:
