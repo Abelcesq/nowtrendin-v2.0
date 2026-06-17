@@ -126,7 +126,7 @@ td.r{text-align:right}
 .stage.BREAKOUT{color:var(--bk-t); background:var(--bk-b)}
 .stage.STRONG{color:var(--st-t); background:var(--st-b)}
 .stage.EMERGING{color:var(--em-t); background:var(--em-b)}
-.stage.WATCHING{color:var(--wa-t); background:var(--wa-b)}
+.stage.WATCHING,.stage.MARGINAL{color:var(--wa-t); background:var(--wa-b)}
 .stage.MONITORING{color:var(--mo-t); background:var(--mo-b)}
 .vel{font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px}
 .vel.up{color:var(--up)} .vel.down{color:var(--down)} .vel.flat{color:var(--text-3)}

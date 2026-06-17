@@ -13,18 +13,22 @@ import { MC, stageColor, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } f
 const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean; sort?: SortKey }[] = [
   { k: 'nowtrendin', label: 'Now TrendIn', sort: 'n' },
   { k: 'all', label: 'All Signals', sort: 'det' },
+  // Stage-coherent tiers — each filter shows ONLY topics whose Detection-derived
+  // stage matches, so the Stage badge always agrees with the selected filter.
   { k: 'breakout', label: 'Breakout ≥85', test: (r) => r.det >= 85 },
   { k: 'strong', label: 'Strong ≥70', test: (r) => r.det >= 70 && r.det < 85 },
   { k: 'emerging', label: 'Emerging', test: (r) => r.det >= 55 && r.det < 70 },
-  { k: 'lowrisk', label: 'Low Risk', test: (r) => Math.abs(r.gap) <= 6 },
-  { k: 'anomalies', label: 'Anomalies', test: (r) => Math.abs(r.gap) >= 18 },
+  { k: 'marginal', label: 'Marginal', test: (r) => r.det >= 35 && r.det < 55 },
+  // Anomalies = the engine's genuine gravitational-anomaly flag (NOT a raw gap
+  // threshold, which caught nearly everything).
+  { k: 'anomalies', label: 'Anomalies', test: (r) => !!r.is_anomaly },
 ]
 
 interface Row extends TopicRow { det: number; conf: number; n: number; gap: number; stage: string; ageMin: number }
 type SortKey = 'topic_display' | 'det' | 'conf' | 'n' | 'gap' | 'stage' | 'category' | 'total_mentions' | 'ageMin'
 
 function stageOf(d: number) {
-  return d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'WATCHING' : 'MONITORING'
+  return d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'MARGINAL' : 'MONITORING'
 }
 function minsSince(iso?: string) {
   if (!iso) return 9999

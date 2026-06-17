@@ -23,7 +23,7 @@ function gapMicro(det: number, conf: number) {
     </svg>
   )
 }
-const stageOf = (d: number) => d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'WATCHING' : 'MONITORING'
+const stageOf = (d: number) => d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'MARGINAL' : 'MONITORING'
 
 export function Watchlists() {
   const [lists, setLists] = useState<WatchlistT[]>([])

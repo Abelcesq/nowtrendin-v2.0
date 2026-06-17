@@ -12,7 +12,7 @@ import { queryApi } from '../../lib/api';
 type Tab = 'trends' | 'market' | 'graded';
 
 const STAGE_COLOR: Record<string, string> = {
-  BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017', WATCHING: '#E85A1E', MONITORING: '#94A3B8',
+  BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017', MARGINAL: '#E85A1E', WATCHING: '#E85A1E', MONITORING: '#94A3B8',
 };
 
 function timeAgo(iso: string): string {

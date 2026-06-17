@@ -20,7 +20,7 @@ export const MC = {
 // Signal stage → color (frontend STAGE_COLORS).
 export const STAGE_COLOR: Record<string, string> = {
   VIRAL: '#CF2A1B', BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017',
-  WATCHING: '#E85A1E', WATCH: '#E85A1E', MONITORING: '#9AA3B0', DECAY: '#94A3B8',
+  MARGINAL: '#E85A1E', WATCHING: '#E85A1E', WATCH: '#E85A1E', MONITORING: '#9AA3B0', DECAY: '#94A3B8',
 }
 export const stageColor = (s?: string) => STAGE_COLOR[(s || '').toUpperCase()] ?? '#9AA3B0'
 

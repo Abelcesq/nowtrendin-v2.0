@@ -8,7 +8,8 @@ export type Stage =
   | 'BREAKOUT'
   | 'STRONG'
   | 'EMERGING'
-  | 'WATCHING'
+  | 'MARGINAL'
+  | 'WATCHING'   // legacy alias of MARGINAL (kept for back-compat / server values)
   | 'WATCH'
   | 'MONITORING'
   | 'DECAY';
@@ -127,7 +128,7 @@ export const STAGE_META = [
   { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', desc: 'Strongest signal', color: '#00C896' },
   { key: 'STRONG', label: 'STRONG', range: '70–84', desc: 'High signal strength', color: '#2D7EEF' },
   { key: 'EMERGING', label: 'EMERGING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
-  { key: 'WATCHING', label: 'WATCHING', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
+  { key: 'MARGINAL', label: 'MARGINAL', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
 
 // Single source of truth for the displayed stage band. Derived from the
@@ -140,7 +141,7 @@ export function stageFromScore(score: number): Stage {
   if (score >= 85) return 'BREAKOUT';
   if (score >= 70) return 'STRONG';
   if (score >= 55) return 'EMERGING';
-  if (score >= 35) return 'WATCHING';
+  if (score >= 35) return 'MARGINAL';
   return 'MONITORING';
 }
 
@@ -157,7 +158,7 @@ export function stageFromScore(score: number): Stage {
 // at call time — move CATEGORY_DEFS below `scoreGap` if you make that switch.
 export type CategoryKey =
   | 'nowtrendin' | 'all' | 'breakout' | 'strong'
-  | 'emerging' | 'lowrisk' | 'anomalies';
+  | 'emerging' | 'marginal' | 'anomalies';
 
 export const CATEGORY_DEFS: Array<{
   key: CategoryKey;
@@ -249,38 +250,35 @@ export const CATEGORY_DEFS: Array<{
     filter: (s) => s.score >= 55 && s.score < 70,
   },
   {
-    key: 'lowrisk',
-    label: 'Low Risk',
-    short: 'LOW RISK',
-    range: 'Detection vs Confidence gap ≤ 6 pts',
-    color: '#10B981',
+    key: 'marginal',
+    label: 'Marginal',
+    short: 'MARGINAL',
+    range: 'Detection Score 35–54',
+    color: '#E85A1E',
     definition:
-      'Signals where Detection and Confidence Scores are tightly aligned (within 6 points). ' +
-      'The engine sees both earliness AND confirmation — the most balanced, least uncertain band.',
+      'Marginal signals — early and unconfirmed. Detection is in the 35–54 band: present and ' +
+      'worth watching, but the engine has not yet seen sustained acceleration or broad confirmation.',
     howReached:
-      'Both Detection and Confidence land near the same value, meaning the early-edge ' +
-      'components (G, D) and the confirmation components (I, M) are reading the same story. ' +
-      'Convergent evidence on both sides of the Duality split.',
+      'Detection Score lands in the 35–54 band. Usually some early-edge evidence is present but ' +
+      'Inertia, breadth, and persistence are still thin — many of these fade before confirming.',
     showTile: true,
-    filter: (s) => scoreGap(s) <= 6,
+    filter: (s) => s.score >= 35 && s.score < 55,
   },
   {
     key: 'anomalies',
     label: 'Anomalies',
     short: 'ANOMALIES',
-    range: 'Detection vs Confidence gap ≥ 18 pts',
+    range: 'Engine-flagged gravitational anomaly',
     color: '#8B5CF6',
     definition:
-      'Signals where Detection Score is sharply diverging from Confidence Score by 18+ points. ' +
-      'These are the engine\'s earliest, most uncertain leads — strong early-edge evidence (high G ' +
-      'or D) running ahead of cross-platform confirmation. Sometimes the future arriving; ' +
-      'sometimes noise.',
+      'Signals the engine has flagged as genuine gravitational anomalies — strong early-edge ' +
+      'evidence (a Dark Matter or Gradient Strength spike) running ahead of cross-platform ' +
+      'confirmation in a way the anomaly gate recognises. Sometimes the future arriving; sometimes noise.',
     howReached:
-      'The absolute gap between Detection and Confidence reaches 18 points or more. Typically ' +
-      'driven by a Dark Matter or Gradient Strength spike that has not yet been validated by ' +
-      'Inertia or Medium Sequence.',
+      'The engine\'s calibrated anomaly gate fires (is_anomaly), not a raw score-gap threshold — ' +
+      'so this is a curated set of true anomalies rather than every wide-gap topic.',
     showTile: true,
-    filter: (s) => scoreGap(s) >= 18,
+    filter: (s) => !!s.isAnomaly,
   },
 ];
 
@@ -323,8 +321,9 @@ const ACTION_LINE: Record<Stage, string> = {
   BREAKOUT: 'Breakout in progress.',
   STRONG: 'Strong, sustained momentum.',
   EMERGING: 'Early momentum forming.',
-  WATCHING: 'Building — not yet confirmed.',
-  WATCH: 'Building — not yet confirmed.',
+  MARGINAL: 'Marginal — early, not yet confirmed.',
+  WATCHING: 'Marginal — early, not yet confirmed.',
+  WATCH: 'Marginal — early, not yet confirmed.',
   MONITORING: 'Low-intensity background signal.',
   DECAY: 'Attention falling.',
 };
@@ -379,8 +378,8 @@ export const MOCK_SIGNALS: Signal[] = [
   { id: '4', topic: 'mcp servers',        category: 'Technology', score: 72, detection: 74, confidence: 69, stage: 'STRONG',     createdAt: now - 3 * HOUR },
   { id: '5', topic: 'rag pipelines',      category: 'Technology', score: 66, detection: 68, confidence: 61, stage: 'EMERGING',   createdAt: now - 6 * HOUR },
   { id: '6', topic: 'creator economy',    category: 'Business',   score: 59, detection: 62, confidence: 55, stage: 'EMERGING',   createdAt: now - 11 * HOUR },
-  { id: '7', topic: 'vector databases',   category: 'Technology', score: 64, detection: 66, confidence: 60, stage: 'WATCHING',   createdAt: now - 13 * HOUR },
-  { id: '8', topic: 'climate tech',       category: 'Business',   score: 57, detection: 59, confidence: 52, stage: 'WATCHING',   createdAt: now - 14 * HOUR },
+  { id: '7', topic: 'vector databases',   category: 'Technology', score: 64, detection: 66, confidence: 60, stage: 'MARGINAL',   createdAt: now - 13 * HOUR },
+  { id: '8', topic: 'climate tech',       category: 'Business',   score: 57, detection: 59, confidence: 52, stage: 'MARGINAL',   createdAt: now - 14 * HOUR },
   { id: '9', topic: 'longevity drugs',    category: 'Health',     score: 53, detection: 55, confidence: 48, stage: 'MONITORING', createdAt: now - 26 * HOUR },
   { id: '10', topic: 'spatial computing', category: 'Technology', score: 49, detection: 51, confidence: 44, stage: 'MONITORING', createdAt: now - 38 * HOUR },
 ];
@@ -438,6 +437,7 @@ const STAGE_COLORS: Record<Stage, string> = {
   BREAKOUT: '#00C896',
   STRONG: '#2D7EEF',
   EMERGING: '#D4A017',
+  MARGINAL: '#E85A1E',
   WATCHING: '#E85A1E',
   WATCH: '#E85A1E',
   MONITORING: '#9AA3B0',
@@ -456,8 +456,9 @@ const ACTIONS: Record<Stage, { title: string; body: string }> = {
   BREAKOUT: { title: 'Breakout in progress.', body: 'Strong multi-platform momentum with both scores in the breakout band.' },
   STRONG: { title: 'Strong signal.', body: 'Established strength and steady momentum across platforms.' },
   EMERGING: { title: 'Early momentum.', body: 'Momentum is forming but not yet confirmed across multiple cycles.' },
-  WATCHING: { title: 'Building — unconfirmed.', body: 'The signal is building but has not yet been confirmed across cycles.' },
-  WATCH: { title: 'Building — unconfirmed.', body: 'The signal is building but has not yet been confirmed across cycles.' },
+  MARGINAL: { title: 'Marginal — unconfirmed.', body: 'An early signal in the marginal band — present but not yet confirmed across cycles.' },
+  WATCHING: { title: 'Marginal — unconfirmed.', body: 'An early signal in the marginal band — present but not yet confirmed across cycles.' },
+  WATCH: { title: 'Marginal — unconfirmed.', body: 'An early signal in the marginal band — present but not yet confirmed across cycles.' },
   MONITORING: { title: 'Background signal.', body: 'Low-intensity background activity, below the emerging threshold.' },
   DECAY: { title: 'Attention falling.', body: 'Attention for this topic is declining from its peak.' },
 };
