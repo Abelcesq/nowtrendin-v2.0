@@ -6420,6 +6420,25 @@ def monitor_catchall():
             except Exception: pass
 
 
+@app.get("/monitor/market-coverage")
+def monitor_market_coverage():
+    """Market Universe Coverage — publicly-traded companies trending in attention
+    but MISSING from the Market Signal universe (the 'SpaceX problem'). Standalone
+    (not in /monitor) because it makes per-candidate Finnhub ticker lookups (block B1)."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.market_universe_coverage(conn)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/monitor/subscriptions")
 def monitor_subscriptions():
     """Data Subscriptions — every external data API: configured?, billing class,

@@ -634,6 +634,90 @@ def catchall_auditor(conn) -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+# ── Agent J: MARKET UNIVERSE COVERAGE (B1 — Market Signal completeness) ──────
+# Catches the "SpaceX problem": a real publicly-traded company is trending in the
+# attention data but is MISSING from the curated Market Signal universe
+# (WATCHLIST_TICKERS) — e.g. a fresh IPO the static list never got. It scans the
+# top business/economy/technology trending topics, and for any NOT already
+# tracked, asks the ticker resolver (Finnhub Common-Stock search) whether it's a
+# real public company. Real ticker + trending + untracked = a coverage GAP to add.
+#
+# Integrity: it FLAGS candidates with their resolved ticker for human confirmation
+# — it never auto-adds (a wrong/ambiguous resolve must not silently enter the
+# universe) and never force-injects a score. Private companies (Anthropic, etc.)
+# don't resolve to a Common Stock, so they're correctly NOT flagged. NOT in
+# run_all — the per-candidate Finnhub calls are too costly for every /monitor;
+# run it on its own endpoint / on a schedule.
+def market_universe_coverage(conn, sample: int = 250, max_resolve: int = 20) -> dict:
+    import gravitational_anomaly_detector as g
+    alerts = []
+    if not getattr(g, "_RISK_AVAILABLE", False) or not hasattr(g, "risk"):
+        return {"agent": "market_universe_coverage", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B1", "msg": "risk module unavailable"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+    wl = g.risk.WATCHLIST_TICKERS if hasattr(g.risk, "WATCHLIST_TICKERS") else {}
+    wl_disp = {d.lower() for d in wl}
+    wl_tkr = {t.upper() for t in wl.values()}
+    try:
+        rows = conn.execute(
+            """SELECT v.topic_key, v.topic_display, v.total_mentions FROM velocity_scores v
+               INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
+                           GROUP BY topic_key) l
+                 ON v.topic_key = l.topic_key AND v.scored_at = l.m
+               ORDER BY COALESCE(v.total_mentions, 0) DESC LIMIT ?""", (sample,)).fetchall()
+    except Exception as e:
+        return {"agent": "market_universe_coverage", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B1", "msg": f"query failed: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+
+    # company-like candidates not already tracked (capped to limit Finnhub calls)
+    candidates = []
+    for r in rows:
+        disp = (r["topic_display"] or "").strip()
+        if not disp or disp.lower() in wl_disp:
+            continue
+        if disp == disp.lower():          # proper nouns only (companies are capitalised)
+            continue
+        try:
+            cat = g._topic_category(disp) or ""
+        except Exception:
+            cat = ""
+        if cat not in ("business", "economy", "technology"):
+            continue
+        candidates.append((disp, int(r["total_mentions"] or 0)))
+        if len(candidates) >= max_resolve:
+            break
+
+    gaps = []
+    for disp, mentions in candidates:
+        try:
+            tkr, rdisp = g.risk.resolve_ticker(disp)
+        except Exception:
+            tkr = None
+        if tkr and tkr.upper() not in wl_tkr:
+            gaps.append({"topic": disp, "ticker": tkr.upper(),
+                         "resolved_as": rdisp, "mentions": mentions})
+
+    summary = {
+        "scanned": len(rows),
+        "company_candidates_checked": len(candidates),
+        "tracked_universe": len(wl),
+        "coverage_gaps": len(gaps),
+        "gaps": gaps,
+        "note": "Gaps are publicly-traded companies trending now but absent from "
+                "WATCHLIST_TICKERS. Confirm each ticker, then add to "
+                "financial_risk_gradient.WATCHLIST_TICKERS (+ _TICKER_SECTOR) and run a "
+                "risk collection. Flag only — never auto-add (avoid a wrong resolve).",
+    }
+    if gaps:
+        alerts.append({"level": "warn", "block": "B1",
+                       "msg": f"{len(gaps)} publicly-traded compan{'y' if len(gaps)==1 else 'ies'} "
+                              f"trending but MISSING from the Market universe: "
+                              f"{[(x['topic'], x['ticker']) for x in gaps[:8]]} — add to WATCHLIST_TICKERS"})
+    return {"agent": "market_universe_coverage", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
