@@ -60,7 +60,9 @@ _LEX = {
         ["fifa", "world cup", "nba", "nfl", "mlb", "nhl", "olympic", "olympics",
          "premier league", "la liga", "bundesliga", "serie a", "champions league",
          "super bowl", "ufc", "mma", "grand slam", "wimbledon", "f1", "formula 1",
-         "world series", "playoffs", "world ranking", "national football team"],
+         "world series", "playoffs", "world ranking", "national football team",
+         # unambiguous franchise names (Catch-All Auditor lexicon candidates)
+         "knicks", "celtics", "lakers", "mavericks", "nuggets", "warriors nba"],
         # weak — sports-ish, can appear elsewhere
         ["soccer", "football", "basketball", "baseball", "hockey", "tennis",
          "golf", "boxing", "cricket", "rugby", "cycling", "match", "league",
@@ -76,7 +78,11 @@ _LEX = {
         ["ai", "app", "chip", "rocket", "tesla", "ev", "robot", "crypto",
          "bitcoin", "ethereum", "coding", "programming", "developer", "startup",
          "gadget", "cloud", "server", "api", "hack", "cyber", "tech", "device",
-         "launch", "update", "platform", "model"],
+         "launch", "update", "platform", "model",
+         # dev/AI tooling that fell into the catch-all (Catch-All Auditor candidates)
+         "streamlit", "fastapi", "copilot", "kubernetes", "dockerfile", "pytorch",
+         "langchain", "bioinformatics", "semantic search", "prompt engineering",
+         "diffusion model", "object detection", "vector database", "hugging face"],
     ),
     "politics": (
         ["election", "president", "senate", "congress", "parliament",
@@ -85,7 +91,10 @@ _LEX = {
          "legislation", "sanctions", "diplomacy"],
         ["vote", "government", "policy", "minister", "campaign", "senator",
          "politician", "law", "bill", "deal", "summit", "treaty", "cabinet",
-         "regulation", "court"],
+         "regulation", "court",
+         # unambiguous political figures (Catch-All Auditor candidates)
+         "trump", "biden", "harris", "putin", "zelensky", "netanyahu", "starmer",
+         "modi", "macron"],
     ),
     "business": (
         ["ipo", "merger", "acquisition", "earnings", "quarterly results",
@@ -151,7 +160,8 @@ _LEX = {
          "war", "conflict", "missile", "strike", "troops", "military", "border",
          "refugee", "hostage", "coup", "invasion", "nuclear", "sanctions",
          "iran", "israel", "gaza", "ukraine", "syria", "hamas", "hezbollah",
-         "taiwan", "north korea", "geopolitical"],
+         "taiwan", "north korea", "geopolitical",
+         "china", "russia", "russian", "venezuela", "lebanon", "yemen", "sudan"],
     ),
     # "news" and "general" are fallbacks — no lexicon; assigned when nothing
     # else scores. "economy"/"business" and "politics"/"current_events" overlap
