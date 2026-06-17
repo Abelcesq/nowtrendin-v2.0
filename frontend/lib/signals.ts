@@ -268,17 +268,18 @@ export const CATEGORY_DEFS: Array<{
     key: 'anomalies',
     label: 'Anomalies',
     short: 'ANOMALIES',
-    range: 'Engine-flagged gravitational anomaly',
+    range: 'Detection ahead of Confidence by 16+ pts',
     color: '#8B5CF6',
     definition:
-      'Signals the engine has flagged as genuine gravitational anomalies — strong early-edge ' +
-      'evidence (a Dark Matter or Gradient Strength spike) running ahead of cross-platform ' +
-      'confirmation in a way the anomaly gate recognises. Sometimes the future arriving; sometimes noise.',
+      'Topics where the Detection Score is running well AHEAD of the Confidence Score (a 16+ ' +
+      'point lead) — the engine sees strong early-edge evidence before broad confirmation has ' +
+      'caught up. This is the "future arriving" shape: sometimes the real thing early, sometimes noise.',
     howReached:
-      'The engine\'s calibrated anomaly gate fires (is_anomaly), not a raw score-gap threshold — ' +
-      'so this is a curated set of true anomalies rather than every wide-gap topic.',
+      'Detection minus Confidence is 16 points or more (a SIGNED lead, not an absolute gap). ' +
+      'This is orthogonal to strength — an anomaly can sit at any stage; what defines it is the ' +
+      'early-edge lead, not the level. (Lagging topics where Confidence exceeds Detection are NOT anomalies.)',
     showTile: true,
-    filter: (s) => !!s.isAnomaly,
+    filter: (s) => (s.detection - s.confidence) >= 16,
   },
 ];
 

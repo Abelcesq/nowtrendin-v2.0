@@ -19,9 +19,12 @@ const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean; so
   { k: 'strong', label: 'Strong ≥70', test: (r) => r.det >= 70 && r.det < 85 },
   { k: 'emerging', label: 'Emerging', test: (r) => r.det >= 55 && r.det < 70 },
   { k: 'marginal', label: 'Marginal', test: (r) => r.det >= 35 && r.det < 55 },
-  // Anomalies = the engine's genuine gravitational-anomaly flag (NOT a raw gap
-  // threshold, which caught nearly everything).
-  { k: 'anomalies', label: 'Anomalies', test: (r) => !!r.is_anomaly },
+  // Anomalies = DETECTION running ahead of CONFIRMATION (signed gap ≥ 16) — the
+  // "future arriving" shape. NOT |gap| (also caught lagging conf>det topics) and
+  // NOT the engine is_anomaly flag (which fires on accelerating already-confirmed
+  // topics — 126 of 131 were conf>det). Orthogonal to strength: an anomaly can be
+  // STRONG or MARGINAL — what defines it is the early-edge lead, not the level.
+  { k: 'anomalies', label: 'Anomalies', test: (r) => (r.det - r.conf) >= 16 },
 ]
 
 interface Row extends TopicRow { det: number; conf: number; n: number; gap: number; stage: string; ageMin: number }
