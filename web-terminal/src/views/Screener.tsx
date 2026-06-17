@@ -4,10 +4,14 @@ import { pullTrends } from '../lib/auth'
 
 // Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
 // so the two surfaces match. `gap` here is abs(detection − confidence), matching
-// mobile's scoreGap. Default view is "Now TrendIn" (everything, by Detection desc).
-const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean }[] = [
-  { k: 'nowtrendin', label: 'Now TrendIn' },
-  { k: 'all', label: 'All Signals' },
+// mobile's scoreGap. Stage buckets are derived from Detection (stageOf), so the
+// Stage column always reconciles with the Det column AND these filter thresholds.
+//   • Now TrendIn — everything, ranked by the proprietary N (Now Trending) score.
+//   • All Signals — everything, ranked by Detection.
+// (The two differ by RANK, which is why "Now TrendIn" must not equal "All Signals".)
+const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean; sort?: SortKey }[] = [
+  { k: 'nowtrendin', label: 'Now TrendIn', sort: 'n' },
+  { k: 'all', label: 'All Signals', sort: 'det' },
   { k: 'breakout', label: 'Breakout ≥85', test: (r) => r.det >= 85 },
   { k: 'strong', label: 'Strong ≥70', test: (r) => r.det >= 70 && r.det < 85 },
   { k: 'emerging', label: 'Emerging', test: (r) => r.det >= 55 && r.det < 70 },
@@ -15,8 +19,8 @@ const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean }[]
   { k: 'anomalies', label: 'Anomalies', test: (r) => Math.abs(r.gap) >= 18 },
 ]
 
-interface Row extends TopicRow { det: number; conf: number; gap: number; stage: string; ageMin: number }
-type SortKey = 'topic_display' | 'det' | 'conf' | 'gap' | 'stage' | 'category' | 'total_mentions' | 'ageMin'
+interface Row extends TopicRow { det: number; conf: number; n: number; gap: number; stage: string; ageMin: number }
+type SortKey = 'topic_display' | 'det' | 'conf' | 'n' | 'gap' | 'stage' | 'category' | 'total_mentions' | 'ageMin'
 
 function stageOf(d: number) {
   return d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'WATCHING' : 'MONITORING'
@@ -59,6 +63,67 @@ function gapInterp(d: number): [string, boolean, string] {
   return ['VERY EARLY', false, 'Detected but not yet confirmed — corroborated among expert communities, not yet broad across the mainstream.']
 }
 
+// ── Score Breakdown — the 4 grouped buckets the mobile app shows, derived from
+// the engine's flat G·I·M·D·C·P·N components (same grouping as the engine's
+// build_component_groups). Each group carries a status so the read matches mobile.
+type BItem = { label: string; value: number; desc?: string }
+type BGroup = { title: string; status: string; note: string; items: BItem[] }
+function scoreFor(c: any): number { return Math.round(Number(c?.score ?? 0)) }
+function deriveGroups(components: any): BGroup[] {
+  if (!components) return []
+  const G = scoreFor(components.G_gradient_strength)
+  const M = scoreFor(components.M_platform_diversity)
+  const I = scoreFor(components.I_inertia)
+  const P = scoreFor(components.P_persistence)
+  const D = scoreFor(components.D_dark_matter)
+  const C = scoreFor(components.C_confidence_decay)
+  const N = scoreFor(components.N_nowtrendin)
+  const band = (v: number, hi: number, mid: number): [string, string] =>
+    v >= hi ? ['STRONG', 'Strong'] : v >= mid ? ['MODERATE', 'Moderate'] : ['LOW', 'Low']
+  const qa = (G + M) / 2, ma = (I + P) / 2, ca = (D + C) / 2
+  const [qs] = band(qa, 60, 35)
+  const [ms, msl] = (I <= 1 && P <= 1) ? ['PENDING', 'Pending'] : band(ma, 50, 25)
+  const [cs] = band(ca, 40, 20)
+  return [
+    { title: 'Signal Quality', status: qs, note: 'Niche signal density + cross-platform diffusion', items: [
+      { label: 'Niche Concentration', value: G, desc: 'Niche vs mainstream concentration' },
+      { label: 'Platform Diversity', value: M, desc: 'Cross-platform diffusion pattern' },
+    ] },
+    { title: 'Signal Momentum', status: ms, note: ms === 'PENDING' ? 'First collection run — check back ~30 min' : `${msl} — acceleration across windows`, items: [
+      { label: 'Acceleration (Inertia)', value: I, desc: 'Sustained acceleration across windows' },
+      { label: 'Persistence', value: P, desc: 'Held above threshold across cycles' },
+    ] },
+    { title: 'Signal Context', status: cs, note: 'Hidden early activity + signal freshness', items: [
+      { label: 'Dark Matter', value: D, desc: 'Hidden early activity (first-timers, deep engagement)' },
+      { label: 'Freshness (Decay)', value: C, desc: 'How fresh vs decaying the signal is' },
+    ] },
+    { title: 'Community Demand', status: N >= 50 ? 'HIGH' : N >= 20 ? 'MODERATE' : 'LOW',
+      note: 'Now TrendIn user demand — separate signal, NOT part of the Gradient', items: [
+      { label: 'Now Trending (N)', value: N, desc: 'Internal query demand — shown, never fed into the score' },
+    ] },
+  ]
+}
+
+// Why Detection and Confidence diverge for THIS topic (mobile parity). Detection
+// weights early-edge components (dark matter, first-timers, asymmetry); Confidence
+// weights cross-platform confirmation. We show the signal's ACTUAL values.
+function deriveDivergence(components: any, gap: number) {
+  const rows: { label: string; value: string; favors: 'DET' | 'CONF'; note: string }[] = []
+  const d = components?.D_dark_matter, m = components?.M_platform_diversity
+  if (d?.score != null) rows.push({ label: 'DARK MATTER', value: `${Math.round(d.score)}/100`, favors: 'DET', note: 'hidden early activity → lifts Detection' })
+  if (d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
+  if (d?.asymmetry_detected != null) rows.push({ label: 'ENGAGEMENT ASYMMETRY', value: d.asymmetry_detected ? 'Detected' : 'Normal', favors: 'DET', note: 'deep discussion vs surface votes → lifts Detection' })
+  const pc = Array.isArray(m?.platforms) ? m.platforms.length : null
+  if (pc != null) rows.push({ label: 'PLATFORM SPREAD', value: `${pc} platform${pc === 1 ? '' : 's'}`, favors: 'CONF', note: 'broad cross-platform presence → lifts Confidence' })
+  const g = Math.abs(gap)
+  const summary = g >= 18
+    ? `This signal's ${g}-pt gap means its early-edge components run well ahead of cross-platform confirmation — detected early, not yet broadly confirmed.`
+    : g >= 8
+      ? `A ${g}-pt gap: the early-edge signal is somewhat ahead of confirmation — building, not yet fully aligned.`
+      : `A ${g}-pt gap: early-edge and confirmation are closely aligned — both rule-sets agree on where this sits.`
+  return { summary, rows }
+}
+
 function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const [d, setD] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -78,10 +143,10 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const v = d?.velocity_scores || {}
   const det = v.detection ?? row.det, conf = v.confidence ?? row.conf, gap = Math.round(det - conf)
   const [gs, tight, gt] = gapInterp(gap)
-  const comps: [string, number][] = d?.components
-    ? Object.entries(d.components).map(([k, val]: any) => [k.replace(/_/g, ' '), Math.round(val?.score ?? 0)])
-    : []
-  const platforms: string[] = Array.isArray(d?.platforms_active) ? d.platforms_active : []
+  const groups: BGroup[] = d?.components ? deriveGroups(d.components) : []
+  const diverge = d?.components ? deriveDivergence(d.components, gap) : null
+  const platforms: string[] = Array.isArray(d?.components?.M_platform_diversity?.platforms)
+    ? d.components.M_platform_diversity.platforms : (Array.isArray(d?.platforms_active) ? d.platforms_active : [])
   const why = d?.why_this_matters || ''
   const watch = d?.what_to_watch || ''
 
@@ -134,16 +199,47 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         </div>
       </div>
 
-      {comps.length > 0 && (
+      {groups.length > 0 && (
         <div className="sect">
-          <h4>Component Breakdown</h4>
-          {comps.map(([k, val]) => (
-            <div className="comp-row" key={k}>
-              <span className="cl">{k}</span>
-              <span className="comp-bar"><i style={{ width: `${Math.min(100, val)}%`, background: 'var(--det)' }} /></span>
-              <span className="cv">{val}</span>
+          <h4>Score Breakdown</h4>
+          {groups.map((grp) => (
+            <div className="bgroup" key={grp.title}>
+              <div className="bgroup-head">
+                <span className="bgroup-title">{grp.title}</span>
+                <span className={'bgroup-status s-' + grp.status.toLowerCase()}>{grp.status}</span>
+              </div>
+              <div className="bgroup-note">{grp.note}</div>
+              {grp.items.map((it) => (
+                <div className="comp-row" key={it.label} title={it.desc}>
+                  <span className="cl">{it.label}</span>
+                  <span className="comp-bar"><i style={{ width: `${Math.min(100, it.value)}%`, background: grp.title === 'Community Demand' ? 'var(--early)' : 'var(--det)' }} /></span>
+                  <span className="cv">{it.value}</span>
+                </div>
+              ))}
             </div>
           ))}
+        </div>
+      )}
+
+      {diverge && diverge.rows.length > 0 && (
+        <div className="sect">
+          <h4>Why the Scores Diverge</h4>
+          <div className="narr" style={{ marginBottom: 8 }}>{diverge.summary}</div>
+          <div className="div-grid">
+            {diverge.rows.map((dr) => (
+              <div className="div-cell" key={dr.label}>
+                <div className="div-label">{dr.label}</div>
+                <div className="div-val" style={{ color: dr.favors === 'DET' ? 'var(--det)' : 'var(--conf)' }}>
+                  <span className="div-dot" style={{ background: dr.favors === 'DET' ? 'var(--det)' : 'var(--conf)' }} />{dr.value}
+                </div>
+                <div className="div-note">{dr.note}</div>
+              </div>
+            ))}
+          </div>
+          <div className="div-legend">
+            <span style={{ color: 'var(--det)' }}>● Blue</span> lifts Detection (earliness) ·
+            <span style={{ color: 'var(--conf)' }}> ● Green</span> lifts Confidence (confirmation)
+          </div>
         </div>
       )}
 
@@ -206,7 +302,9 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
         if (!alive) return
         setRows((t.topics || []).map((r) => {
           const det = Math.round(r.detection_score ?? 0), conf = Math.round(r.confidence_score ?? 0)
-          return { ...r, det, conf, gap: det - conf, stage: (r.current_stage || stageOf(det)).toUpperCase(), ageMin: minsSince(r.last_seen_at) }
+          // Stage from Detection (stageOf) — NOT the server's current_stage — so the
+          // Stage column always reconciles with the Det column + the filter buckets.
+          return { ...r, det, conf, n: Math.round(r.nowtrendin_score ?? 0), gap: det - conf, stage: stageOf(det), ageMin: minsSince(r.last_seen_at) }
         }))
         if ((c.categories || []).length) setCats((c.categories || []).filter((x) => x.count > 0))
       })
@@ -230,6 +328,12 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
     return r
   }, [rows, filter, sortKey, sortDir, query])
 
+  // Selecting a signal chip also sets its ranking: "Now TrendIn" → by N score,
+  // "All Signals" → by Detection. (This is what makes the two views differ.)
+  const selectSignal = (f: typeof SIGNAL_FILTERS[number]) => {
+    setFilter(f.k)
+    if (f.sort) { setSortKey(f.sort); setSortDir(-1) }
+  }
   const sort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => -d)
     else { setSortKey(k); setSortDir(k === 'topic_display' || k === 'category' ? 1 : -1) }
@@ -272,7 +376,7 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
           <span className="chip-label">Trends</span>
           {SIGNAL_FILTERS.map((f) => (
             <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')}
-              onClick={() => setFilter(f.k)}>{f.label}</div>
+              onClick={() => selectSignal(f)}>{f.label}</div>
           ))}
         </div>
         {/* Row 2 — CATEGORY filters (the WHAT axis) */}
@@ -298,6 +402,7 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
             <thead>
               <tr>
                 <th onClick={() => sort('topic_display')} className={sortKey === 'topic_display' ? 'sorted' : ''}>Topic <span className="sort">{arrow('topic_display')}</span></th>
+                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Now Trending — proprietary N (community-demand) score">N <span className="sort">{arrow('n')}</span></th>
                 <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')}>Det <span className="sort">{arrow('det')}</span></th>
                 <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')}>Conf <span className="sort">{arrow('conf')}</span></th>
                 <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')}>Gap <span className="sort">{arrow('gap')}</span></th>
@@ -313,6 +418,7 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
                 return (
                   <tr key={r.topic_key} className={r.topic_key === sel ? 'sel' : ''} onClick={() => select(r.topic_key)}>
                     <td><div className="topic-name">{r.topic_display}</div><div className="topic-cat">{r.topic_key}</div></td>
+                    <td className="r"><span className="score-cell" style={{ color: 'var(--early)' }}>{r.n || '—'}</span></td>
                     <td className="r"><span className="score-cell det">{r.det}</span></td>
                     <td className="r"><span className="score-cell conf">{r.conf}</span></td>
                     <td className="r"><div className="gapviz">{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>

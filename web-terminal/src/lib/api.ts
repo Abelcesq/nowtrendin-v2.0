@@ -34,6 +34,7 @@ export interface TopicRow {
   topic_key: string; topic_display: string; category?: string
   current_stage?: string; overall_score?: number
   detection_score?: number; confidence_score?: number
+  nowtrendin_score?: number   // N — internal "Now Trending" demand metric
   total_mentions?: number; last_seen_at?: string; is_anomaly?: number
 }
 

@@ -195,6 +195,24 @@ td.r{text-align:right}
 .comp-bar{flex:1; height:6px; background:var(--line-2); border-radius:3px; overflow:hidden}
 .comp-bar i{display:block; height:100%; border-radius:3px}
 .comp-row .cv{font-family:var(--mono); font-size:11px; color:var(--text-2); width:28px; text-align:right; flex:0 0 auto}
+/* Score Breakdown — grouped buckets (Signal Quality/Momentum/Context/Community Demand) */
+.bgroup{margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--line-2)}
+.bgroup:last-child{border-bottom:0; margin-bottom:0}
+.bgroup-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:2px}
+.bgroup-title{font-size:11.5px; font-weight:700; color:var(--text)}
+.bgroup-status{font-size:9px; font-weight:800; letter-spacing:.05em; padding:2px 6px; border-radius:4px; background:var(--line-2); color:var(--text-2)}
+.bgroup-status.s-strong,.bgroup-status.s-confirmed,.bgroup-status.s-high{background:var(--conf-soft); color:var(--conf)}
+.bgroup-status.s-moderate,.bgroup-status.s-building{background:var(--early-soft); color:var(--early)}
+.bgroup-status.s-pending{background:var(--det-soft); color:var(--det)}
+.bgroup-note{font-size:10.5px; color:var(--text-3); margin-bottom:8px; line-height:1.4}
+/* Why the scores diverge */
+.div-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.div-cell{background:var(--canvas); border:1px solid var(--line); border-radius:8px; padding:9px}
+.div-label{font-size:8.5px; font-weight:800; letter-spacing:.06em; color:var(--text-3); margin-bottom:3px}
+.div-val{font-size:14px; font-weight:800; display:flex; align-items:center; gap:5px}
+.div-dot{width:7px; height:7px; border-radius:4px; display:inline-block}
+.div-note{font-size:9.5px; color:var(--text-3); line-height:1.35; margin-top:3px}
+.div-legend{font-size:9.5px; color:var(--text-3); margin-top:9px}
 .narr{font-size:12px; color:var(--text-2); line-height:1.55; background:var(--canvas); border-radius:8px; padding:12px}
 .narr.muted{color:var(--text-3); font-style:italic}
 /* AI Context — source-aware definition (preview + full), parity with mobile */
