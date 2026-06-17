@@ -477,16 +477,22 @@ def compute_calibrated_gradient(
             "not new emergence. Score adjusted to prevent false anomaly detection."
         )
     elif maturity_cls == "RESURGENT":
+        # velocity/baseline can be None for lifecycle-derived maturity (no
+        # score-history baseline) — never let the explanation string crash.
+        _v = f"+{velocity:.0f}pts" if velocity is not None else "renewed velocity"
+        _b = f" of {baseline_g:.0f}" if baseline_g is not None else ""
         explanation = (
             f"Gradient boosted {round((multiplier-1)*100)}% — "
-            f"established topic showing +{velocity:.0f}pts above its baseline of "
-            f"{baseline_g:.0f}. Velocity confirms genuine renewed interest."
+            f"established topic showing {_v} above its baseline{_b}. "
+            "Velocity confirms genuine renewed interest."
         )
     elif maturity_cls == "EMERGING":
+        _ev = (f"+{velocity:.0f}pts above baseline {baseline_g:.0f}"
+               if (velocity is not None and baseline_g is not None)
+               else "gaining across cycles")
         explanation = (
-            f"Gradient at full weight — "
-            f"confirmed emerging: +{velocity:.0f}pts above baseline {baseline_g:.0f}. "
-            "Acceleration validates niche concentration as a real signal."
+            f"Gradient lightly calibrated (×{multiplier}) — "
+            f"emerging: {_ev}. Acceleration is forming but the baseline is still building."
         )
     elif maturity_cls == "NEW":
         explanation = (

@@ -750,7 +750,10 @@ def get_topic_maturity_state(
                 f"First cycles scored ({cycles} cycle(s), {days} day(s)) — the gradient is "
                 "still stabilizing and not yet calibrated against a baseline.")
         elif days >= 10 and cycles >= 40:
-            _cls, _mult, _reason = "ESTABLISHED", 0.55, (
+            # 0.45 matches the calibration engine's stable-ESTABLISHED multiplier so
+            # the explanation branch (which requires <=0.45) renders the correct
+            # "permanent home" text instead of the MONITORING fallback.
+            _cls, _mult, _reason = "ESTABLISHED", 0.45, (
                 f"Long-running topic — {days} days in system across {cycles} scoring cycles. "
                 "High gradient reflects a permanent expert/attention base, not a new surge, so "
                 "the score is discounted to avoid over-reading an old topic as breaking news.")
