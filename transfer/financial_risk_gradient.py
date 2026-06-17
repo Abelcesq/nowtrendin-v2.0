@@ -1039,6 +1039,10 @@ WATCHLIST_TICKERS = {
     "Meta": "META", "Alphabet": "GOOGL", "Amazon": "AMZN", "JPMorgan": "JPM",
     "Wells Fargo": "WFC", "Citigroup": "C", "Morgan Stanley": "MS", "IBM": "IBM",
     "Ford": "F", "Chevron": "CVX", "Lockheed Martin": "LMT",
+    # SpaceX IPO'd 2026-06-12 on NASDAQ:SPCX ($135 IPO, ~$1.75T valuation) — now a
+    # real public company, so it belongs in the tracked market universe. (Just-IPO'd,
+    # so 13F/short-interest history is thin; the Market Gradient reads "calibrating".)
+    "SpaceX": "SPCX",
 }
 
 
@@ -1275,6 +1279,7 @@ _TICKER_SECTOR = {
     "AAPL": "technology", "MSFT": "technology", "NVDA": "technology", "META": "technology",
     "GOOGL": "technology", "AMZN": "technology", "IBM": "technology",
     "TSLA": "autos", "F": "autos", "CVX": "energy", "LMT": "defense",
+    "SPCX": "defense",   # SpaceX — aerospace/launch; capital-intensive like defense primes
 }
 SECTOR_DE_SCALE = {
     "banks":      (12.0, 2.0),   # banks structurally run high leverage
