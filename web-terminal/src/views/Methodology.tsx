@@ -125,6 +125,34 @@ export function Methodology() {
           </div>
         </section>
 
+        {/* Anomalies */}
+        <section className="mth-sec">
+          <h3>Anomalies</h3>
+          <div className="mth-card" style={{ borderColor: '#8B5CF655', background: '#8B5CF60C' }}>
+            <div className="mth-tag" style={{ color: '#8B5CF6' }}>● Anomaly</div>
+            <p className="mth-p">
+              An <b>anomaly</b> is a topic whose <b>Detection score is running ahead of its Confidence
+              score</b> by a clear margin (a signed lead of <b>16+ points</b>) — strong early-edge
+              evidence the engine sees <b>before</b> broad confirmation has caught up. It is the
+              clearest expression of the product thesis: <i>the future arriving before it's obvious</i>.
+              Some are the real thing early; some are noise that never confirms.
+            </p>
+            <p className="mth-p" style={{ marginTop: 10 }}>
+              <b>It is a separate axis from the signal stage.</b> Stage (Breakout / Strong / Emerging /
+              Marginal) measures <b>strength</b> — how high Detection is. An anomaly measures <b>shape</b>
+              — how far Detection LEADS Confirmation. So an anomaly can appear at any stage: a Strong
+              topic with a wide lead is a strong early anomaly; a Marginal one with a wide lead is an
+              early-stage anomaly. A topic where Confidence exceeds Detection is the opposite —
+              already-confirmed or lagging — and is <b>not</b> an anomaly.
+            </p>
+            <p className="mth-p" style={{ marginTop: 10 }}>
+              True anomalies are deliberately rare. We define them by the signed Detection-minus-
+              Confidence lead, not by an absolute gap (which would also catch lagging topics) and not by
+              raw acceleration alone (a heavily-covered topic can accelerate without being early).
+            </p>
+          </div>
+        </section>
+
         {/* Data & integrity */}
         <section className="mth-sec">
           <h3>Data &amp; integrity</h3>
