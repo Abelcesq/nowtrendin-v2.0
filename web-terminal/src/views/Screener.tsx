@@ -527,6 +527,16 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
     } finally { setPulling(false) }
   }
 
+  // Export the current (filtered + sorted) view to CSV — same UX as Market Signal.
+  const csv = () => {
+    const hdr = ['topic', 'topic_key', 'detection', 'confidence', 'gap', 'n', 'stage', 'category', 'mentions', 'updated_min']
+    const lines = [hdr.join(',')].concat(view.map((r) =>
+      [`"${(r.topic_display || '').replace(/"/g, '""')}"`, r.topic_key, r.det, r.conf, r.gap, r.n, r.stage, r.category || '', r.total_mentions ?? '', r.ageMin].join(',')))
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }))
+    a.download = 'nowtrendin_trends.csv'; a.click()
+  }
+
   const select = (key: string) => {
     if (key === sel) { setSel(null); onRail(null); return }
     setSel(key)
@@ -541,11 +551,10 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
           <div className="main-title">Trends</div>
           <div className="main-sub"><b>{view.length}</b> topics · diffusion-scored{pullMsg ? ` · ${pullMsg}` : ''}</div>
           <div className="main-actions">
-            <button className="btn primary" onClick={doPull} disabled={pulling} title="Enterprise — costs 1 token">
+            <button className="btn primary" onClick={doPull} disabled={pulling} title="Enterprise — fresh attention pull, costs 1 token">
               {pulling ? '⟳ Pulling…' : '⚡ Pull Trends · 1 token'}
             </button>
-            <button className="btn">▦ Columns</button>
-            <button className="btn">↧ Export</button>
+            <button className="btn" onClick={csv}>↧ Export CSV</button>
           </div>
         </div>
         {/* Row 1 — TRENDS (signal) filters — EXACT mobile parity (CATEGORY_DEFS) */}

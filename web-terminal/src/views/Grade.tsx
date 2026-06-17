@@ -97,6 +97,21 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         {result.action && <div className="g-action" style={{ color: scol }}>{result.action}</div>}
         {result.reasoning && <div className="narr" style={{ marginBottom: 10 }}>{result.reasoning}</div>}
 
+        {/* Mainstream vs Niche — engine (in pool) or open-web research (off pool) */}
+        {result.mainstream_vs_niche && (() => {
+          const mv = result.mainstream_vs_niche
+          const col = mv.label === 'mainstream' ? MC.confidence : mv.label === 'emerging' ? MC.gold
+            : mv.label === 'fading' ? MC.slate : MC.detection
+          return (
+            <>
+              <h4 className="g-h">Mainstream vs Niche</h4>
+              <div className="kv"><span>Reach</span><b style={{ textTransform: 'capitalize', color: col }}>{mv.label}</b></div>
+              {mv.note && <div className="disc">{mv.note}</div>}
+              <div className="disc">Determined from: {mv.source}{result.consulted ? ` · consulted ${result.consulted.length} data agents` : ''}</div>
+            </>
+          )
+        })()}
+
         {/* (1) AI Context definition */}
         <h4 className="g-h">AI Context</h4>
         <div className="narr">{ctx || result.research || 'A source-aware definition generates on first view; the AI reasoning above summarizes what this topic is and why it scores here.'}</div>
@@ -226,7 +241,7 @@ export function Grade({ user, onUser }: { user: User; onUser?: (u: User) => void
                   <span className="g-tok">{tokens} grade tokens left</span>
                 </div>
                 <button className="btn primary g-pull" disabled={busy || !topic.trim() || tokens <= 0} onClick={doGrade}>
-                  {busy ? '⟳ Researching… ~20–40s' : tokens <= 0 ? 'No grade tokens remaining this month' : '⚡ Grade · Pull · 1 token'}
+                  {busy ? '⟳ Researching… ~20–40s' : tokens <= 0 ? 'No grade tokens remaining this month' : '⚡ Pull Grade · 1 token'}
                 </button>
                 {msg && <div className="g-err">{msg}</div>}
               </div>

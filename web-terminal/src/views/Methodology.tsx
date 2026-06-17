@@ -92,6 +92,39 @@ export function Methodology() {
           </div>
         </section>
 
+        {/* The N factor — separate from the Gradient Score */}
+        <section className="mth-sec">
+          <h3>The N factor — Now Trending (community demand)</h3>
+          <div className="mth-card" style={{ borderColor: '#EE6A2A55', background: '#EE6A2A0C' }}>
+            <div className="mth-tag" style={{ color: '#EE6A2A' }}>● N · Now Trending</div>
+            <p className="mth-p">
+              <b>N</b> is our on-platform <b>demand</b> signal — how often Now TrendIn users
+              themselves query, open, or grade a topic. It captures real institutional curiosity
+              that no public source can see, and it is shown alongside every score.
+            </p>
+            <p className="mth-p" style={{ marginTop: 10 }}>
+              <b>N is deliberately NOT part of the Gradient Score.</b> Detection and Confidence are
+              composed only from the six <b>external</b> components above (G·I·M·D·C·P) — measured
+              from the outside world. N is reported as a <b>separate, parallel number</b> and is never
+              folded into the official Gradient Score.
+            </p>
+            <p className="mth-p" style={{ marginTop: 10 }}>
+              <b>Why it's kept separate (the integrity reason):</b> if our own users' demand fed the
+              score, the instrument would measure itself — popular topics would look "trending" because
+              we surfaced them, a reflexive feedback loop. That violates the no-circular-metrics rule:
+              a validator must never use inputs derived from what it validates. Keeping N external-only
+              guarantees the Gradient Score stays an <b>objective measure of the outside world</b>, not
+              of our platform.
+            </p>
+            <p className="mth-p" style={{ marginTop: 10 }}>
+              The signal-detail page also shows a clearly-labelled, demand-inclusive
+              <b> "Now Trending Gradient Score"</b> as a what-if read — what the score would be if N
+              were folded in. That view is informational only; the headline Gradient Score always
+              remains N-free.
+            </p>
+          </div>
+        </section>
+
         {/* Data & integrity */}
         <section className="mth-sec">
           <h3>Data &amp; integrity</h3>
