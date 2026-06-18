@@ -1,19 +1,26 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import {
+  LayoutGrid, TrendingUp, DollarSign, Activity, Star, Bell, CheckCircle, Sparkles,
+  Search, type LucideIcon,
+} from 'lucide-react'
 import { TIER_LABEL, type User } from '../lib/auth'
 
 export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'grade'
   | 'watchlists' | 'alerts' | 'ledger' | 'methodology'
 
-const NAV: { key: NavKey; icon: string; label: string }[] = [
-  { key: 'dashboard', icon: '▦', label: 'Dashboard' },
-  { key: 'trends', icon: '▲', label: 'Trends' },
-  { key: 'market', icon: '$', label: 'Market Signal' },
-  { key: 'grade', icon: '◎', label: 'Grade' },
-  { key: 'watchlists', icon: '★', label: 'Watchlists' },
-  { key: 'alerts', icon: '⚑', label: 'Alerts' },
-  { key: 'ledger', icon: '✓', label: 'Accuracy Ledger' },
-  { key: 'methodology', icon: '❋', label: 'Methodology' },
+// Phase 2 of the 3-platform UI migration (Charter §0.6): nav icons now come from
+// lucide-react (the web sibling of the mobile app's lucide-react-native), one icon =
+// one meaning across surfaces — replacing the ad-hoc Unicode glyphs (▦ ▲ $ ◎ ★ ⚑ ✓ ❋).
+const NAV: { key: NavKey; icon: LucideIcon; label: string }[] = [
+  { key: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
+  { key: 'trends', icon: TrendingUp, label: 'Trends' },
+  { key: 'market', icon: DollarSign, label: 'Market Signal' },
+  { key: 'grade', icon: Activity, label: 'Grade' },
+  { key: 'watchlists', icon: Star, label: 'Watchlists' },
+  { key: 'alerts', icon: Bell, label: 'Alerts' },
+  { key: 'ledger', icon: CheckCircle, label: 'Accuracy Ledger' },
+  { key: 'methodology', icon: Sparkles, label: 'Methodology' },
 ]
 
 function useEtClock() {
@@ -62,7 +69,7 @@ export function Shell({
           </div>
         </div>
         <div className="search">
-          <svg className="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
+          <Search className="ico" size={14} strokeWidth={2} />
           <input id="search" type="text" placeholder="Search topics, tickers, screens…" autoComplete="off"
             value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)}
             onFocus={() => nav !== 'trends' && onNav('trends')} />
@@ -72,7 +79,7 @@ export function Shell({
           <div className="asof"><span className="live">●</span> Live · as of<br /><b>{clock}</b></div>
           <div className="bell" title={alertCount > 0 ? `${alertCount} alert${alertCount === 1 ? '' : 's'}` : 'Alerts'}
             onClick={() => onNav('alerts')} style={{ cursor: 'pointer' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+            <Bell size={18} strokeWidth={1.8} />
             {alertCount > 0 && <span className="dot">{alertCount}</span>}
           </div>
           <span className="plan">{plan}</span>
@@ -84,14 +91,17 @@ export function Shell({
       <div className={'body' + (rail ? ' with-rail' : '')}>
         <aside className="sidebar">
           <div>
-            {NAV.map((n) => (
-              <div key={n.key}
-                className={'nav-item' + (nav === n.key ? ' active' : '')}
-                onClick={() => onNav(n.key)}>
-                <span className="ni">{n.icon}</span> {n.label}
-                {n.key === 'alerts' && alertCount > 0 && <span className="badge">{alertCount}</span>}
-              </div>
-            ))}
+            {NAV.map((n) => {
+              const Icon = n.icon
+              return (
+                <div key={n.key}
+                  className={'nav-item' + (nav === n.key ? ' active' : '')}
+                  onClick={() => onNav(n.key)}>
+                  <span className="ni"><Icon size={16} strokeWidth={2} /></span> {n.label}
+                  {n.key === 'alerts' && alertCount > 0 && <span className="badge">{alertCount}</span>}
+                </div>
+              )
+            })}
           </div>
           <div className="nav-label">Saved Screens</div>
           <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--early)' }} /> Early Signals <span className="cnt">—</span></div>
