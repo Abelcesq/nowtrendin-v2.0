@@ -2022,10 +2022,14 @@ _NEWS_REPUTABLE_SOURCES = {
     "abc news", "cbs news", "nbc news", "msnbc", "cnn", "sky news",
     "al jazeera", "deutsche welle", "dw.com", "france 24", "nhk", "cbc",
     "the telegraph", "the independent", "newsweek", "time",
+    # Spanish / international press of record
+    "el país", "el pais", "elpais", "cinco días", "cinco dias", "cincodias",
     # Reputable tech / science press
     "techcrunch", "the verge", "ars technica", "wired", "mit technology",
     "ieee", "nature", "science", "the information", "engadget", "venturebeat",
     "zdnet", "cnet", "protocol",
+    # Multi-source aggregator (reputable-filtered upstream)
+    "currents",
 }
 
 # Default ON — the integrity standard. Set NEWS_REPUTABLE_ONLY=0 only to debug.
@@ -2287,6 +2291,93 @@ def collect_newsdata_io(conn) -> int:
     except Exception as e:
         print(f"  newsdata_io error: {e}")
         return 0
+
+
+def _calls_today(source: str) -> int:
+    """Today's logged API calls for a source (from the api_usage ledger)."""
+    try:
+        if _HEALTH_AVAILABLE:
+            u = _health.get_api_usage(DB_PATH)
+            return int(((u.get("sources", {}).get(source, {})) or {}).get("today", 0) or 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _domain_name(url: str) -> str:
+    """Bare domain from a URL (for reputable-source matching), e.g.
+    https://elpais.com/x → 'elpais.com'."""
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(url).netloc or "").lower().lstrip("www.")
+        return host or "currents"
+    except Exception:
+        return "currents"
+
+
+# Currents free tier = 1000 requests/day. Hard guard keeps us safely under it:
+# we stop calling once today's logged calls reach this cap (default 900 = margin).
+_CURRENTS_DAILY_CAP = int(os.getenv("CURRENTS_DAILY_CAP", "900"))
+
+
+def collect_currents_news(conn) -> int:
+    """Currents News API — multi-source aggregator (120k+ outlets incl. reputable
+    Spanish media like EL PAÍS). A firehose; the reputable-source filter keeps only
+    vetted publishers. HARD daily cap: never exceeds _CURRENTS_DAILY_CAP/day (free
+    tier is 1000/day), enforced from the api_usage ledger so we cannot overrun."""
+    key = os.getenv("CURRENTS_API_KEY", "")
+    if not key:
+        return 0
+    used = _calls_today("currents")
+    if used >= _CURRENTS_DAILY_CAP:
+        print(f"  currents: daily cap reached ({used}/{_CURRENTS_DAILY_CAP}) — skipping to stay under 1000/day")
+        return 0
+    try:
+        from urllib.request import Request, urlopen
+        _count_api("currents")
+        url = f"https://api.currentsapi.services/v1/latest-news?language=en&apiKey={key}"
+        req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
+        with urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        items = [{"title": a.get("title", ""),
+                  "source": _domain_name(a.get("url") or "")}
+                 for a in (data.get("news") or []) if a.get("title")]
+        return _news_write(conn, "currents", items)
+    except Exception as e:
+        print(f"  currents error: {e}")
+        return 0
+
+
+# Direct RSS feeds — verified live (06/18/26). FT Alphaville (paywall teaser, 1 item)
+# and Reuters agency feed (discontinued, 301) were tested and EXCLUDED. Each fetch is
+# 1 request; runs on the slow news cadence.
+_RSS_FEEDS = [
+    ("El País",    "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"),
+    ("TechCrunch", "https://techcrunch.com/feed/"),
+]
+
+
+def collect_rss_news(conn) -> int:
+    """Native RSS→items for specific trusted outlets (El País, TechCrunch). Parses
+    item titles (CDATA-safe) and tags each with the outlet so the reputable filter +
+    corroboration count credit them. No third-party aggregator dependency."""
+    import re as _re
+    from urllib.request import Request, urlopen
+    total = 0
+    for label, url in _RSS_FEEDS:
+        try:
+            _count_api("rss")
+            req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
+            with urlopen(req, timeout=15) as resp:
+                xml = resp.read().decode("utf-8", "ignore")
+            # item-level titles only (skip the channel <title>, which is index 0)
+            titles = _re.findall(r"<item\b.*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>",
+                                 xml, _re.DOTALL | _re.IGNORECASE)
+            items = [{"title": t.strip(), "source": label} for t in titles[:40] if t.strip()]
+            total += _news_write(conn, "rss", items)
+        except Exception as e:
+            print(f"  rss {label} error: {e}")
+    return total
 
 
 def collect_yahoo_finance_news(conn) -> int:
@@ -4400,6 +4491,8 @@ def start_scheduler():
                                  ("newsapi_org", collect_newsapi_org),
                                  ("newsapi_ai", collect_newsapi_ai),
                                  ("newsdata_io", collect_newsdata_io),
+                                 ("currents", collect_currents_news),
+                                 ("rss_direct", collect_rss_news),
                                  ("yahoo_finance", collect_yahoo_finance_news),
                                  ("bluesky", collect_bluesky),
                                  ("lemmy", collect_lemmy),

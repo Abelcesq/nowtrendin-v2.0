@@ -441,6 +441,9 @@ DATA_SUBSCRIPTIONS = [
     ("Blogger",              "BLOGGER_API_KEY",      None, "free", "Google Blogger (free)"),
     ("Hashnode",             "HASHNODE_TOKEN",       None, "free", "dev blogs (free)"),
     ("Dev.to",               "DEVTO_API_KEY",        None, "free", "dev blogs (free)"),
+    ("Currents",             "CURRENTS_API_KEY",     None, "free",
+     "multi-source news aggregator (free tier 1000 req/day; hard-capped via "
+     "CURRENTS_DAILY_CAP, ~4 calls/day in practice)"),
     # usage-metered — tracked on their own cost lines (do NOT add to subs total)
     ("Perplexity",           "PERPLEXITY_API_KEY",   None, "metered", "AI research — on AI ledger line"),
     ("Anthropic",            "ANTHROPIC_API_KEY",    None, "metered", "AI synthesis — on AI ledger line"),
