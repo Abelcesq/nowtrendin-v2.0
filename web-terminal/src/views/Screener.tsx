@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Star, Bell, Download } from 'lucide-react'
 import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
+import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, stageColor, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
 
 // Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
@@ -182,6 +184,14 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const matBadge = r.calibration?.maturity_badge ?? matClass
   const matReason = r.calibration?.maturity_reason ?? r.maturity_reason
   const N = Math.round(r.nowtrendin_score ?? row.n ?? 0)
+  const [act, setAct] = useState('')
+  const onWatch = async () => setAct(await addToWatchlist(row.topic_key, row.topic_display || row.topic_key, 'topic'))
+  const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this topic.')
+  const onExport = () => exportEntityCsv(`${row.topic_key}_nowtrendin.csv`, [
+    ['Topic', row.topic_display], ['Detection', det], ['Confidence', conf], ['Gap', gap],
+    ['N (Now Trending)', N], ['Stage', row.stage], ['Category', row.category || ''],
+    ['Mentions', row.total_mentions ?? ''], ['Updated (min ago)', row.ageMin],
+  ])
   const ntgD = r.nowtrending_gradient_detection, ntgC = r.nowtrending_gradient_confidence
   const dm = Math.round(r.dark_matter_score ?? d?.components?.D_dark_matter?.score ?? 0)
   const ftPct = r.first_timer_ratio != null ? Math.round(r.first_timer_ratio * 100) : null
@@ -456,10 +466,11 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       </div>
 
       <div className="detail-actions">
-        <button className="btn">★ Watchlist</button>
-        <button className="btn">⚑ Alert</button>
-        <button className="btn">↧ Export</button>
+        <button className="btn" onClick={onWatch}><Star size={17} color="var(--early)" /> Add to Watchlist</button>
+        <button className="btn" onClick={onAlert}><Bell size={17} color="var(--early)" /> Add to Alert</button>
+        <button className="btn" onClick={onExport}><Download size={17} color="var(--early)" /> Export</button>
       </div>
+      {act && <div className="detail-act-msg">{act}</div>}
     </aside>
   )
 }

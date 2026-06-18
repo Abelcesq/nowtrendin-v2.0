@@ -106,7 +106,6 @@ export function Shell({
           <div className="nav-label">Saved Screens</div>
           <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--early)' }} /> Early Signals <span className="cnt">—</span></div>
           <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--bk-t)' }} /> Breakouts <span className="cnt">—</span></div>
-          <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--det)' }} /> AI Infrastructure <span className="cnt">—</span></div>
           <div className="screen-item" onClick={() => onNav('watchlists')}><span className="sd" style={{ background: 'var(--conf)' }} /> My Watchlist <span className="cnt">6</span></div>
         </aside>
 
