@@ -125,6 +125,36 @@ When a new accuracy/consistency trap is discovered, add it here with its owning 
 the Charter is the durable home for these, mirrored in the `serve-payload-cache-gotcha`
 project memory.
 
+### 0.6 UI & UX Consistency Mandate (3-platform — hard rule)
+
+Binds **every agent and every change in every session** (this thread included). The
+product is ONE instrument on three surfaces; it must read as one.
+
+- **Mobile is the design model.** The mobile app (`frontend/`) is the canonical
+  reference for icons and styling — **`lucide-react-native` icons + NativeWind/Tailwind
+  tokens**. The web terminal (`web-terminal/`, also served by the desktop) MUST converge
+  on the same icon set (`lucide-react`, the web sibling) and a Tailwind-based styling
+  system. It must NOT keep the ad-hoc Unicode-glyph icons + hand-written CSS it has today.
+- **Audience-calibrated, never divergent.** Mobile = consumer / small-business:
+  **simplicity, intuitiveness, minimal friction are paramount.** Web/desktop = the
+  sophisticated, data-driven, accuracy-meticulous user: denser tables, more columns,
+  deeper filters. The web MAY add depth; it MUST NOT diverge on the shared spine —
+  user flows, navigation/IA, labels, **icon meanings**, color tokens, detail-section
+  structure.
+- **INV-4 — no flow deviation.** A user flow (nav order, screen sequence, the steps to
+  grade / pull / inspect a signal) must be the SAME across all three. Adding a step,
+  reordering nav, or renaming a destination on one surface without the others is a defect.
+- **INV-5 — component & token parity.** Icons come from Lucide (one icon = one meaning
+  everywhere); colors/spacing/radii come from the shared token set
+  (mobile `tailwind.config.js` ↔ web `mobileTheme.ts`), never per-surface hex.
+- **GOTCHA G3 — never introduce a non-Lucide icon or a non-Tailwind styling path on any
+  surface.** When touching the web terminal, reach for `lucide-react` + Tailwind classes;
+  do not add Unicode-glyph icons or new hand-written CSS that duplicates a token.
+
+*Owner: Frontend Consistency (Agent 12) — extended to check icon-library + styling-
+library + flow parity, not just labels/colors. Every agent reads this mandate; any
+agent that proposes or reviews a UI change enforces it.*
+
 ---
 
 # PART I — THE DEVOTED SCORING DIAGNOSTICS
@@ -602,16 +632,20 @@ and via Cost Sentinel.
 
 **1. Identity.** `/frontend-consistency` (skill) · block B8. Read-only.
 
-**2. Definition & scope.** The **3-platform UI-parity** monitor. Confirms the trend
-signal pages and the market-analysis pages present the SAME labels, filters, detail
-sections, data points, and **mobile color scheme** across mobile (`frontend/`), web
-terminal (`web-terminal/`), and desktop (`tauri-desktop/`), and that the deployed
-sites are up. The web terminal may add MORE (denser filters, extra columns) but must
-not DIVERGE on shared elements.
+**2. Definition & scope.** The **3-platform UI-parity** monitor and the **owner of the
+§0.6 UI & UX Consistency Mandate**. Confirms the trend and market pages present the SAME
+labels, filters, detail sections, data points, and **mobile color scheme** across mobile
+(`frontend/`, the design model), web terminal (`web-terminal/`), and desktop
+(`tauri-desktop/`), and that the sites are up. Now also audits the deeper spine:
+**(a) icon-library parity** — every surface uses Lucide (`lucide-react-native` on mobile,
+`lucide-react` on web), one icon = one meaning; flags any Unicode-glyph or non-Lucide
+icon (GOTCHA G3); **(b) styling-library parity** — Tailwind tokens, not per-surface hand
+CSS/hex; **(c) user-flow parity** (INV-4) — nav order, screen sequence, and the steps to
+grade/pull/inspect match. The web MAY add density; it must not diverge on the shared spine.
 
 **3. Will NOT.** Read-only audit — it does not edit components or deploy. It does not
-demand the terminal be a pixel clone (additive density is allowed); it flags
-*divergence* on shared labels/filters/sections/colors only.
+demand the terminal be a pixel clone (additive density is allowed); it flags *divergence*
+on shared labels/filters/sections/colors, icon library, styling library, and user flows.
 
 **4. How it supports accuracy & UX.** A score that looks different on three surfaces
 reads as three different products. Parity is what makes the institutional surfaces
