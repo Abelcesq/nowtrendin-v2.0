@@ -4456,9 +4456,19 @@ def _heartbeat_age_min(role: str) -> float:
                      "(role TEXT PRIMARY KEY, beat_at TEXT)")
         row = conn.execute("SELECT beat_at FROM worker_heartbeat WHERE role=?", (role,)).fetchone()
         conn.close()
-        if not row or not row[0]:
+        if not row:
             return 1e9
-        beat = datetime.fromisoformat(row[0])
+        # Rows are dict-keyed on this DB (psycopg DictRow), so positional row[0]
+        # raises KeyError → the old code silently returned 1e9 ("never") for EVERY
+        # heartbeat, breaking failover detection + the Scorer Watchdog. Read by name,
+        # fall back to positional for sqlite tuple rows.
+        try:
+            beat_at = row["beat_at"]
+        except (KeyError, TypeError, IndexError):
+            beat_at = row[0]
+        if not beat_at:
+            return 1e9
+        beat = datetime.fromisoformat(str(beat_at))
         if beat.tzinfo is None:
             beat = beat.replace(tzinfo=timezone.utc)
         return (datetime.now(timezone.utc) - beat).total_seconds() / 60.0
