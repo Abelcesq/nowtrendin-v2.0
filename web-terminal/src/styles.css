@@ -3,15 +3,23 @@
   --ink-text:#c4d0de; --ink-text-2:#8095ab; --ink-text-3:#5e718a;
   --canvas:#f4f6f8; --surface:#ffffff; --line:#e3e7ed; --line-2:#eef1f5;
   --text:#15202e; --text-2:#5c6a7d; --text-3:#8a97a7;
-  --det:#2f6fed; --det-soft:#e8effd;
-  --conf:#0d9f6e; --conf-soft:#e2f4ec;
+  /* Phase 3 (UI consistency, Charter §0.6): meaning-encoding colors aligned to the
+     mobile token set (mobileTheme.ts STAGE_COLOR / detection / confidence) so a score
+     reads the SAME color on every surface — and so the table matches its own detail
+     rails (which already use the mobile palette). Stage-pill text is a readable dark
+     shade of each mobile hue; the gauge/score data colors are the exact mobile hex.
+     Detection #2D7EEF (blue) · Confidence #00C896 (green) · Breakout green · Strong
+     blue · Emerging gold · Watching orange · Monitoring slate. The dark --ink chrome
+     above is intentional institutional identity (not a meaning color) and stays. */
+  --det:#2D7EEF; --det-soft:#e8f1fd;
+  --conf:#00C896; --conf-soft:#e0f5ec;
   --early:#df7a36; --early-soft:#fbecdc;
-  --up:#15a34a; --down:#d83a3a;
-  --bk-t:#c2410c; --bk-b:#fdeadc;
-  --st-t:#1d4ed8; --st-b:#e8effd;
-  --em-t:#0d9f6e; --em-b:#e2f4ec;
-  --wa-t:#5c6a7d; --wa-b:#eef1f5;
-  --mo-t:#8a97a7; --mo-b:#f2f4f7;
+  --up:#00C896; --down:#DC2626;
+  --bk-t:#007a5a; --bk-b:#e0f5ec;
+  --st-t:#1b5fc4; --st-b:#e8f1fd;
+  --em-t:#8a6d0f; --em-b:#fbf1d6;
+  --wa-t:#c0431a; --wa-b:#fcebe0;
+  --mo-t:#6b7280; --mo-b:#f1f4f7;
   --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
