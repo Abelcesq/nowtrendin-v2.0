@@ -470,7 +470,11 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState('nowtrendin')   // mobile default = Now TrendIn
-  const [sortKey, setSortKey] = useState<SortKey>('det')
+  // Default sort MUST match the default filter: "Now TrendIn" ranks by N (the
+  // proprietary demand signal), "All Signals" by Detection. Defaulting to 'det'
+  // while the Now TrendIn chip is highlighted showed All-Signals-sorted data under
+  // the wrong active tab (selectSignal only synced the sort on a later click).
+  const [sortKey, setSortKey] = useState<SortKey>('n')
   const [sortDir, setSortDir] = useState(-1)
   const [sel, setSel] = useState<string | null>(null)
   const [pulling, setPulling] = useState(false)
