@@ -479,6 +479,9 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
   const [sel, setSel] = useState<string | null>(null)
   const [pulling, setPulling] = useState(false)
   const [pullMsg, setPullMsg] = useState<string | null>(null)
+  // Inline topic filter — same UI as Market Signal's "Filter instruments…", for
+  // cross-section consistency (combines with the top-bar global search).
+  const [topicFilter, setTopicFilter] = useState('')
 
   // When a SIGNAL chip is active we screen the top-ranked set client-side; when a
   // CATEGORY chip is active we ask the engine for THAT category server-side, so the
@@ -511,13 +514,15 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
     // category rows already filtered server-side (catParam) — no client re-filter
     const ql = query.trim().toLowerCase()
     if (ql) r = r.filter((x) => (x.topic_display || '').toLowerCase().includes(ql) || (x.topic_key || '').toLowerCase().includes(ql))
+    const tl = topicFilter.trim().toLowerCase()
+    if (tl) r = r.filter((x) => (x.topic_display || '').toLowerCase().includes(tl) || (x.topic_key || '').toLowerCase().includes(tl))
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string') return String(va).localeCompare(String(vb)) * sortDir
       return ((va ?? -1) - (vb ?? -1)) * sortDir
     })
     return r
-  }, [rows, filter, sortKey, sortDir, query])
+  }, [rows, filter, sortKey, sortDir, query, topicFilter])
 
   // Selecting a signal chip also sets its ranking: "Now TrendIn" → by N score,
   // "All Signals" → by Detection. (This is what makes the two views differ.)
@@ -578,6 +583,8 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
             <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')}
               onClick={() => selectSignal(f)}>{f.label}</div>
           ))}
+          <input className="chip-search" placeholder="Filter topics…" value={topicFilter}
+            onChange={(e) => setTopicFilter(e.target.value)} />
         </div>
         {/* Row 2 — CATEGORY filters (the WHAT axis) */}
         {cats.length > 0 && (

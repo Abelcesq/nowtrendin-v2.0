@@ -12,8 +12,8 @@ function GapMicro({ det, conf }: { det: number; conf: number }) {
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`} aria-hidden="true">
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />
-      <circle cx={x(det)} cy="8" r="3.2" fill="#2f6fed" />
-      <circle cx={x(conf)} cy="8" r="3.2" fill="#0d9f6e" />
+      <circle cx={x(det)} cy="8" r="3.2" fill="#2D7EEF" />
+      <circle cx={x(conf)} cy="8" r="3.2" fill="#00C896" />
     </svg>
   )
 }
