@@ -4121,9 +4121,15 @@ class GravitationalAnomalyDetector:
                         signals,
                         breadth_baseline=_brd_base,
                         magnitude_baseline=_mag_base,
-                        baseline_cycles=_base_cycles)
+                        baseline_cycles=_base_cycles,
+                        expert_confidence=result.get("confidence_score", 0) or 0)
                     result["detection_score"] = _b["detection"]
                     result["overall_score"]   = _b["overall"]
+                    # Fix #3: blend CONFIDENCE through the mainstream pathway too, so a
+                    # mainstream topic's confidence reflects its magnitude/breadth
+                    # instead of the ~constant expert value (FIFA vs obama both 58).
+                    if _b.get("confidence") is not None:
+                        result["confidence_score"] = _b["confidence"]
                     result["heisenberg_gap"]  = round(
                         _b["detection"] - (result.get("confidence_score", 0) or 0), 1)
                     result["detection_pathway"]      = _b["pathway"]

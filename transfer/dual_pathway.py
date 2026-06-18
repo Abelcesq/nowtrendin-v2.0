@@ -199,7 +199,7 @@ def mainstream_detection(magnitude: float, M: float, I: float, P: float,
 def blend(expert_detection: float, expert_overall: float,
           components: dict, signals: list,
           breadth_baseline: float = None, magnitude_baseline: float = None,
-          baseline_cycles: int = 0) -> dict:
+          baseline_cycles: int = 0, expert_confidence: float = None) -> dict:
     """
     Blend the expert (gradient) pathway with the mainstream (magnitude)
     pathway by how mainstream-origin the topic is RIGHT NOW.
@@ -276,14 +276,26 @@ def blend(expert_detection: float, expert_overall: float,
     # (a real, held, broadly-carried consumer/news trend), parallel to md.
     mo = _soft_cap(mag * 0.45 + abs_breadth * 28.0 + P * 0.18 + M * 0.15 + I * 0.08)
 
+    # Mainstream CONFIDENCE (Fix #3, Confidence-not-discriminating). The expert
+    # confidence formula is ~constant for mainstream topics (its G/D terms are ~0),
+    # so FIFA (23k mentions) and obama (1.5k) both read ~58. A mainstream topic's
+    # confidence is its CONFIRMATION strength: held attention magnitude + breadth of
+    # corroboration + persistence. Magnitude-weighted so a 16×-bigger topic separates;
+    # soft-capped so it doesn't re-saturate.
+    mc = _soft_cap(mag * 0.32 + abs_breadth * 28.0 + P * 0.25 + M * 0.15)
+
     detection = round((1 - w) * expert_detection + w * md, 2)
     overall = round((1 - w) * expert_overall + w * mo, 2)
+    confidence = (round((1 - w) * expert_confidence + w * mc, 2)
+                  if expert_confidence is not None else None)
 
     pathway = ("mainstream" if w >= 0.6 else
                "expert" if w <= 0.2 else "blended")
 
     return {
         "detection": detection,
+        "confidence": confidence,            # blended (None if no expert_confidence passed)
+        "mainstream_confidence": round(mc, 2),
         "overall": overall,
         "pathway": pathway,
         "mainstream_ratio": w,
