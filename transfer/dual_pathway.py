@@ -59,6 +59,19 @@ def _norm(x: float, lo: float, hi: float) -> float:
     return max(0.0, min(100.0, (x - lo) / (hi - lo) * 100.0))
 
 
+import math as _math
+def _soft_cap(raw: float, knee: float = 85.0, ceil: float = 100.0) -> float:
+    """Order-preserving ceiling (Fix #2, saturation). Linear up to `knee`, then the
+    excess is compressed asymptotically into (knee, ceil) so the HOTTEST topics still
+    separate instead of all hard-pinning at 100 (FIFA vs obama were both 100 →
+    unrankable). raw 85→85, 100→~94.5, 130→~99.2, ∞→100. Strictly monotonic, so
+    ranking is preserved everywhere."""
+    if raw <= knee:
+        return round(max(0.0, raw), 2)
+    span = ceil - knee
+    return round(knee + span * (1.0 - _math.exp(-(raw - knee) / span)), 2)
+
+
 # Cross-platform corroboration: the niche->mainstream transition is signalled
 # by the SAME/similar words appearing across MANY mainstream-tier platforms
 # (news + social + broadcast + discovery), not by any single source's tier.
@@ -175,13 +188,12 @@ def mainstream_detection(magnitude: float, M: float, I: float, P: float,
     magnitude floor, so without this a story across a dozen reputable outlets
     would read magnitude ~0. Broad outlet corroboration IS mainstream attention.
     """
-    return round(min(100.0,
+    return _soft_cap(
         magnitude * 0.55   # absolute attention now (views / search traffic)
         + breadth * 28.0   # cross-outlet / cross-community corroboration (news!)
         + M * 0.10         # platform diversity
         + I * 0.10         # acceleration — is it rising
-        + P * 0.07         # persistence — has it held
-    ), 2)
+        + P * 0.07)        # persistence — has it held
 
 
 def blend(expert_detection: float, expert_overall: float,
@@ -262,8 +274,7 @@ def blend(expert_detection: float, expert_overall: float,
 
     # Mainstream OVERALL leans on magnitude + corroboration breadth + persistence
     # (a real, held, broadly-carried consumer/news trend), parallel to md.
-    mo = round(min(100.0,
-        mag * 0.45 + abs_breadth * 28.0 + P * 0.18 + M * 0.15 + I * 0.08), 2)
+    mo = _soft_cap(mag * 0.45 + abs_breadth * 28.0 + P * 0.18 + M * 0.15 + I * 0.08)
 
     detection = round((1 - w) * expert_detection + w * md, 2)
     overall = round((1 - w) * expert_overall + w * mo, 2)
