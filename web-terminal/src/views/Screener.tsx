@@ -164,7 +164,10 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
 
   const v = d?.velocity_scores || {}
   const r = d?.rich || {}   // rich parity row (mobile /scores shape)
-  const det = v.detection ?? row.det, conf = v.confidence ?? row.conf, gap = Math.round(det - conf)
+  // Round to whole numbers so the gauge shows a clean "94" like the mobile app —
+  // the detail endpoint returns the raw float (e.g. 69.35), which renders cramped
+  // ("69.35") inside the ring and reads as pixelated next to the app's "27".
+  const det = Math.round(v.detection ?? row.det), conf = Math.round(v.confidence ?? row.conf), gap = det - conf
   const [gs, tight, gt] = gapInterp(gap)
   const groups: BGroup[] = d?.components ? deriveGroups(d.components) : []
   const diverge = d?.components ? deriveDivergence(d.components, gap) : null
