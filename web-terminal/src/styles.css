@@ -35,11 +35,13 @@ body{
 .brand .name b{color:var(--early)}
 .brand .tag{font-size:8.5px; letter-spacing:.16em; color:var(--ink-text-3); text-transform:uppercase; margin-top:1px}
 .search{flex:1; max-width:560px; position:relative}
-.search input{width:100%; height:32px; background:var(--ink-2); border:1px solid var(--ink-line); border-radius:7px; color:var(--ink-text); padding:0 64px 0 32px; font-size:12.5px; font-family:var(--sans)}
-.search input::placeholder{color:var(--ink-text-3)}
-.search input:focus{outline:none; border-color:#34507a; background:var(--ink-3)}
-.search .ico{position:absolute; left:10px; top:8px; color:var(--ink-text-3)}
-.search .kbd{position:absolute; right:8px; top:7px; font-size:10px; color:var(--ink-text-3); border:1px solid var(--ink-line); border-radius:4px; padding:1px 6px; font-family:var(--mono)}
+/* Light-orange fill so the search bar stands out against the dark topbar
+   (was --ink-2 dark-on-dark and blended in). Dark text for readability. */
+.search input{width:100%; height:32px; background:var(--early-soft); border:1px solid var(--early); border-radius:7px; color:var(--text); padding:0 64px 0 32px; font-size:12.5px; font-family:var(--sans)}
+.search input::placeholder{color:#b07a4f}
+.search input:focus{outline:none; border-color:var(--early); background:#fdf4ea; box-shadow:0 0 0 3px rgba(223,122,54,.30)}
+.search .ico{position:absolute; left:10px; top:8px; color:var(--early)}
+.search .kbd{position:absolute; right:8px; top:7px; font-size:10px; color:#b07a4f; border:1px solid #e9c9aa; border-radius:4px; padding:1px 6px; font-family:var(--mono)}
 .top-right{margin-left:auto; display:flex; align-items:center; gap:16px}
 .asof{font-size:11px; color:var(--ink-text-2); text-align:right; line-height:1.25}
 .asof .live{color:var(--conf)}
