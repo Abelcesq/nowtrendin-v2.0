@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Star, Bell, Download } from 'lucide-react'
 import { api, type RiskRow } from '../lib/api'
 import { pullMarket } from '../lib/auth'
+import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, marketTierColor, FEEDS_COLOR, MARKET_TIERS, RISK_PIPELINE, BASELINE_META } from '../lib/mobileTheme'
 
 // Market Signal — the finance-native dual score, wired to the live /risk/scores
@@ -92,6 +94,13 @@ function bar(label: string, val: number | null, color: string) {
 
 function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   const raw = row.raw
+  const [act, setAct] = useState('')
+  const onWatch = async () => setAct(await addToWatchlist(row.key, row.name, 'market'))
+  const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this instrument.')
+  const onExport = () => exportEntityCsv(`${row.key}_market.csv`, [
+    ['Instrument', row.name], ['Detection', row.det], ['Confidence', row.conf], ['Gap', row.gap],
+    ['Tier', row.tier], ['Leverage health', row.lev ?? ''], ['Signals', row.sigs], ['Updated (min ago)', row.ageMin],
+  ])
   const tcol = marketTierColor(row.tier)
   const mg = raw.market_gradient || {}
   const sust = raw.sustainability
@@ -326,10 +335,11 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       <div className="disc" style={{ padding: '0 16px 14px', textAlign: 'center' }}>Positioning analysis for informational purposes only — not financial, investment, or legal advice, and not a risk rating.</div>
 
       <div className="detail-actions">
-        <button className="btn">★ Watchlist</button>
-        <button className="btn">⚑ Alert</button>
-        <button className="btn">↧ Export</button>
+        <button className="btn" onClick={onWatch}><Star size={17} color="var(--early)" /> Add to Watchlist</button>
+        <button className="btn" onClick={onAlert}><Bell size={17} color="var(--early)" /> Add to Alert</button>
+        <button className="btn" onClick={onExport}><Download size={17} color="var(--early)" /> Export</button>
       </div>
+      {act && <div className="detail-act-msg">{act}</div>}
     </aside>
   )
 }

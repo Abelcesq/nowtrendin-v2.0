@@ -219,8 +219,8 @@ export function Grade({ user, onUser }: { user: User; onUser?: (u: User) => void
         <div className="chips tight">
           <span className="chip-label">Grade</span>
           <div className={'chip' + (tab === 'new' ? ' active' : '')} onClick={() => setTab('new')}>+ New Grade</div>
-          <div className={'chip' + (tab === 'history' ? ' active' : '')} onClick={() => setTab('history')}>History</div>
-          <div className={'chip' + (tab === 'graded' ? ' active' : '')} onClick={() => setTab('graded')}>Graded</div>
+          <div className={'chip' + (tab === 'history' ? ' active' : '')} onClick={() => setTab('history')}>My History</div>
+          <div className={'chip' + (tab === 'graded' ? ' active' : '')} onClick={() => setTab('graded')}>Graded Library</div>
         </div>
       </div>
 
