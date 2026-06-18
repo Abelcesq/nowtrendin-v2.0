@@ -94,6 +94,59 @@ def source_watchdog(conn=None, db_path=None) -> dict:
     }
 
 
+# ── Agent K: SCORER WATCHDOG (B4 process liveness) ──────────────────────────
+# The scoring-PROCESS counterpart to Source Watchdog (which watches collectors).
+# A topic is only as fresh as the scorer that wrote it. Scoring is hybrid: a LOCAL
+# worker scores every SCORE_INTERVAL_MIN (free hardware), and the Heroku CLOUD dyno
+# collect+scores every COLLECT_INTERVAL_MIN AND failover-scores if the local
+# heartbeat goes stale (> SCORE_STALE_MIN). This agent reads the worker_heartbeat
+# PROCESS signal — distinct from Pipeline Integrity B4, which checks the DATA
+# freshness (MAX scored_at) — and answers: is a scorer alive, WHICH one, and is the
+# failover posture healthy? It catches the "no local worker AND cloud stalled →
+# scores frozen" case that a data-only check explains only after the fact.
+def scorer_watchdog(conn=None, db_path=None) -> dict:
+    import os as _os
+    import gravitational_anomaly_detector as g
+    alerts = []
+    BIG = 1e8
+    try:
+        age       = g._heartbeat_age_min("score")        # any scorer
+        age_local = g._heartbeat_age_min("score_local")  # local worker
+        age_cloud = g._heartbeat_age_min("score_cloud")  # Heroku cloud/failover
+    except Exception as e:
+        return {"agent": "scorer_watchdog", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B4", "msg": f"heartbeat read failed: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+
+    warn_min = float(_os.getenv("SCORER_WARN_MIN", "420"))   # 7h  (matches B4 warn)
+    crit_min = float(_os.getenv("SCORER_CRIT_MIN", "720"))   # 12h (matches B4 critical)
+    last_scorer = "unknown"
+    if min(age_local, age_cloud) < BIG:
+        last_scorer = "local worker" if age_local <= age_cloud else "Heroku cloud"
+
+    if age >= crit_min:
+        alerts.append({"level": "critical", "block": "B4",
+                       "msg": f"NO scorer heartbeat in {age:.0f}m (>{crit_min:.0f}m) — both the local "
+                              f"worker AND the Heroku failover appear down; scores are FROZEN"})
+    elif age >= warn_min:
+        alerts.append({"level": "warn", "block": "B4",
+                       "msg": f"scorer quiet {age:.0f}m (>{warn_min:.0f}m) — last scorer was {last_scorer}; "
+                              f"a cycle was missed (local worker offline? cloud cadence slow?)"})
+
+    summary = {
+        "score_heartbeat_min_ago": round(age, 1) if age < BIG else None,
+        "last_scorer": last_scorer,
+        "local_worker_min_ago": round(age_local, 1) if age_local < BIG else None,
+        "cloud_min_ago": round(age_cloud, 1) if age_cloud < BIG else None,
+        "failover_stale_min": float(_os.getenv("SCORE_STALE_MIN", "45")),
+        "note": "Local worker scores every SCORE_INTERVAL_MIN; the Heroku cloud collect+scores every "
+                "COLLECT_INTERVAL_MIN and failover-scores if the local heartbeat is stale. Process-"
+                "liveness signal — pairs with Pipeline Integrity B4 (data freshness).",
+    }
+    return {"agent": "scorer_watchdog", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Agent B: PIPELINE INTEGRITY MONITOR (B3 extraction, B4 scoring, B8 serve) ─
 def pipeline_integrity(conn, sample: int = 300) -> dict:
     """Did scoring run, are topics clean (no junk/dupes), are serve fields present?
@@ -772,7 +825,8 @@ def market_universe_coverage(conn, sample: int = 250, max_resolve: int = 20) -> 
 
 # ── Combined run ─────────────────────────────────────────────────────────────
 def run_all(conn, db_path=None) -> dict:
-    agents = [source_watchdog(conn=conn, db_path=db_path), pipeline_integrity(conn),
+    agents = [source_watchdog(conn=conn, db_path=db_path), scorer_watchdog(conn=conn, db_path=db_path),
+              pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
               data_subscriptions(), catchall_auditor(conn)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents

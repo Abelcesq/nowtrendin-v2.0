@@ -79,6 +79,7 @@ convenience, speed, and any individual spec below.
 | 11 | Grade Agent | `/grade` | n/a (request-time) | B4 |
 | 12 | Frontend Consistency | `/frontend-consistency` (skill) | n/a (manual/CI) | B8 |
 | 13 | Terminal Deploy Parity | `/terminal-deploy-parity` (skill) | n/a (manual/CI) | B8 |
+| 14 | Scorer Watchdog | `/monitor/scorer` | ✅ | B4 |
 
 The combined fleet is reachable at **`/monitor`** (`run_all`). Agents 1–2 and 8 are
 the deliberately-excluded on-demand specialists.
@@ -264,6 +265,44 @@ honestly.
 
 **7. Ongoing monitoring.** Runs every `/monitor` poll via `run_all`; also directly
 at `/monitor/sources`. Surfaced by the `/data-watchdog` skill.
+
+## AGENT 14 — SCORER WATCHDOG
+
+**1. Identity.** `monitoring_agents.scorer_watchdog` · `/monitor/scorer` · block B4
+(process liveness). In `run_all`. The scoring-process counterpart to Source Watchdog.
+
+**2. Definition & scope.** Source Watchdog asks "are the *collectors* alive?"; this asks
+"is the *scorer* alive, and which one?" Scoring is hybrid: a **local worker** scores
+every `SCORE_INTERVAL_MIN` (free hardware), and the **Heroku cloud** dyno collect+scores
+every `COLLECT_INTERVAL_MIN` *and* failover-scores when the local heartbeat goes stale
+(> `SCORE_STALE_MIN`). The agent reads the `worker_heartbeat` **process** signal — the
+generic `score` beat plus role-specific `score_local` / `score_cloud` stamps — and
+reports heartbeat age, **which scorer last ran**, and the failover posture. `warn` if no
+beat in `SCORER_WARN_MIN` (7h, a missed cycle); `critical` if none in `SCORER_CRIT_MIN`
+(12h — both local *and* failover down, scores frozen).
+
+**3. Will NOT.** It does not start, restart, or failover the scorer — it reports. It is
+**not** a duplicate of Pipeline Integrity B4: that checks the *data* (`MAX scored_at`);
+this checks the *process* (heartbeat + which scorer + failover health). The two
+corroborate — a heartbeat fresh while data is stale (or vice-versa) is itself a signal.
+
+**4. How it supports accuracy & UX.** A stale score is the worst silent failure (users
+see numbers that look live but aren't). This agent turns "scores quietly stopped" into a
+named, attributed alarm — and tells you *whether the local worker is offline* (so cloud
+failover is carrying the ~6h cadence) or whether *both* are down (frozen). That's the
+exact gap surfaced when no local worker is running.
+
+**5. Success looks like.** A scorer always beats within SLA; `last_scorer` is known;
+when the local worker is offline the cloud failover is visibly carrying it (no frozen
+scores); `critical` only ever fires on a genuine total-scorer outage.
+
+**6. Problem signaling & resolution.** `warn` (quiet > 7h) → check the local worker
+(`run-worker.ps1`) and the Heroku cloud cadence (`COLLECT_INTERVAL_MIN`). `critical`
+(> 12h, frozen) → restart the local worker or confirm the Heroku dyno + failover job are
+up (`WORKER_SCORE`, `FAILOVER_CHECK_MIN`, `SCORE_STALE_MIN`).
+
+**7. Ongoing monitoring.** Every `/monitor` poll via `run_all`; directly at
+`/monitor/scorer`.
 
 ## AGENT 4 — PIPELINE INTEGRITY MONITOR
 

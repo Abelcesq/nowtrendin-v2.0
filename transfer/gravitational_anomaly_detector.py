@@ -4584,6 +4584,12 @@ def start_scheduler():
                     except Exception as _ae:
                         print(f"[scheduler] alert eval error: {_ae}")
                 _write_heartbeat("score")
+                # Stamp WHICH scorer ran (local worker vs Heroku cloud/failover) so
+                # the Scorer Watchdog can report who is alive — read from env at call
+                # time (no closure dependency). WORKER_COLLECT=0 == the local score-
+                # only worker; otherwise this is the Heroku cloud collect+score dyno.
+                _is_local = os.getenv("WORKER_COLLECT", "1").lower() not in ("1", "true", "yes")
+                _write_heartbeat("score_local" if _is_local else "score_cloud")
             except Exception as _ce:
                 print(f"[scheduler] score phase error: {_ce}")
 
@@ -6449,6 +6455,19 @@ def monitor_sources():
         if conn is not None:
             try: conn.close()
             except Exception: pass
+
+
+@app.get("/monitor/scorer")
+def monitor_scorer():
+    """Scorer Watchdog — is a scorer alive, WHICH one (local worker vs Heroku
+    cloud/failover), and is the failover posture healthy? (block B4, process
+    liveness — pairs with /monitor/pipeline's data-freshness check)."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    try:
+        return {"available": True, **_monitor.scorer_watchdog(db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
 
 
 @app.get("/monitor/pipeline")
