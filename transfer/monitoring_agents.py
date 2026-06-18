@@ -128,8 +128,7 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
         # audit field) for serve-readiness instead.
         rows = conn.execute(
             """
-            SELECT v.topic_key, v.topic_display, v.detection_pathway,
-                   v.scored_at, v.overall_score, v.detection_score
+            SELECT v.*
             FROM velocity_scores v
             INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
                         GROUP BY topic_key) l
@@ -184,6 +183,56 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
             alerts.append({"level": "warn", "block": "B8",
                            "msg": f"{no_path}/{len(rows)} scored rows missing detection_pathway "
                                   "(audit field) — re-score may be needed"})
+
+    # B8 (serve-SCORE consistency) — THE SAME TOPIC MUST SERVE THE SAME SCORE on
+    # every surface. /scores, /scores/{key} and /topics all read the precomputed
+    # serve_payload (single source of truth); two ways that silently breaks:
+    #   • STALE PAYLOAD — a scoring/calibration change shipped WITHOUT regenerating
+    #     serve_payload, so the payload (what surfaces serve) drifts from a fresh
+    #     calibration. This exact gotcha masked a fix on 2026-06-18. Detected by
+    #     re-running _calibrate_score_fields live and comparing to the stored payload.
+    #   • MAINSTREAM COLLAPSE — the pathway gate in apply_calibration regresses and a
+    #     mainstream topic's served detection falls far below its stored dual-pathway
+    #     value (every mainstream topic ≈27, unrankable). If the scoring is not
+    #     matching, there is a problem — this is the alarm.
+    # Sub-sampled (live calibration is costly): the top rows only.
+    import json as _json, os as _os
+    stale, collapsed, checked = [], [], 0
+    for r in rows[:int(_os.getenv("SERVE_CONSISTENCY_SAMPLE", "40"))]:
+        rd = dict(r)
+        payload = rd.pop("serve_payload", None)
+        stored_det = rd.get("detection_score") or 0
+        pathway = (rd.get("detection_pathway") or "").lower()
+        try:
+            live = g._calibrate_score_fields(dict(rd))
+            live_det = live.get("detection_score") or 0
+        except Exception:
+            continue
+        checked += 1
+        served_det = live_det
+        if payload:
+            try:
+                served_det = (_json.loads(payload) or {}).get("detection_score") or live_det
+                if abs(served_det - live_det) > 2.0:
+                    stale.append((rd.get("topic_key"), round(served_det, 1), round(live_det, 1)))
+            except Exception:
+                pass
+        if pathway in ("mainstream", "blended") and stored_det >= 50 and served_det < stored_det * 0.6:
+            collapsed.append((rd.get("topic_key"), round(stored_det, 1), round(served_det, 1)))
+    summary["serve_consistency_checked"] = checked
+    summary["serve_stale_payload"] = len(stale)
+    summary["serve_mainstream_collapse"] = len(collapsed)
+    if stale:
+        alerts.append({"level": "warn", "block": "B8",
+                       "msg": f"{len(stale)} topic(s) serve a STALE serve_payload (payload≠fresh "
+                              f"calibration, e.g. {stale[:4]}) — regenerate _precompute_serve_payloads "
+                              f"after ANY scoring/calibration change (GOTCHA)"})
+    if collapsed:
+        alerts.append({"level": "critical", "block": "B8",
+                       "msg": f"{len(collapsed)} mainstream topic(s) served with COLLAPSED detection "
+                              f"(≪ stored dual-pathway, e.g. {collapsed[:4]}) — the pathway gate in "
+                              f"apply_calibration (signal_calibration_integration.py) regressed; served "
+                              f"detection must match across /topics, /scores, /scores/{{key}}"})
 
     return {
         "agent": "pipeline_integrity",

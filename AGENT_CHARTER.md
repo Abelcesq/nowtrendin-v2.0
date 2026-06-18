@@ -83,6 +83,47 @@ convenience, speed, and any individual spec below.
 The combined fleet is reachable at **`/monitor`** (`run_all`). Agents 1–2 and 8 are
 the deliberately-excluded on-demand specialists.
 
+### 0.5 Operational invariants & gotchas (hard rules, learned the hard way)
+
+These are non-negotiable invariants the platform must hold. Each names the agent that
+**owns** detecting a breach. Adding code that can violate one without the owning agent
+catching it is itself a defect.
+
+- **INV-1 — One score per topic, everywhere.** The same topic must serve the **same**
+  Detection/Confidence/Stage on `/topics`, `/scores`, and `/scores/{key}` (and thus on
+  website, app, and desktop). All three read the precomputed `serve_payload` as the
+  single source of truth. **If the scores don't match, there is a problem.**
+  *Owner: Pipeline Integrity (B8).*
+
+- **GOTCHA G1 — Regenerate `serve_payload` after ANY scoring/calibration change.**
+  `/scores` + detail + `/topics` read the precomputed `velocity_scores.serve_payload`
+  via a fast path; they only live-calibrate when it's NULL. So a change to
+  `apply_calibration` / `_calibrate_score_fields` / the scoring formula is **invisible
+  until the payload is regenerated** — `python -c "import gravitational_anomaly_detector
+  as g; g._precompute_serve_payloads(600)"` (it clears all first, then rebuilds), or a
+  full re-score. Symptom: `score-history` (live-calibrates) shows the new value while
+  `/scores` shows the old. Also: the web dyno's in-memory `_cache` clears on deploy
+  restart or `/score-all`; use a novel `?limit=` to bypass when verifying.
+  *Owner: Pipeline Integrity (B8) flags a stale payload automatically.*
+
+- **GOTCHA G2 — The live `apply_calibration` is in `signal_calibration_integration.py`,
+  NOT `calibration_engine.py`.** The engine imports it from the former
+  (`gravitational_anomaly_detector.py:199`); the same-named function in
+  `calibration_engine.py` is dead. Edit the wrong one and nothing changes.
+
+- **INV-2 — Pathway discipline.** The expert G·I·M·D·C recompute applies ONLY to
+  expert/niche topics; mainstream/blended topics keep their dual-pathway headline.
+  Violating this collapses every mainstream topic to ~27 (unrankable).
+  *Owners: Pipeline Integrity (B8 mainstream-collapse alarm) + Trend Signal Diagnostic
+  (N-discipline / pathway gate).*
+
+- **INV-3 — N never feeds the Gradient** (no circular metric); see Integrity Standard #3.
+  *Owner: Trend Signal Diagnostic.*
+
+When a new accuracy/consistency trap is discovered, add it here with its owning agent —
+the Charter is the durable home for these, mirrored in the `serve-payload-cache-gotcha`
+project memory.
+
 ---
 
 # PART I — THE DEVOTED SCORING DIAGNOSTICS
@@ -234,8 +275,16 @@ freshness** — the latest `velocity_scores.scored_at` must be recent; >7h = `wa
 (a 6h cycle missed), >12h = `critical` (stalled), none ever = `critical`. (b) **B3
 extraction** — samples the top scored topics and flags single-word common-word junk
 (via the engine's own `_is_quality_topic`) and unconsolidated canonical duplicate
-groups (via `_topic_key`). (c) **B8 serve** — checks scored rows carry the
-`detection_pathway` audit field so every client renders the same enriched data.
+groups (via `_topic_key`). (c) **B8 serve consistency — THE OWNER of cross-surface
+score agreement.** Checks scored rows carry the `detection_pathway` audit field
+**and** — on a sub-sample — that the **same topic serves the same score on every
+surface**. `/scores`, `/scores/{key}` and `/topics` all read the precomputed
+`serve_payload` (single source of truth); this agent re-runs `_calibrate_score_fields`
+live and (i) flags a **STALE serve_payload** (payload drifted from a fresh calibration
+— the signature of a scoring change shipped without regenerating the payload, see
+Gotcha G1) and (ii) flags a **MAINSTREAM COLLAPSE** (a mainstream topic served far
+below its stored dual-pathway detection — the pathway-gate regression of 2026-06-18).
+**If the served scores don't match, that is the alarm.**
 
 **3. Will NOT.** It does not re-score, prune, or deduplicate — it reports that those
 are needed. Multi-word "junk" is surfaced as **review-only**, never a hard alert,
@@ -249,11 +298,15 @@ identical data.
 
 **5. Success looks like.** Scores always < 7h old; near-zero single-word junk in the
 top sample; zero duplicate groups; `detection_pathway` present on essentially all
-scored rows.
+scored rows; **`serve_stale_payload` = 0 and `serve_mainstream_collapse` = 0** (every
+surface serves the same score).
 
 **6. Problem signaling & resolution.** Freshness critical → the score cycle stalled,
 check the worker / scheduler. Junk/dupes → run the quality gate at scoring time and
-prune old rows. Missing pathway → a re-score is needed.
+prune old rows. Missing pathway → a re-score is needed. **STALE payload (`warn`) →
+regenerate `_precompute_serve_payloads` (Gotcha G1). MAINSTREAM COLLAPSE (`critical`)
+→ the pathway gate in `apply_calibration` (`signal_calibration_integration.py`)
+regressed; fix and re-score (Gotcha G2).**
 
 **7. Ongoing monitoring.** Every `/monitor` poll via `run_all`; directly at
 `/monitor/pipeline`.
