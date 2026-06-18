@@ -473,6 +473,26 @@ td.r{text-align:right}
 .mth-fine{max-width:920px; margin-top:14px; font-size:11px; line-height:1.6; color:var(--text-3)}
 @media (max-width:920px){.mth-two,.mth-list,.mth-comp{grid-template-columns:1fr}.mth-legal{grid-template-columns:1fr}}
 
+/* Dashboard — at-a-glance tiles (Phase 4). Uses the shared meaning-tokens so the
+   tiles match the rest of the terminal + the mobile palette. */
+.dash{padding:16px; overflow-y:auto}
+.dash-head{display:flex; align-items:baseline; gap:10px; margin-bottom:14px}
+.dash-head .h{font-size:18px; font-weight:600; color:var(--text)}
+.dash-head .s{font-size:12px; color:var(--text-3)}
+.dash-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px}
+.dash-tile{background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:15px 17px}
+.dash-tile h3{display:flex; align-items:center; gap:9px; font-size:13px; font-weight:600; color:var(--text); margin:0 0 12px}
+.dash-tile h3 .sub{margin-left:auto; font-size:10px; color:var(--text-3); font-weight:500; text-transform:uppercase; letter-spacing:.05em; cursor:pointer}
+.dash-tile h3 .sub:hover{color:var(--det)}
+.dash-row{display:flex; align-items:center; gap:9px; padding:7px 0; border-top:1px solid var(--line-2); cursor:pointer}
+.dash-row:hover{background:var(--line-2)}
+.dash-row .nm{flex:1; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.dash-row .nm small{color:var(--text-3); font-weight:400}
+.dash-row .v{font-family:var(--mono); font-size:13px; font-weight:600; min-width:28px; text-align:right}
+.dash-row .pill{font-size:10px; font-weight:700; letter-spacing:.03em; padding:1px 7px; border-radius:5px}
+.dash-split{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.dash-split .lbl{font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; margin-bottom:5px}
+.dash-empty{font-size:12px; color:var(--text-3); padding:10px 0}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#cfd6df; border-radius:5px; border:2px solid var(--surface)}
 .sidebar::-webkit-scrollbar-thumb{background:#273a54; border-color:var(--ink)}

@@ -7,6 +7,7 @@ import { Watchlists } from './views/Watchlists'
 import { Methodology } from './views/Methodology'
 import { Account } from './views/Account'
 import { Grade } from './views/Grade'
+import { Dashboard } from './views/Dashboard'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
 
@@ -30,7 +31,7 @@ function Placeholder({ title }: { title: string }) {
 export function App() {
   const [user, setUser] = useState<User | null>(null)
   const [booting, setBooting] = useState(true)
-  const [nav, setNav] = useState<NavKey>('trends')
+  const [nav, setNav] = useState<NavKey>('dashboard')   // land on the at-a-glance dashboard
   const [rail, setRail] = useState<ReactNode | null>(null)
   const [q, setQ] = useState('')   // top-bar search → filters the Trends grid
   const [account, setAccount] = useState(false)   // avatar → account view
@@ -55,6 +56,7 @@ export function App() {
 
   let body: ReactNode
   if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
+  else if (nav === 'dashboard') body = <Dashboard onNav={go} />
   else if (nav === 'trends') body = <Screener onRail={setRail} query={q} />
   else if (nav === 'market') body = <MarketSignal onRail={setRail} />
   else if (nav === 'watchlists') body = <Watchlists />
