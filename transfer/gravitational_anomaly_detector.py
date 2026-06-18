@@ -6742,6 +6742,19 @@ def get_topic_detail(topic_key: str):
     conn.close()
 
     s   = _parse_json_fields(dict(latest))
+    # SINGLE SOURCE OF TRUTH: serve the SAME fully-calibrated row the /scores list
+    # serves (mainstream dual-pathway preserved, expert calibrated), so the detail
+    # headline + components can NEVER diverge from the list/feed. Prefer the
+    # precomputed serve_payload (identical to /scores); fall back to live
+    # calibration for long-tail topics that have no payload yet.
+    _payload = s.pop("serve_payload", None)
+    if _payload:
+        try:
+            s = _parse_json_fields(json.loads(_payload))
+        except Exception:
+            s = _calibrate_score_fields(s)
+    else:
+        s = _calibrate_score_fields(s)
     gap = s.get("heisenberg_gap", 0) or 0
     p   = s.get("persistence_score", 0) or 0
     n   = s.get("nowtrendin_score", 0) or 0
@@ -7253,7 +7266,7 @@ def list_topics(
         SELECT r.topic_key, r.topic_display, r.current_stage,
                r.total_mentions, r.is_anomaly, r.last_seen_at,
                v.overall_score, v.detection_score, v.confidence_score,
-               v.nowtrendin_score
+               v.nowtrendin_score, v.signal_stage, v.serve_payload
         FROM topic_registry r
         LEFT JOIN (
             SELECT topic_key, MAX(scored_at) as max_at
@@ -7271,6 +7284,22 @@ def list_topics(
         d = dict(r)
         if not _is_quality_topic(d.get("topic_display", "")):
             continue   # drop profanity / bare-generic junk from the institutional grid
+        # SINGLE SOURCE OF TRUTH: the institutional grid must show the SAME
+        # detection/confidence the /scores feed serves (mainstream dual-pathway
+        # preserved, expert calibrated). The raw v.* columns are pre-serve-
+        # calibration, so override them from the precomputed serve_payload when
+        # present (top-N topics). Long-tail topics without a payload keep the raw
+        # stored value (already the dual-pathway headline for mainstream topics).
+        _pl = d.pop("serve_payload", None)
+        if _pl:
+            try:
+                _p = json.loads(_pl)
+                for _k in ("overall_score", "detection_score", "confidence_score",
+                           "nowtrendin_score", "signal_stage"):
+                    if _p.get(_k) is not None:
+                        d[_k] = _p[_k]
+            except Exception:
+                pass
         d["category"] = _topic_category(d.get("topic_display", ""))
         if cat and d["category"] != cat:
             continue
