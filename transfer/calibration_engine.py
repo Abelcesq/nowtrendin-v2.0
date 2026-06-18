@@ -1351,29 +1351,12 @@ class CalibrationEngine:
         D   = raw_result.get("dark_matter_score", 0)
         C   = raw_result.get("confidence_decay", 0)
 
-        # The Detection/Confidence/Overall headline is re-derived from the EXPERT
-        # G·I·M·D·C formula ONLY for expert-pathway topics. Mainstream/blended
-        # topics are scored by the dual-pathway on magnitude+breadth, because the
-        # expert gradient is structurally ~0 for them — re-deriving here would
-        # collapse EVERY mainstream topic to ~25-28 (FIFA, Trump, Juneteenth all
-        # ≈ 27, unrankable) and silently undo the dual-pathway. At scoring time
-        # the pathway isn't set yet (defaults to expert, then the dual-pathway
-        # step overwrites mainstream values afterward); at SERVE time the stored
-        # row carries detection_pathway='mainstream', so we PRESERVE the
-        # dual-pathway headline instead of clobbering it. (See dual-pathway step
-        # in score_all_topics + the Trend Signal Diagnostic's N-discipline gate.)
-        _pathway = (raw_result.get("detection_pathway") or "expert").lower()
-        if _pathway in ("expert", "niche", ""):
-            overall_cal = round(min(100,
-                cal_G * 0.30 + I * 0.25 + M * 0.20 + D * 0.15 + C * 0.10), 2)
-            detection_cal = round(min(100,
-                cal_G * 0.40 + D * 0.25 + I * 0.20 + M * 0.10 + C * 0.05), 2)
-            confidence_cal = round(min(100,
-                I * 0.35 + M * 0.30 + cal_G * 0.20 + C * 0.10 + D * 0.05), 2)
-        else:
-            overall_cal    = round(min(100, float(raw_result.get("overall_score", 0) or 0)), 2)
-            detection_cal  = round(min(100, float(raw_result.get("detection_score", 0) or 0)), 2)
-            confidence_cal = round(min(100, float(raw_result.get("confidence_score", 0) or 0)), 2)
+        overall_cal = round(min(100,
+            cal_G * 0.30 + I * 0.25 + M * 0.20 + D * 0.15 + C * 0.10), 2)
+        detection_cal = round(min(100,
+            cal_G * 0.40 + D * 0.25 + I * 0.20 + M * 0.10 + C * 0.05), 2)
+        confidence_cal = round(min(100,
+            I * 0.35 + M * 0.30 + cal_G * 0.20 + C * 0.10 + D * 0.05), 2)
         gap_cal = round(detection_cal - confidence_cal, 1)
 
         # Recalculate stage from calibrated overall

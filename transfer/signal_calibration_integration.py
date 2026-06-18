@@ -1139,6 +1139,21 @@ def apply_calibration(
     )
     new_overall = round((new_detection + new_confidence) / 2, 1)
 
+    # ── Pathway gate: the expert-component recompute above is valid ONLY for
+    # expert-pathway topics. Mainstream/blended topics are scored by the
+    # dual-pathway on magnitude+breadth, because the expert gradient is
+    # structurally ~0 for them — re-deriving here collapses EVERY mainstream
+    # topic to ~25-28 (FIFA 27.6, Trump 25.8, Juneteenth 25.1 — all ≈27,
+    # unrankable) and silently undoes the dual-pathway. For those, PRESERVE the
+    # incoming dual-pathway headline. (At scoring time the dual-pathway step runs
+    # AFTER calibration and overwrites anyway; at SERVE time the stored row
+    # carries detection_pathway='mainstream', so this keeps the two consistent.)
+    _pathway = (raw_result.get("detection_pathway") or "expert").lower()
+    if _pathway not in ("expert", "niche", ""):
+        new_detection  = round(detection_score, 1)
+        new_confidence = round(confidence_score, 1)
+        new_overall    = round(overall_score, 1)
+
     # ── Reclassify stage with calibrated scores ───────────────────
     avg = (new_detection + new_confidence) / 2
     if avg >= 85:
