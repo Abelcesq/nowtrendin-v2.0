@@ -477,7 +477,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 }
 
-export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNode | null) => void; query?: string }) {
+export function Screener({ onRail, query = '', preset }: { onRail: (node: React.ReactNode | null) => void; query?: string; preset?: { filter: string; n: number } | null }) {
   const [rows, setRows] = useState<Row[]>([])
   const [cats, setCats] = useState<{ key: string; label: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
@@ -519,6 +519,15 @@ export function Screener({ onRail, query = '' }: { onRail: (node: React.ReactNod
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [catParam])
+
+  // Saved-screen preset (Early Signals / Breakouts) → apply the matching signal
+  // filter + its ranking. Nonce-keyed so re-clicking the same screen re-applies.
+  useEffect(() => {
+    if (!preset) return
+    const f = SIGNAL_FILTERS.find((x) => x.k === preset.filter)
+    if (f) { setFilter(f.k); if (f.sort) { setSortKey(f.sort); setSortDir(-1) } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset?.n])
 
   const view = useMemo(() => {
     let r = rows.slice()
