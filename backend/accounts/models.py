@@ -100,4 +100,5 @@ class DashboardLayout(models.Model):
     follows the member across web, desktop, and mobile."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dashboard')
     tiles = models.JSONField(default=list)
+    favorites = models.JSONField(default=list)   # sidebar Favorites — saved filtered-view shortcuts
     updated_at = models.DateTimeField(auto_now=True)

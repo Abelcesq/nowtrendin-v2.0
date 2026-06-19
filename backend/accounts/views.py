@@ -28,16 +28,20 @@ class DashboardView(APIView):
 
     def get(self, request):
         obj, _ = DashboardLayout.objects.get_or_create(user=request.user)
-        return Response({'tiles': obj.tiles or []})
+        return Response({'tiles': obj.tiles or [], 'favorites': obj.favorites or []})
 
     def put(self, request):
-        tiles = request.data.get('tiles', [])
-        if not isinstance(tiles, list):
-            return Response({'detail': 'tiles must be a list'}, status=400)
         obj, _ = DashboardLayout.objects.get_or_create(user=request.user)
-        obj.tiles = tiles
+        if 'tiles' in request.data:
+            if not isinstance(request.data['tiles'], list):
+                return Response({'detail': 'tiles must be a list'}, status=400)
+            obj.tiles = request.data['tiles']
+        if 'favorites' in request.data:
+            if not isinstance(request.data['favorites'], list):
+                return Response({'detail': 'favorites must be a list'}, status=400)
+            obj.favorites = request.data['favorites']
         obj.save()
-        return Response({'tiles': obj.tiles})
+        return Response({'tiles': obj.tiles or [], 'favorites': obj.favorites or []})
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
 # Monthly AI-grade credits per tier (grade ≈ $0.012 each; caps the exposure).
