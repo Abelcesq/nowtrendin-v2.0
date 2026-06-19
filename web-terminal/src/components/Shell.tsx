@@ -1,9 +1,27 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   LayoutGrid, TrendingUp, DollarSign, Activity, Star, Bell, CheckCircle, Sparkles,
-  Search, Clock, type LucideIcon,
+  Search, Clock, Pencil, Plus, X, Check, type LucideIcon,
 } from 'lucide-react'
-import { TIER_LABEL, type User } from '../lib/auth'
+import { TIER_LABEL, type User, type Favorite } from '../lib/auth'
+
+// Filter options a Favorite can target (label + key) per section.
+const FAV_OPTIONS: Record<string, { k: string; label: string }[]> = {
+  trends: [
+    { k: 'nowtrendin', label: 'Now TrendIn' }, { k: 'all', label: 'All Signals' },
+    { k: 'breakout', label: 'Breakout' }, { k: 'strong', label: 'Strong' },
+    { k: 'emerging', label: 'Emerging' }, { k: 'marginal', label: 'Marginal' },
+    { k: 'anomalies', label: 'Anomalies' },
+  ],
+  market: [
+    { k: 'all', label: 'All' }, { k: 'elevated', label: 'Elevated' }, { k: 'active', label: 'Active' },
+    { k: 'building', label: 'Building' }, { k: 'routine', label: 'Routine' },
+    { k: 'dormant', label: 'Dormant' }, { k: 'leverage', label: 'Leverage ≥60' },
+  ],
+  watchlist: [{ k: '', label: 'My watchlists' }],
+}
+const FAV_COLORS = ['var(--bk-t)', '#8B5CF6', 'var(--down)', 'var(--det)', 'var(--em-t)', 'var(--conf)']
+let _favc = 0
 
 export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'grade'
@@ -39,7 +57,7 @@ function useEtClock() {
 
 export function Shell({
   nav, onNav, children, rail, user, onSignOut, onAccount, search, onSearch, alertCount = 0,
-  onScreen, screenCounts,
+  favorites = [], onFav, onFavChange,
 }: {
   nav: NavKey
   onNav: (k: NavKey) => void
@@ -51,12 +69,24 @@ export function Shell({
   search?: string
   onSearch?: (v: string) => void
   alertCount?: number
-  onScreen?: (filter: string) => void
-  screenCounts?: { early?: number; breakout?: number; watchlist?: number }
+  favorites?: Favorite[]
+  onFav?: (f: Favorite) => void
+  onFavChange?: (next: Favorite[]) => void
 }) {
   const clock = useEtClock()
   const initials = (user?.name || user?.email || 'NT').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'NT'
   const plan = user?.tier ? TIER_LABEL[user.tier].toUpperCase() : 'GUEST'
+  const [favEdit, setFavEdit] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
+  const [favSection, setFavSection] = useState<'trends' | 'market' | 'watchlist'>('trends')
+  const [favFilter, setFavFilter] = useState('breakout')
+  const [favName, setFavName] = useState('')
+  const addFavorite = () => {
+    const opt = FAV_OPTIONS[favSection].find((o) => o.k === favFilter) || FAV_OPTIONS[favSection][0]
+    const fav: Favorite = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || opt.label, section: favSection, filter: favFilter, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
+    onFavChange?.([...favorites, fav]); setShowAdd(false); setFavName('')
+  }
+  const removeFavorite = (id: string) => onFavChange?.(favorites.filter((f) => f.id !== id))
   return (
     <div className="app">
       {/* TOP BAR */}
@@ -107,10 +137,40 @@ export function Shell({
               )
             })}
           </div>
-          <div className="nav-label">Saved Screens</div>
-          <div className="screen-item" onClick={() => onScreen?.('emerging')}><span className="sd" style={{ background: 'var(--early)' }} /> Early Signals <span className="cnt">{screenCounts?.early ?? '—'}</span></div>
-          <div className="screen-item" onClick={() => onScreen?.('breakout')}><span className="sd" style={{ background: 'var(--bk-t)' }} /> Breakouts <span className="cnt">{screenCounts?.breakout ?? '—'}</span></div>
-          <div className="screen-item" onClick={() => onNav('watchlists')}><span className="sd" style={{ background: 'var(--conf)' }} /> My Watchlist <span className="cnt">{screenCounts?.watchlist ?? '—'}</span></div>
+          <div className="nav-label fav-label">
+            Favorites
+            <span className="fav-edit" onClick={() => { setFavEdit(!favEdit); setShowAdd(false) }} title={favEdit ? 'Done' : 'Edit favorites'}>
+              {favEdit ? <Check size={13} /> : <Pencil size={12} />}
+            </span>
+          </div>
+          {favorites.map((f) => (
+            <div className="screen-item" key={f.id} onClick={() => !favEdit && onFav?.(f)}>
+              <span className="sd" style={{ background: f.color || 'var(--det)' }} /> {f.label}
+              {favEdit && <span className="fav-del" onClick={(e) => { e.stopPropagation(); removeFavorite(f.id) }}><X size={13} /></span>}
+            </div>
+          ))}
+          {favEdit && !showAdd && (
+            <div className="screen-item fav-add" onClick={() => setShowAdd(true)}><Plus size={14} /> Add favorite</div>
+          )}
+          {favEdit && showAdd && (
+            <div className="fav-form">
+              <div className="fav-frow">
+                {(['trends', 'market', 'watchlist'] as const).map((s) => (
+                  <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); setFavFilter(FAV_OPTIONS[s][0].k) }}>{s}</button>
+                ))}
+              </div>
+              {favSection !== 'watchlist' && (
+                <select className="fav-select" value={favFilter} onChange={(e) => setFavFilter(e.target.value)}>
+                  {FAV_OPTIONS[favSection].map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
+                </select>
+              )}
+              <input className="fav-input" value={favName} placeholder="Name (optional)" onChange={(e) => setFavName(e.target.value)} />
+              <div className="fav-frow">
+                <button className="fav-save" onClick={addFavorite}>Add</button>
+                <button className="fav-cancel" onClick={() => setShowAdd(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
         </aside>
 
         <main className="main">{children}</main>

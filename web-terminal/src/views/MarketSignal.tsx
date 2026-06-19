@@ -345,7 +345,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   )
 }
 
-export function MarketSignal({ onRail }: { onRail: (node: React.ReactNode | null) => void }) {
+export function MarketSignal({ onRail, preset }: { onRail: (node: React.ReactNode | null) => void; preset?: { filter: string; n: number } | null }) {
   const [rows, setRows] = useState<MRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -375,6 +375,13 @@ export function MarketSignal({ onRail }: { onRail: (node: React.ReactNode | null
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [])
+
+  // Favorite (market) click → apply the saved tier/leverage filter. Nonce-keyed.
+  useEffect(() => {
+    if (!preset) return
+    if (FILTERS.some((f) => f.k === preset.filter)) setFilter(preset.filter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset?.n])
 
   const anyCalibrating = useMemo(() => rows.some((r) => r.calibrating), [rows])
 

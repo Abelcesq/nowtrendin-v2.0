@@ -11,8 +11,13 @@ import { Dashboard } from './views/Dashboard'
 import { Alerts } from './views/Alerts'
 import { History } from './views/History'
 import { Login } from './views/Login'
-import { fetchMe, logout, listWatchlists, type User } from './lib/auth'
-import { api } from './lib/api'
+import { fetchMe, logout, getDashboard, saveFavorites, type User, type Favorite } from './lib/auth'
+
+const DEFAULT_FAVORITES: Favorite[] = [
+  { id: 'f_break', label: 'Breakouts', section: 'trends', filter: 'breakout', color: 'var(--bk-t)' },
+  { id: 'f_anom', label: 'Anomalies', section: 'trends', filter: 'anomalies', color: '#8B5CF6' },
+  { id: 'f_elev', label: 'Elevated risk', section: 'market', filter: 'elevated', color: 'var(--down)' },
+]
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -38,10 +43,11 @@ export function App() {
   const [rail, setRail] = useState<ReactNode | null>(null)
   const [q, setQ] = useState('')   // top-bar search → filters the Trends grid
   const [account, setAccount] = useState(false)   // avatar → account view
-  // Saved-screen click → jump to Trends with a preset filter (nonce so re-clicking
-  // the same screen re-applies even after navigating away).
+  // Favorite click → jump to its section with the filter applied (nonce so
+  // re-clicking re-applies even after navigating away).
   const [screen, setScreen] = useState<{ filter: string; n: number } | null>(null)
-  const [counts, setCounts] = useState<{ early?: number; breakout?: number; watchlist?: number }>({})
+  const [marketScreen, setMarketScreen] = useState<{ filter: string; n: number } | null>(null)
+  const [favorites, setFavorites] = useState<Favorite[]>(DEFAULT_FAVORITES)
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
   // clear it (Consumer/Business belong on the mobile app). The Login screen
@@ -53,23 +59,10 @@ export function App() {
     })
   }, [])
 
-  // Live counts for the Saved Screens (so the section reflects real activity, not
-  // hardcoded numbers). Buckets match the Screener's filter tests.
+  // Load the member's saved Favorites (falls back to sensible defaults).
   useEffect(() => {
     if (!user) return
-    api.topics(200).then((t) => {
-      let early = 0, breakout = 0
-      for (const x of (t.topics || [])) {
-        const d = Math.round(x.detection_score ?? 0)
-        if (d >= 85) breakout++
-        else if (d >= 55 && d < 70) early++
-      }
-      setCounts((c) => ({ ...c, early, breakout }))
-    }).catch(() => {})
-    listWatchlists().then((ws) => {
-      const n = (ws || []).reduce((a: number, w: any) => a + (w.items?.length || 0), 0)
-      setCounts((c) => ({ ...c, watchlist: n }))
-    }).catch(() => {})
+    getDashboard().then((d) => { if (d.favorites && d.favorites.length) setFavorites(d.favorites) }).catch(() => {})
   }, [user])
 
   if (booting) {
@@ -78,14 +71,20 @@ export function App() {
   if (!user) return <Login onAuthed={setUser} />
 
   const go = (k: NavKey) => { setRail(null); setAccount(false); setNav(k) }
-  const onScreen = (filter: string) => { setRail(null); setAccount(false); setNav('trends'); setScreen((s) => ({ filter, n: (s?.n ?? 0) + 1 })) }
   const signOut = () => { logout(); setUser(null) }
+  const onFav = (f: Favorite) => {
+    setRail(null); setAccount(false)
+    if (f.section === 'market') { setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
+    else if (f.section === 'watchlist') setNav('watchlists')
+    else { setNav('trends'); setScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
+  }
+  const onFavChange = (next: Favorite[]) => { setFavorites(next); saveFavorites(next).catch(() => {}) }
 
   let body: ReactNode
   if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
   else if (nav === 'dashboard') body = <Dashboard onNav={go} />
   else if (nav === 'trends') body = <Screener onRail={setRail} query={q} preset={screen} />
-  else if (nav === 'market') body = <MarketSignal onRail={setRail} />
+  else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} />
   else if (nav === 'watchlists') body = <Watchlists />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
@@ -97,7 +96,7 @@ export function App() {
   return (
     <Shell nav={nav} onNav={go} rail={!account && (nav === 'trends' || nav === 'market') ? rail : null}
       user={user} onSignOut={signOut} onAccount={() => { setRail(null); setAccount(true) }}
-      search={q} onSearch={setQ} alertCount={0} onScreen={onScreen} screenCounts={counts}>
+      search={q} onSearch={setQ} alertCount={0} favorites={favorites} onFav={onFav} onFavChange={onFavChange}>
       {body}
     </Shell>
   )

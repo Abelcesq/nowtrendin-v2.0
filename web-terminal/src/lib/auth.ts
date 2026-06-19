@@ -130,9 +130,13 @@ export const removeAlert = (id: number) =>
 // ── Dashboard layout — per-user customizable tiles, saved server-side so the
 // layout follows the member across web, desktop, and mobile. ──
 export interface DashTile { id: string; type: string; title?: string; config?: any }
-export const getDashboard = () => call('/api/dashboard/', {}, true) as Promise<{ tiles: DashTile[] }>
+// Favorites — saved filtered-view shortcuts in the sidebar (section + filter).
+export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'watchlist'; filter?: string; color?: string }
+export const getDashboard = () => call('/api/dashboard/', {}, true) as Promise<{ tiles: DashTile[]; favorites: Favorite[] }>
 export const saveDashboard = (tiles: DashTile[]) =>
   call('/api/dashboard/', { method: 'PUT', body: JSON.stringify({ tiles }) }, true) as Promise<{ tiles: DashTile[] }>
+export const saveFavorites = (favorites: Favorite[]) =>
+  call('/api/dashboard/', { method: 'PUT', body: JSON.stringify({ favorites }) }, true) as Promise<{ favorites: Favorite[] }>
 
 // ── Tier-gating — mirrors constants/tiers.ts so entitlements are identical
 // across platforms. The engine/backend remain the source of truth; this only
