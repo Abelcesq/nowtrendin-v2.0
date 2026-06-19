@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Bell, BellRing, Sparkles, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2, Target, Star } from 'lucide-react-native';
+import { User, Bell, BellRing, Sparkles, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2, Target, Star, LayoutGrid } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { useAuthStore } from '../../../store/auth.store';
 import { TIERS, TierID } from '../../../constants/tiers';
@@ -58,6 +58,7 @@ export default function Profile() {
       <Row icon={<Star size={18} color="#94A3B8" />} label="Favorites" onPress={() => router.push('/profile/favorites')} />
       <Row icon={<Target size={18} color="#94A3B8" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
       <Row icon={<Sparkles size={18} color="#94A3B8" />} label="Methodology" onPress={() => router.push('/profile/methodology')} />
+      <Row icon={<LayoutGrid size={18} color="#94A3B8" />} label="Edit Toolbar Icons" onPress={() => router.push('/profile/edit-toolbar')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
       <Row icon={<FileText size={18} color="#94A3B8" />} label="Legal Documents" onPress={() => router.push('/profile/legal')} />

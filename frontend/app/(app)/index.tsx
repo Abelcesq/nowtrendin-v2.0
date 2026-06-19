@@ -193,7 +193,7 @@ export default function Dashboard() {
         {Platform.OS === 'web' && filtered.length > 0 && (
           <TouchableOpacity
             onPress={() => printSignalsReport(filtered, {
-              subtitle: `${filtered.length} signals · ${cfg.label} tier · ${dataWindowLabel(tier)}`,
+              subtitle: `${filtered.length} signals · ${cfg.name} tier · ${dataWindowLabel(tier)}`,
             })}
             className="flex-row items-center px-3 py-1.5 rounded-full border border-border bg-surface"
             activeOpacity={0.7}
