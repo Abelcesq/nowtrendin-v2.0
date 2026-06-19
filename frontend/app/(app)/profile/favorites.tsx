@@ -50,7 +50,7 @@ export default function Favorites() {
     else router.push('/' as any);
   };
   const chip = (on: boolean, label: string, fn: () => void) => (
-    <TouchableOpacity onPress={fn} className="px-3 py-1.5 rounded-full border mr-1.5 mb-1.5" style={{ backgroundColor: on ? '#00C896' : '#FFFFFF', borderColor: on ? '#00C896' : '#E4E7EC' }}>
+    <TouchableOpacity key={label} onPress={fn} className="px-3 py-1.5 rounded-full border mr-1.5 mb-1.5" style={{ backgroundColor: on ? '#00C896' : '#FFFFFF', borderColor: on ? '#00C896' : '#E4E7EC' }}>
       <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>{label}</Text>
     </TouchableOpacity>
   );
