@@ -36,7 +36,7 @@ function Trajectory({ rows }: { rows: { detection: number; confidence: number }[
   )
 }
 
-export function History({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 'topic' | 'market', display: string) => void }) {
+export function History() {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,14 +64,6 @@ export function History({ onOpenDetail }: { onOpenDetail?: (key: string, kind: '
     api.historyAnalysis(sel.topic_key, sel.topic_display)
       .then(setAn).catch(() => setAn({ available: false, reason: 'Analysis failed.' }))
       .finally(() => setAnLoad(false))
-  }
-
-  // Clicking a row offers to open the topic's full detail page; declining still
-  // shows the in-page trajectory.
-  const rowClick = (r: HistoryRow) => {
-    if (onOpenDetail && window.confirm(`Go to the detail page for "${r.topic_display || r.topic_key}"?`)) {
-      onOpenDetail(r.topic_key, 'topic', r.topic_display || r.topic_key)
-    } else { pick(r) }
   }
 
   const view = useMemo(() => {
@@ -127,8 +119,8 @@ export function History({ onOpenDetail }: { onOpenDetail?: (key: string, kind: '
             {view.map((r) => {
               const [icon, , color] = trendMeta(r.trend)
               return (
-                <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => rowClick(r)}>
-                  <span className="hv-nm link">{r.topic_display}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
+                <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => pick(r)}>
+                  <span className="hv-nm">{r.topic_display}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
                   <Spark pts={r.series.map((p) => p.overall)} color={color} />
                   <span className="hv-v" style={{ color: 'var(--det)' }}>{r.det}</span>
                   <span className="hv-v" style={{ color: 'var(--conf)' }}>{r.conf}</span>

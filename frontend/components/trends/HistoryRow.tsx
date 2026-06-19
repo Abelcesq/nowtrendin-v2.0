@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert as RNAlert } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flame } from 'lucide-react-native';
 import { Signal, stageColor, timeLabel } from '../../lib/signals';
@@ -17,16 +17,10 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
 export function HistoryRow({ signal }: { signal: Signal }) {
   const router = useRouter();
   const col = stageColor(signal.stage);
-  const open = () => {
-    RNAlert.alert('Open detail page?', `Go to the detail page for "${signal.topic}"?`, [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes', onPress: () => router.push(`/signal/${signal.id}`) },
-    ]);
-  };
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={open}
+      onPress={() => router.push(`/signal/${signal.id}`)}
       className="flex-row items-center bg-surface border-b border-border px-3 py-3"
     >
       <View className="w-1 self-stretch rounded-full mr-3" style={{ backgroundColor: col }} />

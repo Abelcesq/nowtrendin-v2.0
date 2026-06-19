@@ -103,7 +103,7 @@ export function App() {
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
-  else if (nav === 'history') body = <History onOpenDetail={openDetail} />
+  else if (nav === 'history') body = <History />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 
