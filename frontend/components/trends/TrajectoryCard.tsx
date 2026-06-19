@@ -84,8 +84,12 @@ export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal;
             onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
             onStartShouldSetResponder={() => true}
             onMoveShouldSetResponder={() => true}
+            onStartShouldSetResponderCapture={() => true}
+            onMoveShouldSetResponderCapture={() => true}
+            onResponderTerminationRequest={() => false}
             onResponderGrant={onTouch}
             onResponderMove={onTouch}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
             {w > 0 && (
               <Svg width={w} height={H}>

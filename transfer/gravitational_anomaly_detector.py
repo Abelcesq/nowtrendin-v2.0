@@ -6995,12 +6995,26 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
         s = _calibrate_score_fields(s)   # same calibration as /scores
         det = round(s.get("detection_score") or 0)
         conf = round(s.get("confidence_score") or 0)
+        # Per-cycle FACTORS that explain why the score moved between points — surfaced
+        # so the detail chart can annotate each data point (volume, diffusion, stage).
+        pa = s.get("platforms_active")
+        if isinstance(pa, str):
+            try:
+                pa = json.loads(pa or "[]")
+            except Exception:
+                pa = []
         out.append({
             "scored_at": s.get("scored_at"),
             "detection": det,
             "confidence": conf,
             "overall": round(s.get("overall_score") or 0),
             "gap": abs(det - conf),
+            # explanatory factors (best-effort; null when a column is absent)
+            "mentions": int(s.get("total_mentions") or 0),
+            "platforms": len(pa) if isinstance(pa, list) else 0,
+            "stage": s.get("signal_stage") or "",
+            "inertia": round(s.get("inertia_score") or 0),
+            "dark_matter": round(s.get("dark_matter_score") or 0),
         })
     return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True}
 
