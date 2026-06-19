@@ -80,6 +80,9 @@ export const api = {
   historyRecent: (window = '7d', limit = 80) =>
     get<{ window: string; count: number; results: HistoryRow[] }>(
       `/history/recent?window=${window}&limit=${limit}`),
+  historyAnalysis: (key: string, topic = '') =>
+    get<{ available: boolean; direction?: string; short?: string; full?: string; citations?: string[]; reason?: string }>(
+      `/history/${encodeURIComponent(key)}/analysis${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   ledgerDetail: (verdict = '') =>
     get<{ status: string; count: number; rows: LedgerRow[] }>(

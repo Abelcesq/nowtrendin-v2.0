@@ -7079,6 +7079,50 @@ def history_recent(window: str = Query("7d"), limit: int = Query(60, ge=1, le=20
     return {"window": window, "count": len(out), "results": out}
 
 
+@app.get("/history/{topic_key}/analysis")
+def history_analysis(topic_key: str, topic: str = ""):
+    """AI explanation of WHY a topic's score has been moving — grounded in its real
+    recent trajectory + the actual coverage driving it. Measurement, not advice.
+    Cached (in-memory) + capped by the monthly AI budget; generated on demand."""
+    ck = f"histanalysis:{topic_key}"
+    cached = _cache.get(ck)
+    if cached is not None:
+        return cached
+    if not _AI_GRADE_AVAILABLE:
+        return {"available": False, "reason": "AI analysis unavailable"}
+    if not _ai_budget_ok():
+        return {"available": False, "reason": "monthly AI budget reached", "budget": AI_MONTHLY_BUDGET_USD}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        rows = conn.execute(
+            "SELECT scored_at, detection_score, confidence_score FROM velocity_scores "
+            "WHERE topic_key = ? ORDER BY scored_at DESC LIMIT 14", (topic_key,)).fetchall()
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+    if not rows or len(rows) < 2:
+        return {"available": False, "reason": "not enough history yet"}
+    series = list(reversed([dict(r) for r in rows]))
+    d0, d1 = round(series[0]["detection_score"] or 0), round(series[-1]["detection_score"] or 0)
+    c0, c1 = round(series[0]["confidence_score"] or 0), round(series[-1]["confidence_score"] or 0)
+    direction = "rising" if (d1 - d0) >= 3 else "falling" if (d1 - d0) <= -3 else "flat"
+    movement = (f"Detection {d0} to {d1}, Confidence {c0} to {c1} over the last "
+                f"{len(series)} scoring cycles")
+    name = (topic or topic_key.replace("_", " ")).strip()
+    ctx = _topic_source_context(topic_key)
+    res = ai_grade.analyze_movement(name, movement, direction, context=ctx)
+    if res.get("available") and res.get("short"):
+        _record_ai_cost("history_analysis", name, res.get("cost") or {})
+        out = {"available": True, "direction": direction, "movement": movement,
+               "short": res["short"], "full": res.get("full", ""),
+               "citations": res.get("citations", [])}
+        _cache.set(ck, out, int(os.getenv("HISTORY_ANALYSIS_TTL", "21600")))
+        return out
+    return {"available": False, "reason": res.get("error", "analysis unavailable")}
+
+
 @app.get("/scores/{topic_key}/history")
 def get_topic_research_history(topic_key: str, force_refresh: bool = False):
     """

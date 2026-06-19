@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Minus, RotateCcw } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
 
 // History — consistent with the mobile app (windowed list of recently-scored
@@ -43,6 +43,8 @@ export function History() {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<HistoryRow | null>(null)
   const [traj, setTraj] = useState<{ detection: number; confidence: number }[] | null>(null)
+  const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)
+  const [anLoad, setAnLoad] = useState(false)
 
   const load = (w: string) => {
     setLoading(true)
@@ -51,10 +53,17 @@ export function History() {
   useEffect(() => load(win), [win])
 
   const pick = (r: HistoryRow) => {
-    setSel(r); setTraj(null)
+    setSel(r); setTraj(null); setAn(null)
     api.scoreHistory(r.topic_key)
       .then((d) => setTraj((d.rows || []).slice().reverse()))
       .catch(() => setTraj([]))
+  }
+  const explain = () => {
+    if (!sel) return
+    setAnLoad(true)
+    api.historyAnalysis(sel.topic_key, sel.topic_display)
+      .then(setAn).catch(() => setAn({ available: false, reason: 'Analysis failed.' }))
+      .finally(() => setAnLoad(false))
   }
 
   const view = useMemo(() => {
@@ -86,8 +95,19 @@ export function History() {
               <span className="hv-trend" style={{ color, background: 'var(--line-2)' }}>{icon} {label}</span>
               <span className="hv-feat-scores"><b style={{ color: 'var(--det)' }}>DET {sel.det}</b> &nbsp; <b style={{ color: 'var(--conf)' }}>CONF {sel.conf}</b></span>
             </div>
-            {traj === null ? <div className="hv-empty">Loading trajectory…</div> : <Trajectory rows={traj} />}
+            <div className="hv-chartslot">{traj === null ? <div className="hv-loading">Loading trajectory…</div> : <Trajectory rows={traj} />}</div>
             <div className="hv-legend"><span style={{ color: 'var(--det)' }}>● Detection</span> &nbsp; <span style={{ color: 'var(--conf)' }}>● Confidence</span></div>
+            <div className="hv-ai">
+              {an?.available ? (
+                <>
+                  <div className="hv-ai-short"><Sparkles size={13} color="var(--early)" /> {an.short}</div>
+                  {an.full && <div className="hv-ai-full">{an.full}</div>}
+                  {!!an.citations?.length && <div className="hv-ai-cite">Sources: {an.citations.slice(0, 4).map((c, i) => <a key={i} href={c} target="_blank" rel="noopener noreferrer">[{i + 1}]</a>)}</div>}
+                  <div className="hv-ai-disc">AI analysis of attention movement — measurement, not financial advice.</div>
+                </>
+              ) : an ? <div className="hv-ai-note">{an.reason || 'Analysis unavailable.'}</div>
+                : <button className="hv-ai-btn" onClick={explain} disabled={anLoad}><Sparkles size={14} /> {anLoad ? 'Analysing…' : 'Explain this move (AI)'}</button>}
+            </div>
           </div>
         )
       })()}
