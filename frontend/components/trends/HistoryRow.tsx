@@ -13,15 +13,18 @@ function Metric({ label, value, color }: { label: string; value: number; color: 
   );
 }
 
-// Compact history list row, matching the web prototype.
-export function HistoryRow({ signal }: { signal: Signal }) {
+// Compact history list row, matching the web prototype. When `onPress` is
+// provided the row selects (to reveal the in-page trajectory graph) instead of
+// navigating to the full signal page.
+export function HistoryRow({ signal, onPress, selected }: { signal: Signal; onPress?: (s: Signal) => void; selected?: boolean }) {
   const router = useRouter();
   const col = stageColor(signal.stage);
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => router.push(`/signal/${signal.id}`)}
-      className="flex-row items-center bg-surface border-b border-border px-3 py-3"
+      onPress={() => (onPress ? onPress(signal) : router.push(`/signal/${signal.id}`))}
+      className="flex-row items-center border-b border-border px-3 py-3"
+      style={{ backgroundColor: selected ? '#00C8960D' : '#FFFFFF' }}
     >
       <View className="w-1 self-stretch rounded-full mr-3" style={{ backgroundColor: col }} />
       <View className="flex-1 pr-2">

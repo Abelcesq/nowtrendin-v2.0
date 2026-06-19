@@ -4,15 +4,16 @@ import { Search, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Disclaimer } from '../../components/ui/Disclaimer';
 import { HistoryRow } from '../../components/trends/HistoryRow';
+import { TrajectoryCard } from '../../components/trends/TrajectoryCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { TierID } from '../../constants/tiers';
-import { dayLabel } from '../../lib/signals';
+import { dayLabel, Signal } from '../../lib/signals';
 import { useTierFeed } from '../../hooks/useSignals';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
-const WINDOWS = [
+const ALL_WINDOWS = [
   { k: '12h', label: '12h', ms: 12 * HOUR },
   { k: '24h', label: '24h', ms: 24 * HOUR },
   { k: '7d', label: '7d', ms: 7 * DAY },
@@ -23,9 +24,14 @@ export default function History() {
   const tier = (user?.tier ?? 'consumer') as TierID;
   const { accessible, lockedCount, isLoading, refetch } = useTierFeed(tier);
 
+  // Consumer data freshness is ≥24h (constants/tiers) — they never see 12h-fresh
+  // data, so the 12h window is hidden for that tier.
+  const WINDOWS = tier === 'consumer' ? ALL_WINDOWS.filter((w) => w.k !== '12h') : ALL_WINDOWS;
+
   const [win, setWin] = useState<string>('7d');
   const [query, setQuery] = useState('');
   const [desc, setDesc] = useState(true);
+  const [selected, setSelected] = useState<Signal | null>(null);
 
   const windowMs = WINDOWS.find((w) => w.k === win)?.ms ?? 7 * DAY;
   const winLabel = WINDOWS.find((w) => w.k === win)?.label ?? '7d';
@@ -99,6 +105,17 @@ export default function History() {
         <Text className="text-textSecondary text-[11px] mb-2">
           <Text className="font-bold text-textPrimary">{filtered.length}</Text> topics scored in the last {winLabel}
         </Text>
+
+        {/* Selected topic's score trajectory (tap a row below to view its graph). */}
+        {selected && (
+          <View className="mt-1">
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-textMuted text-[10px] font-bold tracking-wider">SCORE TRAJECTORY</Text>
+              <TouchableOpacity onPress={() => setSelected(null)}><Text className="text-textMuted text-[11px]">Hide</Text></TouchableOpacity>
+            </View>
+            <TrajectoryCard signal={selected} />
+          </View>
+        )}
       </View>
 
       {isLoading ? (
@@ -113,7 +130,7 @@ export default function History() {
                 </Text>
               </View>
               {g.items.map((s) => (
-                <HistoryRow key={s.id} signal={s} />
+                <HistoryRow key={s.id} signal={s} onPress={setSelected} selected={selected?.id === s.id} />
               ))}
             </View>
           ))}
