@@ -39,6 +39,7 @@ function useEtClock() {
 
 export function Shell({
   nav, onNav, children, rail, user, onSignOut, onAccount, search, onSearch, alertCount = 0,
+  onScreen, screenCounts,
 }: {
   nav: NavKey
   onNav: (k: NavKey) => void
@@ -50,6 +51,8 @@ export function Shell({
   search?: string
   onSearch?: (v: string) => void
   alertCount?: number
+  onScreen?: (filter: string) => void
+  screenCounts?: { early?: number; breakout?: number; watchlist?: number }
 }) {
   const clock = useEtClock()
   const initials = (user?.name || user?.email || 'NT').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'NT'
@@ -105,9 +108,9 @@ export function Shell({
             })}
           </div>
           <div className="nav-label">Saved Screens</div>
-          <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--early)' }} /> Early Signals <span className="cnt">—</span></div>
-          <div className="screen-item" onClick={() => onNav('trends')}><span className="sd" style={{ background: 'var(--bk-t)' }} /> Breakouts <span className="cnt">—</span></div>
-          <div className="screen-item" onClick={() => onNav('watchlists')}><span className="sd" style={{ background: 'var(--conf)' }} /> My Watchlist <span className="cnt">6</span></div>
+          <div className="screen-item" onClick={() => onScreen?.('emerging')}><span className="sd" style={{ background: 'var(--early)' }} /> Early Signals <span className="cnt">{screenCounts?.early ?? '—'}</span></div>
+          <div className="screen-item" onClick={() => onScreen?.('breakout')}><span className="sd" style={{ background: 'var(--bk-t)' }} /> Breakouts <span className="cnt">{screenCounts?.breakout ?? '—'}</span></div>
+          <div className="screen-item" onClick={() => onNav('watchlists')}><span className="sd" style={{ background: 'var(--conf)' }} /> My Watchlist <span className="cnt">{screenCounts?.watchlist ?? '—'}</span></div>
         </aside>
 
         <main className="main">{children}</main>
