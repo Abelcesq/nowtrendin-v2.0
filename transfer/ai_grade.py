@@ -154,6 +154,54 @@ def explain_topic(topic: str, context: str = "") -> dict:
         return {"available": False, "error": str(e)}
 
 
+_MOVEMENT_PROMPT = (
+    'You are analysing why a topic\'s ATTENTION score has been {direction} on an '
+    'attention-measurement platform. Detection = how early/strong the signal is; '
+    'Confidence = how broadly it is confirmed across sources.\n\n'
+    'Topic: "{topic}"\n'
+    'Score movement (oldest to newest): {movement}\n\n'
+    'Real recent coverage where this topic is appearing:\n{context}\n\n'
+    'In 2-4 sentences, explain the most likely real-world reason attention is '
+    '{direction} (specific events, news, releases, controversies). Ground every '
+    'claim in the coverage above; do NOT speculate beyond it. This is measurement '
+    'of attention, NOT financial, investment, or legal advice. '
+    'Return ONLY JSON: {{"short": "<one-sentence headline>", "full": "<2-4 sentence explanation>"}}'
+)
+
+
+def analyze_movement(topic: str, movement: str, direction: str, context: str = "") -> dict:
+    """Explain WHY a topic's score has been rising/falling/flat — one Perplexity
+    call, grounded in the real movement + coverage. Caller caches + meters."""
+    if not PERPLEXITY_API_KEY:
+        return {"available": False}
+    prompt = _MOVEMENT_PROMPT.format(topic=topic, movement=movement[:600],
+                                     direction=direction, context=(context or "")[:2200])
+    try:
+        _api("perplexity")
+        r = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={"model": PPLX_MODEL, "messages": [{"role": "user", "content": prompt}]},
+            timeout=45,
+        )
+        r.raise_for_status()
+        data = r.json()
+        content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        citations = data.get("citations", []) or []
+        cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
+        _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
+        parsed = _extract_json(content)
+        if parsed and parsed.get("short"):
+            return {"available": True, "short": str(parsed.get("short", ""))[:300],
+                    "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
+        return {"available": True, "short": content[:200], "full": content,
+                "citations": citations, "cost": _c}
+    except Exception as e:
+        print(f"[ai_grade] movement analysis error for '{topic}': {e}")
+        return {"available": False, "error": str(e)}
+
+
 def research_topic(topic: str) -> dict:
     """Perplexity web research. Returns {available, summary, citations}."""
     if not PERPLEXITY_API_KEY:

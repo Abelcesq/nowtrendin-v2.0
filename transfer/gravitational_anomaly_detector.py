@@ -7005,6 +7005,124 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
     return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True}
 
 
+@app.get("/history/recent")
+def history_recent(window: str = Query("7d"), limit: int = Query(60, ge=1, le=200),
+                   points: int = Query(12, ge=2, le=40)):
+    """Recent scoring TRAJECTORY per topic — powers the History view (web + mobile,
+    one shared source). One call returns each topic's current score (from the
+    calibrated serve_payload, so it matches /scores) plus its last `points` cycles
+    within `window` and a slope-based up/down/flat trend, so clients draw sparklines
+    without N requests."""
+    import datetime as _dt
+    hours = {"12h": 12, "24h": 24, "7d": 168, "30d": 720}.get(window, 168)
+    cut = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=hours)).isoformat()
+    conn = get_db(DB_PATH)
+    try:
+        latest = conn.execute(
+            """
+            SELECT v.* FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
+                        WHERE scored_at >= ? GROUP BY topic_key) l
+              ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            ORDER BY v.overall_score DESC NULLS LAST
+            LIMIT ?
+            """, (cut, limit * 3)).fetchall()
+        picked = []
+        for r in latest:
+            disp = r["topic_display"] or r["topic_key"]
+            if not _is_quality_topic(disp):
+                continue
+            picked.append(dict(r))
+            if len(picked) >= limit:
+                break
+        keys = [r["topic_key"] for r in picked]
+        series = {}
+        if keys:
+            ph = ",".join(["?"] * len(keys))
+            for h in conn.execute(
+                f"""SELECT topic_key, scored_at, overall_score, detection_score, confidence_score
+                    FROM velocity_scores WHERE topic_key IN ({ph}) AND scored_at >= ?
+                    ORDER BY scored_at ASC""", (*keys, cut)).fetchall():
+                series.setdefault(h["topic_key"], []).append({
+                    "t": h["scored_at"],
+                    "overall": round(h["overall_score"] or 0, 1),
+                    "det": round(h["detection_score"] or 0, 1),
+                    "conf": round(h["confidence_score"] or 0, 1),
+                })
+    finally:
+        conn.close()
+    out = []
+    for r in picked:
+        cur = r
+        pl = r.get("serve_payload")
+        if pl:
+            try:
+                cur = json.loads(pl)
+            except Exception:
+                cur = r
+        s = series.get(r["topic_key"], [])[-points:]
+        ys = [p["overall"] for p in s]
+        slope = round(ys[-1] - ys[0], 1) if len(ys) >= 2 else 0.0
+        trend = "up" if slope >= 3 else "down" if slope <= -3 else "flat"
+        out.append({
+            "topic_key": r["topic_key"],
+            "topic_display": r["topic_display"] or r["topic_key"],
+            "category": _topic_category(r["topic_display"] or ""),
+            "overall": round(cur.get("overall_score") or 0),
+            "det": round(cur.get("detection_score") or 0),
+            "conf": round(cur.get("confidence_score") or 0),
+            "n": round(cur.get("nowtrendin_score") or 0),
+            "stage": cur.get("signal_stage"),
+            "is_anomaly": bool(cur.get("is_gravitational_anomaly")),
+            "scored_at": r["scored_at"], "series": s, "trend": trend, "slope": slope,
+        })
+    return {"window": window, "count": len(out), "results": out}
+
+
+@app.get("/history/{topic_key}/analysis")
+def history_analysis(topic_key: str, topic: str = ""):
+    """AI explanation of WHY a topic's score has been moving — grounded in its real
+    recent trajectory + the actual coverage driving it. Measurement, not advice.
+    Cached (in-memory) + capped by the monthly AI budget; generated on demand."""
+    ck = f"histanalysis:{topic_key}"
+    cached = _cache.get(ck)
+    if cached is not None:
+        return cached
+    if not _AI_GRADE_AVAILABLE:
+        return {"available": False, "reason": "AI analysis unavailable"}
+    if not _ai_budget_ok():
+        return {"available": False, "reason": "monthly AI budget reached", "budget": AI_MONTHLY_BUDGET_USD}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        rows = conn.execute(
+            "SELECT scored_at, detection_score, confidence_score FROM velocity_scores "
+            "WHERE topic_key = ? ORDER BY scored_at DESC LIMIT 14", (topic_key,)).fetchall()
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+    if not rows or len(rows) < 2:
+        return {"available": False, "reason": "not enough history yet"}
+    series = list(reversed([dict(r) for r in rows]))
+    d0, d1 = round(series[0]["detection_score"] or 0), round(series[-1]["detection_score"] or 0)
+    c0, c1 = round(series[0]["confidence_score"] or 0), round(series[-1]["confidence_score"] or 0)
+    direction = "rising" if (d1 - d0) >= 3 else "falling" if (d1 - d0) <= -3 else "flat"
+    movement = (f"Detection {d0} to {d1}, Confidence {c0} to {c1} over the last "
+                f"{len(series)} scoring cycles")
+    name = (topic or topic_key.replace("_", " ")).strip()
+    ctx = _topic_source_context(topic_key)
+    res = ai_grade.analyze_movement(name, movement, direction, context=ctx)
+    if res.get("available") and res.get("short"):
+        _record_ai_cost("history_analysis", name, res.get("cost") or {})
+        out = {"available": True, "direction": direction, "movement": movement,
+               "short": res["short"], "full": res.get("full", ""),
+               "citations": res.get("citations", [])}
+        _cache.set(ck, out, int(os.getenv("HISTORY_ANALYSIS_TTL", "21600")))
+        return out
+    return {"available": False, "reason": res.get("error", "analysis unavailable")}
+
+
 @app.get("/scores/{topic_key}/history")
 def get_topic_research_history(topic_key: str, force_refresh: bool = False):
     """

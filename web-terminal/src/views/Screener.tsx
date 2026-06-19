@@ -442,22 +442,24 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       </div>
 
       {/* Scoring history (lazy) */}
-      {Array.isArray(hist?.rows) && hist.rows.length > 1 && (
-        <div className="sect">
-          <h4>Scoring History</h4>
-          <div className="hist">
-            {hist.rows.slice(0, 8).map((h: any, i: number) => (
-              <div className="hist-row" key={i}>
-                <span className="hist-d">{(h.scored_at || '').slice(5, 16).replace('T', ' ')}</span>
-                <span style={{ color: MC.detection }}>{Math.round(h.detection ?? 0)}</span>
-                <span style={{ color: MC.confidence }}>{Math.round(h.confidence ?? 0)}</span>
-                <span className="hist-g">{Math.round(h.gap ?? 0)}</span>
-              </div>
-            ))}
+      {Array.isArray(hist?.rows) && hist.rows.length > 1 && (() => {
+        const pts = hist.rows.slice(0, 24).slice().reverse()   // oldest → newest
+        const W = 300, H = 92, pad = 6
+        const xs = (i: number) => pad + i * (W - 2 * pad) / (pts.length - 1)
+        const ys = (v: number) => H - pad - (Math.max(0, Math.min(100, v)) / 100) * (H - 2 * pad)
+        const ln = (k: string) => pts.map((h: any, i: number) => `${xs(i).toFixed(1)},${ys(Math.round(h[k] ?? 0)).toFixed(1)}`).join(' ')
+        return (
+          <div className="sect">
+            <h4>Scoring History</h4>
+            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+              <line x1={0} y1={H - pad} x2={W} y2={H - pad} style={{ stroke: 'var(--line)' }} strokeWidth={1} />
+              <polyline points={ln('detection')} style={{ stroke: MC.detection, fill: 'none' }} strokeWidth={2} />
+              <polyline points={ln('confidence')} style={{ stroke: MC.confidence, fill: 'none' }} strokeWidth={2} />
+            </svg>
+            <div className="div-legend"><span style={{ color: MC.detection }}>● Detection</span> · <span style={{ color: MC.confidence }}>● Confidence</span> · oldest → newest</div>
           </div>
-          <div className="div-legend">det · conf · gap, newest first</div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Methodology */}
       <div className="sect">
