@@ -73,6 +73,8 @@ export const watchlistApi = {
   list: () => api.get('/api/watchlists/'),
   create: (name: string) => api.post('/api/watchlists/', { name }),
   rename: (id: number, name: string) => api.patch(`/api/watchlists/${id}/`, { name }),
+  update: (id: number, fields: { notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number }) =>
+    api.patch(`/api/watchlists/${id}/`, fields),
   remove: (id: number) => api.delete(`/api/watchlists/${id}/`),
   addItem: (id: number, item: { key: string; display?: string; kind?: 'topic' | 'market' }) =>
     api.post(`/api/watchlists/${id}/items/`, item),

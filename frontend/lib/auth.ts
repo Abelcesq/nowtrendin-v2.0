@@ -21,6 +21,7 @@ function normalizeUser(u: any): User {
     phoneVerified: !!u.phoneVerified,
     notifyEmail: u.notifyEmail ?? true,
     notifyPush: u.notifyPush ?? true,
+    notifySms: !!u.notifySms,
   };
 }
 
@@ -99,7 +100,7 @@ export async function verifyPhoneCode(code: string): Promise<User> {
 }
 
 // Update notification preferences (email/push). Returns the updated user.
-export async function updateNotifyPrefs(prefs: { notifyEmail?: boolean; notifyPush?: boolean }): Promise<User> {
+export async function updateNotifyPrefs(prefs: { notifyEmail?: boolean; notifyPush?: boolean; notifySms?: boolean }): Promise<User> {
   const data = await api.patch('/api/auth/me/', prefs);
   return normalizeUser(data.user);
 }

@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import { TIER_LABEL, updateProfile, changePassword, type User } from '../lib/auth'
+import { TIER_LABEL, updateProfile, changePassword, updateNotifyPrefs, sendPhoneCode, verifyPhone, type User } from '../lib/auth'
+
+// Plan pricing (authority: constants/tiers.ts / CLAUDE.md §6). Billing is a UI
+// shell — Stripe is deferred; "Manage billing" activates when Stripe lands.
+const PLAN_PRICE: Record<string, number> = { consumer: 49, business: 499, enterprise: 250_000 }
 
 // Account — the web equivalent of the mobile Profile flow (edit profile, change
 // password, etc.). The one web-specific difference: "Membership" is replaced by
@@ -82,6 +86,40 @@ export function Account({ user, onSignOut, onClose, onUserUpdate }: {
     } finally { setSavingPw(false) }
   }
 
+  // notification channels + text-alert phone capture
+  const [nEmail, setNEmail] = useState(user.notifyEmail ?? true)
+  const [nSms, setNSms] = useState(user.notifySms ?? false)
+  const [phone, setPhone] = useState(user.phone ?? '')
+  const [verified, setVerified] = useState(user.phoneVerified ?? false)
+  const [codeSent, setCodeSent] = useState(false)
+  const [code, setCode] = useState('')
+  const [nMsg, setNMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  const saveChannels = async (next: { notifyEmail?: boolean; notifySms?: boolean }) => {
+    setNMsg(null)
+    try { const u = await updateNotifyPrefs(next); onUserUpdate(u) }
+    catch { setNMsg({ ok: false, text: 'Could not save notification preferences.' }) }
+  }
+  const onEmailToggle = (v: boolean) => { setNEmail(v); saveChannels({ notifyEmail: v }) }
+  const onSmsToggle = (v: boolean) => {
+    if (v && !verified) { setNMsg({ ok: false, text: 'Verify a phone number first to enable text alerts.' }); return }
+    setNSms(v); saveChannels({ notifySms: v })
+  }
+  const sendCode = async () => {
+    setNMsg(null)
+    if (phone.trim().length < 7) { setNMsg({ ok: false, text: 'Enter a valid phone number (with country code).' }); return }
+    try { const r = await sendPhoneCode(phone.trim()); setCodeSent(true); setNMsg({ ok: true, text: r.detail || 'Verification code sent.' }) }
+    catch (e: any) { setNMsg({ ok: false, text: e?.data?.detail ?? 'Could not send the code. SMS may not be configured yet.' }) }
+  }
+  const confirmCode = async () => {
+    setNMsg(null)
+    try {
+      const u = await verifyPhone(code.trim())
+      onUserUpdate(u); setVerified(true); setCodeSent(false); setCode('')
+      setNMsg({ ok: true, text: 'Phone verified. You can now enable text alerts.' })
+    } catch (e: any) { setNMsg({ ok: false, text: e?.data?.detail ?? 'Incorrect or expired code.' }) }
+  }
+
   // authorized users — the account admin is the signed-in account holder. Seats
   // beyond the admin are shown as available; we do NOT fabricate other users.
   const used = Math.max(0, ENT_TOKEN_POOL - (user.tokensRemaining ?? 0))
@@ -133,6 +171,65 @@ export function Account({ user, onSignOut, onClose, onUserUpdate }: {
           <input style={inp} value={cf} onChange={(e) => setCf(e.target.value)} placeholder="Confirm new password" type="password" />
           <button style={btnGhost} onClick={savePw} disabled={savingPw}>{savingPw ? 'Updating…' : 'Update Password'}</button>
           <Msg m={pwMsg} />
+        </div>
+
+        {/* Notifications + Text Alerts (phone capture) */}
+        <div style={card}>
+          <div style={lbl}>Notifications</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginBottom: 12 }}>
+            Choose how your alert and watchlist notifications are delivered.
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={nEmail} onChange={(e) => onEmailToggle(e.target.checked)} />
+            Email — alerts and account updates by email
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text)', cursor: verified ? 'pointer' : 'not-allowed', opacity: verified ? 1 : 0.6 }}>
+            <input type="checkbox" checked={nSms} disabled={!verified} onChange={(e) => onSmsToggle(e.target.checked)} />
+            Text (SMS) — alerts to your verified phone
+          </label>
+
+          <div style={{ borderTop: '1px solid var(--line-2)', margin: '14px 0' }} />
+          <div style={lbl}>Cell phone for text alerts</div>
+          {verified ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text)' }}>
+              <span style={{ fontWeight: 700 }}>{phone}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 5, background: 'var(--conf-soft)', color: 'var(--conf)' }}>VERIFIED</span>
+              <button style={{ ...btnGhost, height: 30, padding: '0 12px', fontSize: 12 }} onClick={() => { setVerified(false); setCodeSent(false) }}>Change</button>
+            </div>
+          ) : (
+            <>
+              <input style={inp} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555 123 4567" type="tel" />
+              {!codeSent ? (
+                <button style={btn} onClick={sendCode}>Send verification code</button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input style={{ ...inp, marginBottom: 0, width: 140 }} value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" />
+                  <button style={btn} onClick={confirmCode}>Verify</button>
+                  <button style={btnGhost} onClick={sendCode}>Resend</button>
+                </div>
+              )}
+            </>
+          )}
+          <Msg m={nMsg} />
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8 }}>
+            Standard message rates may apply. We only text a phone you've verified.
+          </div>
+        </div>
+
+        {/* Billing (UI shell — Stripe deferred) */}
+        <div style={card}>
+          <div style={lbl}>Billing</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{plan} Plan</span>
+            <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>
+              ${(PLAN_PRICE[user.tier ?? 'consumer'] ?? 0).toLocaleString()}
+              <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>/mo</span>
+            </span>
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginBottom: 14 }}>
+            Your plan renews monthly. Payment management arrives with the upcoming billing release.
+          </div>
+          <button style={{ ...btnGhost, cursor: 'default', opacity: 0.55 }} disabled>Manage billing — coming soon</button>
         </div>
 
         {/* Authorized Users (replaces Membership on web) */}

@@ -16,6 +16,7 @@ class Profile(models.Model):
     reset_expires = models.DateTimeField(null=True, blank=True)
     notify_email = models.BooleanField(default=True)
     notify_push = models.BooleanField(default=True)
+    notify_sms = models.BooleanField(default=False)   # text (SMS) channel — needs a verified phone
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -53,6 +54,7 @@ class Alert(models.Model):
     threshold = models.IntegerField(default=75)
     notify_email = models.BooleanField(default=True)
     notify_push = models.BooleanField(default=False)
+    notify_sms = models.BooleanField(default=False)   # text (SMS) — fires only if phone verified
     active = models.BooleanField(default=True)
     last_triggered_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,6 +68,12 @@ class Watchlist(models.Model):
     the backend so the SAME lists appear on web, desktop, and mobile."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='watchlists')
     name = models.CharField(max_length=80)
+    # Per-list movement notifications: alert me (email/text) when ANY item in the
+    # list crosses notify_threshold on its Detection score. Off by default.
+    notify_email = models.BooleanField(default=False)
+    notify_sms = models.BooleanField(default=False)
+    notify_threshold = models.IntegerField(default=75)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

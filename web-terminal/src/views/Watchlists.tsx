@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import {
-  listWatchlists, createWatchlist, deleteWatchlist,
+  listWatchlists, createWatchlist, deleteWatchlist, updateWatchlist,
   addWatchItem, removeWatchItem, type WatchlistT, type WatchKind,
 } from '../lib/auth'
 
@@ -103,6 +103,12 @@ export function Watchlists() {
     setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, items: l.items.filter((i) => i.id !== itemId) } : l))
     try { await removeWatchItem(current.id, itemId) } catch { load() }
   }
+  // Per-list movement notifications (email / text). Optimistic; reverts on error.
+  const setNotify = async (fields: { notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number }) => {
+    if (!current) return
+    setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, ...fields } : l))
+    try { await updateWatchlist(current.id, fields) } catch { load() }
+  }
 
   return (
     <>
@@ -128,6 +134,18 @@ export function Watchlists() {
             onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
             placeholder="Add a topic or instrument to this list… (e.g. world models, Nvidia)" />
           <button className="add-btn" onClick={addItem} disabled={busy}>Add</button>
+        </div>
+      )}
+
+      {current && (
+        <div className="wl-notify">
+          <span className="wl-notify-lbl">Notify me when any item crosses Detection</span>
+          <select value={current.notify_threshold ?? 75} onChange={(e) => setNotify({ notify_threshold: Number(e.target.value) })}>
+            {[60, 70, 75, 80, 85, 90].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <label className="wl-notify-ch"><input type="checkbox" checked={!!current.notify_email} onChange={(e) => setNotify({ notify_email: e.target.checked })} /> Email</label>
+          <label className="wl-notify-ch"><input type="checkbox" checked={!!current.notify_sms} onChange={(e) => setNotify({ notify_sms: e.target.checked })} /> Text</label>
+          <span className="wl-notify-hint">Text needs a verified phone (Account).</span>
         </div>
       )}
 

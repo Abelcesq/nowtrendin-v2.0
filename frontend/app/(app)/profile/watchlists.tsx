@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert as RNAlert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch, Alert as RNAlert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus, X, Star } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
@@ -9,7 +9,7 @@ import { TierID } from '../../../constants/tiers';
 import { useTierFeed, useRiskScores } from '../../../hooks/useSignals';
 
 interface WItem { id: number; key: string; display: string; kind: 'topic' | 'market' }
-interface WList { id: number; name: string; items: WItem[] }
+interface WList { id: number; name: string; items: WItem[]; notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number }
 
 const DET = '#2D7EEF', CONF = '#00C896';
 
@@ -87,6 +87,13 @@ export default function ProfileWatchlists() {
     setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, items: l.items.filter((i) => i.id !== itemId) } : l));
     await watchlistApi.removeItem(current.id, itemId).catch(() => load());
   };
+  // Per-list movement notifications (email / text). Optimistic; reverts on error.
+  const setNotify = async (fields: { notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number }) => {
+    if (!current) return;
+    setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, ...fields } : l));
+    await watchlistApi.update(current.id, fields).catch(() => load());
+  };
+  const phoneVerified = useAuthStore.getState().user?.phoneVerified ?? false;
 
   return (
     <Screen scroll>
@@ -127,6 +134,34 @@ export default function ProfileWatchlists() {
           <TouchableOpacity onPress={addItem} disabled={busy} className="h-11 px-4 rounded-xl items-center justify-center" style={{ backgroundColor: '#1A1A2E' }}>
             <Text className="text-white font-bold text-sm">Add</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Per-list movement notifications */}
+      {current && (
+        <View className="bg-surface rounded-2xl border border-border p-4 mb-4">
+          <Text className="text-textSecondary text-xs font-semibold mb-1">Notify me when any item crosses Detection</Text>
+          <View className="flex-row flex-wrap gap-1.5 mb-2">
+            {[60, 70, 75, 80, 85, 90].map((v) => {
+              const on = (current.notify_threshold ?? 75) === v;
+              return (
+                <TouchableOpacity key={v} onPress={() => setNotify({ notify_threshold: v })} className="px-3 py-1.5 rounded-full border" style={{ backgroundColor: on ? '#00C896' : '#FFFFFF', borderColor: on ? '#00C896' : '#E4E7EC' }}>
+                  <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>{v}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View className="flex-row items-center justify-between py-1">
+            <Text className="text-textSecondary text-sm">Email</Text>
+            <Switch value={!!current.notify_email} onValueChange={(v) => setNotify({ notify_email: v })} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+          </View>
+          <View className="flex-row items-center justify-between py-1">
+            <View className="flex-1 pr-2">
+              <Text className="text-textSecondary text-sm">Text (SMS)</Text>
+              {!phoneVerified && <Text className="text-textMuted text-[10px]">Needs a verified phone (Profile → Notifications)</Text>}
+            </View>
+            <Switch value={!!current.notify_sms} disabled={!phoneVerified} onValueChange={(v) => setNotify({ notify_sms: v })} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+          </View>
         </View>
       )}
 

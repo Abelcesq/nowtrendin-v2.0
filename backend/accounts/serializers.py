@@ -13,10 +13,11 @@ class UserSerializer(serializers.ModelSerializer):
     phoneVerified = serializers.SerializerMethodField()
     notifyEmail = serializers.SerializerMethodField()
     notifyPush = serializers.SerializerMethodField()
+    notifySms = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'gradeTokens', 'phone', 'phoneVerified', 'notifyEmail', 'notifyPush']
+        fields = ['id', 'name', 'email', 'tier', 'tokensRemaining', 'gradeTokens', 'phone', 'phoneVerified', 'notifyEmail', 'notifyPush', 'notifySms']
 
     def get_gradeTokens(self, u):
         p = getattr(u, 'profile', None)
@@ -29,6 +30,10 @@ class UserSerializer(serializers.ModelSerializer):
     def get_notifyPush(self, u):
         p = getattr(u, 'profile', None)
         return bool(p.notify_push) if p else True
+
+    def get_notifySms(self, u):
+        p = getattr(u, 'profile', None)
+        return bool(p.notify_sms) if p else False
 
     def get_name(self, u):
         return u.first_name or u.username
@@ -77,7 +82,7 @@ class AlertSerializer(serializers.ModelSerializer):
         model = Alert
         fields = [
             'id', 'topic_key', 'topic_display', 'score_type', 'threshold',
-            'notify_email', 'notify_push', 'active', 'last_triggered_at', 'created_at',
+            'notify_email', 'notify_push', 'notify_sms', 'active', 'last_triggered_at', 'created_at',
         ]
         read_only_fields = ['id', 'last_triggered_at', 'created_at']
 
@@ -94,5 +99,6 @@ class WatchlistSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Watchlist
-        fields = ['id', 'name', 'created_at', 'items']
+        fields = ['id', 'name', 'created_at', 'items',
+                  'notify_email', 'notify_sms', 'notify_threshold']
         read_only_fields = ['id', 'created_at', 'items']

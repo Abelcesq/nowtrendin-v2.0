@@ -204,6 +204,8 @@ class MeView(APIView):
             profile.notify_email = bool(data['notifyEmail'])
         if 'notifyPush' in data:
             profile.notify_push = bool(data['notifyPush'])
+        if 'notifySms' in data:
+            profile.notify_sms = bool(data['notifySms'])
         profile.save()
 
         return Response({'user': UserSerializer(user).data})
@@ -434,7 +436,9 @@ class GradedAllView(APIView):
 
 
 def _notify_alert(alert, current):
-    """Deliver a fired alert. Email now; push requires an Expo push token (dev build)."""
+    """Deliver a fired alert. Email + text now; push requires an Expo push token
+    (dev build). Text fires only when the alert opts into SMS AND the user has a
+    verified phone — otherwise SMS is silently skipped."""
     user = alert.user
     label = alert.topic_display or alert.topic_key
     if alert.notify_email and user.email:
@@ -452,10 +456,46 @@ def _notify_alert(alert, current):
             )
         except Exception:
             pass
+    if getattr(alert, 'notify_sms', False):
+        profile = getattr(user, 'profile', None)
+        if profile and profile.phone_verified and profile.phone:
+            _send_sms(
+                profile.phone,
+                f"Now TrendIn: {label} hit a {alert.score_type} score of {current} "
+                f"(threshold {alert.threshold}).",
+            )
+
+
+def _notify_watchlist(wl, crossed):
+    """Deliver a watchlist movement notification (email + text) listing the items
+    that crossed the list's Detection threshold. Text only if phone verified."""
+    user = wl.user
+    names = ', '.join(c['label'] for c in crossed[:6])
+    more = f" (+{len(crossed) - 6} more)" if len(crossed) > 6 else ''
+    body_lines = '\n'.join(f"  • {c['label']}: Detection {c['score']}" for c in crossed[:12])
+    if wl.notify_email and user.email:
+        try:
+            send_mail(
+                subject=f"Now TrendIn watchlist '{wl.name}': {len(crossed)} item(s) moving",
+                message=(
+                    f"These items on your '{wl.name}' watchlist crossed Detection "
+                    f"{wl.notify_threshold}:\n\n{body_lines}\n\nOpen Now TrendIn for the full signal."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+    if wl.notify_sms:
+        profile = getattr(user, 'profile', None)
+        if profile and profile.phone_verified and profile.phone:
+            _send_sms(profile.phone, f"Now TrendIn '{wl.name}': {names}{more} crossing Detection {wl.notify_threshold}.")
 
 
 class EvaluateAlertsView(APIView):
-    """Internal: pull live scores and fire any active alert whose threshold is crossed."""
+    """Internal: pull live scores and fire any active alert whose threshold is
+    crossed, plus any watchlist whose items cross its movement threshold."""
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -475,6 +515,15 @@ class EvaluateAlertsView(APIView):
                 'overall': round(row.get('overall_score', 0) or 0),
             }
 
+        # Market (risk) detection scores — for watchlist 'market' items. Best-effort.
+        market = {}
+        try:
+            rr = requests.get(f'{GRADIENT_API}/risk/scores', params={'limit': 200}, timeout=30)
+            for row in rr.json().get('results', []):
+                market[row.get('risk_topic')] = round(row.get('detection_score', 0) or 0)
+        except Exception:
+            pass
+
         now = timezone.now()
         cooldown = now - timedelta(hours=6)
         fired = 0
@@ -491,7 +540,34 @@ class EvaluateAlertsView(APIView):
                 alert.save(update_fields=['last_triggered_at'])
                 _notify_alert(alert, current)
                 fired += 1
-        return Response({'fired': fired, 'checked': active.count()})
+
+        # Watchlist movement notifications — any list opting into email/text whose
+        # items cross its Detection threshold. One digest per list, 6h cooldown.
+        wl_fired = 0
+        from django.db.models import Q
+        lists = (Watchlist.objects.filter(Q(notify_email=True) | Q(notify_sms=True))
+                 .prefetch_related('items'))
+        for wl in lists:
+            fresh = wl.last_notified_at is None or wl.last_notified_at < cooldown
+            if not fresh:
+                continue
+            crossed = []
+            for item in wl.items.all():
+                if item.kind == 'market':
+                    sc = market.get(item.key)
+                else:
+                    s = scores.get(item.key)
+                    sc = s['detection'] if s else None
+                if sc is not None and sc >= wl.notify_threshold:
+                    crossed.append({'label': item.display or item.key, 'score': sc})
+            if crossed:
+                wl.last_notified_at = now
+                wl.save(update_fields=['last_notified_at'])
+                _notify_watchlist(wl, crossed)
+                wl_fired += 1
+
+        return Response({'fired': fired, 'checked': active.count(),
+                         'watchlists_fired': wl_fired})
 
 
 class ResetCreditsView(APIView):

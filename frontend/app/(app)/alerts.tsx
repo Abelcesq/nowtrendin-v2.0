@@ -24,6 +24,7 @@ export default function Alerts() {
   const [threshold, setThreshold] = useState(75);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
+  const [sms, setSms] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const reload = () => qc.invalidateQueries({ queryKey: ['alerts'] });
@@ -40,6 +41,7 @@ export default function Alerts() {
         threshold,
         notify_push: push,
         notify_email: email,
+        notify_sms: sms,
       });
       setTopicDisplay('');
       setTopicKey('');
@@ -72,7 +74,7 @@ export default function Alerts() {
             <View className="flex-1 pr-2">
               <Text className="text-textPrimary font-semibold">{a.topic_display || a.topic_key}</Text>
               <Text className="text-textMuted text-xs mt-0.5">
-                When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email'].filter(Boolean).join(' + ') || 'No channel'}
+                When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
               {a.last_triggered_at && (
                 <Text className="text-[11px] font-bold mt-1" style={{ color: '#009970' }}>
@@ -136,9 +138,16 @@ export default function Alerts() {
           <Text className="text-textSecondary text-sm">Push notification</Text>
           <Switch value={push} onValueChange={setPush} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
         </View>
-        <View className="flex-row items-center justify-between py-1 mb-3">
+        <View className="flex-row items-center justify-between py-1">
           <Text className="text-textSecondary text-sm">Email</Text>
           <Switch value={email} onValueChange={setEmail} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+        </View>
+        <View className="flex-row items-center justify-between py-1 mb-3">
+          <View className="flex-1 pr-2">
+            <Text className="text-textSecondary text-sm">Text (SMS)</Text>
+            <Text className="text-textMuted text-[10px]">Needs a verified phone (Profile → Notifications)</Text>
+          </View>
+          <Switch value={sms} onValueChange={setSms} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
         </View>
 
         <Button onPress={create} loading={creating} disabled={!topicDisplay.trim()} size="lg">

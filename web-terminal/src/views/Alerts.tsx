@@ -17,6 +17,7 @@ export function Alerts() {
   const [threshold, setThreshold] = useState(75)
   const [push, setPush] = useState(true)
   const [email, setEmail] = useState(true)
+  const [sms, setSms] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -38,7 +39,7 @@ export function Alerts() {
       await createAlert({
         topic_key: topicKey || topicDisplay.trim().toLowerCase().replace(/\s+/g, '_'),
         topic_display: topicDisplay.trim(), score_type: scoreType, threshold,
-        notify_push: push, notify_email: email,
+        notify_push: push, notify_email: email, notify_sms: sms,
       })
       setTopicDisplay(''); setTopicKey(''); reload()
     } catch (e: any) { setErr(e?.data?.detail || e?.message || 'Could not create alert — please sign in again.') }
@@ -62,7 +63,7 @@ export function Alerts() {
               <span className="al-ico"><Bell size={16} color="var(--conf)" /></span>
               <div className="al-body">
                 <div className="al-topic">{a.topic_display || a.topic_key}</div>
-                <div className="al-meta">When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email'].filter(Boolean).join(' + ') || 'No channel'}</div>
+                <div className="al-meta">When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}</div>
                 {a.last_triggered_at && <div className="al-fired">🔔 Triggered {new Date(a.last_triggered_at).toLocaleDateString()}</div>}
               </div>
               <button className={'al-toggle' + (a.active ? ' on' : '')} onClick={() => toggle(a)} title={a.active ? 'Active' : 'Paused'} />
@@ -97,6 +98,8 @@ export function Alerts() {
           <button className={'al-toggle' + (push ? ' on' : '')} onClick={() => setPush(!push)} /></div>
         <div className="al-row"><span>Email</span>
           <button className={'al-toggle' + (email ? ' on' : '')} onClick={() => setEmail(!email)} /></div>
+        <div className="al-row"><span>Text (SMS)<span style={{ color: 'var(--text-3)', fontSize: 11, marginLeft: 6 }}>needs a verified phone (Account)</span></span>
+          <button className={'al-toggle' + (sms ? ' on' : '')} onClick={() => setSms(!sms)} /></div>
 
         {err && <div className="al-err">{err}</div>}
         <button className="al-create" disabled={!topicDisplay.trim() || busy} onClick={create}>{busy ? 'Creating…' : 'Create Alert'}</button>

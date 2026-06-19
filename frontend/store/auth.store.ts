@@ -14,6 +14,7 @@ export interface User {
   phoneVerified?: boolean;
   notifyEmail?: boolean;
   notifyPush?: boolean;
+  notifySms?: boolean;
 }
 
 interface AuthState {

@@ -10,6 +10,8 @@ export interface User {
   id: string; name: string; email: string
   tier: TierID | null
   tokensRemaining: number; gradeTokens: number
+  phone?: string | null; phoneVerified?: boolean
+  notifyEmail?: boolean; notifyPush?: boolean; notifySms?: boolean
 }
 
 const ACCESS = 'nt_access', REFRESH = 'nt_refresh'
@@ -35,6 +37,8 @@ function normalizeUser(u: any): User {
     tier: (u.tier ?? null) as TierID | null,
     tokensRemaining: u.tokensRemaining ?? 0,
     gradeTokens: u.gradeTokens ?? 0,
+    phone: u.phone ?? null, phoneVerified: !!u.phoneVerified,
+    notifyEmail: u.notifyEmail ?? true, notifyPush: u.notifyPush ?? true, notifySms: !!u.notifySms,
   }
 }
 
@@ -71,6 +75,25 @@ export async function changePassword(currentPassword: string, newPassword: strin
   }, true)
 }
 
+// Notification channel prefs (email / push / text) — same /api/auth/me/ PATCH the
+// mobile app uses, so prefs sync across surfaces.
+export async function updateNotifyPrefs(
+  fields: { notifyEmail?: boolean; notifyPush?: boolean; notifySms?: boolean }
+): Promise<User> {
+  const d = await call('/api/auth/me/', { method: 'PATCH', body: JSON.stringify(fields) }, true)
+  return normalizeUser(d.user ?? d)
+}
+
+// Phone (text-alert) capture + SMS verification. The number is verified via a
+// 6-digit code so we only ever text a confirmed handset. SMS sends once the
+// backend's Twilio creds are configured.
+export const sendPhoneCode = (phone: string) =>
+  call('/api/auth/phone/send-code/', { method: 'POST', body: JSON.stringify({ phone }) }, true) as Promise<{ detail: string }>
+export async function verifyPhone(code: string): Promise<User> {
+  const d = await call('/api/auth/phone/verify/', { method: 'POST', body: JSON.stringify({ code }) }, true)
+  return normalizeUser(d.user ?? d)
+}
+
 // Enterprise "Pull Trends" — fresh attention collect, token-metered by the
 // backend (1 token). Same endpoint the mobile app uses, so behaviour matches.
 export const pullTrends = () =>
@@ -96,13 +119,18 @@ export const gradedAll = (q = '') =>
 // kind only; the view looks up live scores by key. ──
 export type WatchKind = 'topic' | 'market'
 export interface WatchItem { id: number; key: string; display: string; kind: WatchKind; added_at: string }
-export interface WatchlistT { id: number; name: string; created_at: string; items: WatchItem[] }
+export interface WatchlistT {
+  id: number; name: string; created_at: string; items: WatchItem[]
+  notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number
+}
 
 export const listWatchlists = () => call('/api/watchlists/', {}, true) as Promise<WatchlistT[]>
 export const createWatchlist = (name: string) =>
   call('/api/watchlists/', { method: 'POST', body: JSON.stringify({ name }) }, true) as Promise<WatchlistT>
 export const renameWatchlist = (id: number, name: string) =>
   call(`/api/watchlists/${id}/`, { method: 'PATCH', body: JSON.stringify({ name }) }, true) as Promise<WatchlistT>
+export const updateWatchlist = (id: number, fields: { notify_email?: boolean; notify_sms?: boolean; notify_threshold?: number }) =>
+  call(`/api/watchlists/${id}/`, { method: 'PATCH', body: JSON.stringify(fields) }, true) as Promise<WatchlistT>
 export const deleteWatchlist = (id: number) =>
   call(`/api/watchlists/${id}/`, { method: 'DELETE' }, true)
 export const addWatchItem = (id: number, item: { key: string; display?: string; kind?: WatchKind }) =>
@@ -116,7 +144,7 @@ export const removeWatchItem = (id: number, itemId: number) =>
 export interface AlertT {
   id: number; topic_key: string; topic_display?: string
   score_type: string; threshold: number
-  notify_push: boolean; notify_email: boolean
+  notify_push: boolean; notify_email: boolean; notify_sms?: boolean
   active: boolean; last_triggered_at?: string | null
 }
 export const listAlerts = () => call('/api/alerts/', {}, true) as Promise<AlertT[]>
