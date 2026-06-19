@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
+import { ScoreChart, type ChartPoint } from '../components/ScoreChart'
 
-// History — consistent with the mobile app (windowed list of recently-scored
-// topics) PLUS the trajectory redesign: a sparkline + rising/falling/flat trend per
-// row, and a featured line chart of the selected topic's score over time. One call
-// (/history/recent) powers the list; the detail uses /scores/{key}/score-history.
+// History — windowed list of recently-scored topics, plus a featured axed chart of
+// the selected topic's full scoring trajectory (Detection/Confidence over time, with
+// the driving factors per point). The list uses /history/recent; the featured chart
+// uses /scores/{key}/score-history (real per-cycle events), clipped to the window.
 const WINDOWS = ['12h', '24h', '7d']
+const WIN_MS: Record<string, number> = { '12h': 12 * 3600e3, '24h': 24 * 3600e3, '7d': 7 * 24 * 3600e3 }
 
 function trendMeta(t: string): [JSX.Element, string, string] {
   if (t === 'up') return [<TrendingUp size={15} />, 'Rising', 'var(--bk-t)']
@@ -21,27 +23,13 @@ function Spark({ pts, color }: { pts: number[]; color: string }) {
   return <svg width={84} height={26} style={{ display: 'block', flex: '0 0 auto' }}><polyline points={P} style={{ stroke: color, fill: 'none' }} strokeWidth={2} /></svg>
 }
 
-function Trajectory({ rows }: { rows: { detection: number; confidence: number }[] }) {
-  if (rows.length < 2) return <div className="hv-empty">Not enough history yet for a trajectory.</div>
-  const W = 560, H = 150, pad = 10
-  const xs = (i: number) => pad + i * (W - 2 * pad) / (rows.length - 1)
-  const ys = (v: number) => H - pad - (Math.max(0, Math.min(100, v)) / 100) * (H - 2 * pad)
-  const line = (k: 'detection' | 'confidence') => rows.map((r, i) => `${xs(i).toFixed(1)},${ys(r[k]).toFixed(1)}`).join(' ')
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-      <line x1={0} y1={H - pad} x2={W} y2={H - pad} style={{ stroke: 'var(--line)' }} strokeWidth={1} />
-      <polyline points={line('detection')} style={{ stroke: 'var(--det)', fill: 'none' }} strokeWidth={2.5} />
-      <polyline points={line('confidence')} style={{ stroke: 'var(--conf)', fill: 'none' }} strokeWidth={2.5} />
-    </svg>
-  )
-}
-
 export function History() {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [selKey, setSelKey] = useState<string | null>(null)
+  const [hist, setHist] = useState<ChartPoint[] | null>(null)   // enriched per-cycle history for the selected topic
   const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)
   const [anLoad, setAnLoad] = useState(false)
 
@@ -51,12 +39,24 @@ export function History() {
   }
   useEffect(() => load(win), [win])
 
-  const pick = (r: HistoryRow) => { setSelKey(r.topic_key); setAn(null) }
-  // The selected topic's row in the CURRENT window — so the featured chart's
-  // det/conf, trend, and trajectory all reflect the chosen 12h/24h/7d window
-  // (the engine returns a window-filtered `series` per row).
+  // Fetch the full per-cycle scoring history (with driving factors) for the picked
+  // topic; the chart clips it to the selected window below.
+  const pick = (r: HistoryRow) => {
+    setSelKey(r.topic_key); setAn(null); setHist(null)
+    api.scoreHistory(r.topic_key)
+      .then((d) => setHist((d.rows || []).map((x: any) => ({
+        t: x.scored_at, det: Math.round(x.detection ?? 0), conf: Math.round(x.confidence ?? 0),
+        overall: x.overall, gap: x.gap, mentions: x.mentions, platforms: x.platforms,
+        stage: x.stage, inertia: x.inertia, dark_matter: x.dark_matter,
+      }))))
+      .catch(() => setHist([]))
+  }
   const sel = useMemo(() => (selKey ? rows.find((r) => r.topic_key === selKey) ?? null : null), [rows, selKey])
-  const traj = useMemo(() => (sel?.series ?? []).map((p) => ({ detection: Math.round(p.det ?? 0), confidence: Math.round(p.conf ?? 0) })), [sel])
+  // Clip the per-cycle history to the selected window so the chart reflects 12h/24h/7d.
+  const chartPoints = useMemo(() => {
+    const cutoff = Date.now() - (WIN_MS[win] ?? WIN_MS['7d'])
+    return (hist ?? []).filter((p) => +new Date(p.t) >= cutoff)
+  }, [hist, win])
   const explain = () => {
     if (!sel) return
     setAnLoad(true)
@@ -94,8 +94,7 @@ export function History() {
               <span className="hv-trend" style={{ color, background: 'var(--line-2)' }}>{icon} {label}</span>
               <span className="hv-feat-scores"><b style={{ color: 'var(--det)' }}>DET {sel.det}</b> &nbsp; <b style={{ color: 'var(--conf)' }}>CONF {sel.conf}</b></span>
             </div>
-            <div className="hv-chartslot">{loading ? <div className="hv-loading">Loading trajectory…</div> : <Trajectory rows={traj} />}</div>
-            <div className="hv-legend"><span style={{ color: 'var(--det)' }}>● Detection</span> &nbsp; <span style={{ color: 'var(--conf)' }}>● Confidence</span> &nbsp;·&nbsp; <span style={{ color: 'var(--text-3)' }}>{traj.length} scoring run{traj.length === 1 ? '' : 's'} in last {win}</span></div>
+            <div className="hv-chartslot">{hist === null ? <div className="hv-loading">Loading trajectory…</div> : <ScoreChart points={chartPoints} />}</div>
             <div className="hv-ai">
               {an?.available ? (
                 <>
