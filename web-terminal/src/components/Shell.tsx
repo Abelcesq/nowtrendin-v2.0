@@ -175,7 +175,7 @@ export function Shell({
           )}
           {favEdit && showAdd && (
             <div className="fav-form">
-              <div className="fav-frow">
+              <div className="fav-frow fav-sections">
                 {([['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic']] as const).map(([s, label]) => (
                   <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); setFavPicked(null); setFavQuery(''); if (s !== 'history') setFavFilter(FAV_OPTIONS[s][0].k) }}>{label}</button>
                 ))}
