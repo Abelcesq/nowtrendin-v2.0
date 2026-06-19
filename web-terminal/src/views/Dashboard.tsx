@@ -229,12 +229,17 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
   const MKT_RANK = [['det', 'Detection'], ['leverage', 'Leverage']]
   const STAGES = ['', 'BREAKOUT', 'STRONG', 'EMERGING', 'WATCHING', 'MONITORING']
   const TIERS = ['', 'ELEVATED', 'ACTIVE', 'BUILDING', 'ROUTINE', 'DORMANT']
-  const sugg = topics.slice(0, 8)
+  // Verified typeahead (same as the watchlist): filter the live topic universe as
+  // the user types; a tile can only track a topic that exists in our database.
+  const tq = topic.trim().toLowerCase()
+  const matches = !topicKey && tq.length >= 2
+    ? topics.filter((s) => s.name.toLowerCase().includes(tq) || s.key.toLowerCase().includes(tq)).slice(0, 8)
+    : []
 
   const add = () => {
     if (section === 'track') {
-      if (!topic.trim()) return
-      onAdd({ id: newId(), type: 'track-topic', title: name || `Track: ${topic.trim()}`, config: { topic_key: topicKey || topic.trim().toLowerCase().replace(/\s+/g, '_'), topic_display: topic.trim() } })
+      if (!topicKey) return  // hard gate — must be a verified DB topic
+      onAdd({ id: newId(), type: 'track-topic', title: name || `Track: ${topic.trim()}`, config: { topic_key: topicKey, topic_display: topic.trim() } })
     } else if (section === 'trends') {
       onAdd({ id: newId(), type: 'trends-custom', title: name || 'Custom trends', config: { rankBy, stage: stage || undefined } })
     } else {
@@ -255,9 +260,15 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
 
       {section === 'track' ? (
         <>
-          <label className="al-lbl">Topic</label>
-          <input className="al-input" value={topic} placeholder="Type or pick a topic" onChange={(e) => { setTopic(e.target.value); setTopicKey('') }} />
-          <div className="al-chips">{sugg.map((s) => <button key={s.key} className="al-chip" onClick={() => { setTopic(s.name); setTopicKey(s.key) }}>{s.name}</button>)}</div>
+          <label className="al-lbl">Topic — search and select a verified topic</label>
+          <input className="al-input" value={topic} placeholder="Search a topic…" onChange={(e) => { setTopic(e.target.value); setTopicKey('') }} />
+          {topicKey ? (
+            <div className="al-verified">✓ {topic} <button className="al-verified-x" onClick={() => { setTopic(''); setTopicKey('') }} title="Clear">✕</button></div>
+          ) : matches.length > 0 ? (
+            <div className="al-chips">{matches.map((s) => <button key={s.key} className="al-chip" onClick={() => { setTopic(s.name); setTopicKey(s.key) }}>{s.name}</button>)}</div>
+          ) : tq.length >= 2 ? (
+            <div className="al-hint">Not in our database — only existing topics can be tracked.</div>
+          ) : null}
         </>
       ) : (
         <>
@@ -274,7 +285,7 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
 
       <div className="dash-builder-foot">
         <input className="al-input" style={{ flex: 1, marginBottom: 0 }} value={name} placeholder="Tile name" onChange={(e) => setName(e.target.value)} />
-        <button className="al-create" style={{ width: 'auto', marginTop: 0, padding: '0 18px', height: 36 }} onClick={add}>Add tile</button>
+        <button className="al-create" style={{ width: 'auto', marginTop: 0, padding: '0 18px', height: 36 }} onClick={add} disabled={section === 'track' && !topicKey}>Add tile</button>
       </div>
     </div>
   )
