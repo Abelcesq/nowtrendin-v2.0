@@ -529,10 +529,17 @@ class EvaluateAlertsView(APIView):
         fired = 0
         active = Alert.objects.filter(active=True)
         for alert in active:
-            s = scores.get(alert.topic_key)
-            if not s:
-                continue
-            current = s.get(alert.score_type, s['detection'])
+            if alert.kind == 'market':
+                # Market alerts evaluate against the market (risk) Detection score.
+                mv = market.get(alert.topic_key)
+                if mv is None:
+                    continue
+                current = mv
+            else:
+                s = scores.get(alert.topic_key)
+                if not s:
+                    continue
+                current = s.get(alert.score_type, s['detection'])
             crossed = current >= alert.threshold
             fresh = alert.last_triggered_at is None or alert.last_triggered_at < cooldown
             if crossed and fresh:

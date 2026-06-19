@@ -36,7 +36,7 @@ function Trajectory({ rows }: { rows: { detection: number; confidence: number }[
   )
 }
 
-export function History({ preset }: { preset?: { topic: string; n: number } | null }) {
+export function History({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 'topic' | 'market', display: string) => void }) {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,16 +66,13 @@ export function History({ preset }: { preset?: { topic: string; n: number } | nu
       .finally(() => setAnLoad(false))
   }
 
-  // A "Track topic" favorite → default to the 12h window and auto-select that topic
-  // (loads its trajectory directly even if it's not in the windowed list).
-  useEffect(() => {
-    if (!preset?.topic) return
-    setWin('12h')
-    const key = preset.topic
-    const found = rows.find((r) => r.topic_key === key || (r.topic_display || '').toLowerCase().replace(/\s+/g, '_') === key)
-    pick(found || { topic_key: key, topic_display: key.replace(/_/g, ' '), overall: 0, det: 0, conf: 0, n: 0, series: [], trend: 'flat', slope: 0 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset?.n])
+  // Clicking a row offers to open the topic's full detail page; declining still
+  // shows the in-page trajectory.
+  const rowClick = (r: HistoryRow) => {
+    if (onOpenDetail && window.confirm(`Go to the detail page for "${r.topic_display || r.topic_key}"?`)) {
+      onOpenDetail(r.topic_key, 'topic', r.topic_display || r.topic_key)
+    } else { pick(r) }
+  }
 
   const view = useMemo(() => {
     const ql = q.trim().toLowerCase()
@@ -130,8 +127,8 @@ export function History({ preset }: { preset?: { topic: string; n: number } | nu
             {view.map((r) => {
               const [icon, , color] = trendMeta(r.trend)
               return (
-                <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => pick(r)}>
-                  <span className="hv-nm">{r.topic_display}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
+                <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => rowClick(r)}>
+                  <span className="hv-nm link">{r.topic_display}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
                   <Spark pts={r.series.map((p) => p.overall)} color={color} />
                   <span className="hv-v" style={{ color: 'var(--det)' }}>{r.det}</span>
                   <span className="hv-v" style={{ color: 'var(--conf)' }}>{r.conf}</span>

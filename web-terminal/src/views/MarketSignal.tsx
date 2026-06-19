@@ -345,7 +345,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   )
 }
 
-export function MarketSignal({ onRail, preset }: { onRail: (node: React.ReactNode | null) => void; preset?: { filter: string; n: number } | null }) {
+export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.ReactNode | null) => void; preset?: { filter: string; n: number } | null; focus?: { key: string; display: string; n: number } | null }) {
   const [rows, setRows] = useState<MRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -410,6 +410,17 @@ export function MarketSignal({ onRail, preset }: { onRail: (node: React.ReactNod
     const row = rows.find((r) => r.key === key)!
     onRail(<MarketRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
   }
+
+  // Focus = open a SPECIFIC instrument's detail rail (from a favorite / watchlist /
+  // alert). The market detail needs the full payload, so we open it once the row is
+  // in the loaded set; otherwise we filter the list to surface it.
+  useEffect(() => {
+    if (!focus) return
+    const row = rows.find((r) => r.key === focus.key)
+    if (row) { setSel(focus.key); onRail(<MarketRail row={row} onClose={() => { setSel(null); onRail(null) }} />) }
+    else setQ(focus.display)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.n, rows])
 
   const csv = () => {
     const hdr = ['item', 'detection', 'confidence', 'gap', 'tier', 'classification', 'pct_vs_baseline', 'leverage_health', 'signals', 'updated_min']

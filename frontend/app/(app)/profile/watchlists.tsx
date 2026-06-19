@@ -103,6 +103,13 @@ export default function ProfileWatchlists() {
     await watchlistApi.update(current.id, fields).catch(() => load());
   };
   const phoneVerified = useAuthStore.getState().user?.phoneVerified ?? false;
+  // Tap an item → confirm → open the real detail page (signal or market).
+  const openDetail = (it: WItem) => {
+    RNAlert.alert('Open detail page?', `Go to the detail page for "${it.display || it.key}"?`, [
+      { text: 'No', style: 'cancel' },
+      { text: 'Yes', onPress: () => router.push(`/${it.kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(it.key)}` as any) },
+    ]);
+  };
 
   return (
     <Screen scroll>
@@ -216,10 +223,10 @@ export default function ProfileWatchlists() {
           const det = lv?.det ?? 0, conf = lv?.conf ?? 0, gap = det - conf;
           return (
             <View key={it.id} className="bg-surface rounded-2xl border border-border p-4 mb-2.5 flex-row items-center">
-              <View className="flex-1">
+              <TouchableOpacity className="flex-1" onPress={() => openDetail(it)} activeOpacity={0.6}>
                 <Text className="text-textPrimary text-base font-bold">{it.display || it.key}</Text>
-                <Text className="text-textMuted text-[11px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend'}</Text>
-              </View>
+                <Text className="text-textMuted text-[11px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend'} · tap to open</Text>
+              </TouchableOpacity>
               {lv ? (
                 <View className="flex-row items-center gap-3 mr-1">
                   <View className="items-center"><Text className="text-textMuted text-[9px] font-bold">DET</Text><Text style={{ color: DET }} className="text-lg font-black">{det}</Text></View>

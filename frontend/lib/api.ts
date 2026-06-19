@@ -20,7 +20,12 @@ async function request(path: string, options: RequestInit = {}) {
     const body = await res.json().catch(() => ({}));
     throw { status: res.status, data: body };
   }
-  return res.json();
+  // 204 No Content (e.g. DELETE) and empty bodies have no JSON to parse — calling
+  // res.json() on them throws "Unexpected end of JSON input", which surfaces as an
+  // uncaught promise rejection. Return null instead.
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export const api = {

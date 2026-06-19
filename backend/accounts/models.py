@@ -47,9 +47,11 @@ class GradeHistory(models.Model):
 
 class Alert(models.Model):
     SCORE_TYPES = [('detection', 'detection'), ('confidence', 'confidence'), ('overall', 'overall')]
+    KINDS = [('topic', 'topic'), ('market', 'market')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     topic_key = models.CharField(max_length=120)
     topic_display = models.CharField(max_length=160, blank=True)
+    kind = models.CharField(max_length=12, choices=KINDS, default='topic')  # topic (trend) or market signal
     score_type = models.CharField(max_length=12, choices=SCORE_TYPES, default='detection')
     threshold = models.IntegerField(default=75)
     notify_email = models.BooleanField(default=True)

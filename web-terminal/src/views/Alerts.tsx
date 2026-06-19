@@ -7,12 +7,15 @@ import { listAlerts, createAlert, updateAlert, removeAlert, type AlertT } from '
 // alert set here fires for the same member on mobile (UI-consistency mandate §0.6).
 const SCORE_TYPES = ['detection', 'confidence', 'overall'] as const
 
-export function Alerts() {
+type Ent = { key: string; display: string; kind: 'topic' | 'market' }
+
+export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 'topic' | 'market', display: string) => void }) {
   const [alerts, setAlerts] = useState<AlertT[]>([])
   const [loading, setLoading] = useState(true)
-  const [suggest, setSuggest] = useState<{ key: string; display: string }[]>([])
+  const [suggest, setSuggest] = useState<Ent[]>([])
   const [topicDisplay, setTopicDisplay] = useState('')
   const [topicKey, setTopicKey] = useState('')
+  const [topicKind, setTopicKind] = useState<'topic' | 'market'>('topic')
   const [scoreType, setScoreType] = useState<string>('detection')
   const [threshold, setThreshold] = useState(75)
   const [push, setPush] = useState(true)
@@ -22,16 +25,19 @@ export function Alerts() {
   const [err, setErr] = useState('')
 
   const reload = () => listAlerts().then(setAlerts).catch(() => {})
+  // Search the SAME universe as the watchlist — trends AND market signals — so a
+  // member can alert on either (e.g. SpaceX, a market signal).
   useEffect(() => {
     let alive = true
     Promise.all([
       listAlerts().catch(() => [] as AlertT[]),
-      api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key }))).catch(() => []),
-    ]).then(([a, s]) => { if (!alive) return; setAlerts(a); setSuggest(s) }).finally(() => alive && setLoading(false))
+      api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key, kind: 'topic' as const }))).catch(() => [] as Ent[]),
+      api.risk(200).then((r) => (r.results || []).map((x) => ({ key: x.risk_topic, display: x.risk_display || x.risk_topic, kind: 'market' as const }))).catch(() => [] as Ent[]),
+    ]).then(([a, ts, ms]) => { if (!alive) return; setAlerts(a); setSuggest([...(ms as Ent[]), ...(ts as Ent[])]) }).finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [])
 
-  // Verified-only: an alert can be created only for a topic that exists in our
+  // Verified-only: an alert can be created only for an entity that exists in our
   // live data (topicKey is set by picking a match, never by free text).
   const q = topicDisplay.trim().toLowerCase()
   const matches = !topicKey && q.length >= 2
@@ -40,20 +46,24 @@ export function Alerts() {
 
   const bump = (d: number) => setThreshold((t) => Math.max(0, Math.min(100, t + d)))
   const create = async () => {
-    if (!topicKey) return  // hard gate — must be a verified topic
+    if (!topicKey) return  // hard gate — must be a verified entity
     setBusy(true); setErr('')
     try {
       await createAlert({
-        topic_key: topicKey,
+        topic_key: topicKey, kind: topicKind,
         topic_display: topicDisplay.trim(), score_type: scoreType, threshold,
         notify_push: push, notify_email: email, notify_sms: sms,
       })
-      setTopicDisplay(''); setTopicKey(''); reload()
+      setTopicDisplay(''); setTopicKey(''); setTopicKind('topic'); reload()
     } catch (e: any) { setErr(e?.data?.detail || e?.message || 'Could not create alert — please sign in again.') }
     finally { setBusy(false) }
   }
   const toggle = async (a: AlertT) => { try { await updateAlert(a.id, { active: !a.active }); reload() } catch {} }
   const remove = async (a: AlertT) => { try { await removeAlert(a.id); reload() } catch {} }
+  const open = (a: AlertT) => {
+    if (onOpenDetail && window.confirm(`Go to the detail page for "${a.topic_display || a.topic_key}"?`))
+      onOpenDetail(a.topic_key, (a.kind as 'topic' | 'market') || 'topic', a.topic_display || a.topic_key)
+  }
 
   return (
     <div className="al">
@@ -69,7 +79,7 @@ export function Alerts() {
             <div className="al-card" key={a.id}>
               <span className="al-ico"><Bell size={16} color="var(--conf)" /></span>
               <div className="al-body">
-                <div className="al-topic">{a.topic_display || a.topic_key}</div>
+                <div className="al-topic link" onClick={() => open(a)} title="Open detail page">{a.topic_display || a.topic_key}</div>
                 <div className="al-meta">When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}</div>
                 {a.last_triggered_at && <div className="al-fired">🔔 Triggered {new Date(a.last_triggered_at).toLocaleDateString()}</div>}
               </div>
@@ -80,17 +90,17 @@ export function Alerts() {
 
       <div className="al-sect" style={{ marginTop: 18 }}>Create new alert</div>
       <div className="al-form">
-        <label className="al-lbl">Topic — search and select a verified topic</label>
-        <input className="al-input" value={topicDisplay} placeholder="Type a topic to search…"
+        <label className="al-lbl">Topic — search and select a verified topic or market signal</label>
+        <input className="al-input" value={topicDisplay} placeholder="Search a topic or market signal…"
           onChange={(e) => { setTopicDisplay(e.target.value); setTopicKey('') }} />
         {topicKey ? (
-          <div className="al-verified">✓ {topicDisplay} <button className="al-verified-x" onClick={() => { setTopicKey(''); setTopicDisplay('') }} title="Clear">✕</button></div>
+          <div className="al-verified">✓ {topicDisplay} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {topicKind === 'market' ? 'Market' : 'Trend'}</span> <button className="al-verified-x" onClick={() => { setTopicKey(''); setTopicDisplay('') }} title="Clear">✕</button></div>
         ) : matches.length > 0 ? (
           <div className="al-chips">{matches.map((s) => (
-            <button key={s.key} className="al-chip" onClick={() => { setTopicDisplay(s.display); setTopicKey(s.key) }}>{s.display}</button>
+            <button key={s.kind + ':' + s.key} className="al-chip" onClick={() => { setTopicDisplay(s.display); setTopicKey(s.key); setTopicKind(s.kind) }}>{s.display} <span style={{ opacity: 0.6, fontSize: 10 }}>{s.kind === 'market' ? 'Market' : 'Trend'}</span></button>
           ))}</div>
         ) : q.length >= 2 ? (
-          <div className="al-hint">Not in our database — only existing topics can be alerted on.</div>
+          <div className="al-hint">Not in our database — only existing topics or market signals can be alerted on.</div>
         ) : null}
 
         <label className="al-lbl">Score type</label>

@@ -478,7 +478,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 }
 
-export function Screener({ onRail, query = '', preset }: { onRail: (node: React.ReactNode | null) => void; query?: string; preset?: { filter: string; n: number } | null }) {
+export function Screener({ onRail, query = '', preset, focus }: { onRail: (node: React.ReactNode | null) => void; query?: string; preset?: { filter: string; n: number } | null; focus?: { key: string; display: string; n: number } | null }) {
   const [rows, setRows] = useState<Row[]>([])
   const [cats, setCats] = useState<{ key: string; label: string; count: number }[]>([])
   const [loading, setLoading] = useState(true)
@@ -585,6 +585,21 @@ export function Screener({ onRail, query = '', preset }: { onRail: (node: React.
     const row = rows.find((r) => r.topic_key === key)!
     onRail(<DetailRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
   }
+
+  // Focus = open a SPECIFIC topic's detail rail (from a favorite / watchlist /
+  // alert / history click). If the topic isn't in the loaded grid, build a stub
+  // row — DetailRail fetches the full live score by key on mount.
+  useEffect(() => {
+    if (!focus) return
+    const existing = rows.find((r) => r.topic_key === focus.key)
+    const row: Row = existing ?? {
+      topic_key: focus.key, topic_display: focus.display, detection_score: 0, confidence_score: 0,
+      det: 0, conf: 0, n: 0, gap: 0, stage: 'MONITORING', ageMin: 0,
+    } as Row
+    setSel(focus.key)
+    onRail(<DetailRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.n, rows])
 
   return (
     <>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView, Alert as RNAlert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Trash2, Plus, Minus, ChevronLeft, Search, X, CheckCircle } from 'lucide-react-native';
@@ -7,24 +7,26 @@ import { Screen } from '../../components/ui/Screen';
 import { Disclaimer } from '../../components/ui/Disclaimer';
 import { Button } from '../../components/ui/Button';
 import { alertsApi } from '../../lib/api';
-import { useSignals } from '../../hooks/useSignals';
+import { useSignals, useRiskScores } from '../../hooks/useSignals';
 import { ageLabel } from '../../lib/signals';
 
 const SCORE_TYPES = ['detection', 'confidence', 'overall'] as const;
-type Picked = { key: string; display: string };
+type Picked = { key: string; display: string; kind: 'topic' | 'market' };
 
 export default function Alerts() {
-  const params = useLocalSearchParams<{ topic?: string; key?: string }>();
+  const params = useLocalSearchParams<{ topic?: string; key?: string; kind?: string }>();
   const router = useRouter();
   const qc = useQueryClient();
   const { data: alerts = [], isLoading } = useQuery({ queryKey: ['alerts'], queryFn: () => alertsApi.list() });
   const { signals } = useSignals();
+  const { risks } = useRiskScores();
 
-  // Verified-only topic selection: an alert can ONLY target a topic that exists
-  // in our live data. Free text is never accepted (it would link to nothing).
+  // Verified-only selection: an alert can ONLY target a topic OR market signal
+  // that exists in our live data (same universe as the watchlist). Free text is
+  // never accepted (it would link to nothing).
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Picked | null>(
-    params.key ? { key: String(params.key), display: String(params.topic ?? params.key) } : null
+    params.key ? { key: String(params.key), display: String(params.topic ?? params.key), kind: (params.kind === 'market' ? 'market' : 'topic') } : null
   );
   const [scoreType, setScoreType] = useState<string>('detection');
   const [threshold, setThreshold] = useState(75);
@@ -36,18 +38,25 @@ export default function Alerts() {
   const reload = () => qc.invalidateQueries({ queryKey: ['alerts'] });
   const bump = (d: number) => setThreshold((t) => Math.max(0, Math.min(100, t + d)));
 
+  // Unified universe: trends + market signals (same as the watchlist).
+  const entities = useMemo<Picked[]>(() => [
+    ...risks.map((r: any) => ({ key: String(r.key), display: r.display || String(r.key), kind: 'market' as const })),
+    ...signals.map((s: any) => ({ key: String(s.id), display: s.topic || String(s.id), kind: 'topic' as const })),
+  ], [signals, risks]);
+
   const q = query.trim().toLowerCase();
   const matches = q.length >= 2
-    ? signals.filter((s) => (s.topic || '').toLowerCase().includes(q) || String(s.id).toLowerCase().includes(q)).slice(0, 8)
+    ? entities.filter((e) => e.display.toLowerCase().includes(q) || e.key.toLowerCase().includes(q)).slice(0, 8)
     : [];
 
   const create = async () => {
-    if (!picked) return;  // hard gate — must be a verified topic
+    if (!picked) return;  // hard gate — must be a verified entity
     setCreating(true);
     try {
       await alertsApi.create({
         topic_key: picked.key,
         topic_display: picked.display,
+        kind: picked.kind,
         score_type: scoreType,
         threshold,
         notify_push: push,
@@ -63,6 +72,14 @@ export default function Alerts() {
 
   const toggle = async (a: any) => { await alertsApi.update(a.id, { active: !a.active }); reload(); };
   const remove = async (a: any) => { await alertsApi.remove(a.id); reload(); };
+  // Tap an active alert → confirm → open the real detail page (signal or market).
+  const openDetail = (a: any) => {
+    const kind = a.kind === 'market' ? 'market' : 'topic';
+    RNAlert.alert('Open detail page?', `Go to the detail page for "${a.topic_display || a.topic_key}"?`, [
+      { text: 'No', style: 'cancel' },
+      { text: 'Yes', onPress: () => router.push(`/${kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(a.topic_key)}` as any) },
+    ]);
+  };
 
   return (
     <Screen scroll>
@@ -82,17 +99,17 @@ export default function Alerts() {
             <View className="w-9 h-9 rounded-full items-center justify-center mr-3" style={{ backgroundColor: '#00C89620' }}>
               <Bell size={16} color="#00C896" />
             </View>
-            <View className="flex-1 pr-2">
+            <TouchableOpacity className="flex-1 pr-2" onPress={() => openDetail(a)} activeOpacity={0.6}>
               <Text className="text-textPrimary font-semibold">{a.topic_display || a.topic_key}</Text>
               <Text className="text-textMuted text-xs mt-0.5">
-                When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
+                {a.kind === 'market' ? 'Market' : 'Trend'} · when {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
               {a.last_triggered_at && (
                 <Text className="text-[11px] font-bold mt-1" style={{ color: '#009970' }}>
                   🔔 Triggered {ageLabel(Date.parse(a.last_triggered_at))}
                 </Text>
               )}
-            </View>
+            </TouchableOpacity>
             <Switch value={a.active} onValueChange={() => toggle(a)} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
             <TouchableOpacity onPress={() => remove(a)} className="ml-2 p-1">
               <Trash2 size={18} color="#DC2626" />
@@ -103,12 +120,12 @@ export default function Alerts() {
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2 mt-5">Create new alert</Text>
       <View className="bg-surface rounded-2xl border border-border p-4">
-        <Text className="text-textMuted text-[11px] mb-1">Topic — search and select a verified topic</Text>
+        <Text className="text-textMuted text-[11px] mb-1">Topic — search and select a verified topic or market signal</Text>
         {picked ? (
           <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 border mb-3" style={{ borderColor: '#00C896' }}>
             <View className="flex-row items-center gap-2 flex-1">
               <CheckCircle size={16} color="#00C896" />
-              <Text className="text-textPrimary text-base flex-1">{picked.display}</Text>
+              <Text className="text-textPrimary text-base flex-1">{picked.display} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
             </View>
             <X size={16} color="#94A3B8" />
           </TouchableOpacity>
@@ -116,16 +133,16 @@ export default function Alerts() {
           <>
             <View className="flex-row items-center bg-bg rounded-lg px-3 border border-border mb-2">
               <Search size={16} color="#9AA3B0" />
-              <TextInput value={query} onChangeText={setQuery} placeholder="Type a topic to search…" placeholderTextColor="#9AA3B0" className="flex-1 py-2.5 ml-2" style={{ color: '#1A1A2E' }} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search a topic or market signal…" placeholderTextColor="#9AA3B0" className="flex-1 py-2.5 ml-2" style={{ color: '#1A1A2E' }} />
             </View>
             {q.length >= 2 && matches.length === 0 ? (
-              <Text className="text-textMuted text-xs mb-3">Not in our database — only existing topics can be alerted on.</Text>
+              <Text className="text-textMuted text-xs mb-3">Not in our database — only existing topics/market signals can be alerted on.</Text>
             ) : matches.length > 0 ? (
               <View className="mb-3">
-                {matches.map((s) => (
-                  <TouchableOpacity key={s.id} onPress={() => { setPicked({ key: String(s.id), display: s.topic }); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
-                    <Text className="text-textPrimary text-[15px]">{s.topic}</Text>
-                    <Text className="text-textMuted text-[11px]">Trend</Text>
+                {matches.map((e) => (
+                  <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
+                    <Text className="text-textPrimary text-[15px]">{e.display}</Text>
+                    <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

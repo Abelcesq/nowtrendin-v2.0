@@ -25,7 +25,7 @@ function gapMicro(det: number, conf: number) {
 }
 const stageOf = (d: number) => d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'MARGINAL' : 'MONITORING'
 
-export function Watchlists() {
+export function Watchlists({ onOpenDetail }: { onOpenDetail?: (key: string, kind: WatchKind, display: string) => void }) {
   const [lists, setLists] = useState<WatchlistT[]>([])
   const [live, setLive] = useState<Record<string, Live>>({})
   const [active, setActive] = useState<number | null>(null)
@@ -195,9 +195,10 @@ export function Watchlists() {
                 const det = lv?.det ?? 0, conf = lv?.conf ?? 0, gap = det - conf
                 const scored = !!lv
                 const gw = Math.abs(gap) >= 20 ? 'wide' : gap < 0 ? 'neg' : 'tight'
+                const go = () => { if (onOpenDetail && window.confirm(`Go to the detail page for "${it.display || it.key}"?`)) onOpenDetail(it.key, it.kind, it.display || it.key) }
                 return (
                   <tr key={it.id}>
-                    <td><div className="topic-name">{it.display || it.key}</div><div className="topic-cat">{it.kind === 'market' ? 'Market Signal' : 'Trend'}</div></td>
+                    <td><div className="topic-name link" onClick={go} title="Open detail page">{it.display || it.key}</div><div className="topic-cat">{it.kind === 'market' ? 'Market Signal' : 'Trend'}</div></td>
                     {scored ? (<>
                       <td className="r"><span className="score-cell det">{det}</span></td>
                       <td className="r"><span className="score-cell conf">{conf}</span></td>

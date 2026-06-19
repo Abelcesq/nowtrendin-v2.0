@@ -142,7 +142,7 @@ export const removeWatchItem = (id: number, itemId: number) =>
 // alert set on web fires for the same member on mobile). Score type detection /
 // confidence / overall; notify by push and/or email. ──
 export interface AlertT {
-  id: number; topic_key: string; topic_display?: string
+  id: number; topic_key: string; topic_display?: string; kind?: 'topic' | 'market'
   score_type: string; threshold: number
   notify_push: boolean; notify_email: boolean; notify_sms?: boolean
   active: boolean; last_triggered_at?: string | null

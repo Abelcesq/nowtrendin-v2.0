@@ -47,7 +47,10 @@ export function App() {
   // re-clicking re-applies even after navigating away).
   const [screen, setScreen] = useState<{ filter: string; n: number } | null>(null)
   const [marketScreen, setMarketScreen] = useState<{ filter: string; n: number } | null>(null)
-  const [histScreen, setHistScreen] = useState<{ topic: string; n: number } | null>(null)
+  // Open a SPECIFIC entity's detail rail (from a favorite / watchlist / alert /
+  // history click) — nonce-keyed so re-opening the same one re-fires.
+  const [trendFocus, setTrendFocus] = useState<{ key: string; display: string; n: number } | null>(null)
+  const [marketFocus, setMarketFocus] = useState<{ key: string; display: string; n: number } | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>(DEFAULT_FAVORITES)
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
@@ -73,10 +76,19 @@ export function App() {
 
   const go = (k: NavKey) => { setRail(null); setAccount(false); setNav(k) }
   const signOut = () => { logout(); setUser(null) }
+  // Open a specific entity's detail rail. Trends → Screener focus; market →
+  // MarketSignal focus. The view auto-opens the matching row's rail once loaded.
+  const openDetail = (key: string, kind: 'topic' | 'market' = 'topic', display = key) => {
+    setRail(null); setAccount(false)
+    if (kind === 'market') { setNav('market'); setMarketFocus((s) => ({ key, display, n: (s?.n ?? 0) + 1 })) }
+    else { setNav('trends'); setTrendFocus((s) => ({ key, display, n: (s?.n ?? 0) + 1 })) }
+  }
   const onFav = (f: Favorite) => {
     setRail(null); setAccount(false)
-    if (f.section === 'market') { setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
-    else if (f.section === 'history') { setNav('history'); setHistScreen((s) => ({ topic: f.filter || '', n: (s?.n ?? 0) + 1 })) }
+    // A "Track topic" favorite links to the ACTUAL entity detail (signal/market),
+    // not a filter. The other sections are saved filter-views.
+    if (f.section === 'history' && f.filter) openDetail(f.filter, f.kind === 'market' ? 'market' : 'topic', f.label)
+    else if (f.section === 'market') { setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
     else if (f.section === 'watchlist') setNav('watchlists')
     else { setNav('trends'); setScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
   }
@@ -85,13 +97,13 @@ export function App() {
   let body: ReactNode
   if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
   else if (nav === 'dashboard') body = <Dashboard onNav={go} />
-  else if (nav === 'trends') body = <Screener onRail={setRail} query={q} preset={screen} />
-  else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} />
-  else if (nav === 'watchlists') body = <Watchlists />
+  else if (nav === 'trends') body = <Screener onRail={setRail} query={q} preset={screen} focus={trendFocus} />
+  else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} />
+  else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
-  else if (nav === 'alerts') body = <Alerts />
-  else if (nav === 'history') body = <History preset={histScreen} />
+  else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
+  else if (nav === 'history') body = <History onOpenDetail={openDetail} />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 
