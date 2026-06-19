@@ -226,7 +226,9 @@ class ChangePasswordView(APIView):
         return Response({'detail': 'Password updated'})
 
 
-GRADIENT_API = os.environ.get('GRADIENT_API', 'https://nowtrendin-e62dcb9ecb69.herokuapp.com')
+# Default points at the v2.0 engine — NEVER the frozen 1.0 app. Prod sets the
+# GRADIENT_API config var explicitly; this fallback just keeps us off legacy 1.0.
+GRADIENT_API = os.environ.get('GRADIENT_API', 'https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com')
 
 
 class DirectQueryView(APIView):
