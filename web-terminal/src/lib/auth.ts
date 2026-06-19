@@ -127,6 +127,13 @@ export const updateAlert = (id: number, data: Partial<AlertT>) =>
 export const removeAlert = (id: number) =>
   call(`/api/alerts/${id}/`, { method: 'DELETE' }, true)
 
+// ── Dashboard layout — per-user customizable tiles, saved server-side so the
+// layout follows the member across web, desktop, and mobile. ──
+export interface DashTile { id: string; type: string; title?: string; config?: any }
+export const getDashboard = () => call('/api/dashboard/', {}, true) as Promise<{ tiles: DashTile[] }>
+export const saveDashboard = (tiles: DashTile[]) =>
+  call('/api/dashboard/', { method: 'PUT', body: JSON.stringify({ tiles }) }, true) as Promise<{ tiles: DashTile[] }>
+
 // ── Tier-gating — mirrors constants/tiers.ts so entitlements are identical
 // across platforms. The engine/backend remain the source of truth; this only
 // gates UI affordances. ──
