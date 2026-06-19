@@ -525,6 +525,32 @@ td.r{text-align:right}
 .al-err{font-size:12px; color:var(--down); margin:8px 0}
 .al-create{width:100%; height:44px; border:0; border-radius:10px; background:var(--conf); color:#fff; font-size:14px; font-weight:600; cursor:pointer; margin-top:12px}
 .al-create:disabled{opacity:.5; cursor:not-allowed}
+/* History view — windowed list with sparkline + trend, featured trajectory chart.
+   Prefixed hv- to avoid colliding with the detail-rail's .hist mini-list. */
+.hv{padding:16px; overflow-y:auto; max-width:760px}
+.hv-controls{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+.hv-wins{display:flex; gap:5px}
+.hv-win{font-size:12px; padding:5px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--text-2); cursor:pointer}
+.hv-win.on{background:var(--det); border-color:var(--det); color:#fff; font-weight:600}
+.hv-search{flex:1; height:34px; background:var(--early-soft); border:1px solid var(--early); border-radius:8px; padding:0 11px; font-size:13px; font-family:var(--sans); color:var(--text)}
+.hv-search::placeholder{color:#b07a4f}
+.hv-search:focus{outline:none; box-shadow:0 0 0 3px rgba(223,122,54,.25)}
+.hv-refresh{width:34px; height:34px; border-radius:8px; border:1px solid var(--line); background:var(--surface); cursor:pointer; display:grid; place-items:center; color:var(--text-2); flex:0 0 auto}
+.hv-feature{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:15px 17px; margin-bottom:16px}
+.hv-feat-head{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+.hv-feat-name{font-size:15px; font-weight:600; color:var(--text)}
+.hv-trend{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px}
+.hv-feat-scores{margin-left:auto; font-size:12px}
+.hv-legend{font-size:11px; color:var(--text-3); margin-top:6px}
+.hv-count{font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:6px}
+.hv-row{display:flex; align-items:center; gap:13px; padding:9px 6px; border-top:1px solid var(--line-2); cursor:pointer; border-radius:6px}
+.hv-row:hover{background:var(--line-2)}
+.hv-row.sel{background:var(--det-soft)}
+.hv-nm{flex:1; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:7px}
+.hv-anom{font-size:9px; font-weight:700; letter-spacing:.04em; color:var(--em-t); background:var(--em-b); padding:1px 6px; border-radius:4px}
+.hv-v{font-family:var(--mono); font-size:13px; font-weight:600; min-width:26px; text-align:right}
+.hv-arrow{display:grid; place-items:center; min-width:18px}
+.hv-empty{font-size:13px; color:var(--text-3); padding:14px 0; text-align:center}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#cfd6df; border-radius:5px; border:2px solid var(--surface)}
 .sidebar::-webkit-scrollbar-thumb{background:#273a54; border-color:var(--ink)}

@@ -67,8 +67,19 @@ export interface RiskRow {
   macro_leverage?: any
 }
 
+export interface HistoryPoint { t: string; overall: number; det: number; conf: number }
+export interface HistoryRow {
+  topic_key: string; topic_display: string; category?: string
+  overall: number; det: number; conf: number; n: number
+  stage?: string; is_anomaly?: boolean; scored_at?: string
+  series: HistoryPoint[]; trend: 'up' | 'down' | 'flat'; slope: number
+}
+
 export const api = {
   ledger: () => get<LedgerSummary>('/accuracy/ledger'),
+  historyRecent: (window = '7d', limit = 80) =>
+    get<{ window: string; count: number; results: HistoryRow[] }>(
+      `/history/recent?window=${window}&limit=${limit}`),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   ledgerDetail: (verdict = '') =>
     get<{ status: string; count: number; rows: LedgerRow[] }>(

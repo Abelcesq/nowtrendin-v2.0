@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   LayoutGrid, TrendingUp, DollarSign, Activity, Star, Bell, CheckCircle, Sparkles,
-  Search, type LucideIcon,
+  Search, Clock, type LucideIcon,
 } from 'lucide-react'
 import { TIER_LABEL, type User } from '../lib/auth'
 
 export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'grade'
-  | 'watchlists' | 'alerts' | 'ledger' | 'methodology'
+  | 'watchlists' | 'alerts' | 'history' | 'ledger' | 'methodology'
 
 // Phase 2 of the 3-platform UI migration (Charter §0.6): nav icons now come from
 // lucide-react (the web sibling of the mobile app's lucide-react-native), one icon =
@@ -19,6 +19,7 @@ const NAV: { key: NavKey; icon: LucideIcon; label: string }[] = [
   { key: 'grade', icon: Activity, label: 'Grade' },
   { key: 'watchlists', icon: Star, label: 'Watchlists' },
   { key: 'alerts', icon: Bell, label: 'Alerts' },
+  { key: 'history', icon: Clock, label: 'History' },
   { key: 'ledger', icon: CheckCircle, label: 'Accuracy Ledger' },
   { key: 'methodology', icon: Sparkles, label: 'Methodology' },
 ]

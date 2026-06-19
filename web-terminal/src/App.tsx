@@ -9,6 +9,7 @@ import { Account } from './views/Account'
 import { Grade } from './views/Grade'
 import { Dashboard } from './views/Dashboard'
 import { Alerts } from './views/Alerts'
+import { History } from './views/History'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
 
@@ -64,6 +65,7 @@ export function App() {
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts />
+  else if (nav === 'history') body = <History />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 
@@ -79,7 +81,7 @@ export function App() {
 function titleFor(k: NavKey): string {
   return ({
     dashboard: 'Dashboard', trends: 'Signal Screener', market: 'Market Signal',
-    grade: 'Grade', watchlists: 'Watchlists', alerts: 'Alerts',
+    grade: 'Grade', watchlists: 'Watchlists', alerts: 'Alerts', history: 'History',
     ledger: 'Accuracy Ledger', methodology: 'Methodology',
   } as Record<NavKey, string>)[k]
 }
