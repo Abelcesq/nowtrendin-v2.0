@@ -9,7 +9,7 @@ import { fetchScores, fetchRiskScores } from '../../../lib/gradientApi';
 // Favorites — saved filtered-view shortcuts, synced via /api/dashboard/ (matches the
 // web). "Track topic" is DB-validated: you can only pin a topic or market instrument
 // that actually exists in our data, and clicking opens its real detail.
-const SECTIONS = [['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic'], ['watchlist', 'Watchlist']] as const;
+const SECTIONS = [['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic']] as const;
 const OPTIONS: Record<string, { k: string; label: string }[]> = {
   trends: [{ k: 'nowtrendin', label: 'Now TrendIn' }, { k: 'all', label: 'All' }, { k: 'breakout', label: 'Breakout' }, { k: 'strong', label: 'Strong' }, { k: 'emerging', label: 'Emerging' }, { k: 'marginal', label: 'Marginal' }, { k: 'anomalies', label: 'Anomalies' }],
   market: [{ k: 'all', label: 'All' }, { k: 'elevated', label: 'Elevated' }, { k: 'active', label: 'Active' }, { k: 'building', label: 'Building' }, { k: 'routine', label: 'Routine' }, { k: 'dormant', label: 'Dormant' }, { k: 'leverage', label: 'Leverage ≥60' }],
@@ -23,9 +23,8 @@ export default function Favorites() {
   const [favs, setFavs] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [section, setSection] = useState<'trends' | 'market' | 'history' | 'watchlist'>('trends');
+  const [section, setSection] = useState<'trends' | 'market' | 'history'>('trends');
   const [filter, setFilter] = useState('breakout');
-  const [name, setName] = useState('');
   // Track-topic search (DB-validated)
   const [entities, setEntities] = useState<Entity[] | null>(null);
   const [query, setQuery] = useState('');
@@ -49,18 +48,16 @@ export default function Favorites() {
 
   const persist = (next: Favorite[]) => { setFavs(next); dashboardApi.saveFavorites(next).catch(() => {}); };
   const remove = (id: string) => persist(favs.filter((f) => f.id !== id));
-  const resetForm = () => { setAdding(false); setName(''); setQuery(''); setPicked(null); };
+  const resetForm = () => { setAdding(false); setQuery(''); setPicked(null); };
   const add = () => {
     let fav: Favorite;
     const color = COLORS[favs.length % COLORS.length];
     if (section === 'history') {
       if (!picked) return;   // must be a real DB entity
-      fav = { id: `fav_${Date.now()}`, label: name.trim() || picked.display, section: 'history', filter: picked.key, kind: picked.kind, color };
-    } else if (section === 'watchlist') {
-      fav = { id: `fav_${Date.now()}`, label: name.trim() || 'My watchlists', section: 'watchlist', color };
+      fav = { id: `fav_${Date.now()}`, label: picked.display, section: 'history', filter: picked.key, kind: picked.kind, color };
     } else {
       const opt = OPTIONS[section].find((o) => o.k === filter) || OPTIONS[section][0];
-      fav = { id: `fav_${Date.now()}`, label: name.trim() || opt.label, section, filter, color };
+      fav = { id: `fav_${Date.now()}`, label: opt.label, section, filter, color };
     }
     persist([...favs, fav]); resetForm();
   };
@@ -105,7 +102,7 @@ export default function Favorites() {
       ) : (
         <View className="bg-surface rounded-2xl border border-border p-4 mt-2">
           <Text className="text-textMuted text-[11px] mb-1.5">Section</Text>
-          <View className="flex-row flex-wrap mb-3">{SECTIONS.map(([s, label]) => chip(section === s, label, () => { setSection(s); setPicked(null); setQuery(''); if (s !== 'history' && s !== 'watchlist') setFilter(OPTIONS[s][0].k); }))}</View>
+          <View className="flex-row flex-wrap mb-3">{SECTIONS.map(([s, label]) => chip(section === s, label, () => { setSection(s); setPicked(null); setQuery(''); if (s !== 'history') setFilter(OPTIONS[s][0].k); }))}</View>
 
           {section === 'history' ? (
             <>
@@ -138,12 +135,11 @@ export default function Favorites() {
                 </>
               )}
             </>
-          ) : section !== 'watchlist' ? (
+          ) : (
             <><Text className="text-textMuted text-[11px] mb-1.5">Filter</Text>
               <View className="flex-row flex-wrap mb-3">{OPTIONS[section].map((o) => chip(filter === o.k, o.label, () => setFilter(o.k)))}</View></>
-          ) : null}
+          )}
 
-          <TextInput value={name} onChangeText={setName} placeholder="Name (optional)" placeholderTextColor="#9AA3B0" className="bg-bg rounded-lg px-3 py-2.5 border border-border mb-3" style={{ color: '#1A1A2E' }} />
           <View className="flex-row gap-2">
             <TouchableOpacity onPress={add} disabled={section === 'history' && !picked} className="flex-1 rounded-lg py-3 items-center" style={{ backgroundColor: section === 'history' && !picked ? '#9DDDC9' : '#00C896' }}>
               <Text className="text-white font-semibold">Add</Text>
