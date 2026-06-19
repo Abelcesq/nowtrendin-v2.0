@@ -411,14 +411,16 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
     onRail(<MarketRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
   }
 
-  // Focus = open a SPECIFIC instrument's detail rail (from a favorite / watchlist /
-  // alert). The market detail needs the full payload, so we open it once the row is
-  // in the loaded set; otherwise we filter the list to surface it.
+  // Focus = filter the list to a SPECIFIC instrument AND open its detail rail
+  // (from a favorite / watchlist / alert), so the user lands on the filtered word.
+  // The market detail needs the full payload, so the rail opens once the row is in
+  // the loaded set.
   useEffect(() => {
     if (!focus) return
+    setFilter('all')        // clear any tier filter that could hide it
+    setQ(focus.display)     // narrow the list to the focused instrument
     const row = rows.find((r) => r.key === focus.key)
     if (row) { setSel(focus.key); onRail(<MarketRail row={row} onClose={() => { setSel(null); onRail(null) }} />) }
-    else setQ(focus.display)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.n, rows])
 

@@ -25,15 +25,17 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
   const [err, setErr] = useState('')
 
   const reload = () => listAlerts().then(setAlerts).catch(() => {})
-  // Search the SAME universe as the watchlist — trends AND market signals — so a
-  // member can alert on either (e.g. SpaceX, a market signal).
   useEffect(() => {
     let alive = true
+    // Render the active-alerts list as soon as it loads — do NOT block it on the
+    // (slower) topic + market universe used only by the create-form search.
+    listAlerts().then((a) => { if (alive) setAlerts(a) }).catch(() => {}).finally(() => { if (alive) setLoading(false) })
+    // Search universe (trends + market signals) loads in the background so a member
+    // can alert on either (e.g. SpaceX, a market signal).
     Promise.all([
-      listAlerts().catch(() => [] as AlertT[]),
       api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key, kind: 'topic' as const }))).catch(() => [] as Ent[]),
       api.risk(200).then((r) => (r.results || []).map((x) => ({ key: x.risk_topic, display: x.risk_display || x.risk_topic, kind: 'market' as const }))).catch(() => [] as Ent[]),
-    ]).then(([a, ts, ms]) => { if (!alive) return; setAlerts(a); setSuggest([...(ms as Ent[]), ...(ts as Ent[])]) }).finally(() => alive && setLoading(false))
+    ]).then(([ts, ms]) => { if (alive) setSuggest([...(ms as Ent[]), ...(ts as Ent[])]) })
     return () => { alive = false }
   }, [])
 

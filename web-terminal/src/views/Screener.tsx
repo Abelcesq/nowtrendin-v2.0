@@ -587,10 +587,13 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
   }
 
   // Focus = open a SPECIFIC topic's detail rail (from a favorite / watchlist /
-  // alert / history click). If the topic isn't in the loaded grid, build a stub
-  // row — DetailRail fetches the full live score by key on mount.
+  // alert / history click) AND filter the grid to just that topic, so the user
+  // lands on the filtered word — not the whole list. If the topic isn't in the
+  // loaded grid, build a stub row — DetailRail fetches the full live score by key.
   useEffect(() => {
     if (!focus) return
+    setFilter('all')               // clear any signal-stage filter that could hide it
+    setTopicFilter(focus.display)  // narrow the list to the focused topic
     const existing = rows.find((r) => r.topic_key === focus.key)
     const row: Row = existing ?? {
       topic_key: focus.key, topic_display: focus.display, detection_score: 0, confidence_score: 0,
