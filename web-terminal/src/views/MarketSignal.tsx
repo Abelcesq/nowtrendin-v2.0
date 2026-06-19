@@ -143,6 +143,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
           <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : (mg.gap_state || `${Math.abs(row.gap)}-pt gap`)}{!mg.calibrating && ` · ${Math.abs(row.gap)}-pt gap`}</b>
           {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
+          {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</div>}
         </div>
         <div className="disc">Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). The gap shows how early the move is. Measurement only — not financial advice.</div>
       </div>
