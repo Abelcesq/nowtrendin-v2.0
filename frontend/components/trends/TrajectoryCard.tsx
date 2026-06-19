@@ -8,12 +8,15 @@ import { useScoreHistory } from '../../hooks/useSignals';
 // Mobile History trajectory graph — mirrors the web History feature pane. Shows
 // how a topic's Detection (blue) and Confidence (green) have scored over time.
 // Tapping a History row reveals THIS, rather than jumping to the full signal page.
-export function TrajectoryCard({ signal }: { signal: Signal }) {
+// The trajectory is clipped to the selected window (12h/24h/7d) so the chart
+// truly reflects the chosen clip — not the full unwindowed history.
+export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal; windowMs?: number; winLabel?: string }) {
   const router = useRouter();
   const { rows, isLoading } = useScoreHistory(signal.id);
   const col = stageColor(signal.stage);
 
-  const pts = [...rows].sort((a, b) => a.scoredAt - b.scoredAt); // oldest → newest
+  const cutoff = windowMs ? Date.now() - windowMs : 0;
+  const pts = [...rows].filter((r) => r.scoredAt >= cutoff).sort((a, b) => a.scoredAt - b.scoredAt); // oldest → newest
   const W = 320, H = 120, pad = 8;
   const n = pts.length;
   const xs = (i: number) => (n <= 1 ? W / 2 : pad + (i * (W - 2 * pad)) / (n - 1));
@@ -37,7 +40,8 @@ export function TrajectoryCard({ signal }: { signal: Signal }) {
         <ActivityIndicator color="#00C896" style={{ marginVertical: 24 }} />
       ) : pts.length < 2 ? (
         <Text className="text-textMuted text-xs py-7 text-center">
-          Not enough history yet for a trajectory — scores accumulate each collection cycle.
+          {pts.length === 1 ? `Only one scoring run in the last ${winLabel ?? 'window'} — not enough for a trajectory yet.`
+            : `Not enough history yet for a trajectory — scores accumulate each collection cycle.`}
         </Text>
       ) : (
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -49,7 +53,8 @@ export function TrajectoryCard({ signal }: { signal: Signal }) {
 
       <View className="flex-row items-center justify-between mt-1.5">
         <Text className="text-textMuted text-[10px]">
-          <Text style={{ color: '#2D7EEF' }}>● Detection</Text> · <Text style={{ color: '#00C896' }}>● Confidence</Text> · oldest → newest
+          <Text style={{ color: '#2D7EEF' }}>● Detection</Text> · <Text style={{ color: '#00C896' }}>● Confidence</Text>
+          {winLabel ? ` · ${pts.length} run${pts.length === 1 ? '' : 's'} in ${winLabel}` : ' · oldest → newest'}
         </Text>
         <TouchableOpacity onPress={() => router.push(`/signal/${signal.id}`)} className="flex-row items-center">
           <Text className="text-primary text-xs font-semibold">Full signal</Text>

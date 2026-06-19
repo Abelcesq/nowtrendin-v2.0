@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   LayoutGrid, TrendingUp, DollarSign, Activity, Star, Bell, CheckCircle, Sparkles,
-  Search, Clock, Pencil, Plus, X, Check, type LucideIcon,
+  Search, Clock, Pencil, Plus, X, type LucideIcon,
 } from 'lucide-react'
 import { TIER_LABEL, type User, type Favorite } from '../lib/auth'
 import { api } from '../lib/api'
@@ -160,9 +160,11 @@ export function Shell({
           </div>
           <div className="nav-label fav-label">
             Favorites
-            <span className="fav-edit" onClick={() => { setFavEdit(!favEdit); setShowAdd(false) }} title={favEdit ? 'Done' : 'Edit favorites'}>
-              {favEdit ? <Check size={13} /> : <Pencil size={12} />}
-            </span>
+            {favEdit ? (
+              <button className="fav-savebtn" onClick={() => { setFavEdit(false); setShowAdd(false); resetFav() }} title="Save and exit editing">Save</button>
+            ) : (
+              <button className="fav-editbtn" onClick={() => setFavEdit(true)} title="Edit favorites"><Pencil size={11} /> Edit</button>
+            )}
           </div>
           {favorites.map((f) => (
             <div className="screen-item" key={f.id} onClick={() => !favEdit && onFav?.(f)}>

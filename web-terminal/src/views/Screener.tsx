@@ -525,6 +525,8 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
   // filter + its ranking. Nonce-keyed so re-clicking the same screen re-applies.
   useEffect(() => {
     if (!preset) return
+    setTopicFilter('')   // clear any leftover topic filter from a prior "track-topic" focus
+    setSel(null); onRail(null)
     const f = SIGNAL_FILTERS.find((x) => x.k === preset.filter)
     if (f) { setFilter(f.k); if (f.sort) { setSortKey(f.sort); setSortDir(-1) } }
     // eslint-disable-next-line react-hooks/exhaustive-deps

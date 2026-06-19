@@ -113,7 +113,7 @@ export default function History() {
               <Text className="text-textMuted text-[10px] font-bold tracking-wider">SCORE TRAJECTORY</Text>
               <TouchableOpacity onPress={() => setSelected(null)}><Text className="text-textMuted text-[11px]">Hide</Text></TouchableOpacity>
             </View>
-            <TrajectoryCard signal={selected} />
+            <TrajectoryCard signal={selected} windowMs={windowMs} winLabel={winLabel} />
           </View>
         )}
       </View>

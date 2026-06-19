@@ -86,11 +86,12 @@ export function App() {
   const onFav = (f: Favorite) => {
     setRail(null); setAccount(false)
     // A "Track topic" favorite links to the ACTUAL entity detail (signal/market),
-    // not a filter. The other sections are saved filter-views.
+    // not a filter. The other sections are saved filter-views — clear any prior
+    // track-topic focus so its leftover row-filter doesn't hide the filtered list.
     if (f.section === 'history' && f.filter) openDetail(f.filter, f.kind === 'market' ? 'market' : 'topic', f.label)
-    else if (f.section === 'market') { setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
+    else if (f.section === 'market') { setTrendFocus(null); setMarketFocus(null); setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
     else if (f.section === 'watchlist') setNav('watchlists')
-    else { setNav('trends'); setScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
+    else { setTrendFocus(null); setMarketFocus(null); setNav('trends'); setScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
   }
   const onFavChange = (next: Favorite[]) => { setFavorites(next); saveFavorites(next).catch(() => {}) }
 

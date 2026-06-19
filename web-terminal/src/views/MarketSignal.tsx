@@ -379,6 +379,8 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   // Favorite (market) click → apply the saved tier/leverage filter. Nonce-keyed.
   useEffect(() => {
     if (!preset) return
+    setQ('')             // clear any leftover instrument filter from a prior "track-topic" focus
+    setSel(null); onRail(null)
     if (FILTERS.some((f) => f.k === preset.filter)) setFilter(preset.filter)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.n])
