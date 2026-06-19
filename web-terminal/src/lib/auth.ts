@@ -110,6 +110,23 @@ export const addWatchItem = (id: number, item: { key: string; display?: string; 
 export const removeWatchItem = (id: number, itemId: number) =>
   call(`/api/watchlists/${id}/items/${itemId}/`, { method: 'DELETE' }, true)
 
+// ── Alerts — score-threshold alerts (SAME backend the mobile app uses, so an
+// alert set on web fires for the same member on mobile). Score type detection /
+// confidence / overall; notify by push and/or email. ──
+export interface AlertT {
+  id: number; topic_key: string; topic_display?: string
+  score_type: string; threshold: number
+  notify_push: boolean; notify_email: boolean
+  active: boolean; last_triggered_at?: string | null
+}
+export const listAlerts = () => call('/api/alerts/', {}, true) as Promise<AlertT[]>
+export const createAlert = (data: Partial<AlertT>) =>
+  call('/api/alerts/', { method: 'POST', body: JSON.stringify(data) }, true) as Promise<AlertT>
+export const updateAlert = (id: number, data: Partial<AlertT>) =>
+  call(`/api/alerts/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }, true) as Promise<AlertT>
+export const removeAlert = (id: number) =>
+  call(`/api/alerts/${id}/`, { method: 'DELETE' }, true)
+
 // ── Tier-gating — mirrors constants/tiers.ts so entitlements are identical
 // across platforms. The engine/backend remain the source of truth; this only
 // gates UI affordances. ──

@@ -8,6 +8,7 @@ import { Methodology } from './views/Methodology'
 import { Account } from './views/Account'
 import { Grade } from './views/Grade'
 import { Dashboard } from './views/Dashboard'
+import { Alerts } from './views/Alerts'
 import { Login } from './views/Login'
 import { fetchMe, logout, type User } from './lib/auth'
 
@@ -62,6 +63,7 @@ export function App() {
   else if (nav === 'watchlists') body = <Watchlists />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
+  else if (nav === 'alerts') body = <Alerts />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 
