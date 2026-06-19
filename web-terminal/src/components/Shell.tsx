@@ -121,7 +121,7 @@ export function Shell({
       {/* FOOTER */}
       <footer className="footer">
         <span className="live">●</span>
-        <span>Measurement, not investment advice — not a recommendation or risk rating.</span>
+        <span>All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</span>
         <span className="sep">|</span>
         <a className="foot-link" href="https://nowtrendin.com/terms/" target="_blank" rel="noopener noreferrer">Terms</a>
         <a className="foot-link" href="https://nowtrendin.com/privacy/" target="_blank" rel="noopener noreferrer">Privacy</a>

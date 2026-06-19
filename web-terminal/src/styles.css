@@ -336,8 +336,8 @@ td.r{text-align:right}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Footer */
-.footer{background:var(--ink); color:var(--ink-text-3); display:flex; align-items:center; gap:16px; padding:0 16px; font-size:10.5px; border-top:1px solid var(--ink-line)}
-.footer .sep{color:var(--ink-line)}
+.footer{background:var(--ink); color:#ffffff; display:flex; align-items:center; gap:16px; padding:0 16px; font-size:10.5px; border-top:1px solid var(--ink-line)}
+.footer .sep{color:var(--ink-text-2)}
 .footer .live{color:var(--conf)}
 .footer .right{margin-left:auto; font-family:var(--mono)}
 
