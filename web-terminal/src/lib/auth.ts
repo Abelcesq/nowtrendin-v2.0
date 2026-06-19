@@ -131,7 +131,7 @@ export const removeAlert = (id: number) =>
 // layout follows the member across web, desktop, and mobile. ──
 export interface DashTile { id: string; type: string; title?: string; config?: any }
 // Favorites — saved filtered-view shortcuts in the sidebar (section + filter).
-export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'watchlist'; filter?: string; color?: string }
+export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'history' | 'watchlist'; filter?: string; kind?: 'topic' | 'market'; color?: string }
 export const getDashboard = () => call('/api/dashboard/', {}, true) as Promise<{ tiles: DashTile[]; favorites: Favorite[] }>
 export const saveDashboard = (tiles: DashTile[]) =>
   call('/api/dashboard/', { method: 'PUT', body: JSON.stringify({ tiles }) }, true) as Promise<{ tiles: DashTile[] }>

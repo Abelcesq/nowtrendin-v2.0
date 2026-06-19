@@ -4,6 +4,7 @@ import {
   Search, Clock, Pencil, Plus, X, Check, type LucideIcon,
 } from 'lucide-react'
 import { TIER_LABEL, type User, type Favorite } from '../lib/auth'
+import { api } from '../lib/api'
 
 // Filter options a Favorite can target (label + key) per section.
 const FAV_OPTIONS: Record<string, { k: string; label: string }[]> = {
@@ -80,19 +81,32 @@ export function Shell({
   const [showAdd, setShowAdd] = useState(false)
   const [favSection, setFavSection] = useState<'trends' | 'market' | 'history' | 'watchlist'>('trends')
   const [favFilter, setFavFilter] = useState('breakout')
-  const [favTopic, setFavTopic] = useState('')
+  const [favQuery, setFavQuery] = useState('')
   const [favName, setFavName] = useState('')
+  const [favEnts, setFavEnts] = useState<{ key: string; display: string; kind: 'topic' | 'market' }[] | null>(null)
+  const [favPicked, setFavPicked] = useState<{ key: string; display: string; kind: 'topic' | 'market' } | null>(null)
+  // Lazy-load the searchable universe (topics + market instruments) so "Track topic"
+  // can only pin an entity that actually exists in our database.
+  useEffect(() => {
+    if (favSection !== 'history' || favEnts !== null) return
+    setFavEnts([])
+    Promise.all([
+      api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key, kind: 'topic' as const }))).catch(() => []),
+      api.risk(200).then((r) => (r.results || []).map((x) => ({ key: x.risk_topic, display: x.risk_display || x.risk_topic, kind: 'market' as const }))).catch(() => []),
+    ]).then(([ts, ms]) => setFavEnts([...ms, ...ts]))
+  }, [favSection, favEnts])
+  const favMatches = (favEnts || []).filter((e) => favQuery.trim().length >= 2 && e.display.toLowerCase().includes(favQuery.trim().toLowerCase())).slice(0, 6)
+  const resetFav = () => { setShowAdd(false); setFavName(''); setFavQuery(''); setFavPicked(null) }
   const addFavorite = () => {
     let fav: Favorite
     if (favSection === 'history') {
-      if (!favTopic.trim()) return
-      const key = favTopic.trim().toLowerCase().replace(/\s+/g, '_')
-      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || favTopic.trim(), section: 'history', filter: key, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
+      if (!favPicked) return
+      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || favPicked.display, section: 'history', filter: favPicked.key, kind: favPicked.kind, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
     } else {
       const opt = FAV_OPTIONS[favSection].find((o) => o.k === favFilter) || FAV_OPTIONS[favSection][0]
       fav = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || opt.label, section: favSection, filter: favFilter, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
     }
-    onFavChange?.([...favorites, fav]); setShowAdd(false); setFavName(''); setFavTopic('')
+    onFavChange?.([...favorites, fav]); resetFav()
   }
   const removeFavorite = (id: string) => onFavChange?.(favorites.filter((f) => f.id !== id))
   return (
@@ -164,11 +178,20 @@ export function Shell({
             <div className="fav-form">
               <div className="fav-frow">
                 {([['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic'], ['watchlist', 'Watchlist']] as const).map(([s, label]) => (
-                  <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); if (s !== 'history' && s !== 'watchlist') setFavFilter(FAV_OPTIONS[s][0].k) }}>{label}</button>
+                  <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); setFavPicked(null); setFavQuery(''); if (s !== 'history' && s !== 'watchlist') setFavFilter(FAV_OPTIONS[s][0].k) }}>{label}</button>
                 ))}
               </div>
               {favSection === 'history' ? (
-                <input className="fav-input" value={favTopic} placeholder="Type a topic to track…" onChange={(e) => setFavTopic(e.target.value)} />
+                favPicked ? (
+                  <div className="fav-picked" onClick={() => setFavPicked(null)} title="Clear">{favPicked.display} <span>· {favPicked.kind === 'market' ? 'Market' : 'Trend'}</span> <X size={12} /></div>
+                ) : (
+                  <>
+                    <input className="fav-input" value={favQuery} placeholder="Search a topic or ticker…" onChange={(e) => setFavQuery(e.target.value)} />
+                    {favEnts === null ? <div className="fav-hint">Loading…</div>
+                      : favQuery.trim().length >= 2 && favMatches.length === 0 ? <div className="fav-hint">Not in our database — only existing topics/instruments can be tracked.</div>
+                        : favMatches.map((e) => <div key={e.kind + ':' + e.key} className="fav-sugg" onClick={() => { setFavPicked(e); setFavQuery('') }}>{e.display}<span>{e.kind === 'market' ? 'Market' : 'Trend'}</span></div>)}
+                  </>
+                )
               ) : favSection !== 'watchlist' && (
                 <select className="fav-select" value={favFilter} onChange={(e) => setFavFilter(e.target.value)}>
                   {FAV_OPTIONS[favSection].map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
@@ -176,8 +199,8 @@ export function Shell({
               )}
               <input className="fav-input" value={favName} placeholder="Name (optional)" onChange={(e) => setFavName(e.target.value)} />
               <div className="fav-frow">
-                <button className="fav-save" onClick={addFavorite}>Add</button>
-                <button className="fav-cancel" onClick={() => setShowAdd(false)}>Cancel</button>
+                <button className="fav-save" onClick={addFavorite} disabled={favSection === 'history' && !favPicked} style={favSection === 'history' && !favPicked ? { opacity: 0.5 } : undefined}>Add</button>
+                <button className="fav-cancel" onClick={resetFav}>Cancel</button>
               </div>
             </div>
           )}
