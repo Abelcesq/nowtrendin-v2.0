@@ -9,6 +9,9 @@ export default function ProfileLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="accuracy" />
       <Stack.Screen name="watchlists" />
+      <Stack.Screen name="favorites" />
+      <Stack.Screen name="methodology" />
+      <Stack.Screen name="billing" />
       <Stack.Screen name="legal" />
     </Stack>
   );

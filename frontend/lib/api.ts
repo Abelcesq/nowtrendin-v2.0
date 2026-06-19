@@ -27,9 +27,19 @@ export const api = {
   get: (path: string) => request(path, { method: 'GET' }),
   post: (path: string, body?: object) =>
     request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+  put: (path: string, body?: object) =>
+    request(path, { method: 'PUT', body: JSON.stringify(body ?? {}) }),
   patch: (path: string, body?: object) =>
     request(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   delete: (path: string) => request(path, { method: 'DELETE' }),
+};
+
+// Customizable dashboard + Favorites — same /api/dashboard/ the web terminal uses,
+// so layout + favorites are identical across web, desktop, and mobile.
+export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'history' | 'watchlist'; filter?: string; color?: string }
+export const dashboardApi = {
+  get: () => api.get('/api/dashboard/') as Promise<{ tiles: any[]; favorites: Favorite[] }>,
+  saveFavorites: (favorites: Favorite[]) => api.put('/api/dashboard/', { favorites }) as Promise<{ favorites: Favorite[] }>,
 };
 
 export const queryApi = {

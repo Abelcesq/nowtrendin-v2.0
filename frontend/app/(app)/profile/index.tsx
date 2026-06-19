@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { User, Bell, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2, Target, Star } from 'lucide-react-native';
+import { User, Bell, BellRing, Sparkles, CreditCard, Shield, FileText, LogOut, ChevronRight, Zap, Briefcase, Building2, Target, Star } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { useAuthStore } from '../../../store/auth.store';
 import { TIERS, TierID } from '../../../constants/tiers';
@@ -50,11 +50,14 @@ export default function Profile() {
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Account</Text>
       <Row icon={<User size={18} color="#94A3B8" />} label="Edit Profile" onPress={() => router.push('/profile/edit')} />
+      <Row icon={<BellRing size={18} color="#94A3B8" />} label="Alerts" onPress={() => router.push('/alerts')} />
       <Row icon={<Bell size={18} color="#94A3B8" />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
-      <Row icon={<CreditCard size={18} color="#94A3B8" />} label="Billing" />
+      <Row icon={<CreditCard size={18} color="#94A3B8" />} label="Billing" onPress={() => router.push('/profile/billing')} />
       <Row icon={<Shield size={18} color="#94A3B8" />} label="Membership" onPress={() => router.push('/profile/membership')} />
       <Row icon={<Star size={18} color="#94A3B8" />} label="Watchlists" onPress={() => router.push('/profile/watchlists')} />
+      <Row icon={<Star size={18} color="#94A3B8" />} label="Favorites" onPress={() => router.push('/profile/favorites')} />
       <Row icon={<Target size={18} color="#94A3B8" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
+      <Row icon={<Sparkles size={18} color="#94A3B8" />} label="Methodology" onPress={() => router.push('/profile/methodology')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
       <Row icon={<FileText size={18} color="#94A3B8" />} label="Legal Documents" onPress={() => router.push('/profile/legal')} />
