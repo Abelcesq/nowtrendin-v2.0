@@ -14,11 +14,30 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, Alert, GradeHistory, Watchlist, WatchlistItem
+from .models import Profile, Alert, GradeHistory, Watchlist, WatchlistItem, DashboardLayout
 from .serializers import (
     SignupSerializer, UserSerializer, AlertSerializer,
     WatchlistSerializer, WatchlistItemSerializer,
 )
+
+
+class DashboardView(APIView):
+    """GET/PUT the member's customizable dashboard layout (ordered tile configs).
+    Stored per-user so it follows them across web, desktop, and mobile."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        obj, _ = DashboardLayout.objects.get_or_create(user=request.user)
+        return Response({'tiles': obj.tiles or []})
+
+    def put(self, request):
+        tiles = request.data.get('tiles', [])
+        if not isinstance(tiles, list):
+            return Response({'detail': 'tiles must be a list'}, status=400)
+        obj, _ = DashboardLayout.objects.get_or_create(user=request.user)
+        obj.tiles = tiles
+        obj.save()
+        return Response({'tiles': obj.tiles})
 
 TIER_TOKENS = {'consumer': 0, 'business': 0, 'enterprise': 100000}
 # Monthly AI-grade credits per tier (grade ≈ $0.012 each; caps the exposure).

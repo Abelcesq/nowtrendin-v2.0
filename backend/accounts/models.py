@@ -92,3 +92,12 @@ class WatchlistItem(models.Model):
 
     def __str__(self):
         return f"{self.display or self.key} in {self.watchlist.name}"
+
+
+class DashboardLayout(models.Model):
+    """Per-user customizable dashboard — an ordered list of tile configs (built-in
+    tiles + user-created custom 'metric' tiles). Saved server-side so the layout
+    follows the member across web, desktop, and mobile."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dashboard')
+    tiles = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
