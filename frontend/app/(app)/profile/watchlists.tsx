@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch, Alert as RNAlert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Plus, X, Star } from 'lucide-react-native';
+import { ChevronLeft, Plus, X, Star, Search } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { watchlistApi } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
@@ -23,7 +23,8 @@ export default function ProfileWatchlists() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [adding, setAdding] = useState('');
+  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<{ key: string; display: string; kind: 'topic' | 'market' } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // live score lookup keyed by `${kind}:${key}`
@@ -68,18 +69,26 @@ export default function ProfileWatchlists() {
       } },
     ]);
   };
+  // Searchable universe (accessible trends + all market signals), built from the
+  // same live lookup so we only ever add a VERIFIED, linkable entity.
+  const entities = useMemo(() => Object.entries(live).map(([k, v]) => {
+    const kind = k.split(':')[0] as 'topic' | 'market';
+    const key = k.split(':').slice(1).join(':');
+    return { key, display: v.label, kind };
+  }), [live]);
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return entities.filter((e) => e.display.toLowerCase().includes(q) || e.key.toLowerCase().includes(q)).slice(0, 8);
+  }, [entities, query]);
+
   const addItem = async () => {
-    const raw = adding.trim(); if (!raw || !current) return;
-    const q = raw.toLowerCase();
-    const found = Object.entries(live).find(([, v]) => v.label.toLowerCase() === q) ||
-      Object.entries(live).find(([k]) => k.endsWith(`:${q}`));
-    const [kind, key] = found ? [found[0].split(':')[0], found[0].split(':').slice(1).join(':')] : ['topic', raw];
-    const display = found ? found[1].label : raw;
+    if (!current || !picked) return;   // hard gate — must be a verified entity
     setBusy(true);
     try {
-      const item = await watchlistApi.addItem(current.id, { key, display, kind: kind as 'topic' | 'market' });
+      const item = await watchlistApi.addItem(current.id, { key: picked.key, display: picked.display, kind: picked.kind });
       setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, items: [...l.items.filter((i) => i.key !== item.key), item] } : l));
-      setAdding('');
+      setPicked(null); setQuery('');
     } catch { setErr('Could not add item.'); } finally { setBusy(false); }
   };
   const removeItem = async (itemId: number) => {
@@ -125,15 +134,39 @@ export default function ProfileWatchlists() {
       </View>
       {current && <Text className="text-textMuted text-[11px] mb-3">Long-press a list to delete it.</Text>}
 
-      {/* add row */}
+      {/* add row — verified search: only a real, linkable topic/instrument can be added */}
       {current && (
-        <View className="flex-row gap-2 mb-4">
-          <TextInput value={adding} onChangeText={setAdding} onSubmitEditing={addItem} placeholder="Add a topic or instrument…"
-            placeholderTextColor="#9AA3B0"
-            className="flex-1 h-11 px-3 rounded-xl border border-border bg-surface text-textPrimary" />
-          <TouchableOpacity onPress={addItem} disabled={busy} className="h-11 px-4 rounded-xl items-center justify-center" style={{ backgroundColor: '#1A1A2E' }}>
-            <Text className="text-white font-bold text-sm">Add</Text>
-          </TouchableOpacity>
+        <View className="mb-4">
+          {picked ? (
+            <View className="flex-row gap-2">
+              <TouchableOpacity onPress={() => setPicked(null)} className="flex-1 flex-row items-center justify-between bg-surface rounded-xl px-3 h-11 border" style={{ borderColor: '#00C896' }}>
+                <Text className="text-textPrimary text-sm flex-1" numberOfLines={1}>{picked.display} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
+                <X size={16} color="#94A3B8" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={addItem} disabled={busy} className="h-11 px-4 rounded-xl items-center justify-center" style={{ backgroundColor: '#1A1A2E' }}>
+                <Text className="text-white font-bold text-sm">Add</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View className="flex-row items-center bg-surface rounded-xl px-3 h-11 border border-border">
+                <Search size={16} color="#9AA3B0" />
+                <TextInput value={query} onChangeText={setQuery} placeholder="Search a topic or instrument to add…" placeholderTextColor="#9AA3B0" className="flex-1 ml-2 text-textPrimary" style={{ color: '#1A1A2E' }} />
+              </View>
+              {query.trim().length >= 2 && matches.length === 0 ? (
+                <Text className="text-textMuted text-xs mt-2">Not in our database — only existing topics/instruments can be added.</Text>
+              ) : matches.length > 0 ? (
+                <View className="bg-surface rounded-xl border border-border mt-2 overflow-hidden">
+                  {matches.map((e) => (
+                    <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between px-3 py-2.5 border-b border-border">
+                      <Text className="text-textPrimary text-[15px]">{e.display}</Text>
+                      <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          )}
         </View>
       )}
 

@@ -26,18 +26,25 @@ export function Alerts() {
     let alive = true
     Promise.all([
       listAlerts().catch(() => [] as AlertT[]),
-      api.topics(8).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key }))).catch(() => []),
+      api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key }))).catch(() => []),
     ]).then(([a, s]) => { if (!alive) return; setAlerts(a); setSuggest(s) }).finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [])
 
+  // Verified-only: an alert can be created only for a topic that exists in our
+  // live data (topicKey is set by picking a match, never by free text).
+  const q = topicDisplay.trim().toLowerCase()
+  const matches = !topicKey && q.length >= 2
+    ? suggest.filter((s) => s.display.toLowerCase().includes(q) || s.key.toLowerCase().includes(q)).slice(0, 8)
+    : []
+
   const bump = (d: number) => setThreshold((t) => Math.max(0, Math.min(100, t + d)))
   const create = async () => {
-    if (!topicDisplay.trim()) return
+    if (!topicKey) return  // hard gate — must be a verified topic
     setBusy(true); setErr('')
     try {
       await createAlert({
-        topic_key: topicKey || topicDisplay.trim().toLowerCase().replace(/\s+/g, '_'),
+        topic_key: topicKey,
         topic_display: topicDisplay.trim(), score_type: scoreType, threshold,
         notify_push: push, notify_email: email, notify_sms: sms,
       })
@@ -73,14 +80,18 @@ export function Alerts() {
 
       <div className="al-sect" style={{ marginTop: 18 }}>Create new alert</div>
       <div className="al-form">
-        <label className="al-lbl">Topic</label>
-        <input className="al-input" value={topicDisplay} placeholder="Type or pick a topic"
+        <label className="al-lbl">Topic — search and select a verified topic</label>
+        <input className="al-input" value={topicDisplay} placeholder="Type a topic to search…"
           onChange={(e) => { setTopicDisplay(e.target.value); setTopicKey('') }} />
-        {suggest.length > 0 && (
-          <div className="al-chips">{suggest.map((s) => (
+        {topicKey ? (
+          <div className="al-verified">✓ {topicDisplay} <button className="al-verified-x" onClick={() => { setTopicKey(''); setTopicDisplay('') }} title="Clear">✕</button></div>
+        ) : matches.length > 0 ? (
+          <div className="al-chips">{matches.map((s) => (
             <button key={s.key} className="al-chip" onClick={() => { setTopicDisplay(s.display); setTopicKey(s.key) }}>{s.display}</button>
           ))}</div>
-        )}
+        ) : q.length >= 2 ? (
+          <div className="al-hint">Not in our database — only existing topics can be alerted on.</div>
+        ) : null}
 
         <label className="al-lbl">Score type</label>
         <div className="al-chips">{SCORE_TYPES.map((st) => (
@@ -102,7 +113,7 @@ export function Alerts() {
           <button className={'al-toggle' + (sms ? ' on' : '')} onClick={() => setSms(!sms)} /></div>
 
         {err && <div className="al-err">{err}</div>}
-        <button className="al-create" disabled={!topicDisplay.trim() || busy} onClick={create}>{busy ? 'Creating…' : 'Create Alert'}</button>
+        <button className="al-create" disabled={!topicKey || busy} onClick={create}>{busy ? 'Creating…' : topicKey ? 'Create Alert' : 'Select a topic first'}</button>
       </div>
 
       <div className="disc" style={{ textAlign: 'center', marginTop: 14 }}>Now TrendIn provides signal analysis for informational purposes only — not financial, investment, or legal advice.</div>

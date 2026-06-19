@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Trash2, Plus, Minus } from 'lucide-react-native';
+import { Bell, Trash2, Plus, Minus, ChevronLeft, Search, X, CheckCircle } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Disclaimer } from '../../components/ui/Disclaimer';
 import { Button } from '../../components/ui/Button';
@@ -11,15 +11,21 @@ import { useSignals } from '../../hooks/useSignals';
 import { ageLabel } from '../../lib/signals';
 
 const SCORE_TYPES = ['detection', 'confidence', 'overall'] as const;
+type Picked = { key: string; display: string };
 
 export default function Alerts() {
   const params = useLocalSearchParams<{ topic?: string; key?: string }>();
+  const router = useRouter();
   const qc = useQueryClient();
   const { data: alerts = [], isLoading } = useQuery({ queryKey: ['alerts'], queryFn: () => alertsApi.list() });
   const { signals } = useSignals();
 
-  const [topicDisplay, setTopicDisplay] = useState(params.topic ?? '');
-  const [topicKey, setTopicKey] = useState(params.key ?? '');
+  // Verified-only topic selection: an alert can ONLY target a topic that exists
+  // in our live data. Free text is never accepted (it would link to nothing).
+  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<Picked | null>(
+    params.key ? { key: String(params.key), display: String(params.topic ?? params.key) } : null
+  );
   const [scoreType, setScoreType] = useState<string>('detection');
   const [threshold, setThreshold] = useState(75);
   const [push, setPush] = useState(true);
@@ -30,21 +36,25 @@ export default function Alerts() {
   const reload = () => qc.invalidateQueries({ queryKey: ['alerts'] });
   const bump = (d: number) => setThreshold((t) => Math.max(0, Math.min(100, t + d)));
 
+  const q = query.trim().toLowerCase();
+  const matches = q.length >= 2
+    ? signals.filter((s) => (s.topic || '').toLowerCase().includes(q) || String(s.id).toLowerCase().includes(q)).slice(0, 8)
+    : [];
+
   const create = async () => {
-    if (!topicDisplay.trim()) return;
+    if (!picked) return;  // hard gate — must be a verified topic
     setCreating(true);
     try {
       await alertsApi.create({
-        topic_key: topicKey || topicDisplay.trim().toLowerCase().replace(/\s+/g, '_'),
-        topic_display: topicDisplay.trim(),
+        topic_key: picked.key,
+        topic_display: picked.display,
         score_type: scoreType,
         threshold,
         notify_push: push,
         notify_email: email,
         notify_sms: sms,
       });
-      setTopicDisplay('');
-      setTopicKey('');
+      setPicked(null); setQuery('');
       reload();
     } finally {
       setCreating(false);
@@ -54,11 +64,12 @@ export default function Alerts() {
   const toggle = async (a: any) => { await alertsApi.update(a.id, { active: !a.active }); reload(); };
   const remove = async (a: any) => { await alertsApi.remove(a.id); reload(); };
 
-  const suggestions = signals.slice(0, 8);
-
   return (
     <Screen scroll>
-      <Text className="text-textPrimary text-2xl font-bold pt-4 mb-4">Alerts</Text>
+      <TouchableOpacity onPress={() => router.push('/profile')} className="pt-4 mb-2 self-start flex-row items-center gap-1">
+        <ChevronLeft size={22} color="#5B6472" /><Text className="text-textSecondary text-base">Profile</Text>
+      </TouchableOpacity>
+      <Text className="text-textPrimary text-2xl font-bold mb-4">Alerts</Text>
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Active alerts</Text>
       {isLoading ? (
@@ -92,23 +103,34 @@ export default function Alerts() {
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2 mt-5">Create new alert</Text>
       <View className="bg-surface rounded-2xl border border-border p-4">
-        <Text className="text-textMuted text-[11px] mb-1">Topic</Text>
-        <TextInput
-          value={topicDisplay}
-          onChangeText={(t) => { setTopicDisplay(t); setTopicKey(''); }}
-          placeholder="Type or pick a topic"
-          placeholderTextColor="#9AA3B0"
-          className="bg-bg rounded-lg px-3 py-2.5 border border-border mb-2"
-          style={{ color: '#1A1A2E' }}
-        />
-        {!!suggestions.length && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} className="mb-3">
-            {suggestions.map((s) => (
-              <TouchableOpacity key={s.id} onPress={() => { setTopicDisplay(s.topic); setTopicKey(s.id); }} className="px-3 py-1.5 rounded-full border border-border bg-bg">
-                <Text className="text-textSecondary text-xs">{s.topic}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        <Text className="text-textMuted text-[11px] mb-1">Topic — search and select a verified topic</Text>
+        {picked ? (
+          <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 border mb-3" style={{ borderColor: '#00C896' }}>
+            <View className="flex-row items-center gap-2 flex-1">
+              <CheckCircle size={16} color="#00C896" />
+              <Text className="text-textPrimary text-base flex-1">{picked.display}</Text>
+            </View>
+            <X size={16} color="#94A3B8" />
+          </TouchableOpacity>
+        ) : (
+          <>
+            <View className="flex-row items-center bg-bg rounded-lg px-3 border border-border mb-2">
+              <Search size={16} color="#9AA3B0" />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Type a topic to search…" placeholderTextColor="#9AA3B0" className="flex-1 py-2.5 ml-2" style={{ color: '#1A1A2E' }} />
+            </View>
+            {q.length >= 2 && matches.length === 0 ? (
+              <Text className="text-textMuted text-xs mb-3">Not in our database — only existing topics can be alerted on.</Text>
+            ) : matches.length > 0 ? (
+              <View className="mb-3">
+                {matches.map((s) => (
+                  <TouchableOpacity key={s.id} onPress={() => { setPicked({ key: String(s.id), display: s.topic }); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
+                    <Text className="text-textPrimary text-[15px]">{s.topic}</Text>
+                    <Text className="text-textMuted text-[11px]">Trend</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </>
         )}
 
         <Text className="text-textMuted text-[11px] mb-1">Score type</Text>
@@ -150,8 +172,8 @@ export default function Alerts() {
           <Switch value={sms} onValueChange={setSms} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
         </View>
 
-        <Button onPress={create} loading={creating} disabled={!topicDisplay.trim()} size="lg">
-          Create Alert
+        <Button onPress={create} loading={creating} disabled={!picked} size="lg">
+          {picked ? 'Create Alert' : 'Select a topic first'}
         </Button>
       </View>
 

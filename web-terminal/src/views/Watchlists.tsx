@@ -32,6 +32,7 @@ export function Watchlists() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [adding, setAdding] = useState('')
+  const [picked, setPicked] = useState<{ key: string; display: string; kind: WatchKind } | null>(null)
   const [busy, setBusy] = useState(false)
 
   // live score lookup table, keyed by `${kind}:${key}`
@@ -80,21 +81,23 @@ export function Watchlists() {
     try { await deleteWatchlist(id); setLists((ls) => ls.filter((l) => l.id !== id)); setActive((a) => (a === id ? null : a)) }
     finally { setBusy(false) }
   }
+  // Searchable universe from the live lookup, so we only ever add a VERIFIED,
+  // linkable entity (never raw free text).
+  const matches = useMemo(() => {
+    const q = adding.trim().toLowerCase()
+    if (q.length < 2) return [] as { key: string; display: string; kind: WatchKind }[]
+    return Object.entries(live).map(([k, v]) => ({
+      key: k.split(':').slice(1).join(':'), display: v.label, kind: v.kind,
+    })).filter((e) => e.display.toLowerCase().includes(q) || e.key.toLowerCase().includes(q)).slice(0, 8)
+  }, [live, adding])
+
   const addItem = async () => {
-    const raw = adding.trim(); if (!raw || !current) return
-    // resolve against the live universe by key OR display name
-    const q = raw.toLowerCase()
-    const hit = Object.values(live).find((v) => v.label.toLowerCase() === q) ||
-      live[liveKey('market', raw)] || live[liveKey('topic', raw)]
-    const key = hit ? Object.keys(live).find((k) => live[k] === hit)!.split(':').slice(1).join(':') : raw
-    const payload = hit
-      ? { key, display: hit.label, kind: hit.kind }
-      : { key: raw, display: raw, kind: 'topic' as WatchKind }
+    if (!current || !picked) return  // hard gate — must be a verified entity
     setBusy(true)
     try {
-      const item = await addWatchItem(current.id, payload)
+      const item = await addWatchItem(current.id, { key: picked.key, display: picked.display, kind: picked.kind })
       setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, items: [...l.items.filter((i) => i.key !== item.key), item] } : l))
-      setAdding('')
+      setAdding(''); setPicked(null)
     } catch (e: any) { setErr(e?.data?.detail || 'Could not add item.') }
     finally { setBusy(false) }
   }
@@ -129,11 +132,31 @@ export function Watchlists() {
       </div>
 
       {current && (
-        <div className="add-row">
-          <input value={adding} onChange={(e) => setAdding(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addItem() }}
-            placeholder="Add a topic or instrument to this list… (e.g. world models, Nvidia)" />
-          <button className="add-btn" onClick={addItem} disabled={busy}>Add</button>
+        <div className="add-wrap">
+          <div className="add-row">
+            {picked ? (
+              <div className="wl-picked" onClick={() => setPicked(null)} title="Clear">
+                ✓ {picked.display} <span>· {picked.kind === 'market' ? 'Market' : 'Trend'}</span> ✕
+              </div>
+            ) : (
+              <input value={adding} onChange={(e) => { setAdding(e.target.value); setPicked(null) }}
+                placeholder="Search a topic or instrument to add… (e.g. world models, Nvidia)" />
+            )}
+            <button className="add-btn" onClick={addItem} disabled={busy || !picked}>Add</button>
+          </div>
+          {!picked && adding.trim().length >= 2 && (
+            matches.length > 0 ? (
+              <div className="wl-suggest">
+                {matches.map((e) => (
+                  <div key={`${e.kind}:${e.key}`} className="wl-suggest-item" onClick={() => { setPicked(e); setAdding(e.display) }}>
+                    {e.display}<span>{e.kind === 'market' ? 'Market' : 'Trend'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="wl-suggest-empty">Not in our database — only existing topics/instruments can be added.</div>
+            )
+          )}
         </div>
       )}
 
