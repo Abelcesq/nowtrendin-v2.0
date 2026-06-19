@@ -78,13 +78,21 @@ export function Shell({
   const plan = user?.tier ? TIER_LABEL[user.tier].toUpperCase() : 'GUEST'
   const [favEdit, setFavEdit] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
-  const [favSection, setFavSection] = useState<'trends' | 'market' | 'watchlist'>('trends')
+  const [favSection, setFavSection] = useState<'trends' | 'market' | 'history' | 'watchlist'>('trends')
   const [favFilter, setFavFilter] = useState('breakout')
+  const [favTopic, setFavTopic] = useState('')
   const [favName, setFavName] = useState('')
   const addFavorite = () => {
-    const opt = FAV_OPTIONS[favSection].find((o) => o.k === favFilter) || FAV_OPTIONS[favSection][0]
-    const fav: Favorite = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || opt.label, section: favSection, filter: favFilter, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
-    onFavChange?.([...favorites, fav]); setShowAdd(false); setFavName('')
+    let fav: Favorite
+    if (favSection === 'history') {
+      if (!favTopic.trim()) return
+      const key = favTopic.trim().toLowerCase().replace(/\s+/g, '_')
+      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || favTopic.trim(), section: 'history', filter: key, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
+    } else {
+      const opt = FAV_OPTIONS[favSection].find((o) => o.k === favFilter) || FAV_OPTIONS[favSection][0]
+      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favName.trim() || opt.label, section: favSection, filter: favFilter, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
+    }
+    onFavChange?.([...favorites, fav]); setShowAdd(false); setFavName(''); setFavTopic('')
   }
   const removeFavorite = (id: string) => onFavChange?.(favorites.filter((f) => f.id !== id))
   return (
@@ -155,11 +163,13 @@ export function Shell({
           {favEdit && showAdd && (
             <div className="fav-form">
               <div className="fav-frow">
-                {(['trends', 'market', 'watchlist'] as const).map((s) => (
-                  <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); setFavFilter(FAV_OPTIONS[s][0].k) }}>{s}</button>
+                {([['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic'], ['watchlist', 'Watchlist']] as const).map(([s, label]) => (
+                  <button key={s} className={'fav-chip' + (favSection === s ? ' on' : '')} onClick={() => { setFavSection(s); if (s !== 'history' && s !== 'watchlist') setFavFilter(FAV_OPTIONS[s][0].k) }}>{label}</button>
                 ))}
               </div>
-              {favSection !== 'watchlist' && (
+              {favSection === 'history' ? (
+                <input className="fav-input" value={favTopic} placeholder="Type a topic to track…" onChange={(e) => setFavTopic(e.target.value)} />
+              ) : favSection !== 'watchlist' && (
                 <select className="fav-select" value={favFilter} onChange={(e) => setFavFilter(e.target.value)}>
                   {FAV_OPTIONS[favSection].map((o) => <option key={o.k} value={o.k}>{o.label}</option>)}
                 </select>

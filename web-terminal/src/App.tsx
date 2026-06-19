@@ -47,6 +47,7 @@ export function App() {
   // re-clicking re-applies even after navigating away).
   const [screen, setScreen] = useState<{ filter: string; n: number } | null>(null)
   const [marketScreen, setMarketScreen] = useState<{ filter: string; n: number } | null>(null)
+  const [histScreen, setHistScreen] = useState<{ topic: string; n: number } | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>(DEFAULT_FAVORITES)
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
@@ -75,6 +76,7 @@ export function App() {
   const onFav = (f: Favorite) => {
     setRail(null); setAccount(false)
     if (f.section === 'market') { setNav('market'); setMarketScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
+    else if (f.section === 'history') { setNav('history'); setHistScreen((s) => ({ topic: f.filter || '', n: (s?.n ?? 0) + 1 })) }
     else if (f.section === 'watchlist') setNav('watchlists')
     else { setNav('trends'); setScreen((s) => ({ filter: f.filter || 'all', n: (s?.n ?? 0) + 1 })) }
   }
@@ -89,7 +91,7 @@ export function App() {
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts />
-  else if (nav === 'history') body = <History />
+  else if (nav === 'history') body = <History preset={histScreen} />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 

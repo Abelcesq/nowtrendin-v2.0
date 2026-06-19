@@ -36,7 +36,7 @@ function Trajectory({ rows }: { rows: { detection: number; confidence: number }[
   )
 }
 
-export function History() {
+export function History({ preset }: { preset?: { topic: string; n: number } | null }) {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,6 +65,17 @@ export function History() {
       .then(setAn).catch(() => setAn({ available: false, reason: 'Analysis failed.' }))
       .finally(() => setAnLoad(false))
   }
+
+  // A "Track topic" favorite → default to the 12h window and auto-select that topic
+  // (loads its trajectory directly even if it's not in the windowed list).
+  useEffect(() => {
+    if (!preset?.topic) return
+    setWin('12h')
+    const key = preset.topic
+    const found = rows.find((r) => r.topic_key === key || (r.topic_display || '').toLowerCase().replace(/\s+/g, '_') === key)
+    pick(found || { topic_key: key, topic_display: key.replace(/_/g, ' '), overall: 0, det: 0, conf: 0, n: 0, series: [], trend: 'flat', slope: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset?.n])
 
   const view = useMemo(() => {
     const ql = q.trim().toLowerCase()
