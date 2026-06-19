@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, X, ChevronRight, ChevronLeft } from 'lucide-react-native';
+import { Plus, X, ChevronRight, ChevronLeft, Search } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { dashboardApi, type Favorite } from '../../../lib/api';
+import { fetchScores, fetchRiskScores } from '../../../lib/gradientApi';
 
-// Favorites — saved filtered-view shortcuts, identical flow to the web terminal and
-// synced via the SAME /api/dashboard/ backend, so they match across every platform.
+// Favorites — saved filtered-view shortcuts, synced via /api/dashboard/ (matches the
+// web). "Track topic" is DB-validated: you can only pin a topic or market instrument
+// that actually exists in our data, and clicking opens its real detail.
 const SECTIONS = [['trends', 'Trends'], ['market', 'Market'], ['history', 'Track topic'], ['watchlist', 'Watchlist']] as const;
 const OPTIONS: Record<string, { k: string; label: string }[]> = {
   trends: [{ k: 'nowtrendin', label: 'Now TrendIn' }, { k: 'all', label: 'All' }, { k: 'breakout', label: 'Breakout' }, { k: 'strong', label: 'Strong' }, { k: 'emerging', label: 'Emerging' }, { k: 'marginal', label: 'Marginal' }, { k: 'anomalies', label: 'Anomalies' }],
   market: [{ k: 'all', label: 'All' }, { k: 'elevated', label: 'Elevated' }, { k: 'active', label: 'Active' }, { k: 'building', label: 'Building' }, { k: 'routine', label: 'Routine' }, { k: 'dormant', label: 'Dormant' }, { k: 'leverage', label: 'Leverage ≥60' }],
 };
 const COLORS = ['#00C896', '#8B5CF6', '#DC2626', '#2D7EEF', '#D4A017', '#E85A1E'];
+
+type Entity = { key: string; display: string; kind: 'topic' | 'market' };
 
 export default function Favorites() {
   const router = useRouter();
@@ -21,34 +25,52 @@ export default function Favorites() {
   const [adding, setAdding] = useState(false);
   const [section, setSection] = useState<'trends' | 'market' | 'history' | 'watchlist'>('trends');
   const [filter, setFilter] = useState('breakout');
-  const [topic, setTopic] = useState('');
   const [name, setName] = useState('');
+  // Track-topic search (DB-validated)
+  const [entities, setEntities] = useState<Entity[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<Entity | null>(null);
 
   useEffect(() => {
     dashboardApi.get().then((d) => setFavs(d.favorites || [])).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Lazy-load the searchable universe (topics + market instruments) when the user
+  // first opens "Track topic".
+  useEffect(() => {
+    if (section !== 'history' || entities !== null) return;
+    setEntities([]);
+    Promise.all([fetchScores().catch(() => []), fetchRiskScores().catch(() => [])]).then(([sigs, risks]) => {
+      const ts: Entity[] = (sigs || []).map((s: any) => ({ key: String(s.id), display: s.topic || String(s.id), kind: 'topic' }));
+      const ms: Entity[] = (risks || []).map((r: any) => ({ key: String(r.key), display: r.display || String(r.key), kind: 'market' }));
+      setEntities([...ms, ...ts]);
+    });
+  }, [section]);
+
   const persist = (next: Favorite[]) => { setFavs(next); dashboardApi.saveFavorites(next).catch(() => {}); };
   const remove = (id: string) => persist(favs.filter((f) => f.id !== id));
+  const resetForm = () => { setAdding(false); setName(''); setQuery(''); setPicked(null); };
   const add = () => {
     let fav: Favorite;
     const color = COLORS[favs.length % COLORS.length];
     if (section === 'history') {
-      if (!topic.trim()) return;
-      fav = { id: `fav_${Date.now()}`, label: name.trim() || topic.trim(), section: 'history', filter: topic.trim().toLowerCase().replace(/\s+/g, '_'), color };
+      if (!picked) return;   // must be a real DB entity
+      fav = { id: `fav_${Date.now()}`, label: name.trim() || picked.display, section: 'history', filter: picked.key, kind: picked.kind, color };
     } else if (section === 'watchlist') {
       fav = { id: `fav_${Date.now()}`, label: name.trim() || 'My watchlists', section: 'watchlist', color };
     } else {
       const opt = OPTIONS[section].find((o) => o.k === filter) || OPTIONS[section][0];
       fav = { id: `fav_${Date.now()}`, label: name.trim() || opt.label, section, filter, color };
     }
-    persist([...favs, fav]); setAdding(false); setName(''); setTopic('');
+    persist([...favs, fav]); resetForm();
   };
   const open = (f: Favorite) => {
-    if (f.section === 'history' && f.filter) router.push(`/signal/${encodeURIComponent(f.filter)}` as any);
-    else if (f.section === 'history') router.push('/history' as any);
+    if (f.section === 'history' && f.filter) router.push(`/${f.kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(f.filter)}` as any);
     else if (f.section === 'watchlist') router.push('/profile/watchlists' as any);
     else router.push('/' as any);
   };
+
+  const matches = (entities || []).filter((e) => query.trim().length >= 2 && e.display.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8);
   const chip = (on: boolean, label: string, fn: () => void) => (
     <TouchableOpacity key={label} onPress={fn} className="px-3 py-1.5 rounded-full border mr-1.5 mb-1.5" style={{ backgroundColor: on ? '#00C896' : '#FFFFFF', borderColor: on ? '#00C896' : '#E4E7EC' }}>
       <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>{label}</Text>
@@ -83,18 +105,50 @@ export default function Favorites() {
       ) : (
         <View className="bg-surface rounded-2xl border border-border p-4 mt-2">
           <Text className="text-textMuted text-[11px] mb-1.5">Section</Text>
-          <View className="flex-row flex-wrap mb-3">{SECTIONS.map(([s, label]) => chip(section === s, label, () => { setSection(s); if (s !== 'history' && s !== 'watchlist') setFilter(OPTIONS[s][0].k); }))}</View>
+          <View className="flex-row flex-wrap mb-3">{SECTIONS.map(([s, label]) => chip(section === s, label, () => { setSection(s); setPicked(null); setQuery(''); if (s !== 'history' && s !== 'watchlist') setFilter(OPTIONS[s][0].k); }))}</View>
+
           {section === 'history' ? (
-            <><Text className="text-textMuted text-[11px] mb-1.5">Topic</Text>
-              <TextInput value={topic} onChangeText={setTopic} placeholder="Type a topic to track…" placeholderTextColor="#9AA3B0" className="bg-bg rounded-lg px-3 py-2.5 border border-border mb-3" style={{ color: '#1A1A2E' }} /></>
+            <>
+              <Text className="text-textMuted text-[11px] mb-1.5">Search a topic or company</Text>
+              {picked ? (
+                <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 border mb-3" style={{ borderColor: '#00C896' }}>
+                  <Text className="text-textPrimary text-base">{picked.display} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
+                  <X size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <View className="flex-row items-center bg-bg rounded-lg px-3 border border-border mb-2">
+                    <Search size={16} color="#9AA3B0" />
+                    <TextInput value={query} onChangeText={setQuery} placeholder="Type a topic or ticker…" placeholderTextColor="#9AA3B0" className="flex-1 py-2.5 ml-2" style={{ color: '#1A1A2E' }} />
+                  </View>
+                  {entities === null || (entities.length === 0 && query.length >= 2) ? (
+                    <Text className="text-textMuted text-xs mb-3">Loading the topic universe…</Text>
+                  ) : query.trim().length >= 2 && matches.length === 0 ? (
+                    <Text className="text-textMuted text-xs mb-3">Not in our database — only existing topics/instruments can be tracked.</Text>
+                  ) : (
+                    <View className="mb-3">
+                      {matches.map((e) => (
+                        <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
+                          <Text className="text-textPrimary text-[15px]">{e.display}</Text>
+                          <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+            </>
           ) : section !== 'watchlist' ? (
             <><Text className="text-textMuted text-[11px] mb-1.5">Filter</Text>
               <View className="flex-row flex-wrap mb-3">{OPTIONS[section].map((o) => chip(filter === o.k, o.label, () => setFilter(o.k)))}</View></>
           ) : null}
+
           <TextInput value={name} onChangeText={setName} placeholder="Name (optional)" placeholderTextColor="#9AA3B0" className="bg-bg rounded-lg px-3 py-2.5 border border-border mb-3" style={{ color: '#1A1A2E' }} />
           <View className="flex-row gap-2">
-            <TouchableOpacity onPress={add} className="flex-1 bg-primary rounded-lg py-3 items-center"><Text className="text-white font-semibold">Add</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setAdding(false)} className="flex-1 border border-border rounded-lg py-3 items-center"><Text className="text-textSecondary font-semibold">Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={add} disabled={section === 'history' && !picked} className="flex-1 rounded-lg py-3 items-center" style={{ backgroundColor: section === 'history' && !picked ? '#9DDDC9' : '#00C896' }}>
+              <Text className="text-white font-semibold">Add</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={resetForm} className="flex-1 border border-border rounded-lg py-3 items-center"><Text className="text-textSecondary font-semibold">Cancel</Text></TouchableOpacity>
           </View>
         </View>
       )}

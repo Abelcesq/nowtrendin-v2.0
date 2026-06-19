@@ -36,7 +36,7 @@ export const api = {
 
 // Customizable dashboard + Favorites — same /api/dashboard/ the web terminal uses,
 // so layout + favorites are identical across web, desktop, and mobile.
-export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'history' | 'watchlist'; filter?: string; color?: string }
+export interface Favorite { id: string; label: string; section: 'trends' | 'market' | 'history' | 'watchlist'; filter?: string; kind?: 'topic' | 'market'; color?: string }
 export const dashboardApi = {
   get: () => api.get('/api/dashboard/') as Promise<{ tiles: any[]; favorites: Favorite[] }>,
   saveFavorites: (favorites: Favorite[]) => api.put('/api/dashboard/', { favorites }) as Promise<{ favorites: Favorite[] }>,
