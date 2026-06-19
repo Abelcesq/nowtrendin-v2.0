@@ -41,8 +41,7 @@ export function History() {
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState<HistoryRow | null>(null)
-  const [traj, setTraj] = useState<{ detection: number; confidence: number }[] | null>(null)
+  const [selKey, setSelKey] = useState<string | null>(null)
   const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)
   const [anLoad, setAnLoad] = useState(false)
 
@@ -52,12 +51,12 @@ export function History() {
   }
   useEffect(() => load(win), [win])
 
-  const pick = (r: HistoryRow) => {
-    setSel(r); setTraj(null); setAn(null)
-    api.scoreHistory(r.topic_key)
-      .then((d) => setTraj((d.rows || []).slice().reverse()))
-      .catch(() => setTraj([]))
-  }
+  const pick = (r: HistoryRow) => { setSelKey(r.topic_key); setAn(null) }
+  // The selected topic's row in the CURRENT window — so the featured chart's
+  // det/conf, trend, and trajectory all reflect the chosen 12h/24h/7d window
+  // (the engine returns a window-filtered `series` per row).
+  const sel = useMemo(() => (selKey ? rows.find((r) => r.topic_key === selKey) ?? null : null), [rows, selKey])
+  const traj = useMemo(() => (sel?.series ?? []).map((p) => ({ detection: Math.round(p.det ?? 0), confidence: Math.round(p.conf ?? 0) })), [sel])
   const explain = () => {
     if (!sel) return
     setAnLoad(true)
@@ -95,8 +94,8 @@ export function History() {
               <span className="hv-trend" style={{ color, background: 'var(--line-2)' }}>{icon} {label}</span>
               <span className="hv-feat-scores"><b style={{ color: 'var(--det)' }}>DET {sel.det}</b> &nbsp; <b style={{ color: 'var(--conf)' }}>CONF {sel.conf}</b></span>
             </div>
-            <div className="hv-chartslot">{traj === null ? <div className="hv-loading">Loading trajectory…</div> : <Trajectory rows={traj} />}</div>
-            <div className="hv-legend"><span style={{ color: 'var(--det)' }}>● Detection</span> &nbsp; <span style={{ color: 'var(--conf)' }}>● Confidence</span></div>
+            <div className="hv-chartslot">{loading ? <div className="hv-loading">Loading trajectory…</div> : <Trajectory rows={traj} />}</div>
+            <div className="hv-legend"><span style={{ color: 'var(--det)' }}>● Detection</span> &nbsp; <span style={{ color: 'var(--conf)' }}>● Confidence</span> &nbsp;·&nbsp; <span style={{ color: 'var(--text-3)' }}>{traj.length} scoring run{traj.length === 1 ? '' : 's'} in last {win}</span></div>
             <div className="hv-ai">
               {an?.available ? (
                 <>
