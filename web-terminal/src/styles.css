@@ -496,6 +496,35 @@ td.r{text-align:right}
 .dash-split{display:grid; grid-template-columns:1fr 1fr; gap:14px}
 .dash-split .lbl{font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; margin-bottom:5px}
 .dash-empty{font-size:12px; color:var(--text-3); padding:10px 0}
+/* Alerts view — mirrors the mobile alerts flow (create + active list). */
+.al{padding:16px; overflow-y:auto; max-width:680px}
+.al-sect{font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin-bottom:9px}
+.al-empty{font-size:13px; color:var(--text-3); margin-bottom:8px}
+.al-card{display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:12px 14px; margin-bottom:9px}
+.al-ico{width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--conf-soft); flex:0 0 auto}
+.al-body{flex:1; min-width:0}
+.al-topic{font-size:13px; font-weight:600; color:var(--text)}
+.al-meta{font-size:11.5px; color:var(--text-3); margin-top:2px}
+.al-fired{font-size:11px; font-weight:700; color:var(--conf); margin-top:3px}
+.al-del{background:none; border:0; cursor:pointer; padding:4px; margin-left:4px; display:grid; place-items:center}
+.al-toggle{width:38px; height:22px; border-radius:11px; background:var(--line); border:0; cursor:pointer; position:relative; flex:0 0 auto; transition:background .15s}
+.al-toggle.on{background:var(--conf)}
+.al-toggle::after{content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; transition:left .15s}
+.al-toggle.on::after{left:18px}
+.al-form{background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:15px 16px}
+.al-lbl{display:block; font-size:11px; color:var(--text-3); margin:0 0 5px}
+.al-input{width:100%; height:36px; background:var(--canvas); border:1px solid var(--line); border-radius:8px; padding:0 11px; font-size:13px; font-family:var(--sans); color:var(--text); margin-bottom:10px}
+.al-input:focus{outline:none; border-color:var(--det)}
+.al-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px}
+.al-chip{font-size:12px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--text-2); cursor:pointer}
+.al-chip.on{background:var(--conf); border-color:var(--conf); color:#fff; font-weight:600}
+.al-step{display:flex; align-items:center; gap:16px; margin-bottom:12px}
+.al-step button{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--surface); cursor:pointer; display:grid; place-items:center; color:var(--text-2)}
+.al-thr{font-size:24px; font-weight:800; color:var(--text); min-width:46px; text-align:center; font-family:var(--mono)}
+.al-row{display:flex; align-items:center; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text-2)}
+.al-err{font-size:12px; color:var(--down); margin:8px 0}
+.al-create{width:100%; height:44px; border:0; border-radius:10px; background:var(--conf); color:#fff; font-size:14px; font-weight:600; cursor:pointer; margin-top:12px}
+.al-create:disabled{opacity:.5; cursor:not-allowed}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#cfd6df; border-radius:5px; border:2px solid var(--surface)}
 .sidebar::-webkit-scrollbar-thumb{background:#273a54; border-color:var(--ink)}
