@@ -153,6 +153,12 @@ export interface ScoreHistoryRow {
   confidence: number;
   overall: number;
   gap: number;
+  // Per-cycle factors that explain the move (engine score-history enrichment).
+  mentions?: number;
+  platforms?: number;
+  stage?: string;
+  inertia?: number;
+  darkMatter?: number;
 }
 
 // Per-collection-run scoring events for a topic (newest first).
@@ -169,6 +175,11 @@ export async function fetchScoreHistory(topicKey: string): Promise<ScoreHistoryR
     confidence: Math.round(Number(r.confidence ?? 0)),
     overall: Math.round(Number(r.overall ?? 0)),
     gap: Math.round(Number(r.gap ?? 0)),
+    mentions: r.mentions != null ? Number(r.mentions) : undefined,
+    platforms: r.platforms != null ? Number(r.platforms) : undefined,
+    stage: r.stage || undefined,
+    inertia: r.inertia != null ? Math.round(Number(r.inertia)) : undefined,
+    darkMatter: r.dark_matter != null ? Math.round(Number(r.dark_matter)) : undefined,
   }));
 }
 
