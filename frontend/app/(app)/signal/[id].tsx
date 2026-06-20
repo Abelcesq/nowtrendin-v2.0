@@ -29,15 +29,19 @@ const MATURITY_EXPLAIN: Record<string, string> = {
 };
 
 export default function SignalDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
+  // Return to where we came from (alerts / favorites / watchlist) when provided,
+  // so the back link doesn't dump the user on the Trends home.
+  const goBack = () => { if (from) router.replace(from as any); else router.back(); };
+  const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Signal Intel';
   const { signal, isLoading } = useSignal(String(id));
   const [open, setOpen] = useState<string | null>('Signal Quality');
 
   if (isLoading) {
     return (
       <Screen>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
+        <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
           <ChevronLeft size={24} color="#5B6472" />
         </TouchableOpacity>
         <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
@@ -48,7 +52,7 @@ export default function SignalDetail() {
   if (!signal) {
     return (
       <Screen>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
+        <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
           <ChevronLeft size={24} color="#5B6472" />
         </TouchableOpacity>
         <Text className="text-textMuted text-center mt-20">Signal not found.</Text>
@@ -66,9 +70,9 @@ export default function SignalDetail() {
 
   return (
     <Screen scroll>
-      <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-4 self-start flex-row items-center gap-1">
+      <TouchableOpacity onPress={goBack} className="mt-4 mb-4 self-start flex-row items-center gap-1">
         <ChevronLeft size={22} color="#5B6472" />
-        <Text className="text-textSecondary text-sm">Signal Intel</Text>
+        <Text className="text-textSecondary text-sm">{backLabel}</Text>
       </TouchableOpacity>
 
       <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>

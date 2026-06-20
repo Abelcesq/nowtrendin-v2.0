@@ -52,6 +52,7 @@ export function App() {
   const [trendFocus, setTrendFocus] = useState<{ key: string; display: string; n: number } | null>(null)
   const [marketFocus, setMarketFocus] = useState<{ key: string; display: string; n: number } | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>(DEFAULT_FAVORITES)
+  const [historyInitQ, setHistoryInitQ] = useState('')
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
   // clear it (Consumer/Business belong on the mobile app). The Login screen
@@ -96,15 +97,17 @@ export function App() {
   const onFavChange = (next: Favorite[]) => { setFavorites(next); saveFavorites(next).catch(() => {}) }
 
   let body: ReactNode
+  const onNavHistory = (q: string) => { go('history'); setHistoryInitQ(q) }
+
   if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
-  else if (nav === 'dashboard') body = <Dashboard onNav={go} />
+  else if (nav === 'dashboard') body = <Dashboard onNav={go} onNavHistory={onNavHistory} />
   else if (nav === 'trends') body = <Screener onRail={setRail} query={q} preset={screen} focus={trendFocus} />
   else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} />
   else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
-  else if (nav === 'history') body = <History />
+  else if (nav === 'history') body = <History initialQ={historyInitQ} />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 

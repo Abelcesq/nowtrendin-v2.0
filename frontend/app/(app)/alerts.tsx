@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView, Alert as RNAlert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, Trash2, Plus, Minus, ChevronLeft, Search, X, CheckCircle } from 'lucide-react-native';
@@ -72,13 +72,12 @@ export default function Alerts() {
 
   const toggle = async (a: any) => { await alertsApi.update(a.id, { active: !a.active }); reload(); };
   const remove = async (a: any) => { await alertsApi.remove(a.id); reload(); };
-  // Tap an active alert → confirm → open the real detail page (signal or market).
   const openDetail = (a: any) => {
-    const kind = a.kind === 'market' ? 'market' : 'topic';
-    RNAlert.alert('Open detail page?', `Go to the detail page for "${a.topic_display || a.topic_key}"?`, [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes', onPress: () => router.push(`/${kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(a.topic_key)}` as any) },
-    ]);
+    if (a.kind === 'market') {
+      router.push({ pathname: '/risk/[key]', params: { key: a.topic_key, from: '/alerts' } } as any);
+    } else {
+      router.push({ pathname: '/signal/[id]', params: { id: a.topic_key, from: '/alerts' } } as any);
+    }
   };
 
   return (

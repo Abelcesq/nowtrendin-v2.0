@@ -56,14 +56,16 @@ const MKT_DET = '#2D7EEF';
 const MKT_CONF = '#00C896';
 
 export default function RiskDetail() {
-  const { key } = useLocalSearchParams<{ key: string }>();
+  const { key, from } = useLocalSearchParams<{ key: string; from?: string }>();
   const router = useRouter();
+  const goBack = () => { if (from) router.replace(from as any); else router.back(); };
+  const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Market Signal';
   const { risk, isLoading } = useRisk(String(key));
 
   if (isLoading) {
     return (
       <Screen>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
+        <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
           <ChevronLeft size={24} color="#5B6472" />
         </TouchableOpacity>
         <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />
@@ -73,7 +75,7 @@ export default function RiskDetail() {
   if (!risk) {
     return (
       <Screen>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
+        <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
           <ChevronLeft size={24} color="#5B6472" />
         </TouchableOpacity>
         <Text className="text-textMuted text-center mt-20">Not found.</Text>
@@ -95,9 +97,9 @@ export default function RiskDetail() {
         const gap = mg ? Math.round(Math.abs(mg.gap)) : 0;
         return (
           <>
-            <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-4 self-start flex-row items-center gap-1">
+            <TouchableOpacity onPress={goBack} className="mt-4 mb-4 self-start flex-row items-center gap-1">
               <ChevronLeft size={22} color="#5B6472" />
-              <Text className="text-textSecondary text-sm">Market Signal</Text>
+              <Text className="text-textSecondary text-sm">{backLabel}</Text>
             </TouchableOpacity>
 
             <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Market Signal</Text>

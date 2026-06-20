@@ -34,7 +34,7 @@ function stagePill(stage?: string) {
 const num = (v: number, c: string) => <span className="dash-row-v" style={{ color: c }}>{v}</span>
 const pill = (t: string, col: string, bg: string) => <span className="dash-pill" style={{ color: col, background: bg }}>{t}</span>
 
-export function Dashboard({ onNav }: { onNav: (k: NavKey) => void }) {
+export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void; onNavHistory?: (q: string) => void }) {
   const [topics, setTopics] = useState<TopicRow[]>([])
   const [risks, setRisks] = useState<RiskRow[]>([])
   const [tiles, setTiles] = useState<DashTile[]>(DEFAULT_TILES)
@@ -131,7 +131,7 @@ export function Dashboard({ onNav }: { onNav: (k: NavKey) => void }) {
         return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('market')}><span className="dash-nm">{x.name}</span>{num(x.det, 'var(--det)')}{t.config?.rankBy === 'leverage' ? num(x.lev ?? 0, 'var(--text-2)') : pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>) : <div className="dash-empty">No matches.</div>
       }
       case 'track-topic':
-        return <TrackTile topicKey={t.config?.topic_key} display={t.config?.topic_display} onNav={onNav} />
+        return <TrackTile topicKey={t.config?.topic_key} display={t.config?.topic_display} onNav={onNav} onNavHistory={onNavHistory} />
       default:
         return <div className="dash-empty">Unknown tile.</div>
     }
@@ -182,7 +182,7 @@ export function Dashboard({ onNav }: { onNav: (k: NavKey) => void }) {
 }
 
 // ── Track-a-topic tile — self-fetches the topic's trajectory ──────
-function TrackTile({ topicKey, display, onNav }: { topicKey?: string; display?: string; onNav: (k: NavKey) => void }) {
+function TrackTile({ topicKey, display, onNav, onNavHistory }: { topicKey?: string; display?: string; onNav: (k: NavKey) => void; onNavHistory?: (q: string) => void }) {
   const [d, setD] = useState<any[] | null>(null)
   useEffect(() => {
     if (!topicKey) return
@@ -200,7 +200,7 @@ function TrackTile({ topicKey, display, onNav }: { topicKey?: string; display?: 
   const ys = (v: number) => H - pad - (Math.max(0, Math.min(100, v)) / 100) * (H - 2 * pad)
   const ln = (a: number[]) => a.map((v, i) => `${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ')
   return (
-    <div onClick={() => onNav('history')} style={{ cursor: 'pointer' }}>
+    <div onClick={() => onNavHistory ? onNavHistory(display || topicKey || '') : onNav('history')} style={{ cursor: 'pointer' }}>
       <div className="dash-row" style={{ borderTop: 'none', paddingTop: 0 }}>
         <span className="dash-nm" style={{ fontWeight: 600 }}>{display || topicKey}</span>
         <span className="dash-pill" style={{ color: tcol, background: 'var(--line-2)' }}>{trend}</span>

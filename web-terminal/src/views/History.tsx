@@ -23,11 +23,11 @@ function Spark({ pts, color }: { pts: number[]; color: string }) {
   return <svg width={84} height={26} style={{ display: 'block', flex: '0 0 auto' }}><polyline points={P} style={{ stroke: color, fill: 'none' }} strokeWidth={2} /></svg>
 }
 
-export function History() {
+export function History({ initialQ }: { initialQ?: string }) {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQ ?? '')
   const [selKey, setSelKey] = useState<string | null>(null)
   const [hist, setHist] = useState<ChartPoint[] | null>(null)   // enriched per-cycle history for the selected topic
   const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)
@@ -38,6 +38,8 @@ export function History() {
     api.historyRecent(w, 80).then((d) => setRows(d.results || [])).catch(() => setRows([])).finally(() => setLoading(false))
   }
   useEffect(() => load(win), [win])
+  // When a dashboard tile navigates here with a topic pre-set, apply the filter.
+  useEffect(() => { if (initialQ) { setQ(initialQ); setSelKey(null) } }, [initialQ])
 
   // Fetch the full per-cycle scoring history (with driving factors) for the picked
   // topic; the chart clips it to the selected window below.

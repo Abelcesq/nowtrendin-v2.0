@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch, Alert as RNAlert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus, X, Star, Search } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
@@ -16,7 +16,7 @@ const DET = '#2D7EEF', CONF = '#00C896';
 export default function ProfileWatchlists() {
   const router = useRouter();
   const tier = (useAuthStore((s) => s.user)?.tier ?? 'consumer') as TierID;
-  const { accessible } = useTierFeed(tier);
+  const { accessible, signals } = useTierFeed(tier);
   const { risks } = useRiskScores();
 
   const [lists, setLists] = useState<WList[]>([]);
@@ -69,13 +69,14 @@ export default function ProfileWatchlists() {
       } },
     ]);
   };
-  // Searchable universe (accessible trends + all market signals), built from the
-  // same live lookup so we only ever add a VERIFIED, linkable entity.
-  const entities = useMemo(() => Object.entries(live).map(([k, v]) => {
-    const kind = k.split(':')[0] as 'topic' | 'market';
-    const key = k.split(':').slice(1).join(':');
-    return { key, display: v.label, kind };
-  }), [live]);
+  // Searchable universe = the FULL topic + market universe (same as the website),
+  // not the tier-aged feed — so any real, linkable entity can be added.
+  const entities = useMemo(() => {
+    const out: { key: string; display: string; kind: 'topic' | 'market' }[] = [];
+    for (const s of (signals as any[])) out.push({ key: String(s.id), display: s.topic || String(s.id), kind: 'topic' });
+    for (const r of (risks as any[])) out.push({ key: String(r.key), display: r.display || String(r.key), kind: 'market' });
+    return out;
+  }, [signals, risks]);
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
@@ -83,13 +84,19 @@ export default function ProfileWatchlists() {
   }, [entities, query]);
 
   const addItem = async () => {
-    if (!current || !picked) return;   // hard gate — must be a verified entity
-    setBusy(true);
+    if (!picked) return;   // hard gate — must be a verified entity
+    setBusy(true); setErr(null);
     try {
-      const item = await watchlistApi.addItem(current.id, { key: picked.key, display: picked.display, kind: picked.kind });
-      setLists((ls) => ls.map((l) => l.id === current.id ? { ...l, items: [...l.items.filter((i) => i.key !== item.key), item] } : l));
+      // Auto-create a default list if the member has none yet, so "add" always works.
+      let listId = current?.id ?? null;
+      if (listId == null) {
+        const wl = await watchlistApi.create('My Watchlist');
+        setLists((ls) => [...ls, wl]); setActiveId(wl.id); listId = wl.id;
+      }
+      const item = await watchlistApi.addItem(listId, { key: picked.key, display: picked.display, kind: picked.kind });
+      setLists((ls) => ls.map((l) => l.id === listId ? { ...l, items: [...l.items.filter((i) => i.key !== item.key), item] } : l));
       setPicked(null); setQuery('');
-    } catch { setErr('Could not add item.'); } finally { setBusy(false); }
+    } catch (e: any) { setErr(e?.data?.detail || 'Could not add item — please try again.'); } finally { setBusy(false); }
   };
   const removeItem = async (itemId: number) => {
     if (!current) return;
@@ -103,12 +110,12 @@ export default function ProfileWatchlists() {
     await watchlistApi.update(current.id, fields).catch(() => load());
   };
   const phoneVerified = useAuthStore.getState().user?.phoneVerified ?? false;
-  // Tap an item → confirm → open the real detail page (signal or market).
   const openDetail = (it: WItem) => {
-    RNAlert.alert('Open detail page?', `Go to the detail page for "${it.display || it.key}"?`, [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes', onPress: () => router.push(`/${it.kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(it.key)}` as any) },
-    ]);
+    if (it.kind === 'market') {
+      router.push({ pathname: '/risk/[key]', params: { key: it.key, from: '/profile/watchlists' } } as any);
+    } else {
+      router.push({ pathname: '/signal/[id]', params: { id: it.key, from: '/profile/watchlists' } } as any);
+    }
   };
 
   return (
@@ -141,8 +148,9 @@ export default function ProfileWatchlists() {
       </View>
       {current && <Text className="text-textMuted text-[11px] mb-3">Long-press a list to delete it.</Text>}
 
-      {/* add row — verified search: only a real, linkable topic/instrument can be added */}
-      {current && (
+      {/* add row — verified search: only a real, linkable topic/instrument can be added.
+          Shown even with no list yet (the first add auto-creates "My Watchlist"). */}
+      {!loading && (
         <View className="mb-4">
           {picked ? (
             <View className="flex-row gap-2">
@@ -174,6 +182,7 @@ export default function ProfileWatchlists() {
               ) : null}
             </>
           )}
+          {err && <Text className="text-error text-xs mt-2">{err}</Text>}
         </View>
       )}
 
@@ -225,7 +234,7 @@ export default function ProfileWatchlists() {
             <View key={it.id} className="bg-surface rounded-2xl border border-border p-4 mb-2.5 flex-row items-center">
               <TouchableOpacity className="flex-1" onPress={() => openDetail(it)} activeOpacity={0.6}>
                 <Text className="text-textPrimary text-base font-bold">{it.display || it.key}</Text>
-                <Text className="text-textMuted text-[11px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend'} · tap to open</Text>
+                <Text className="text-textMuted text-[11px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend Signal'}</Text>
               </TouchableOpacity>
               {lv ? (
                 <View className="flex-row items-center gap-3 mr-1">

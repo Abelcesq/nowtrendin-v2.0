@@ -62,9 +62,17 @@ export default function Favorites() {
     persist([...favs, fav]); resetForm();
   };
   const open = (f: Favorite) => {
-    if (f.section === 'history' && f.filter) router.push(`/${f.kind === 'market' ? 'risk' : 'signal'}/${encodeURIComponent(f.filter)}` as any);
-    else if (f.section === 'watchlist') router.push('/profile/watchlists' as any);
-    else router.push('/' as any);
+    if (f.section === 'history' && f.filter) {
+      if (f.kind === 'market') {
+        router.push({ pathname: '/risk/[key]', params: { key: f.filter, from: '/profile/favorites' } } as any);
+      } else {
+        router.push({ pathname: '/signal/[id]', params: { id: f.filter, from: '/profile/favorites' } } as any);
+      }
+    } else if (f.section === 'watchlist') {
+      router.push('/profile/watchlists' as any);
+    } else {
+      router.push('/' as any);
+    }
   };
 
   const matches = (entities || []).filter((e) => query.trim().length >= 2 && e.display.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8);

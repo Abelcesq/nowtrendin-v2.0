@@ -4,16 +4,16 @@
   "version": "2.0.0",
   "identifier": "com.nowtrendin.desktop",
   "build": {
-    "frontendDist": "../../frontend/dist"
+    "frontendDist": "../../web-terminal/dist"
   },
   "app": {
     "windows": [
       {
-        "title": "Now TrendIn",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 480,
-        "minHeight": 600,
+        "title": "Now TrendIn Terminal",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 680,
         "center": true
       }
     ],
