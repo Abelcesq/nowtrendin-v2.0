@@ -32,6 +32,9 @@ export function History({ initialQ }: { initialQ?: string }) {
   const [hist, setHist] = useState<ChartPoint[] | null>(null)   // enriched per-cycle history for the selected topic
   const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)
   const [anLoad, setAnLoad] = useState(false)
+  // Direct-lookup hit: used when the search term matches nothing in the top-80 list
+  // (e.g. a low-scoring topic like SpaceX at ~40 that doesn't rank in the top 80).
+  const [directHit, setDirectHit] = useState<HistoryRow | null>(null)
 
   const load = (w: string) => {
     setLoading(true)
@@ -53,7 +56,47 @@ export function History({ initialQ }: { initialQ?: string }) {
       }))))
       .catch(() => setHist([]))
   }
-  const sel = useMemo(() => (selKey ? rows.find((r) => r.topic_key === selKey) ?? null : null), [rows, selKey])
+
+  const view = useMemo(() => {
+    const ql = q.trim().toLowerCase()
+    return ql ? rows.filter((r) => (r.topic_display || '').toLowerCase().includes(ql) || (r.topic_key || '').toLowerCase().includes(ql)) : rows
+  }, [rows, q])
+
+  // When the search has text but yields nothing from the top-80 list, try a direct
+  // topic lookup so low-scoring topics (below the top-80 cutoff) are still findable.
+  useEffect(() => {
+    const ql = q.trim().toLowerCase()
+    if (!ql || view.length > 0) { setDirectHit(null); return }
+    const key = ql.replace(/\s+/g, '_')
+    api.score(key)
+      .then((d: any) => {
+        if (!d?.topic_key) { setDirectHit(null); return }
+        setDirectHit({
+          topic_key: d.topic_key,
+          topic_display: d.topic_display || d.topic_key,
+          overall: Math.round(d.overall_score ?? 0),
+          det: Math.round(d.detection_score ?? 0),
+          conf: Math.round(d.confidence_score ?? 0),
+          n: Math.round(d.nowtrendin_score ?? 0),
+          stage: d.signal_stage,
+          is_anomaly: !!d.is_gravitational_anomaly,
+          scored_at: d.scored_at,
+          series: [],
+          trend: 'flat',
+          slope: 0,
+        })
+      })
+      .catch(() => setDirectHit(null))
+  }, [q, view.length])
+
+  const effectiveView = view.length > 0 ? view : (directHit ? [directHit] : [])
+
+  // sel must also check directHit so the featured chart works for direct-lookup results.
+  const sel = useMemo(() => {
+    if (!selKey) return null
+    return rows.find((r) => r.topic_key === selKey) ?? (directHit?.topic_key === selKey ? directHit : null)
+  }, [rows, selKey, directHit])
+
   // Clip the per-cycle history to the selected window so the chart reflects 12h/24h/7d.
   const chartPoints = useMemo(() => {
     const cutoff = Date.now() - (WIN_MS[win] ?? WIN_MS['7d'])
@@ -66,11 +109,6 @@ export function History({ initialQ }: { initialQ?: string }) {
       .then(setAn).catch(() => setAn({ available: false, reason: 'Analysis failed.' }))
       .finally(() => setAnLoad(false))
   }
-
-  const view = useMemo(() => {
-    const ql = q.trim().toLowerCase()
-    return ql ? rows.filter((r) => (r.topic_display || '').toLowerCase().includes(ql) || (r.topic_key || '').toLowerCase().includes(ql)) : rows
-  }, [rows, q])
 
   return (
     <div className="hv">
@@ -115,8 +153,8 @@ export function History({ initialQ }: { initialQ?: string }) {
       {loading ? <div className="center-state"><div className="spinner" />Loading…</div>
         : (
           <div className="hv-list">
-            <div className="hv-count">{view.length} topics scored · last {win}</div>
-            {view.map((r) => {
+            <div className="hv-count">{effectiveView.length} topics scored · last {win}</div>
+            {effectiveView.map((r) => {
               const [icon, , color] = trendMeta(r.trend)
               return (
                 <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => pick(r)}>
@@ -128,7 +166,7 @@ export function History({ initialQ }: { initialQ?: string }) {
                 </div>
               )
             })}
-            {view.length === 0 && <div className="hv-empty">No history in this window.</div>}
+            {effectiveView.length === 0 && <div className="hv-empty">No history in this window.</div>}
           </div>
         )}
     </div>
