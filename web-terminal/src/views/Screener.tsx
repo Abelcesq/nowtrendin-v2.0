@@ -31,7 +31,7 @@ const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean; so
 ]
 
 interface Row extends TopicRow { det: number; conf: number; n: number; gap: number; stage: string; ageMin: number }
-type SortKey = 'topic_display' | 'det' | 'conf' | 'n' | 'gap' | 'stage' | 'category' | 'total_mentions' | 'ageMin'
+type SortKey = 'topic_display' | 'det' | 'conf' | 'n' | 'gap' | 'stage' | 'category' | 'direction' | 'total_mentions' | 'ageMin'
 
 function stageOf(d: number) {
   return d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'MARGINAL' : 'MONITORING'
@@ -541,6 +541,10 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
     const tl = topicFilter.trim().toLowerCase()
     if (tl) r = r.filter((x) => (x.topic_display || '').toLowerCase().includes(tl) || (x.topic_key || '').toLowerCase().includes(tl))
     r.sort((a, b) => {
+      if (sortKey === 'direction') {
+        const dir = (r: typeof a) => r.gap >= 8 ? 1 : r.gap <= -8 ? -1 : 0
+        return (dir(a) - dir(b)) * sortDir
+      }
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string') return String(va).localeCompare(String(vb)) * sortDir
       return ((va ?? -1) - (vb ?? -1)) * sortDir
@@ -660,7 +664,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                 <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Gap <span className="sort">{arrow('gap')}</span></th>
                 <th onClick={() => sort('stage')} className={sortKey === 'stage' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Stage <span className="sort">{arrow('stage')}</span></th>
                 <th onClick={() => sort('category')} className={sortKey === 'category' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Category <span className="sort">{arrow('category')}</span></th>
-                <th style={{ textAlign: 'center' }}>Direction</th>
+                <th onClick={() => sort('direction')} className={sortKey === 'direction' ? 'sorted' : ''} style={{ textAlign: 'center', cursor: 'pointer' }}>Direction <span className="sort">{arrow('direction')}</span></th>
                 <th onClick={() => sort('total_mentions')} className={'r ' + (sortKey === 'total_mentions' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Mentions <span className="sort">{arrow('total_mentions')}</span></th>
                 <th onClick={() => sort('ageMin')} className={'r ' + (sortKey === 'ageMin' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Updated <span className="sort">{arrow('ageMin')}</span></th>
               </tr>
