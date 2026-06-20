@@ -53,6 +53,7 @@ export function App() {
   const [marketFocus, setMarketFocus] = useState<{ key: string; display: string; n: number } | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>(DEFAULT_FAVORITES)
   const [historyInitQ, setHistoryInitQ] = useState('')
+  const [historyNavKey, setHistoryNavKey] = useState(0)
 
   // Enterprise-only web build: a restored session must be Enterprise tier, else
   // clear it (Consumer/Business belong on the mobile app). The Login screen
@@ -75,7 +76,7 @@ export function App() {
   }
   if (!user) return <Login onAuthed={setUser} />
 
-  const go = (k: NavKey) => { setRail(null); setAccount(false); setNav(k) }
+  const go = (k: NavKey) => { setRail(null); setAccount(false); setNav(k); if (k === 'history') setHistoryNavKey((n) => n + 1) }
   const signOut = () => { logout(); setUser(null) }
   // Open a specific entity's detail rail. Trends → Screener focus; market →
   // MarketSignal focus. The view auto-opens the matching row's rail once loaded.
@@ -107,7 +108,7 @@ export function App() {
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
-  else if (nav === 'history') body = <History initialQ={historyInitQ} />
+  else if (nav === 'history') body = <History key={historyNavKey} initialQ={historyInitQ} />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 

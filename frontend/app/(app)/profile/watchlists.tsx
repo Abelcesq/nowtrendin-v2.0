@@ -167,6 +167,7 @@ export default function ProfileWatchlists() {
               <View className="flex-row items-center bg-surface rounded-xl px-3 h-11 border border-border">
                 <Search size={16} color="#9AA3B0" />
                 <TextInput value={query} onChangeText={setQuery} placeholder="Search a topic or instrument to add…" placeholderTextColor="#9AA3B0" className="flex-1 ml-2 text-textPrimary" style={{ color: '#1A1A2E' }} />
+                {query ? <TouchableOpacity onPress={() => setQuery('')}><X size={15} color="#9AA3B0" /></TouchableOpacity> : null}
               </View>
               {query.trim().length >= 2 && matches.length === 0 ? (
                 <Text className="text-textMuted text-xs mt-2">Not in our database — only existing topics/instruments can be added.</Text>

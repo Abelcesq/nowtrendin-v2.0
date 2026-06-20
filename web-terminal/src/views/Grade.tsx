@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { X } from 'lucide-react'
 import { grade as gradeApi, gradeHistory, gradedAll, type User } from '../lib/auth'
 import { api } from '../lib/api'
 import { MC, stageColor, marketTierColor, GAP_BANDS, gapBandIndex } from '../lib/mobileTheme'
@@ -161,9 +162,11 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
 
   return (
     <div>
-      <div className="add-row" style={{ margin: '0 0 10px' }}>
+      <div className="add-row" style={{ margin: '0 0 10px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder={kind === 'history' ? 'Search your graded topics…' : 'Search all graded topics…'} />
+          placeholder={kind === 'history' ? 'Search your graded topics…' : 'Search all graded topics…'}
+          style={{ flex: 1, paddingRight: q ? 24 : undefined }} />
+        {q && <button onClick={() => setQ('')} title="Clear" style={{ position: 'absolute', right: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={13} /></button>}
       </div>
       <div className="disc" style={{ marginBottom: 10 }}>
         {kind === 'history' ? 'Your AI grades from the last 12 months. No token charge to view.'

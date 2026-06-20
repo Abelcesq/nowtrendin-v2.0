@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Search as SearchIcon, TrendingUp, Activity, Globe } from 'lucide-react-native';
+import { Search as SearchIcon, TrendingUp, Activity, Globe, X } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
@@ -63,12 +63,13 @@ function TabBtn({ icon, label, color, active, onPress }: { icon: React.ReactNode
   );
 }
 
-function SearchBar({ value, onChange, placeholder }: { value: string; onChange: (s: string) => void; placeholder: string }) {
+function SearchBar({ value, onChange, placeholder, onClear }: { value: string; onChange: (s: string) => void; placeholder: string; onClear?: () => void }) {
   return (
     <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
       <SearchIcon size={18} color="#9AA3B0" />
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#9AA3B0"
         className="flex-1 ml-3 text-base" style={{ color: '#1A1A2E' }} />
+      {value && onClear ? <TouchableOpacity onPress={onClear} className="ml-2"><X size={16} color="#9AA3B0" /></TouchableOpacity> : null}
     </View>
   );
 }
@@ -80,7 +81,7 @@ function TrendsSearch({ tier }: { tier: TierID }) {
   const results = ql ? accessible.filter((s) => s.topic.toLowerCase().includes(ql) || s.category.toLowerCase().includes(ql)) : accessible;
   return (
     <>
-      <SearchBar value={q} onChange={setQ} placeholder="Search trends…" />
+      <SearchBar value={q} onChange={setQ} placeholder="Search trends…" onClear={() => setQ('')} />
       <Text className="text-textMuted text-[11px] mb-2">{results.length} trend{results.length === 1 ? '' : 's'} in your data window</Text>
       {isLoading ? <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No trends match "${q}".`} />
@@ -97,7 +98,7 @@ function MarketSearch({ tier }: { tier: TierID }) {
   const results = ql ? accessible.filter((r) => r.display.toLowerCase().includes(ql)) : accessible;
   return (
     <>
-      <SearchBar value={q} onChange={setQ} placeholder="Search market topics…" />
+      <SearchBar value={q} onChange={setQ} placeholder="Search market topics…" onClear={() => setQ('')} />
       <Text className="text-textMuted text-[11px] mb-2">{results.length} market item{results.length === 1 ? '' : 's'} in your data window</Text>
       {isLoading ? <ActivityIndicator size="large" color="#CF2A1B" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No market topics match "${q}".`} />
@@ -119,7 +120,7 @@ function GradedSearch() {
   useEffect(() => { const t = setTimeout(() => load(q.trim()), 350); return () => clearTimeout(t); }, [q, load]);
   return (
     <>
-      <SearchBar value={q} onChange={setQ} placeholder="Search graded topics…" />
+      <SearchBar value={q} onChange={setQ} placeholder="Search graded topics…" onClear={() => setQ('')} />
       <Text className="text-textMuted text-[11px] mb-2">Topics graded by members across all plans — free to view.</Text>
       {loading ? <ActivityIndicator size="small" color="#D4A017" style={{ marginTop: 28 }} />
         : rows.length === 0 ? <Empty text={q ? `No graded topics match "${q}".` : 'No topics have been graded yet.'} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Star, Bell, Download } from 'lucide-react'
+import { Star, Bell, Download, X } from 'lucide-react'
 import { api, type RiskRow } from '../lib/api'
 import { pullMarket } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
@@ -453,7 +453,10 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
           {FILTERS.map((f) => (
             <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')} onClick={() => setFilter(f.k)}>{f.label}</div>
           ))}
-          <input className="chip-search" placeholder="Filter instruments…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input className="chip-search" placeholder="Filter instruments…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingRight: q ? 22 : undefined }} />
+            {q && <button onClick={() => setQ('')} title="Clear" style={{ position: 'absolute', right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={12} /></button>}
+          </div>
         </div>
       </div>
 

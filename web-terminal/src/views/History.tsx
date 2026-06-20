@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
 import { ScoreChart, type ChartPoint } from '../components/ScoreChart'
 
@@ -121,7 +121,10 @@ export function History({ initialQ }: { initialQ?: string }) {
         <div className="hv-wins">{WINDOWS.map((w) => (
           <button key={w} className={'hv-win' + (win === w ? ' on' : '')} onClick={() => setWin(w)}>{w}</button>
         ))}</div>
-        <input className="hv-search" value={q} placeholder="Search history…" onChange={(e) => setQ(e.target.value)} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input className="hv-search" value={q} placeholder="Search history…" onChange={(e) => setQ(e.target.value)} style={{ paddingRight: q ? 24 : undefined }} />
+          {q && <button onClick={() => setQ('')} title="Clear" style={{ position: 'absolute', right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={13} /></button>}
+        </div>
         <button className="hv-refresh" onClick={() => load(win)} title="Refresh"><RotateCcw size={15} /></button>
       </div>
 

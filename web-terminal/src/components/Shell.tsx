@@ -128,7 +128,11 @@ export function Shell({
           <input id="search" type="text" placeholder="Search topics, tickers, screens…" autoComplete="off"
             value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)}
             onFocus={() => nav !== 'trends' && onNav('trends')} />
-          <span className="kbd">⌘K</span>
+          {search ? (
+            <button onClick={() => onSearch?.('')} title="Clear" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px 4px', display: 'flex', alignItems: 'center' }}><X size={13} /></button>
+          ) : (
+            <span className="kbd">⌘K</span>
+          )}
         </div>
         <div className="top-right">
           <div className="asof"><span className="live">●</span> Live · as of<br /><b>{clock}</b></div>

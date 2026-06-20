@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Search, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import { Search, ArrowUp, ArrowDown, RotateCcw, X } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Disclaimer } from '../../components/ui/Disclaimer';
 import { HistoryRow } from '../../components/trends/HistoryRow';
@@ -32,6 +33,9 @@ export default function History() {
   const [query, setQuery] = useState('');
   const [desc, setDesc] = useState(true);
   const [selected, setSelected] = useState<Signal | null>(null);
+
+  // Clear the search filter whenever the user navigates to this tab.
+  useFocusEffect(useCallback(() => { setQuery(''); }, []));
 
   const windowMs = WINDOWS.find((w) => w.k === win)?.ms ?? 7 * DAY;
   const winLabel = WINDOWS.find((w) => w.k === win)?.label ?? '7d';
@@ -100,6 +104,7 @@ export default function History() {
             className="flex-1 ml-3 text-textPrimary text-base"
             style={{ color: '#1A1A2E' }}
           />
+          {query ? <TouchableOpacity onPress={() => setQuery('')} className="ml-2"><X size={16} color="#9AA3B0" /></TouchableOpacity> : null}
         </View>
 
         <Text className="text-textSecondary text-[11px] mb-2">

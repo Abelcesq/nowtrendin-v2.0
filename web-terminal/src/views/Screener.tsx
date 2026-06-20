@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Star, Bell, Download } from 'lucide-react'
+import { Star, Bell, Download, X } from 'lucide-react'
 import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
@@ -619,8 +619,11 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
             <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')}
               onClick={() => selectSignal(f)}>{f.label}</div>
           ))}
-          <input className="chip-search" placeholder="Filter topics…" value={topicFilter}
-            onChange={(e) => setTopicFilter(e.target.value)} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input className="chip-search" placeholder="Filter topics…" value={topicFilter}
+              onChange={(e) => setTopicFilter(e.target.value)} style={{ paddingRight: topicFilter ? 22 : undefined }} />
+            {topicFilter && <button onClick={() => setTopicFilter('')} title="Clear" style={{ position: 'absolute', right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={12} /></button>}
+          </div>
         </div>
         {/* Row 2 — CATEGORY filters (the WHAT axis) */}
         {cats.length > 0 && (
