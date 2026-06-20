@@ -26,6 +26,8 @@ import db_compat
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 DEFAULT_TIMEOUT_DAYS = int(os.getenv("LEDGER_TIMEOUT_DAYS", "90"))
+MATCH_WINDOW_DAYS    = int(os.getenv("LEDGER_MATCH_WINDOW_DAYS", "30"))
+LEDGER_PARAM_VERSION = "calib-params-v1"
 
 try:
     from google_trends_validation import (
@@ -128,7 +130,7 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     pending = [dict(r) for r in conn.execute(q).fetchall()]
     fetch = fetch_fn or fetch_trends_curve
     now = datetime.now(timezone.utc)
-    led = lagged = same = fp = still = 0
+    led = lagged = same = fp = still = late = 0
     for p in pending:
         try:
             curve = fetch(p["topic_display"])
@@ -138,6 +140,16 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
         if breakout:
             lead = compute_lead_time(p["detection_date"], breakout)
             if lead:
+                # C1: reject cross-surge matches where the breakout date is outside
+                # the detection window — e.g. nukes detected in June matching a Feb spike.
+                if abs(lead["lead_time_days"]) > MATCH_WINDOW_DAYS:
+                    rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
+                    _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
+                                   lead["lead_time_days"], "LATE_REDETECTION", "sweep")
+                    conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
+                    conn.commit()
+                    late += 1
+                    continue
                 rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                 _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
                                lead["lead_time_days"], lead["verdict"], "sweep")
@@ -166,7 +178,8 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
             still += 1
     conn.close()
     out = {"resolved_led": led, "resolved_lagged": lagged, "resolved_same_day": same,
-           "resolved_false_positive": fp, "still_pending": still}
+           "resolved_false_positive": fp, "resolved_late_redetection": late,
+           "still_pending": still}
     print(f"[ledger] sweep: {out}")
     return out
 
@@ -186,15 +199,20 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     same = [r for r in rows if r["verdict"] == "SAME_DAY"]
     lag = [r for r in rows if r["verdict"] == "LAGGED"]
     fp = [r for r in rows if r["verdict"] == "FALSE_POSITIVE"]
+    # LATE_REDETECTION rows are excluded from the honest denominator (C1 gate).
+    late = [r for r in rows if r["verdict"] == "LATE_REDETECTION"]
     resolved = len(led) + len(same) + len(lag) + len(fp)
     if resolved == 0:
-        return {"status": "empty", "message": "No resolved predictions yet.", "pending": pending}
+        return {"status": "empty", "message": "No resolved predictions yet.", "pending": pending,
+                "late_redetection_excluded": len(late), "param_version": LEDGER_PARAM_VERSION}
     lead_times = [r["lead_time_days"] for r in led if r["lead_time_days"] is not None]
     naive_denom = len(led) + len(same) + len(lag)
     return {
         "status": "ok",
+        "param_version": LEDGER_PARAM_VERSION,
         "sample_size": resolved,
         "still_pending": pending,
+        "late_redetection_excluded": len(late),
         "hits_led": len(led), "same_day": len(same),
         "misses_lagged": len(lag), "misses_false_positive": len(fp),
         "honest_hit_rate_pct": round(len(led) / resolved * 100, 1),

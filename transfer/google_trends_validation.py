@@ -60,6 +60,12 @@ TRENDS_PROVIDER = os.getenv("TRENDS_PROVIDER") or (
     "apify" if APIFY_TOKEN else "official" if GOOGLE_TRENDS_API_KEY else "serpapi" if SERPAPI_KEY else "manual"
 )
 
+# C2: Frozen breakout parameters — version-stamped so any threshold change
+# creates a new epoch and can't silently alter historical comparisons.
+BREAKOUT_THRESHOLD_MULT = float(os.getenv("LEDGER_BREAKOUT_MULT", "2.5"))
+BREAKOUT_SUSTAIN_DAYS   = int(os.getenv("LEDGER_SUSTAIN_DAYS", "2"))
+LEDGER_PARAM_VERSION    = "calib-params-v1"
+
 
 # ════════════════════════════════════════════════════════════════
 # SECTION 1: PROVIDER INTERFACE
@@ -270,7 +276,7 @@ def import_manual_curve(topic: str, csv_path: str) -> list[dict]:
 # ════════════════════════════════════════════════════════════════
 
 def detect_breakout_date(curve: list[dict],
-                         breakout_threshold: float = 2.5) -> Optional[dict]:
+                         breakout_threshold: float = BREAKOUT_THRESHOLD_MULT) -> Optional[dict]:
     """
     Detect the breakout point in a Google Trends curve.
 
@@ -307,6 +313,7 @@ def detect_breakout_date(curve: list[dict],
                     "baseline_mean":  round(baseline_mean, 1),
                     "multiple":       round(values[i] / baseline_mean, 1),
                     "breakout_index": i,
+                    "param_version":  LEDGER_PARAM_VERSION,
                 }
 
     return None  # No breakout yet — topic still pre-mainstream
