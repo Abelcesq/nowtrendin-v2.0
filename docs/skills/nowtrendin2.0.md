@@ -158,7 +158,7 @@ Run all three service checks in parallel:
 
 ```powershell
 # Engine (v2 — the live scoring engine)
-curl -s --max-time 20 https://nowtrendin-e62dcb9ecb69.herokuapp.com/health
+curl -s --max-time 20 https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com/health
 
 # Backend (Django API) — /api/health/ doesn't exist; use auth endpoint as liveness probe
 # HTTP 400 with JSON = Django is up and routing correctly
@@ -322,7 +322,7 @@ now canonical in `NowTrendin v2.0/transfer/` — see `ENGINE_AND_REPO_FREEZE.md`
 
 | App | Dir | Remote | Command |
 |---|---|---|---|
-| Engine (v2, ACTIVE) | `NowTrendin v2.0/transfer/` | Heroku `nowtrendin` | `git subtree push --prefix transfer heroku main` (from v2.0 root) |
+| Engine (v2, ACTIVE) | `NowTrendin v2.0/transfer/` | Heroku `nowtrendin-v2-engine` | `git subtree push --prefix transfer heroku-v2engine main` (from v2.0 root) |
 | Backend (Django) | `NowTrendin v2.0/backend/` | Heroku `nowtrendin-backend` | `git subtree push --prefix backend heroku main` (from v2.0 root) |
 | Web terminal (source) | `web-terminal/` | `origin main` → `Abelcesq/nowtrendin-v2.0` | `git push origin main` |
 | Web terminal (live) | `.ghpages-deploy/` worktree | `origin gh-pages` → `Abelcesq/nowtrendin-v2.0` | build → copy → push gh-pages |
