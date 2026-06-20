@@ -560,105 +560,26 @@ def _prune_anomaly_log(keep_days: int = 30) -> int:
         conn.close()
 
 
-def _prune_velocity_scores(keep_per_topic: int = 30) -> int:
-    """Delete all but the most recent `keep_per_topic` rows per topic_key.
+def _prune_velocity_scores(retention_days: int = 90) -> int:
+    """Delete velocity_scores rows older than retention_days (default 90).
 
-    velocity_scores grows by one row per topic per scoring cycle; left
-    unbounded, the latest-per-topic GROUP BY join in /scores degrades until it
-    times out. Called once per worker cycle. Returns rows deleted.
+    DATA RETENTION RULE — never delete scores within the 90-day window.
+    Historical scores are required for tracking trend progression, accuracy-
+    ledger validation, and calibration. Only rows beyond the retention window
+    are removed. Do NOT change this to a count-based prune; count-based deletes
+    valid history whenever a topic is scored frequently.
     """
     conn = get_db(DB_PATH)
     try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).isoformat()
         cur = conn.execute(
-            """
-            DELETE FROM velocity_scores v
-            USING (
-                SELECT id, row_number() OVER (
-                    PARTITION BY topic_key ORDER BY scored_at DESC
-                ) AS rn
-                FROM velocity_scores
-            ) ranked
-            WHERE v.id = ranked.id AND ranked.rn > ?
-            """,
-            (keep_per_topic,),
+            "DELETE FROM velocity_scores WHERE scored_at < ?",
+            (cutoff,),
         )
         deleted = cur.rowcount or 0
         conn.commit()
         if deleted:
-            print(f"[prune] velocity_scores: removed {deleted} old rows")
-        return deleted
-    finally:
-        conn.close()
-
-
-def prune_catchall_single_source(window_hours: int = 72) -> int:
-    """Delete velocity_scores rows for catch-all topics with no multi-source corroboration.
-
-    The scoring-time corroboration floor is forward-only: rows that existed
-    before the floor was added (or that slipped through while the floor was
-    disabled) survive until time-based retention removes them (~90 days).
-    This prune closes that gap — runs each consolidation cycle.
-
-    Hard exemptions (same as the scoring gate):
-      - topic in accuracy_ledger or pending_detections (a tracked prediction)
-      - any expert-tier signal in the window (hasx=1)
-      - signal magnitude >= HIGH_MAGNITUDE_ENG (mass-attention evidence)
-
-    Returns the number of velocity_scores rows deleted.
-    """
-    if CATCHALL_MIN_SOURCES <= 1:
-        return 0  # floor disabled — nothing to prune
-    conn = get_db(DB_PATH)
-    try:
-        protect: set = set()
-        for tbl in ("accuracy_ledger", "pending_detections"):
-            try:
-                for r in conn.execute(
-                        f"SELECT DISTINCT topic_key FROM {tbl}").fetchall():
-                    protect.add(r["topic_key"])
-            except Exception:
-                pass
-
-        vs_rows = conn.execute(
-            "SELECT DISTINCT topic_key, topic_display FROM velocity_scores"
-        ).fetchall()
-        catch_keys = []
-        for r in vs_rows:
-            disp = r["topic_display"] or r["topic_key"] or ""
-            try:
-                cat = _topic_category(disp) or ""
-            except Exception:
-                cat = ""
-            if cat in _CATCHALL_CATS:
-                catch_keys.append(r["topic_key"])
-
-        if not catch_keys:
-            return 0
-
-        cut = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
-        evidence: dict = {}
-        for r in conn.execute(
-                "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
-                "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx, "
-                "MAX(COALESCE(magnitude, 0)) maxe "
-                "FROM topic_signals WHERE extracted_at >= ? GROUP BY topic_key",
-                (cut,)).fetchall():
-            evidence[r["topic_key"]] = (
-                int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0)
-            )
-
-        deleted = 0
-        for key in catch_keys:
-            if key in protect:
-                continue
-            nsrc, hasx, maxe = evidence.get(key, (0, 0, 0.0))
-            if nsrc < CATCHALL_MIN_SOURCES and not hasx and maxe < HIGH_MAGNITUDE_ENG:
-                conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (key,))
-                deleted += 1
-
-        if deleted:
-            conn.commit()
-            print(f"[prune] catch-all single-source: removed {deleted} under-corroborated rows")
+            print(f"[prune] velocity_scores: removed {deleted} rows older than {retention_days}d")
         return deleted
     finally:
         conn.close()
@@ -3267,8 +3188,6 @@ class GravitationalAnomalyDetector:
         conn.commit()
         if folded or pruned:
             print(f"  [score] consolidated {folded} variant keys; pruned {pruned} stale/junk score rows")
-        # ── 3) Drop historical catch-all rows that never had multi-source corroboration ──
-        prune_catchall_single_source()
         return folded
 
     def compute_gradient_strength(self, signals: list[dict]) -> tuple[float, float]:
@@ -4643,7 +4562,7 @@ def start_scheduler():
                 except Exception as _lre:
                     print(f"[scheduler] ledger record error: {_lre}")
                 try:
-                    _prune_velocity_scores(int(os.getenv("KEEP_CYCLES_PER_TOPIC", "5000")))
+                    _prune_velocity_scores(int(os.getenv("VELOCITY_RETENTION_DAYS", "90")))
                     _prune_anomaly_log(int(os.getenv("KEEP_ANOMALY_DAYS", "30")))
                 except Exception as _pe:
                     print(f"[scheduler] prune error: {_pe}")

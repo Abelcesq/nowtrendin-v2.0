@@ -226,13 +226,23 @@ Account view (edit profile, change password, **Authorized Users** = the Enterpri
 the **Frontend Consistency** agent (`/frontend-consistency`).
 
 ## 13. DATA-QUALITY + MONITORING (the engine guardrails)
+
+> **DATA RETENTION RULE (hard — do not override):** All `velocity_scores` rows
+> are retained for **90 days**. Never delete scored data within this window —
+> historical scores are required for trend tracking, calibration, and accuracy-
+> ledger validation. Only rows older than 90 days are removed by
+> `_prune_velocity_scores()`. Do NOT change this to a count-based prune; count-
+> based deletes valid history for frequently-scored topics. Do NOT add any
+> function that deletes `velocity_scores` rows based on quality judgements
+> (e.g., corroboration level) — the floor is enforced at SCORING time so that
+> new bad data never enters; old data stays for the full retention window.
+
 - **Catch-all corroboration floor** (`CATCHALL_MIN_SOURCES`, default 2): a topic
   classifying into news/general must have ≥2 distinct sources to score, with hard
   exemptions (expert-tier signal, high magnitude, ledger/pending). De-congests the
   catch-all without losing early signals. NOT a raw post-volume floor (that would
-  break the before-it-arrives thesis). Floor applied at SCORING time (forward-only)
-  + `prune_catchall_single_source()` runs each consolidation cycle to retroactively
-  clean pre-floor historical rows from `velocity_scores`.
+  break the before-it-arrives thesis). Floor applied at SCORING time only (forward-
+  only); historical rows within the 90-day window are never retroactively deleted.
 - **Catch-all floor trend monitoring**: `catchall_auditor()` writes a row to
   `catchall_floor_log` table each run (total_scored, catchall_count, catchall_pct,
   single_source_leak, min_sources). Reads the last row to compute `floor_trend`
@@ -254,4 +264,4 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD), Cost
   Sentinel, Data Subscriptions, Calibration Auditor. Full spec: `DATA_BUILDING_BLOCKS.md`.
 
-*Last updated: 2026-06-19 — catch-all prune (prune_catchall_single_source + consolidation wiring), catchall_floor_log trend monitoring, stale window startup validation + COLLECT_INTERVAL_MIN rule*
+*Last updated: 2026-06-19 — 90-day data retention rule (no quality-based deletes within window), catchall_floor_log trend monitoring, stale window startup validation + COLLECT_INTERVAL_MIN rule*
