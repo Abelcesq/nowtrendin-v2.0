@@ -230,7 +230,20 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   classifying into news/general must have ≥2 distinct sources to score, with hard
   exemptions (expert-tier signal, high magnitude, ledger/pending). De-congests the
   catch-all without losing early signals. NOT a raw post-volume floor (that would
-  break the before-it-arrives thesis).
+  break the before-it-arrives thesis). Floor applied at SCORING time (forward-only)
+  + `prune_catchall_single_source()` runs each consolidation cycle to retroactively
+  clean pre-floor historical rows from `velocity_scores`.
+- **Catch-all floor trend monitoring**: `catchall_auditor()` writes a row to
+  `catchall_floor_log` table each run (total_scored, catchall_count, catchall_pct,
+  single_source_leak, min_sources). Reads the last row to compute `floor_trend`
+  (IMPROVING / STABLE / WORSENING). Alerts on WORSENING (leak growing >10 since
+  last check) — signals floor disabled or new junk bypassing corroboration.
+- **Stale window rule**: `collector_health.COLLECTOR_EXPECTATIONS` `max_gap_minutes`
+  MUST exceed `COLLECT_INTERVAL_MIN + 60m` for every collector that runs with the
+  main cycle. `risk` runs inside `_collect_phase` (not standalone), so its window
+  must be `COLLECT_INTERVAL_MIN + 60` (currently 360+60=420m). The scheduler
+  validates this on startup and logs a WARNING on mismatch — update both
+  `collector_health.py` AND this rule whenever `COLLECT_INTERVAL_MIN` changes.
 - **Fragment gate**: single-word junk + multi-word filler-anchored fragments
   rejected at scoring + pruned each cycle.
 - **Topic maturity** (NEW/EMERGING/ESTABLISHED) derived from the maintained
@@ -241,4 +254,4 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD), Cost
   Sentinel, Data Subscriptions, Calibration Auditor. Full spec: `DATA_BUILDING_BLOCKS.md`.
 
-*Last updated: 2026-06-16 — 3-platform comprehensive trend+market detail parity (mobile colors), web Account/Authorized-Users flow, catch-all corroboration floor + classifier cleanup, maturity-from-lifecycle fix, 7-agent monitoring fleet + daily catch-all EOD report*
+*Last updated: 2026-06-19 — catch-all prune (prune_catchall_single_source + consolidation wiring), catchall_floor_log trend monitoring, stale window startup validation + COLLECT_INTERVAL_MIN rule*

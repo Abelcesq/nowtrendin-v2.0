@@ -591,6 +591,79 @@ def _prune_velocity_scores(keep_per_topic: int = 30) -> int:
         conn.close()
 
 
+def prune_catchall_single_source(window_hours: int = 72) -> int:
+    """Delete velocity_scores rows for catch-all topics with no multi-source corroboration.
+
+    The scoring-time corroboration floor is forward-only: rows that existed
+    before the floor was added (or that slipped through while the floor was
+    disabled) survive until time-based retention removes them (~90 days).
+    This prune closes that gap — runs each consolidation cycle.
+
+    Hard exemptions (same as the scoring gate):
+      - topic in accuracy_ledger or pending_detections (a tracked prediction)
+      - any expert-tier signal in the window (hasx=1)
+      - signal magnitude >= HIGH_MAGNITUDE_ENG (mass-attention evidence)
+
+    Returns the number of velocity_scores rows deleted.
+    """
+    if CATCHALL_MIN_SOURCES <= 1:
+        return 0  # floor disabled — nothing to prune
+    conn = get_db(DB_PATH)
+    try:
+        protect: set = set()
+        for tbl in ("accuracy_ledger", "pending_detections"):
+            try:
+                for r in conn.execute(
+                        f"SELECT DISTINCT topic_key FROM {tbl}").fetchall():
+                    protect.add(r["topic_key"])
+            except Exception:
+                pass
+
+        vs_rows = conn.execute(
+            "SELECT DISTINCT topic_key, topic_display FROM velocity_scores"
+        ).fetchall()
+        catch_keys = []
+        for r in vs_rows:
+            disp = r["topic_display"] or r["topic_key"] or ""
+            try:
+                cat = _topic_category(disp) or ""
+            except Exception:
+                cat = ""
+            if cat in _CATCHALL_CATS:
+                catch_keys.append(r["topic_key"])
+
+        if not catch_keys:
+            return 0
+
+        cut = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+        evidence: dict = {}
+        for r in conn.execute(
+                "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
+                "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx, "
+                "MAX(COALESCE(magnitude, 0)) maxe "
+                "FROM topic_signals WHERE extracted_at >= ? GROUP BY topic_key",
+                (cut,)).fetchall():
+            evidence[r["topic_key"]] = (
+                int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0)
+            )
+
+        deleted = 0
+        for key in catch_keys:
+            if key in protect:
+                continue
+            nsrc, hasx, maxe = evidence.get(key, (0, 0, 0.0))
+            if nsrc < CATCHALL_MIN_SOURCES and not hasx and maxe < HIGH_MAGNITUDE_ENG:
+                conn.execute("DELETE FROM velocity_scores WHERE topic_key = ?", (key,))
+                deleted += 1
+
+        if deleted:
+            conn.commit()
+            print(f"[prune] catch-all single-source: removed {deleted} under-corroborated rows")
+        return deleted
+    finally:
+        conn.close()
+
+
 def _log_topic_query(topic_key: str, endpoint: str = "/scores") -> None:
     """Enqueue a query log entry.  Drops silently when queue is full."""
     try:
@@ -3194,6 +3267,8 @@ class GravitationalAnomalyDetector:
         conn.commit()
         if folded or pruned:
             print(f"  [score] consolidated {folded} variant keys; pruned {pruned} stale/junk score rows")
+        # ── 3) Drop historical catch-all rows that never had multi-source corroboration ──
+        prune_catchall_single_source()
         return folded
 
     def compute_gradient_strength(self, signals: list[dict]) -> tuple[float, float]:
@@ -4643,6 +4718,22 @@ def start_scheduler():
         _w_collect = os.getenv("WORKER_COLLECT", "1").lower() in ("1", "true", "yes")
         _w_score = os.getenv("WORKER_SCORE", "1").lower()
         _collect_min = int(os.getenv("COLLECT_INTERVAL_MIN", "30"))
+        # ── Stale window safety check ─────────────────────────────────────────────
+        # collector_health max_gap_minutes MUST exceed the actual collection cadence
+        # + 1h margin or it fires STALE on every cycle (the source of the false
+        # CRITICAL alert on the risk collector — see collector_health.py comment).
+        # Risk runs inside _collect_phase, so its window must track COLLECT_INTERVAL_MIN.
+        try:
+            from collector_health import COLLECTOR_EXPECTATIONS as _CE
+            _gap_margin = 60
+            for _cn, _ce in _CE.items():
+                if _ce.get("critical") and _ce.get("max_gap_minutes", 9999) < (_collect_min + _gap_margin):
+                    print(f"[scheduler] WARNING: collector_health '{_cn}' max_gap_minutes="
+                          f"{_ce['max_gap_minutes']} < COLLECT_INTERVAL_MIN={_collect_min}"
+                          f"+{_gap_margin}m margin — will fire STALE every cycle. "
+                          f"Set max_gap_minutes >= {_collect_min + _gap_margin}.")
+        except Exception as _she:
+            print(f"[scheduler] stale-window check skipped: {_she}")
         _score_min = int(os.getenv("SCORE_INTERVAL_MIN", "30"))
         _soon = datetime.now(timezone.utc) + timedelta(seconds=20)  # fire shortly after boot
         if _w_collect:

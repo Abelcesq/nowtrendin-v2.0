@@ -714,10 +714,53 @@ def catchall_auditor(conn) -> dict:
 
     catch_pct = round(catch / total * 100, 1)
     top_terms = token_freq.most_common(25)
+
+    # ── Persist time-series row and compute trend ──────────────────────────────
+    trend = "STABLE"
+    leak_delta = None
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS catchall_floor_log (
+                logged_at TEXT PRIMARY KEY,
+                total_scored INTEGER,
+                catchall_count INTEGER,
+                catchall_pct REAL,
+                single_source_leak INTEGER,
+                misclassified_tracked INTEGER,
+                min_sources INTEGER
+            )
+        """)
+        conn.commit()
+        prev_rows = conn.execute(
+            "SELECT single_source_leak FROM catchall_floor_log "
+            "ORDER BY logged_at DESC LIMIT 2"
+        ).fetchall()
+        now_str = _now().isoformat()
+        conn.execute("""
+            INSERT OR IGNORE INTO catchall_floor_log
+                (logged_at, total_scored, catchall_count, catchall_pct,
+                 single_source_leak, misclassified_tracked, min_sources)
+            VALUES (?,?,?,?,?,?,?)
+        """, (now_str, total, catch, catch_pct, single_src,
+              len(misclassified_real), min_src))
+        conn.commit()
+        if prev_rows:
+            prev_leak = prev_rows[0]["single_source_leak"] or 0
+            leak_delta = single_src - prev_leak
+            if leak_delta > 10:
+                trend = "WORSENING"
+            elif leak_delta < -10:
+                trend = "IMPROVING"
+    except Exception as _e:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"catchall_floor_log write failed: {_e}"})
+
     summary = {
         "total_scored": total, "catchall_count": catch, "catchall_pct": catch_pct,
         "floor_min_sources": min_src,
         "single_source_catchall_leak": single_src,
+        "floor_trend": trend,
+        "floor_leak_delta": leak_delta,
         "misclassified_tracked": len(misclassified_real),
         "misclassified_examples": misclassified_real[:15],
         "lexicon_candidates": [{"term": t, "count": c} for t, c in top_terms],
@@ -731,6 +774,11 @@ def catchall_auditor(conn) -> dict:
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"{single_src} single-source catch-all topics leaked past the "
                               f"corroboration floor (min_sources={min_src}) — floor disabled or purge overdue"})
+    if trend == "WORSENING":
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"catch-all floor trend WORSENING: single-source leaks grew by "
+                              f"{leak_delta} since last check (now {single_src}) — "
+                              f"floor may be disabled or new junk is entering"})
     if misclassified_real:
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"{len(misclassified_real)} TRACKED call(s) (ledger/pending) stuck in the "
