@@ -151,6 +151,7 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
   const [q, setQ] = useState('')
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [sel, setSel] = useState<any | null>(null)
   const load = useCallback(async (query: string) => {
     setLoading(true)
     try {
@@ -159,6 +160,18 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
     } catch { setRows([]) } finally { setLoading(false) }
   }, [kind])
   useEffect(() => { const t = setTimeout(() => load(q.trim()), 350); return () => clearTimeout(t) }, [q, load])
+
+  if (sel) {
+    const hasResult = sel.result && Object.keys(sel.result).length > 0
+    return (
+      <div>
+        <button className="btn" onClick={() => setSel(null)} style={{ marginBottom: 14 }}>← Back</button>
+        {hasResult
+          ? <ProposedCard result={sel.result} topic={sel.topic} />
+          : <div className="center-state">Full grade detail was not saved for this entry.</div>}
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -173,11 +186,11 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
           : 'Topics graded by Now TrendIn members across all plans. No token charge to view.'}
       </div>
       {loading ? <div className="center-state"><div className="spinner" />Loading…</div>
-        : rows.length === 0 ? <div className="center-state">{q ? 'No graded topics match.' : (kind === 'history' ? 'You haven’t graded any topics yet.' : 'No topics graded yet.')}</div>
+        : rows.length === 0 ? <div className="center-state">{q ? 'No graded topics match.' : (kind === 'history' ? "You haven't graded any topics yet." : 'No topics graded yet.')}</div>
           : rows.map((g) => {
             const col = stageColor(g.stage)
             return (
-              <div className="g-row" key={g.id}>
+              <div className="g-row" key={g.id} onClick={() => setSel(g)} style={{ cursor: 'pointer' }}>
                 <div className="g-row-top"><span className="g-row-name">{g.topic}</span>
                   {g.stage && <span className="g-tier" style={{ background: col + '1A', color: col }}>{g.stage}</span>}</div>
                 <div className="g-row-sc">
