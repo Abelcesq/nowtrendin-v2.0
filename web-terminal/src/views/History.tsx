@@ -38,7 +38,7 @@ export function History({ initialQ }: { initialQ?: string }) {
 
   const load = (w: string) => {
     setLoading(true)
-    api.historyRecent(w, 80).then((d) => setRows(d.results || [])).catch(() => setRows([])).finally(() => setLoading(false))
+    api.historyRecent(w, 2000).then((d) => setRows(d.results || [])).catch(() => setRows([])).finally(() => setLoading(false))
   }
   useEffect(() => load(win), [win])
   // When a dashboard tile navigates here with a topic pre-set, apply the filter.

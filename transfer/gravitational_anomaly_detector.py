@@ -4737,12 +4737,13 @@ def start_scheduler():
             _sched.add_job(_scheduled_google_trends, "cron", hour="0,6,12,18", minute=30,
                            id="google_trends_discovery", max_instances=1,
                            coalesce=True, misfire_grace_time=900)
-        # Daily 12-month pull-history snapshot (both feeds) + 12-month prune.
-        # Durable record of each topic's score + timestamp, retained 1 year.
+        # Daily pull-history snapshot (both feeds) — permanent record from inception.
+        # DATA RETENTION RULE: pull_history is NEVER pruned. It is the durable
+        # daily archive of every topic's score from the day it was first detected.
+        # Pruning it would permanently destroy the trend history the product is built on.
         def _scheduled_pull_history():
             try:
                 archive_pull_history(DB_PATH)
-                prune_pull_history(DB_PATH, days=int(os.getenv("PULL_HISTORY_KEEP_DAYS", "365")))
             except Exception as _phe:
                 print(f"[scheduler] pull-history error: {_phe}")
         _sched.add_job(_scheduled_pull_history, "cron", hour=2, minute=15,
@@ -6320,7 +6321,7 @@ def query_topic(payload: dict = Body(...)):
 def get_all_scores(
     min_score: float = Query(0.0),
     stage: str = Query("all"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(600, ge=1, le=5000),
     sort_by: str = Query("overall", enum=["overall", "detection", "confidence"]),
 ):
     """
@@ -6350,7 +6351,7 @@ def get_all_scores(
     # with GitHub emitting ~6k signals/cycle the top-200-by-overall window was
     # 100% tech — cross-domain topics (e.g. world_cup during FIFA 2026) were
     # scored but never entered the serve window.
-    candidate_cap = max(limit, min(limit * 8, int(os.getenv("SCORES_CANDIDATE_CAP", "600"))))
+    candidate_cap = max(limit, int(os.getenv("SCORES_CANDIDATE_CAP", "5000")))
     # Mentions floor: topic extraction emits up to 12 candidate phrases per post,
     # so blog/GitHub text fragments into thousands of ~3-mention micro-topics.
     # Real trends carry far more volume (live: 30–97 mentions vs 3–4 for noise),
@@ -6395,11 +6396,12 @@ def get_all_scores(
 def get_pull_history(
     topic_key: str = Query(None),
     feed: str = Query("attention", enum=["attention", "risk"]),
-    days: int = Query(365, ge=1, le=400),
-    limit: int = Query(400, ge=1, le=2000),
+    days: int = Query(1825, ge=1, le=36500),
+    limit: int = Query(5000, ge=1, le=100000),
 ):
-    """12-month pull history (daily score snapshots). Pass a topic_key for one
-    topic's time series, or omit it for the most recent rows across the feed."""
+    """Full pull history (daily score snapshots) from inception. Pass a topic_key
+    for one topic's full time series, or omit it for the most recent rows across
+    the feed. No artificial day cap — pull_history is the permanent record."""
     conn = get_db(DB_PATH)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     cols = ("snapshot_date, feed, topic_key, topic_display, detection_score, "
@@ -7030,7 +7032,7 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
 
 
 @app.get("/history/recent")
-def history_recent(window: str = Query("7d"), limit: int = Query(60, ge=1, le=200),
+def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2000),
                    points: int = Query(12, ge=2, le=40)):
     """Recent scoring TRAJECTORY per topic — powers the History view (web + mobile,
     one shared source). One call returns each topic's current score (from the

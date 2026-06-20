@@ -140,7 +140,7 @@ export function mapSignal(r: any): Signal {
 
 // Fetch all scored topics from the live engine.
 export async function fetchScores(): Promise<Signal[]> {
-  const res = await fetch(`${GRADIENT_API}/scores`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`${GRADIENT_API}/scores?limit=2000`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Gradient API ${res.status}`);
   const data = await res.json();
   const results = Array.isArray(data?.results) ? data.results : [];
