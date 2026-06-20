@@ -50,8 +50,8 @@ COLLECTOR_EXPECTATIONS = {
     "gdelt":         {"max_gap_minutes": 8 * 60,  "mode": "attention", "critical": False},
     "creators":      {"max_gap_minutes": 8 * 60,  "mode": "attention", "critical": False},
     "broadcast":     {"max_gap_minutes": 8 * 60,  "mode": "attention", "critical": False},
-    # Risk (every ~60 min)
-    "risk":          {"max_gap_minutes": 180, "mode": "risk", "critical": True},
+    # Risk runs inside the main collect phase — every 6h (COLLECT_INTERVAL_MIN=360)
+    "risk":          {"max_gap_minutes": 420, "mode": "risk", "critical": True},
     # Alpha Vantage retail/news coverage (free tier 25 req/day; supplementary)
     "alphavantage":  {"max_gap_minutes": 8 * 60, "mode": "risk", "critical": False},
     # Intentionally OFF (licensing) — tracked but never critical
