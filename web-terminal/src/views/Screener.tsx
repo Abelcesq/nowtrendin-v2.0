@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Star, Bell, Download, X } from 'lucide-react'
+import { Star, Bell, Download, X, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
@@ -53,6 +53,12 @@ function gapMicro(det: number, conf: number) {
       <circle cx={x(conf)} cy="8" r="3.2" fill="var(--conf)" />
     </svg>
   )
+}
+
+function dirOf(gap: number): [JSX.Element, string] {
+  if (gap >= 8) return [<TrendingUp size={15} />, 'var(--bk-t)']
+  if (gap <= -8) return [<TrendingDown size={15} />, 'var(--down)']
+  return [<Minus size={15} />, 'var(--text-3)']
 }
 
 function ring(val: number, color: string) {
@@ -647,20 +653,22 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
           <table>
             <thead>
               <tr>
-                <th onClick={() => sort('topic_display')} className={sortKey === 'topic_display' ? 'sorted' : ''}>Topic <span className="sort">{arrow('topic_display')}</span></th>
-                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Now Trending — proprietary N (community-demand) score">N <span className="sort">{arrow('n')}</span></th>
-                <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')}>Det <span className="sort">{arrow('det')}</span></th>
-                <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')}>Conf <span className="sort">{arrow('conf')}</span></th>
-                <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')}>Gap <span className="sort">{arrow('gap')}</span></th>
-                <th onClick={() => sort('stage')} className={sortKey === 'stage' ? 'sorted' : ''}>Stage <span className="sort">{arrow('stage')}</span></th>
-                <th onClick={() => sort('category')} className={sortKey === 'category' ? 'sorted' : ''}>Category <span className="sort">{arrow('category')}</span></th>
-                <th onClick={() => sort('total_mentions')} className={'r ' + (sortKey === 'total_mentions' ? 'sorted' : '')}>Mentions <span className="sort">{arrow('total_mentions')}</span></th>
-                <th onClick={() => sort('ageMin')} className={'r ' + (sortKey === 'ageMin' ? 'sorted' : '')}>Updated <span className="sort">{arrow('ageMin')}</span></th>
+                <th onClick={() => sort('topic_display')} className={sortKey === 'topic_display' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Topic <span className="sort">{arrow('topic_display')}</span></th>
+                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Now Trending — proprietary N (community-demand) score" style={{ textAlign: 'center' }}>N <span className="sort">{arrow('n')}</span></th>
+                <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Det <span className="sort">{arrow('det')}</span></th>
+                <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Conf <span className="sort">{arrow('conf')}</span></th>
+                <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Gap <span className="sort">{arrow('gap')}</span></th>
+                <th onClick={() => sort('stage')} className={sortKey === 'stage' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Stage <span className="sort">{arrow('stage')}</span></th>
+                <th onClick={() => sort('category')} className={sortKey === 'category' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Category <span className="sort">{arrow('category')}</span></th>
+                <th style={{ textAlign: 'center' }}>Direction</th>
+                <th onClick={() => sort('total_mentions')} className={'r ' + (sortKey === 'total_mentions' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Mentions <span className="sort">{arrow('total_mentions')}</span></th>
+                <th onClick={() => sort('ageMin')} className={'r ' + (sortKey === 'ageMin' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Updated <span className="sort">{arrow('ageMin')}</span></th>
               </tr>
             </thead>
             <tbody>
               {view.map((r) => {
                 const gw = Math.abs(r.gap) >= 20 ? 'wide' : r.gap < 0 ? 'neg' : 'tight'
+                const [dirIcon, dirColor] = dirOf(r.gap)
                 return (
                   <tr key={r.topic_key} className={r.topic_key === sel ? 'sel' : ''} onClick={() => select(r.topic_key)}>
                     <td><div className="topic-name">{r.topic_display}</div><div className="topic-cat">{r.topic_key}</div></td>
@@ -670,6 +678,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                     <td className="r"><div className="gapviz">{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
                     <td><span className={'stage ' + r.stage}>{r.stage}</span></td>
                     <td><span className="muted" style={{ textTransform: 'capitalize' }}>{r.category || '—'}</span></td>
+                    <td style={{ textAlign: 'center' }}><span style={{ color: dirColor, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{dirIcon}</span></td>
                     <td className="r"><span className="muted">{r.total_mentions ?? '—'}</span></td>
                     <td className="r"><span className="muted">{ageLabel(r.ageMin)}</span></td>
                   </tr>
