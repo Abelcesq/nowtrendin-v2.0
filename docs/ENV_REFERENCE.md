@@ -28,6 +28,7 @@ Status legend:
 |---|---|---|
 | `ANTHROPIC_API_KEY` | SET | Claude API key for AI grading (`/grade`) |
 | `PERPLEXITY_API_KEY` | SET | Perplexity API key for AI grading research step |
+| `FIRECRAWL_API_KEY` | SET ✅ | Firecrawl web search — Stage 0 pre-research in grade pipeline. Anchors Perplexity to real URLs. Set 2026-06-21 v74. |
 | `AI_GRADE_CLAUDE_MODEL` | SET | Claude model for grading — must be `claude-sonnet-4-6` |
 | `AI_GRADE_PPLX_MODEL` | OPTIONAL | Perplexity model for grading — defaults to `sonar` |
 | `AI_MONTHLY_BUDGET_USD` | OPTIONAL | Monthly AI spend cap (default: no cap) |
