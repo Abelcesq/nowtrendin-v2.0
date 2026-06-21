@@ -2873,14 +2873,16 @@ def collect_for_term(conn, term: str) -> int:
     # Registers how widely the mainstream press covers a topic, inserted as
     # MAINSTREAM signals so a widely-covered topic (e.g. SpaceX) carries real
     # mainstream weight and its niche-concentration gradient correctly drops.
-    # Prefer the Guardian API (cloud-friendly, free key); fall back to GDELT
-    # (free/no-key but rate-limited from cloud IPs → circuit-breakered).
+    # Sources: Guardian API (key-gated) + NYT RSS (free, no key) are merged;
+    # GDELT is last resort only (rate-limited from cloud/Heroku IPs).
     if _NEWS_AVAILABLE:
         try:
             news_key = f"news:{term.strip().lower()}"
             gd = _cache.get(news_key)
             if gd is None:
-                gd = (_news.collect_guardian_signal(term)
+                gd_guardian = _news.collect_guardian_signal(term)
+                gd_nyt = _news.collect_nyt_signal(term)
+                gd = (_news.merge_media_signals(gd_guardian, gd_nyt)
                       or _news.collect_gdelt_signal(term)
                       or {})
                 _cache.set(news_key, gd, CACHE_TTL_XSIGNAL)  # 12h — coverage is stable

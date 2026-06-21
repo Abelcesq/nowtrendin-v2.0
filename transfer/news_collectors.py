@@ -246,6 +246,135 @@ def collect_guardian_signal(topic: str) -> Optional[dict]:
 
 
 # ════════════════════════════════════════════════════════════════
+# SECTION 1c: NYT RSS COLLECTOR (Stage 4 — Media Coverage)
+# Free, no API key, no rate limit, no commercial restriction.
+# Pulls 15 NYT section feeds and keyword-matches article titles/
+# descriptions against the topic. Article content is never ingested —
+# only title + summary metadata for count and recency.
+# Runs alongside Guardian (both Stage 4); GDELT is only the fallback
+# when BOTH are absent.
+# ════════════════════════════════════════════════════════════════
+
+_NYT_SECTIONS = [
+    "Technology", "Science", "Business", "Economy", "Health",
+    "Arts", "Climate", "Energy", "Education", "Sports",
+    "Politics", "World", "US", "Travel", "Food",
+]
+_NYT_BASE = "https://rss.nytimes.com/services/xml/rss/nyt/{section}.xml"
+_NYT_CACHE: dict = {}
+_NYT_TTL   = 3600  # 1h — feeds update hourly
+
+
+def collect_nyt_signal(topic: str) -> Optional[dict]:
+    """
+    NYT RSS media-coverage signal for a topic. Checks 15 section feeds
+    and returns article count, section breadth, and recency.
+    Stage 4 (Media Coverage) — same tier as Guardian. No API key needed.
+    Returns None when zero articles match (topic not in NYT this week).
+    """
+    import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
+
+    if not topic:
+        return None
+
+    cached = _NYT_CACHE.get(topic)
+    if cached is not None and (time.time() - cached["ts"] < _NYT_TTL):
+        return cached["data"]
+
+    topic_lower = topic.lower()
+    terms = [t.strip() for t in topic_lower.replace("-", " ").split()
+             if len(t.strip()) > 2]
+    if not terms:
+        _NYT_CACHE[topic] = {"ts": time.time(), "data": None}
+        return None
+
+    now_utc  = datetime.now(timezone.utc)
+    total    = 0
+    sections = set()
+    newest_h: Optional[float] = None
+
+    for section in _NYT_SECTIONS:
+        url = _NYT_BASE.format(section=section)
+        try:
+            req = Request(url, headers={"User-Agent": "NowTrendIn/2.0"})
+            with urlopen(req, timeout=8) as resp:
+                content = resp.read()
+            root  = ET.fromstring(content)
+            items = root.findall(".//item")
+            matched = 0
+            for item in items:
+                title = (item.findtext("title") or "").lower()
+                desc  = (item.findtext("description") or "").lower()
+                text  = title + " " + desc
+                if any(t in text for t in terms):
+                    matched += 1
+                    pub = item.findtext("pubDate")
+                    if pub:
+                        try:
+                            pub_dt = parsedate_to_datetime(pub)
+                            age_h  = (now_utc - pub_dt.astimezone(timezone.utc)).total_seconds() / 3600
+                            if newest_h is None or age_h < newest_h:
+                                newest_h = round(age_h, 1)
+                        except Exception:
+                            pass
+            if matched:
+                total += matched
+                sections.add(section)
+        except Exception:
+            pass  # individual section failure is non-fatal
+        time.sleep(0.05)  # gentle pacing across 15 feeds
+
+    if total == 0:
+        _NYT_CACHE[topic] = {"ts": time.time(), "data": None}
+        return None
+
+    result = {
+        "type":            "media_coverage",
+        "source":          "nyt_rss",
+        "topic":           topic,
+        "diffusion_stage": 4,
+        "total_volume":    total,
+        "article_count":   total,
+        "source_breadth":  len(sections),
+        "sections":        sorted(sections),
+        "newest_age_h":    newest_h,
+        "avg_tone":        0.0,
+        "raw_signal":      f"NYT RSS: {total} articles in {', '.join(sorted(sections))}",
+    }
+    _NYT_CACHE[topic] = {"ts": time.time(), "data": result}
+    return result
+
+
+def merge_media_signals(*signals) -> Optional[dict]:
+    """Combine multiple Stage-4 media signals (Guardian, NYT, etc.) into one.
+    Article counts are additive; source names are joined; tone is averaged."""
+    valid = [s for s in signals if s and s.get("article_count", 0) > 0]
+    if not valid:
+        return None
+    if len(valid) == 1:
+        return valid[0]
+    merged_count = sum(s.get("article_count", 0) for s in valid)
+    merged_vol   = sum(s.get("total_volume", 0) or s.get("article_count", 0) for s in valid)
+    merged_breadth = sum(s.get("source_breadth", 0) for s in valid)
+    tones  = [s["avg_tone"] for s in valid if s.get("avg_tone") is not None]
+    merged_tone = round(sum(tones) / len(tones), 4) if tones else 0.0
+    sources = "+".join(s.get("source", "news") for s in valid)
+    topic   = valid[0].get("topic", "")
+    return {
+        "type":            "media_coverage",
+        "source":          sources,
+        "topic":           topic,
+        "diffusion_stage": 4,
+        "total_volume":    merged_vol,
+        "article_count":   merged_count,
+        "source_breadth":  merged_breadth,
+        "avg_tone":        merged_tone,
+        "raw_signal":      f"{sources}: {merged_count} articles ({merged_breadth} sections)",
+    }
+
+
+# ════════════════════════════════════════════════════════════════
 # SECTION 2: FINNHUB COLLECTOR (Stages 1, 3, 4 — Risk mode)
 # 60 calls/min free. Bundles insider, congressional, sentiment, news.
 # ════════════════════════════════════════════════════════════════
