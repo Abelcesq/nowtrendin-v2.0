@@ -163,8 +163,23 @@ def run_nightly(adapter: NowTrendInDataAdapter, today: Optional[date] = None) ->
     rep.sources = CA.source_attribution(rows, adapter.source_first_seen)
 
     # 5–6 · offense (lead_moat_agent) — attribution MUST precede the gate
-    receipts = [LMA.audit_topic(r.topic, r.detection_date, adapter.gt_series(r.topic),
-                                adapter.topic_sources(r.topic)) for r in rows]
+    # For resolved rows the ledger already has the breakout_date — build the receipt
+    # directly without a live GT call. Only pending rows need GT to check for breakout.
+    receipts = []
+    for r in rows:
+        if r.breakout_date is not None:
+            # Already resolved: use stored breakout_date — no API call needed.
+            lead = (r.breakout_date - r.detection_date).days
+            verdict = "LED" if lead >= 1 else ("SAME_DAY" if lead == 0 else "LAGGED")
+            text = (f"{r.topic}: we flagged it {r.detection_date}; "
+                    f"Google Trends broke out {r.breakout_date} → lead {lead:+d}d ({verdict}).")
+            receipts.append(LMA.Receipt(r.topic, r.detection_date, r.breakout_date,
+                                        lead, verdict, adapter.topic_sources(r.topic), text))
+        else:
+            # Still pending: call GT to see if it has broken out since last run.
+            receipts.append(LMA.audit_topic(r.topic, r.detection_date,
+                                            adapter.gt_series(r.topic),
+                                            adapter.topic_sources(r.topic)))
     rep.lead_vs_gt = LMA.gt_scorecard(receipts)
     attribution = {s: d["median_lead"] for s, d in rep.sources.items()}
     counts = {s: d["n"] for s, d in rep.sources.items()}

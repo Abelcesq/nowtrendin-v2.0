@@ -137,9 +137,10 @@ def load_live_topics() -> list:
         return []
     try:
         conn = db_compat.connect(DB_PATH)
-        keys = [r[0] for r in conn.execute(
+        rows_ = conn.execute(
             "SELECT DISTINCT topic_key FROM velocity_scores LIMIT 200"
-        ).fetchall()]
+        ).fetchall()
+        keys = [r["topic_key"] if hasattr(r, "keys") else r[0] for r in rows_]
         conn.close()
     except Exception as e:
         print(f"[calibration] load_live_topics query error: {e}")
@@ -161,9 +162,10 @@ def load_live_instruments() -> list:
         return []
     try:
         conn = db_compat.connect(DB_PATH)
-        symbols = [r[0] for r in conn.execute(
+        rows_ = conn.execute(
             "SELECT DISTINCT item_key FROM market_signal_history LIMIT 100"
-        ).fetchall()]
+        ).fetchall()
+        symbols = [r["item_key"] if hasattr(r, "keys") else r[0] for r in rows_]
         conn.close()
     except Exception as e:
         print(f"[calibration] load_live_instruments query error: {e}")

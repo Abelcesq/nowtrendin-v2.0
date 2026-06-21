@@ -127,7 +127,8 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
             conn.close()
             # Normalize to canonical leading-source names where applicable
             seen, out = set(), []
-            for (p,) in rows:
+            for row in rows:
+                p = row["platform"] if hasattr(row, "keys") else row[0]
                 canonical = _PLATFORM_TO_LEADING.get((p or "").lower(), p)
                 if canonical and canonical not in seen:
                     seen.add(canonical)
@@ -159,7 +160,11 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
 
             # Build {canonical_src: {topic: [daily_counts ordered by day]}}
             by_src: dict = {}
-            for (platform, topic, _day, n) in rows:
+            for row in rows:
+                if hasattr(row, "keys"):
+                    platform, topic, n = row["platform"], row["topic"], row["n"]
+                else:
+                    platform, topic, _day, n = row
                 canonical = _PLATFORM_TO_LEADING.get((platform or "").lower())
                 if canonical is None:
                     continue   # not a leading source
