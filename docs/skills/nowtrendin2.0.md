@@ -116,18 +116,19 @@ At session start, quickly check whether the user has addressed any of these.
 Do NOT repeat the full Heroku config audit — just check the specific gaps:
 
 ```powershell
-heroku config -a nowtrendin-v2-engine 2>$null | Select-String "GUARDIAN_API_KEY|REDDIT_CLIENT_ID|APIFY_REALTIME_ACTOR|APIFY_TRENDS_ACTOR|DEVTO_API_KEY"
+# Check if user has set the high-priority gaps (Guardian + Reddit on hold; Apify resolved)
 heroku config -a nowtrendin-backend 2>$null | Select-String "SECRET_KEY|GOOGLE_ANDROID_CLIENT_ID"
+heroku config -a nowtrendin-v2-engine 2>$null | Select-String "GUARDIAN_API_KEY|REDDIT_CLIENT_ID"
 ```
 
 | Gap | Impact | Action |
 |---|---|---|
-| `GUARDIAN_API_KEY` missing on engine | **HIGH** — Stage 4 mainstream media signal absent; GDELT fallback is rate-limited on Heroku IPs → silent data gap every scoring run | Register free at open-platform.theguardian.com/access then `heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine` |
 | `SECRET_KEY` missing on backend | **HIGH (security)** — Django running with insecure hardcoded default key in settings.py | Generate: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` then `heroku config:set SECRET_KEY=<key> -a nowtrendin-backend` |
-| `REDDIT_CLIENT_ID/SECRET/USER_AGENT` missing on engine | MEDIUM — Reddit signal entirely absent | Register app at reddit.com/prefs/apps then set all three vars on engine |
-| `APIFY_REALTIME_ACTOR` + `APIFY_TRENDS_ACTOR` missing on engine | MEDIUM — APIFY_TOKEN is set but actors can't run without their IDs | Check Apify console for actor IDs, then set on engine |
+| `GUARDIAN_API_KEY` missing on engine | HIGH — Stage 4 mainstream media signal absent; GDELT fallback rate-limited on Heroku IPs | **ON HOLD** (user deferred 2026-06-20). Register free at open-platform.theguardian.com/access when ready. |
+| `REDDIT_CLIENT_ID/SECRET/USER_AGENT` missing on engine | MEDIUM — Reddit signal entirely absent | **ON HOLD** (user deferred 2026-06-20). Register at reddit.com/prefs/apps when ready. |
 | `GOOGLE_ANDROID_CLIENT_ID` missing on backend | MEDIUM — Android Google OAuth may fail silently | Retrieve from Google Cloud Console → OAuth credentials |
-| `DEVTO_API_KEY` missing on engine | LOW — Dev.to blog signal silently skips | Register at dev.to/settings/extensions (free) |
+| `APIFY_REALTIME_ACTOR` + `APIFY_TRENDS_ACTOR` | RESOLVED ✅ | Both actors have hardcoded defaults and ARE running. Confirmed 2026-06-20: 125 results, $0.574/run. No env vars needed. Monitor spend (~$103/mo). |
+| `DEVTO_API_KEY` missing on engine | LOW — Dev.to blog signal silently skips | Register at dev.to/settings/extensions (free) when ready |
 
 Full env var reference: `docs/ENV_REFERENCE.md` in the v2.0 repo.
 

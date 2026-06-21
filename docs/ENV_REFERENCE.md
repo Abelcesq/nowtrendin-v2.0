@@ -41,8 +41,8 @@ Status legend:
 | `REDDIT_CLIENT_SECRET` | **MISSING** | Reddit API OAuth secret — Reddit signal not collected |
 | `REDDIT_USER_AGENT` | **MISSING** | Reddit API user-agent string (e.g. `nowtrendin/1.0`) |
 | `APIFY_TOKEN` | SET | Apify platform API token |
-| `APIFY_REALTIME_ACTOR` | **MISSING** | Apify actor ID for real-time scraping — actors cannot run without this |
-| `APIFY_TRENDS_ACTOR` | **MISSING** | Apify actor ID for trend scraping — actors cannot run without this |
+| `APIFY_REALTIME_ACTOR` | OPTIONAL | Override for realtime actor ID. Default `oOHXMAv8kImUCpHff` (`easyapi/google-realtime-trends-data-scraper`) is hardcoded in `gravitational_anomaly_detector.py:1811` — engine calls it successfully without this var. ~$0.57/run, every 6h. |
+| `APIFY_TRENDS_ACTOR` | OPTIONAL | Override for trends validation actor ID. Default `apify~google-trends-scraper` is hardcoded in `google_trends_validation.py:161` — works without this var. |
 | `MASTODON_INSTANCE` | **MISSING** | Mastodon instance URL (e.g. `mastodon.social`) — collector silently skips |
 
 ### News / Media signals
@@ -153,7 +153,7 @@ Status legend:
 
 3. **REDDIT_CLIENT_ID / SECRET / USER_AGENT** — Register at https://www.reddit.com/prefs/apps (free). Reddit signal currently not collected.
 
-4. **APIFY_REALTIME_ACTOR / APIFY_TRENDS_ACTOR** — Check Apify console for existing actor IDs, or create actors. APIFY_TOKEN is set but actors can't run without these IDs.
+4. **APIFY actors** — Both actors have hardcoded defaults and are already running successfully (confirmed 2026-06-20 via Apify console: 125 results, $0.574/run). No env vars needed. Monitor Apify spend: ~$103/mo for the realtime actor alone (runs every 6h at ~$0.57).
 
 5. **GOOGLE_ANDROID_CLIENT_ID** — Retrieve from Google Cloud Console → nowtrendin project → OAuth credentials.
 
