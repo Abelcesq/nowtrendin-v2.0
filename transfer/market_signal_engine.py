@@ -245,9 +245,14 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
     repo_chg = abs(((macro.get("leverage") or {}).get("repo_volume_change_pct")) or 0.0)
     dark = _norm(stress_v * 0.6 + min(repo_chg, 20) / 20 * 0.4)
 
-    # Fundamental Confirmation — beneficiary cycle inflection + sustainability
-    comps = bene.get("components") or {}
+    # Fundamental Confirmation — FMP income/profile (primary) + beneficiary
+    # cycle inflection + Finnhub sustainability (supporting).  FMP is the
+    # strongest signal: real P&L data, not proxy indicators.
+    fmp_d  = payload.get("fmp") or {}
+    comps  = bene.get("components") or {}
     fu_parts = []
+    if fmp_d.get("score_normalized") is not None:
+        fu_parts.append(_norm(fmp_d["score_normalized"]))
     if "cycle_inflection" in comps:
         fu_parts.append(_norm(comps["cycle_inflection"]))
     if sus.get("score") is not None:

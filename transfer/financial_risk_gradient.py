@@ -2127,6 +2127,12 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
     except Exception:
         pass
     try:
+        import fmp_data as _fmp
+        fmp = _fmp.fundamental_score(ticker)
+        if fmp: payload["fmp"] = fmp
+    except Exception:
+        pass
+    try:
         import ofr_stfm
         payload["macro_leverage"] = ofr_stfm.leverage_snapshot()
     except Exception:
@@ -2275,6 +2281,13 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                     positioning_payload["beneficiary"] = bene
             except Exception as _bee:
                 print(f"[beneficiary] {display}: {_bee}")
+            try:
+                import fmp_data as _fmp
+                fmp = _fmp.fundamental_score(ticker)
+                if fmp:
+                    positioning_payload["fmp"] = fmp
+            except Exception as _fmpe:
+                print(f"[fmp] {display}: {_fmpe}")
 
         # Macro leverage context (OFR repo data) — shared across the feed.
         try:
