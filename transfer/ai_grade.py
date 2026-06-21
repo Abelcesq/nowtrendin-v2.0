@@ -35,14 +35,61 @@ try:
 except Exception:
     def _api(*a, **k): pass
 
-PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
-ANTHROPIC_API_KEY  = os.getenv("ANTHROPIC_API_KEY", "")
+PERPLEXITY_API_KEY  = os.getenv("PERPLEXITY_API_KEY", "")
+ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY", "")
+FIRECRAWL_API_KEY   = os.getenv("FIRECRAWL_API_KEY", "")
 PPLX_MODEL   = os.getenv("AI_GRADE_PPLX_MODEL", "sonar")
 CLAUDE_MODEL = os.getenv("AI_GRADE_CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
 
 
 def is_available() -> bool:
     return bool(PERPLEXITY_API_KEY or ANTHROPIC_API_KEY)
+
+
+# ── Stage 0: WEB PRESENCE (Firecrawl) ───────────────────────────────
+# Pre-research step: fetch real URLs before Perplexity so the research
+# prompt is anchored to actual web evidence rather than hallucinated
+# sources.  Degrades gracefully when FIRECRAWL_API_KEY is absent.
+
+def firecrawl_web_context(topic: str, limit: int = 5) -> dict:
+    """
+    Quick open-web search via Firecrawl /search.
+
+    Returns {available, result_count, urls, web_block} where
+    `web_block` is a compact text snippet suitable for embedding
+    into the Perplexity research prompt.
+
+    Cost: 1 Firecrawl credit per call.  Called once per AI grade
+    (only for topics NOT already in our data pool).
+    """
+    if not FIRECRAWL_API_KEY:
+        return {"available": False, "result_count": 0, "urls": [], "web_block": ""}
+    try:
+        _api("firecrawl")
+        r = requests.post(
+            "https://api.firecrawl.dev/v2/search",
+            headers={"Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={"query": topic, "limit": limit},
+            timeout=15,
+        )
+        r.raise_for_status()
+        results = (r.json().get("data") or [])
+        urls, lines = [], []
+        for item in results:
+            url   = item.get("url", "")
+            title = item.get("title", "")
+            desc  = (item.get("description") or "")[:200]
+            if url:
+                urls.append(url)
+            if title:
+                lines.append(f"- [{title}]({url}): {desc}")
+        web_block = "\n".join(lines)
+        return {"available": True, "result_count": len(results),
+                "urls": urls, "web_block": web_block}
+    except Exception as exc:
+        print(f"[firecrawl] web_context '{topic}': {exc}")
+        return {"available": False, "result_count": 0, "urls": [], "web_block": ""}
 
 
 # ── Stage 1: RESEARCH (Perplexity) ──────────────────────────────────
@@ -59,6 +106,23 @@ _RESEARCH_PROMPT = (
     "'X new this week', percentages of a whole, user numbers) you cannot verify "
     "from sources — describe them qualitatively if unsure, and never give a total "
     "and a growth figure that are internally inconsistent."
+)
+
+# Firecrawl-enriched variant: real web URLs are pre-fetched and anchored
+# into the prompt so Perplexity has verified source material to start from.
+_RESEARCH_PROMPT_WITH_WEB = (
+    "You are a trend-intelligence researcher. Research the topic \"{topic}\" "
+    "across the open web RIGHT NOW.\n\n"
+    "Real web sources already confirmed for this topic:\n{web_block}\n\n"
+    "Use these as anchors and supplement with additional research. Report concisely:\n"
+    "1. What it is and whether it is currently emerging, mainstream, or fading.\n"
+    "2. Where the conversation is happening (niche/expert communities vs "
+    "mainstream platforms like YouTube, news, Reddit, X).\n"
+    "3. Whether expert/insider discussion leads mainstream awareness, or it is "
+    "already widely known.\n"
+    "4. Momentum: is attention accelerating, flat, or declining?\n"
+    "Cite sources (including the ones above). Do NOT invent quantitative metrics "
+    "you cannot verify — describe them qualitatively instead."
 )
 
 
@@ -202,10 +266,19 @@ def analyze_movement(topic: str, movement: str, direction: str, context: str = "
         return {"available": False, "error": str(e)}
 
 
-def research_topic(topic: str) -> dict:
-    """Perplexity web research. Returns {available, summary, citations}."""
+def research_topic(topic: str, web_block: str = "") -> dict:
+    """Perplexity web research. Returns {available, summary, citations}.
+
+    When `web_block` is provided (pre-fetched Firecrawl URLs + snippets),
+    the enriched prompt variant anchors Perplexity to real source evidence.
+    """
     if not PERPLEXITY_API_KEY:
         return {"available": False, "summary": "", "citations": []}
+    prompt = (
+        _RESEARCH_PROMPT_WITH_WEB.format(topic=topic, web_block=web_block)
+        if web_block else
+        _RESEARCH_PROMPT.format(topic=topic)
+    )
     try:
         _api("perplexity")
         r = requests.post(
@@ -214,7 +287,7 @@ def research_topic(topic: str) -> dict:
                      "Content-Type": "application/json"},
             json={
                 "model": PPLX_MODEL,
-                "messages": [{"role": "user", "content": _RESEARCH_PROMPT.format(topic=topic)}],
+                "messages": [{"role": "user", "content": prompt}],
             },
             timeout=60,
         )
@@ -333,8 +406,15 @@ def grade_topic(topic: str) -> dict:
         return {"available": False,
                 "reason": "AI grading not configured (set PERPLEXITY_API_KEY / ANTHROPIC_API_KEY)."}
 
-    research = research_topic(topic)
+    # Stage 0: Firecrawl web presence — fetch real URLs to anchor research
+    fc = firecrawl_web_context(topic)
+    research = research_topic(topic, web_block=fc.get("web_block", ""))
     score = propose_score(topic, research.get("summary", ""))
+
+    # Merge Firecrawl URLs into citation list (deduped)
+    pplx_citations = research.get("citations", []) or []
+    fc_urls = fc.get("urls", []) or []
+    all_citations = list(dict.fromkeys(pplx_citations + fc_urls))  # preserve order, dedupe
 
     if not score.get("available"):
         return {
@@ -342,7 +422,8 @@ def grade_topic(topic: str) -> dict:
             "topic": topic,
             "proposed": False,
             "research": research.get("summary", ""),
-            "citations": research.get("citations", []),
+            "citations": all_citations,
+            "web_result_count": fc.get("result_count", 0),
             "detail": score.get("error", "Scoring synthesis unavailable."),
         }
 
@@ -386,8 +467,9 @@ def grade_topic(topic: str) -> dict:
         "classification": str(score.get("classification") or "").lower() or None,
         "reach_note": score.get("reach_note", ""),
         "research": research.get("summary", ""),
-        "citations": research.get("citations", []),
-        "provenance": "ai_grade:perplexity+claude (engine-weighted)",
+        "citations": all_citations,
+        "web_result_count": fc.get("result_count", 0),
+        "provenance": "ai_grade:firecrawl+perplexity+claude (engine-weighted)" if fc.get("available") else "ai_grade:perplexity+claude (engine-weighted)",
         "cost": {
             "perplexity": round(float(research.get("cost", 0) or 0), 6),
             "anthropic":  round(float(score.get("cost", 0) or 0), 6),
