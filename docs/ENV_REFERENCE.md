@@ -149,9 +149,12 @@ Status legend:
 - `GUARDIAN_API_KEY` — Register free at open-platform.theguardian.com/access when ready, then `heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine`. Restores Stage 4 mainstream media signal.
 - `REDDIT_CLIENT_ID/SECRET/USER_AGENT` — Register at reddit.com/prefs/apps when ready.
 
-**Still open**
-- `GOOGLE_ANDROID_CLIENT_ID` — Retrieve from Google Cloud Console → OAuth credentials → `heroku config:set GOOGLE_ANDROID_CLIENT_ID=<id> -a nowtrendin-backend`.
-- `DEVTO_API_KEY` — Low priority. Register at dev.to/settings/extensions (free) when ready.
+**Deferred until app store publish (Google Play / App Store)**
+- `GOOGLE_ANDROID_CLIENT_ID` — Not needed until Google Play submission. Retrieve from Google Cloud Console → OAuth credentials at that time.
+- Stripe (`@stripe/stripe-react-native`) + push notifications (`expo-notifications`) — Require custom dev client off Expo Go. Do not touch until store submission.
+
+**Still open (low priority)**
+- `DEVTO_API_KEY` — Register at dev.to/settings/extensions (free) when ready. Dev.to blog signal silently skips without it.
 
 ---
 

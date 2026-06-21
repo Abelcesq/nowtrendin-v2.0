@@ -126,8 +126,9 @@ heroku config -a nowtrendin-v2-engine 2>$null | Select-String "GUARDIAN_API_KEY|
 | `SECRET_KEY` (backend) | RESOLVED ✅ | Set 2026-06-20, Heroku v39. Django no longer using insecure default. |
 | `GUARDIAN_API_KEY` missing on engine | HIGH — Stage 4 mainstream media signal absent; GDELT fallback rate-limited on Heroku IPs | **ON HOLD** (user deferred 2026-06-20). Register free at open-platform.theguardian.com/access when ready. |
 | `REDDIT_CLIENT_ID/SECRET/USER_AGENT` missing on engine | MEDIUM — Reddit signal entirely absent | **ON HOLD** (user deferred 2026-06-20). Register at reddit.com/prefs/apps when ready. |
-| `GOOGLE_ANDROID_CLIENT_ID` missing on backend | MEDIUM — Android Google OAuth may fail silently | Retrieve from Google Cloud Console → OAuth credentials |
 | `APIFY_REALTIME_ACTOR` + `APIFY_TRENDS_ACTOR` | RESOLVED ✅ | Both actors have hardcoded defaults and ARE running. Confirmed 2026-06-20: 125 results, $0.574/run. No env vars needed. Monitor spend (~$103/mo). |
+| `GOOGLE_ANDROID_CLIENT_ID` | DEFERRED — app store publish | Do not action until Google Play submission. Retrieve from Google Cloud Console → OAuth credentials at that time. |
+| Stripe + push notifications | DEFERRED — app store publish | Requires custom dev client (off Expo Go). Do not action until Google Play / App Store submission. |
 | `DEVTO_API_KEY` missing on engine | LOW — Dev.to blog signal silently skips | Register at dev.to/settings/extensions (free) when ready |
 
 Full env var reference: `docs/ENV_REFERENCE.md` in the v2.0 repo.
