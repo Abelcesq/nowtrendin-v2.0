@@ -104,7 +104,7 @@ Status legend:
 ### Infrastructure
 | Variable | Status | Description |
 |---|---|---|
-| `SECRET_KEY` | **MISSING (SECURITY RISK)** | Django secret key — without this, Django falls back to the insecure hardcoded default in settings.py. **Must be set before production traffic.** Generate: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
+| `SECRET_KEY` | SET ✅ | Django secret key — set 2026-06-20, Heroku release v39. |
 | `DATABASE_URL` | SET | Postgres connection string (Heroku Postgres add-on) |
 | `DEBUG` | SET | Django debug mode — must be `False` in production |
 | `PORT` | SET (auto) | HTTP port — set by Heroku automatically |
@@ -140,26 +140,18 @@ Status legend:
 
 ## Action items (by priority)
 
-1. **GUARDIAN_API_KEY** — Register at https://open-platform.theguardian.com/access (free, no credit card). Then:
-   ```
-   heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine
-   ```
-   This restores Stage 4 mainstream media signal and removes GDELT rate-limit exposure.
+**Resolved ✅**
+- `SECRET_KEY` (backend) — Set 2026-06-20, Heroku v39.
+- `AI_GRADE_CLAUDE_MODEL` — Updated 2026-06-20 to `claude-sonnet-4-6`.
+- Apify actors — Running with hardcoded defaults (125 results, $0.574/run confirmed 2026-06-20).
 
-2. **SECRET_KEY (backend)** — Generate and set immediately:
-   ```
-   heroku config:set SECRET_KEY=<generated-key> -a nowtrendin-backend
-   ```
+**On hold (user deferred)**
+- `GUARDIAN_API_KEY` — Register free at open-platform.theguardian.com/access when ready, then `heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine`. Restores Stage 4 mainstream media signal.
+- `REDDIT_CLIENT_ID/SECRET/USER_AGENT` — Register at reddit.com/prefs/apps when ready.
 
-3. **REDDIT_CLIENT_ID / SECRET / USER_AGENT** — Register at https://www.reddit.com/prefs/apps (free). Reddit signal currently not collected.
-
-4. **APIFY actors** — Both actors have hardcoded defaults and are already running successfully (confirmed 2026-06-20 via Apify console: 125 results, $0.574/run). No env vars needed. Monitor Apify spend: ~$103/mo for the realtime actor alone (runs every 6h at ~$0.57).
-
-5. **GOOGLE_ANDROID_CLIENT_ID** — Retrieve from Google Cloud Console → nowtrendin project → OAuth credentials.
-
-6. **DEVTO_API_KEY** — Register at https://dev.to/settings/extensions (free). Restores developer blog signal.
-
-7. **AI_GRADE_CLAUDE_MODEL** — Updated 2026-06-20 to `claude-sonnet-4-6` ✅
+**Still open**
+- `GOOGLE_ANDROID_CLIENT_ID` — Retrieve from Google Cloud Console → OAuth credentials → `heroku config:set GOOGLE_ANDROID_CLIENT_ID=<id> -a nowtrendin-backend`.
+- `DEVTO_API_KEY` — Low priority. Register at dev.to/settings/extensions (free) when ready.
 
 ---
 

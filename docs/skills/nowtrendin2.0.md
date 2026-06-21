@@ -123,7 +123,7 @@ heroku config -a nowtrendin-v2-engine 2>$null | Select-String "GUARDIAN_API_KEY|
 
 | Gap | Impact | Action |
 |---|---|---|
-| `SECRET_KEY` missing on backend | **HIGH (security)** — Django running with insecure hardcoded default key in settings.py | Generate: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` then `heroku config:set SECRET_KEY=<key> -a nowtrendin-backend` |
+| `SECRET_KEY` (backend) | RESOLVED ✅ | Set 2026-06-20, Heroku v39. Django no longer using insecure default. |
 | `GUARDIAN_API_KEY` missing on engine | HIGH — Stage 4 mainstream media signal absent; GDELT fallback rate-limited on Heroku IPs | **ON HOLD** (user deferred 2026-06-20). Register free at open-platform.theguardian.com/access when ready. |
 | `REDDIT_CLIENT_ID/SECRET/USER_AGENT` missing on engine | MEDIUM — Reddit signal entirely absent | **ON HOLD** (user deferred 2026-06-20). Register at reddit.com/prefs/apps when ready. |
 | `GOOGLE_ANDROID_CLIENT_ID` missing on backend | MEDIUM — Android Google OAuth may fail silently | Retrieve from Google Cloud Console → OAuth credentials |
