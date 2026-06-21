@@ -62,8 +62,9 @@ Status legend:
 ### Market / Financial signals
 | Variable | Status | Description |
 |---|---|---|
-| `ALPHAVANTAGE_API_KEY` | SET | Alpha Vantage — fundamentals + price data |
-| `FINNHUB_API_KEY` | SET | Finnhub — fundamentals (free tier: limited backfill) |
+| `ALPHAVANTAGE_API_KEY` | SET | Alpha Vantage — news sentiment (article count + tone) |
+| `FINNHUB_API_KEY` | SET | Finnhub — sustainability sub-scores (free tier: limited backfill) |
+| `FMP_API_KEY` | SET ✅ | Financial Modeling Prep — income statement + profile → fundamental_confirmation component. Set 2026-06-21 v72. |
 | `FINRA_API_KEY` | SET | FINRA short interest API key |
 | `WHALEWISDOM_SHARED_KEY` | SET | WhaleWisdom 13F shared key |
 | `WHALEWISDOM_SECRET_KEY` | SET | WhaleWisdom 13F secret key |
