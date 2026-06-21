@@ -44,8 +44,10 @@ INTEGRATION:
 ================================================================
 """
 
+import os
 import re
 import time
+import math
 import hashlib
 import sqlite3
 from datetime import datetime, timezone, timedelta
@@ -146,7 +148,6 @@ def collect_google_trends_hot(conn, geo: str = "US") -> int:
             traffic = _parse_traffic(item.findtext("ht:approx_traffic", default="",
                                                     namespaces=_GT_NS))
             # engagement from approx traffic (log-scaled, like other collectors)
-            import math
             engagement = math.log1p(max(traffic, 1))
             sig_id = hashlib.md5(f"gth-{geo}-{term}".encode()).hexdigest()[:16]
             url = f"https://www.google.com/search?q={term.replace(' ', '+')}"
@@ -205,7 +206,6 @@ def collect_wikipedia_hot(conn, top_n: int = 120) -> int:
         if r.status_code != 200:
             print(f"  [discovery] wikipedia_hot HTTP {r.status_code}")
             return 0
-        import math
         articles = (r.json().get("items") or [{}])[0].get("articles", [])
         for a in articles[:top_n]:
             raw = a.get("article", "")
@@ -231,6 +231,79 @@ def collect_wikipedia_hot(conn, top_n: int = 120) -> int:
     return written
 
 
+# ── 3. Firecrawl — Web Search Discovery (credit-budgeted, 6h rotation) ──
+#
+# Budget math: 1 search/cycle × 4 cycles/day × 31 days × 2 credits = 248/month
+# (free tier = 500 credits/month — leaves 252 buffer for AI grade calls)
+#
+# 5 category queries rotate on (hour // 6) % 5 so every dimension gets
+# fresh coverage each week without exceeding 1 call per cycle.
+
+_FC_ENDPOINT = "https://api.firecrawl.dev/v2/search"
+_FC_QUERIES = [
+    "latest breakthrough AI technology emerging trend 2026",
+    "trending finance crypto market movement 2026",
+    "new health biotech science discovery 2026",
+    "viral culture entertainment sports trend 2026",
+    "growing startup business economy trend 2026",
+]
+
+
+def collect_firecrawl_discovery(conn) -> int:
+    """1 rotating category search per 6h cycle = 2 credits = 248 credits/month."""
+    if not _HAS_REQUESTS:
+        return 0
+    api_key = os.getenv("FIRECRAWL_API_KEY", "")
+    if not api_key:
+        print("  [discovery] firecrawl_web skipped (no FIRECRAWL_API_KEY)")
+        return 0
+
+    hour = datetime.now(timezone.utc).hour
+    query_idx = (hour // 6) % len(_FC_QUERIES)
+    query = _FC_QUERIES[query_idx]
+    platform, tier, source = "firecrawl_web", "niche", f"search_q{query_idx}"
+
+    written = 0
+    try:
+        r = requests.post(
+            _FC_ENDPOINT,
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            json={"query": query, "limit": 5},
+            timeout=20,
+        )
+        if r.status_code != 200:
+            print(f"  [discovery] firecrawl_web HTTP {r.status_code}: {r.text[:200]}")
+            return 0
+        body = r.json()
+        # Response: {"success": true, "data": {"web": [...]}, "creditsUsed": N}
+        results = (body.get("data") or {}).get("web") or []
+        credits_used = int(body.get("creditsUsed") or 0)
+
+        for item in results:
+            title = (item.get("title") or item.get("url") or "").strip()
+            url = (item.get("url") or "").strip()
+            if len(title) < 4 or not url:
+                continue
+            desc = (item.get("description") or "").strip()
+            raw_text = f"{title}. {desc}" if desc else title
+            sig_id = hashlib.md5(f"fc-{url}".encode()).hexdigest()[:16]
+            # Firecrawl returns no engagement count; use a uniform non-zero baseline
+            engagement = math.log1p(5)
+            _write_signal(conn, sig_id=sig_id, platform=platform, tier=tier,
+                          source=source, title=title, url=url,
+                          engagement=engagement, raw_text=raw_text[:500])
+            written += _write_topic(conn, sig_id=sig_id, topic=title,
+                                    platform=platform, tier=tier, source=source,
+                                    engagement=engagement)
+        conn.commit()
+        print(f"  [discovery] firecrawl_web: {written} topic signals "
+              f"({credits_used} credits used, query_idx={query_idx})")
+    except Exception as e:
+        print(f"  [discovery] firecrawl_web error: {e}")
+    return written
+
+
 # ── Orchestrator ───────────────────────────────────────────────────
 
 def collect_all_discovery(conn, geos=("US",)) -> dict:
@@ -239,6 +312,7 @@ def collect_all_discovery(conn, geos=("US",)) -> dict:
     for geo in geos:
         out[f"google_trends_hot:{geo}"] = collect_google_trends_hot(conn, geo)
     out["wikipedia_hot"] = collect_wikipedia_hot(conn)
+    out["firecrawl_web"] = collect_firecrawl_discovery(conn)
     out["_total"] = sum(v for v in out.values() if isinstance(v, int))
     print(f"  [discovery] TOTAL: {out['_total']} topic signals")
     return out
@@ -246,7 +320,6 @@ def collect_all_discovery(conn, geos=("US",)) -> dict:
 
 if __name__ == "__main__":
     # Local smoke test against a throwaway DB.
-    import os
     db = os.getenv("DISCOVERY_TEST_DB", ":memory:")
     c = sqlite3.connect(db)
     c.executescript("""
