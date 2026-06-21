@@ -3,11 +3,75 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-20_
+_Last updated: 2026-06-20 (session 2)_
 
 ---
 
-## Session 2026-06-20
+## Session 2026-06-20 (session 2) — Infrastructure audit + skill hardening
+
+### Completed
+
+- **Full infrastructure audit:** Confirmed both clients (web terminal + mobile) and backend
+  all correctly point to the v2 engine (`nowtrendin-v2-engine-edcb10d44f91.herokuapp.com`).
+  No discrepancies between platforms — single source of truth rule is working at the data layer.
+
+- **Deploy skill rewrite (critical fix):** The old `/deploy` skill was pointing the engine
+  subtree push to `heroku main` (the BACKEND remote) instead of `heroku-v2engine main`.
+  This is what caused the accidental 1.0 engine deploy on 2026-06-19. Fixed and backed up
+  to `docs/skills/deploy.md` in the repo.
+
+- **`AI_GRADE_CLAUDE_MODEL` updated live on Heroku:** Changed from `claude-sonnet-4-5-20250929`
+  to `claude-sonnet-4-6` on `nowtrendin-v2-engine` (Heroku release v69).
+
+- **`docs/ENV_REFERENCE.md` created:** Complete map of every env var for both engine and
+  backend — status (SET/MISSING), description, and exact fix commands for all gaps.
+  Key finding: GUARDIAN_API_KEY is missing → Stage 4 mainstream media signal silently absent
+  every scoring run; GDELT fallback is rate-limited on Heroku IPs.
+
+- **`transfer/.env.example` + `backend/.env.example` created:** Local dev reference templates
+  (key names only — no values). Standard practice to prevent onboarding confusion.
+
+- **`/nowtrendin2.0` skill hardened:** Added INFRASTRUCTURE STATE section (audit results,
+  what's correct, what was fixed, pending user actions with exact commands). Added PENDING
+  USER ACTIONS quick-check to session startup. Fixed wrong engine URL that was in STEP 4
+  health check (pointed to 1.0 frozen engine). Fixed wrong deploy topology table.
+  Rule #9 added: API key values never go in Git.
+
+- **`docs/skills/nowtrendin2.0.md` synced:** Cloud backup of the skill now matches local.
+
+- All above committed and pushed: `6909737` + follow-up skill sync.
+
+### Open / Next
+
+- **GUARDIAN_API_KEY** (HIGH) — Register free at open-platform.theguardian.com/access.
+  Without it, mainstream media (Stage 4) is absent every scoring run.
+  Command ready: `heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine`
+
+- **SECRET_KEY on backend** (HIGH — security) — Django using insecure hardcoded default.
+  Generate + set: `heroku config:set SECRET_KEY=<key> -a nowtrendin-backend`
+
+- **REDDIT_CLIENT_ID/SECRET/USER_AGENT** (MEDIUM) — Reddit signal not collected.
+  Register at reddit.com/prefs/apps (free), set 3 vars on engine.
+
+- **APIFY_REALTIME_ACTOR + APIFY_TRENDS_ACTOR** (MEDIUM) — Token set, actor IDs missing.
+  Check Apify console for existing actor IDs.
+
+- **GOOGLE_ANDROID_CLIENT_ID** (MEDIUM) — Android Google OAuth may fail.
+  Retrieve from Google Cloud Console.
+
+- **Velocity retention 365 days** — PENDING USER CONFIRMATION. Do NOT implement until explicitly confirmed.
+- **Stripe + push notifications** — deferred, require custom dev client (off Expo Go).
+- **NYT RSS feeds** — 39 live feeds identified as viable for topic extraction. Not yet implemented.
+
+### Hard decisions made
+
+- ENV_REFERENCE.md documents key names + status only — never values. Values live on Heroku only.
+- Do NOT re-run the full Heroku config audit each session; check the specific PENDING USER
+  ACTIONS list instead (saved in /nowtrendin2.0 skill INFRASTRUCTURE STATE section).
+
+---
+
+## Session 2026-06-20 (session 1)
 
 ### Completed
 - **Web terminal UX:** Added X clear buttons to every filter input across all platforms (History search, Market chip-search, Grade GradedList search, Shell global search, mobile history/search/watchlists)

@@ -81,6 +81,58 @@ violate these principles, STOP and say so explicitly before proceeding.
 
 ---
 
+## INFRASTRUCTURE STATE — AUDITED 2026-06-20 (do not re-audit unless user asks)
+
+> This section records what was confirmed in the 2026-06-20 infrastructure audit.
+> Do NOT repeat this audit at session start — check PENDING USER ACTIONS below
+> to see if the user has filled the known gaps since last time.
+
+### What was confirmed correct ✅
+
+- Both clients point to v2 engine: `web-terminal/src/lib/api.ts` line 8 and
+  `frontend/lib/gradientApi.ts` lines 5-6 both hardcode the v2 engine URL
+  `https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com`
+- Backend `GRADIENT_API` env var on Heroku = v2 engine URL ✅
+- Git remotes confirmed: `heroku` → `nowtrendin-backend`, `heroku-v2engine` → `nowtrendin-v2-engine`
+- Engine deploy command corrected in the deploy skill (was wrong — pointed to 1.0 app)
+- `AI_GRADE_CLAUDE_MODEL` updated to `claude-sonnet-4-6` on nowtrendin-v2-engine ✅
+- `docs/ENV_REFERENCE.md` created — complete map of all env vars with SET/MISSING status
+- `transfer/.env.example` and `backend/.env.example` created for local dev reference
+- `docs/skills/deploy.md` — cloud backup of the corrected deploy skill
+- Deploy skill rewritten: engine subtree command now correctly uses `heroku-v2engine` remote
+
+### What was found broken / wrong (now fixed) 🔧
+
+- **Deploy skill (old):** Engine subtree command used `heroku main` (the backend remote),
+  which would have deployed engine code to the backend app. Now fixed to `heroku-v2engine main`.
+- **nowtrendin2.0 skill (old):** Health check URL pointed to the 1.0 frozen engine
+  (`nowtrendin-e62dcb9ecb69.herokuapp.com`) — now corrected to the v2 engine URL.
+- **Deploy skill (old):** Was entirely pointing to `NowTrendin/` folder → `nowtrendin`
+  Heroku app (1.0 frozen). This caused an accidental deploy to the frozen 1.0 app on 2026-06-19.
+
+### PENDING USER ACTIONS — check these at each session start
+
+At session start, quickly check whether the user has addressed any of these.
+Do NOT repeat the full Heroku config audit — just check the specific gaps:
+
+```powershell
+heroku config -a nowtrendin-v2-engine 2>$null | Select-String "GUARDIAN_API_KEY|REDDIT_CLIENT_ID|APIFY_REALTIME_ACTOR|APIFY_TRENDS_ACTOR|DEVTO_API_KEY"
+heroku config -a nowtrendin-backend 2>$null | Select-String "SECRET_KEY|GOOGLE_ANDROID_CLIENT_ID"
+```
+
+| Gap | Impact | Action |
+|---|---|---|
+| `GUARDIAN_API_KEY` missing on engine | **HIGH** — Stage 4 mainstream media signal absent; GDELT fallback is rate-limited on Heroku IPs → silent data gap every scoring run | Register free at open-platform.theguardian.com/access then `heroku config:set GUARDIAN_API_KEY=<key> -a nowtrendin-v2-engine` |
+| `SECRET_KEY` missing on backend | **HIGH (security)** — Django running with insecure hardcoded default key in settings.py | Generate: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` then `heroku config:set SECRET_KEY=<key> -a nowtrendin-backend` |
+| `REDDIT_CLIENT_ID/SECRET/USER_AGENT` missing on engine | MEDIUM — Reddit signal entirely absent | Register app at reddit.com/prefs/apps then set all three vars on engine |
+| `APIFY_REALTIME_ACTOR` + `APIFY_TRENDS_ACTOR` missing on engine | MEDIUM — APIFY_TOKEN is set but actors can't run without their IDs | Check Apify console for actor IDs, then set on engine |
+| `GOOGLE_ANDROID_CLIENT_ID` missing on backend | MEDIUM — Android Google OAuth may fail silently | Retrieve from Google Cloud Console → OAuth credentials |
+| `DEVTO_API_KEY` missing on engine | LOW — Dev.to blog signal silently skips | Register at dev.to/settings/extensions (free) |
+
+Full env var reference: `docs/ENV_REFERENCE.md` in the v2.0 repo.
+
+---
+
 ## STEP 1 — MEMORY LOAD
 
 Read these files first (in order). They establish what was built, what's open,
@@ -112,6 +164,12 @@ or dated more recently than the last session.
 - `AGENT_CHARTER.md` — shared mandate for every autonomous agent (integrity rules)
 - `SESSION_LOG.md` — running catch-up of completed + open work
 - `COST_MODEL.md` — per-call cost estimates; check before adding new data sources
+
+**New docs created 2026-06-20 (read if env/deploy work comes up):**
+- `docs/ENV_REFERENCE.md` — complete env var map: SET/MISSING status + action items
+- `transfer/.env.example` — engine local dev template (key names only)
+- `backend/.env.example` — backend local dev template (key names only)
+- `docs/skills/deploy.md` — cloud backup of the corrected deploy skill
 
 **Deep context (skim if topic comes up):**
 - `docs/METHODOLOGY.md` — Gradient Score composition, the dual-pathway model
@@ -157,7 +215,9 @@ Flag if:
 Run all three service checks in parallel:
 
 ```powershell
-# Engine (v2 — the live scoring engine)
+# Engine (v2 — the ONLY active scoring engine)
+# ⚠ CORRECT URL: nowtrendin-v2-engine-edcb10d44f91.herokuapp.com
+# ⚠ WRONG (frozen 1.0): nowtrendin-e62dcb9ecb69.herokuapp.com — never use this
 curl -s --max-time 20 https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com/health
 
 # Backend (Django API) — /api/health/ doesn't exist; use auth endpoint as liveness probe
@@ -170,7 +230,7 @@ curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://abelcesq.github.io/
 
 Expected:
 - Engine: JSON with `"status"` field (any non-error value = up)
-- Backend: HTTP 400 with `{"detail":"Incorrect email or password"}` = Django is up and healthy
+- Backend: HTTP 400 with JSON = Django is up and healthy
 - GH Pages: HTTP 200
 
 If any are down, report immediately and pause other work — a down service
@@ -194,7 +254,7 @@ match the agents listed in `DATA_BUILDING_BLOCKS.md` §Monitoring Agents.
 Current skill roster (update this list when new skills are added):
 | Skill | Purpose |
 |---|---|
-| `/deploy` | Full-stack deploy — engine, backend, frontend |
+| `/deploy` | Full-stack deploy — engine (heroku-v2engine), backend (heroku), web terminal (gh-pages) |
 | `/frontend-consistency` | UI parity audit across mobile / web terminal / desktop |
 | `/data-health` | Pipeline health — collector gaps, stale data, budget burn |
 | `/data-watchdog` | Source watchdog — publisher allowlist, provenance tiers |
@@ -245,10 +305,11 @@ After steps 1–6, output a compact status card:
 ```
 === NowTrendIn 2.0 — Session Status ===
 
-SERVICES       Engine: [UP/DOWN]   Backend: [UP/DOWN]   Web Terminal: [UP/DOWN]
+SERVICES       Engine v2: [UP/DOWN]   Backend: [UP/DOWN]   Web Terminal: [UP/DOWN]
 BUILD          web-terminal: [CLEAN/BROKEN]
 LAST COMMIT    [hash] [message]
 OPEN WORK      [list anything uncommitted or flagged in SESSION_LOG.md as open]
+PENDING USER   [which of the PENDING USER ACTIONS above are still unresolved]
 ACTIVE RULES   [any memory warnings or hard rules relevant to current open work]
 SKILLS         [count] loaded, [any missing or stale]
 ```
@@ -320,16 +381,29 @@ now canonical in `NowTrendin v2.0/transfer/` — see `ENGINE_AND_REPO_FREEZE.md`
 
 ## DEPLOY TOPOLOGY QUICK-REFERENCE
 
-| App | Dir | Remote | Command |
-|---|---|---|---|
-| Engine (v2, ACTIVE) | `NowTrendin v2.0/transfer/` | Heroku `nowtrendin-v2-engine` | `git subtree push --prefix transfer heroku-v2engine main` (from v2.0 root) |
-| Backend (Django) | `NowTrendin v2.0/backend/` | Heroku `nowtrendin-backend` | `git subtree push --prefix backend heroku main` (from v2.0 root) |
-| Web terminal (source) | `web-terminal/` | `origin main` → `Abelcesq/nowtrendin-v2.0` | `git push origin main` |
-| Web terminal (live) | `.ghpages-deploy/` worktree | `origin gh-pages` → `Abelcesq/nowtrendin-v2.0` | build → copy → push gh-pages |
-| Mobile | `frontend/` | `origin main` → `Abelcesq/nowtrendin-v2.0` | `git push origin main` |
-| NowTrendin 1.0 | `NowTrendin/` | `Abelcesq/NowTrendin` — FROZEN | ❌ NEVER PUSH HERE |
+> ⚠ Two Heroku remotes — do NOT mix them up:
+> - `heroku` → `nowtrendin-backend` (Django API)
+> - `heroku-v2engine` → `nowtrendin-v2-engine` (FastAPI scoring engine)
+> Verify with `git remote -v` before any subtree push.
 
-Full spec: `ENGINE_AND_REPO_FREEZE.md` + memory file `deploy-topology.md`.
+| App | Dir | Heroku app | Remote | Command (from v2.0 root) |
+|---|---|---|---|---|
+| **Engine (v2, ACTIVE)** | `transfer/` | `nowtrendin-v2-engine` | `heroku-v2engine` | `git subtree push --prefix transfer heroku-v2engine main` |
+| **Backend (Django)** | `backend/` | `nowtrendin-backend` | `heroku` | `git subtree push --prefix backend heroku main` |
+| Web terminal (source) | `web-terminal/` | — | `origin main` | `git push origin main` |
+| Web terminal (live) | `.ghpages-deploy/` | — | `origin gh-pages` | build → copy → push gh-pages |
+| Mobile (source) | `frontend/` | — | `origin main` | `git push origin main` |
+| NowTrendin 1.0 | `NowTrendin/` | `nowtrendin` (FROZEN) | — | ❌ NEVER PUSH HERE |
+
+**Live URLs:**
+- Engine v2: `https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com`
+- Backend: `https://nowtrendin-backend-acb79c396814.herokuapp.com`
+- Web terminal: `https://abelcesq.github.io/nowtrendin-v2.0/`
+- Frozen 1.0 engine (DO NOT DEPLOY TO): `https://nowtrendin-e62dcb9ecb69.herokuapp.com`
+
+After engine deploy: verify with `/health`.
+After backend deploy: run `heroku run python manage.py migrate -a nowtrendin-backend`.
+Full deploy spec: `C:\Users\acinv\.claude\skills\deploy\SKILL.md` and `docs/skills/deploy.md`.
 
 ---
 
@@ -361,6 +435,9 @@ operational rules are the concrete expressions of those principles. They come fr
 8. **serve_payload must be regenerated** after any scoring or calibration change or
    the API serves stale data. See memory: `serve-payload-cache-gotcha.md`.
    (Accuracy principle — a stale payload is a wrong number presented as current.)
+9. **API key values never go in Git.** Only key names go in `.env.example` and
+   `docs/ENV_REFERENCE.md`. Values live only in Heroku Config Vars and local `.env`
+   files (gitignored). See `.gitignore` before staging anything env-related.
 
 ---
 
