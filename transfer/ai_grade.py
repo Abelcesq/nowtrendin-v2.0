@@ -74,7 +74,10 @@ def firecrawl_web_context(topic: str, limit: int = 5) -> dict:
             timeout=15,
         )
         r.raise_for_status()
-        results = (r.json().get("data") or [])
+        body    = r.json()
+        # Response shape: {"success": true, "data": {"web": [...]}, "creditsUsed": N}
+        results = (body.get("data") or {}).get("web") or []
+        credits = int(body.get("creditsUsed") or 0)
         urls, lines = [], []
         for item in results:
             url   = item.get("url", "")
@@ -86,10 +89,11 @@ def firecrawl_web_context(topic: str, limit: int = 5) -> dict:
                 lines.append(f"- [{title}]({url}): {desc}")
         web_block = "\n".join(lines)
         return {"available": True, "result_count": len(results),
-                "urls": urls, "web_block": web_block}
+                "credits_used": credits, "urls": urls, "web_block": web_block}
     except Exception as exc:
         print(f"[firecrawl] web_context '{topic}': {exc}")
-        return {"available": False, "result_count": 0, "urls": [], "web_block": ""}
+        return {"available": False, "result_count": 0, "credits_used": 0,
+                "urls": [], "web_block": ""}
 
 
 # ── Stage 1: RESEARCH (Perplexity) ──────────────────────────────────
@@ -471,9 +475,10 @@ def grade_topic(topic: str) -> dict:
         "web_result_count": fc.get("result_count", 0),
         "provenance": "ai_grade:firecrawl+perplexity+claude (engine-weighted)" if fc.get("available") else "ai_grade:perplexity+claude (engine-weighted)",
         "cost": {
-            "perplexity": round(float(research.get("cost", 0) or 0), 6),
-            "anthropic":  round(float(score.get("cost", 0) or 0), 6),
-            "total":      round(float(research.get("cost", 0) or 0) + float(score.get("cost", 0) or 0), 6),
+            "perplexity":        round(float(research.get("cost", 0) or 0), 6),
+            "anthropic":         round(float(score.get("cost", 0) or 0), 6),
+            "total":             round(float(research.get("cost", 0) or 0) + float(score.get("cost", 0) or 0), 6),
+            "firecrawl_credits": fc.get("credits_used", 0),
         },
     }
 

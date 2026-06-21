@@ -384,6 +384,36 @@ def cost_sentinel() -> dict:
     except Exception:
         pass
 
+    # 5) Firecrawl credits — 2 credits per AI grade (on-demand only, not automated cycle)
+    fc_line = {}
+    if os.getenv("FIRECRAWL_API_KEY"):
+        try:
+            fc_cap = int(os.getenv("FIRECRAWL_CREDITS_CAP", "500"))
+            # Count AI grades this month from the cost ledger and multiply by 2 credits/grade
+            month_iso = g._month_start_iso()
+            conn_fc = g.get_db(g.DB_PATH)
+            grade_row = conn_fc.execute(
+                "SELECT COUNT(*) AS n FROM ai_grade_costs WHERE created_at >= ?",
+                (month_iso,)).fetchone()
+            conn_fc.close()
+            grades_mtd = int((grade_row or {}).get("n") or 0)
+            fc_used = grades_mtd * 2   # Firecrawl charges 2 credits per /search call
+            pct = fc_used / fc_cap if fc_cap else 0
+            fc_line = {"credits_used": fc_used, "credits_cap": fc_cap,
+                       "grades_mtd": grades_mtd, "pct": round(pct * 100, 1),
+                       "note": "estimated: grades_mtd × 2 credits/grade"}
+            lines.append({"item": "Firecrawl (grade web search)", "credits": fc_used,
+                          "cap": fc_cap, "source": "estimated"})
+            if pct >= 1.0:
+                alerts.append({"level": "critical", "block": "B7",
+                               "msg": f"Firecrawl credits likely EXHAUSTED: ~{fc_used}/{fc_cap} used this month"})
+            elif pct >= 0.8:
+                alerts.append({"level": "warn", "block": "B7",
+                               "msg": f"Firecrawl credits at ~{pct*100:.0f}% of {fc_cap}/mo cap — consider upgrading"})
+        except Exception as _fce:
+            alerts.append({"level": "warn", "block": "B7",
+                           "msg": f"Firecrawl credit check failed: {_fce}"})
+
     grand_cap = float(os.getenv("COST_TOTAL_MONTHLY_CAP", "0") or 0)
     if grand_cap and total >= grand_cap:
         alerts.append({"level": "critical", "block": "B7",
@@ -394,8 +424,11 @@ def cost_sentinel() -> dict:
         "total_cap_usd": grand_cap or None,
         "lines": lines,
         "x_posts": x_line,
+        "firecrawl": fc_line,
         "note": "AI + Apify are live-metered; Heroku/subscriptions/GitHub are env-configured "
-                "(set COST_HEROKU_USD / COST_SUBSCRIPTIONS_USD / COST_GITHUB_USD / COST_TOTAL_MONTHLY_CAP).",
+                "(set COST_HEROKU_USD / COST_SUBSCRIPTIONS_USD / COST_GITHUB_USD / COST_TOTAL_MONTHLY_CAP). "
+                "Firecrawl credits estimated from monthly grade count × 2 credits/grade "
+                "(set FIRECRAWL_CREDITS_CAP to override the 500-credit default).",
     }
     return {"agent": "cost_sentinel", "status": _roll_up(alerts),
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
