@@ -203,13 +203,16 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# ENTRY POINT — runs the full nightly audit on live SQLite data
+# ENTRY POINT — runs the full nightly audit on live data (Postgres or SQLite)
 # ═════════════════════════════════════════════════════════════════════════════
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    use_pg = bool(os.getenv("DATABASE_URL"))
     db = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
-    if not os.path.exists(db):
-        print(f"[adapter] DB not found at {db!r} — set GAD_DB_PATH to the engine database path.")
+    # When DATABASE_URL is set, db_compat ignores the file path and uses Postgres.
+    # Only gate on file existence for pure-SQLite setups.
+    if not use_pg and not os.path.exists(db):
+        print(f"[adapter] DB not found at {db!r} — set GAD_DB_PATH or DATABASE_URL.")
         print("[adapter] To see a synthetic demo run:  python nowtrendin_agent.py --demo")
         return 1
 
