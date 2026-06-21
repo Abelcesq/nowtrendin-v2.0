@@ -54,7 +54,7 @@ Status legend:
 | `CURRENTS_API_KEY` | SET | Currents API key — news feeds |
 | `CURRENTS_DAILY_CAP` | SET | Currents daily call cap (default: 900) |
 | `GUARDIAN_API_KEY` | **MISSING** | The Guardian Open Platform key — mainstream media Stage 4 signal. **Without this, GDELT fallback is used; GDELT is rate-limited on Heroku IPs → mainstream media signal may be absent.** Register free at open-platform.theguardian.com/access (5,000 calls/day) |
-| `DEVTO_API_KEY` | **MISSING** | Dev.to API key — developer blog signal silently skips without this |
+| `DEVTO_API_KEY` | SET ✅ | Dev.to (Forem API v1) — developer blog Dark Matter signal. Set 2026-06-21 v71. |
 | `HASHNODE_TOKEN` | SET | Hashnode API token — developer blog signal |
 | `GITHUB_TOKEN` | SET | GitHub API token — trending repos signal |
 | `BLOGGER_API_KEY` | SET | Google Blogger API key |
@@ -154,9 +154,9 @@ Status legend:
 - Stripe (`@stripe/stripe-react-native`) + push notifications (`expo-notifications`) — Require custom dev client off Expo Go. Do not touch until store submission.
 
 **Still open (low priority)**
-- `DEVTO_API_KEY` — Register at dev.to/settings/extensions (free) when ready. Dev.to blog signal silently skips without it.
+- _(none — all gaps resolved or deferred)_
 
 ---
 
-_Last updated: 2026-06-20_
+_Last updated: 2026-06-21_
 _See `transfer/.env.example` and `backend/.env.example` for local dev setup._
