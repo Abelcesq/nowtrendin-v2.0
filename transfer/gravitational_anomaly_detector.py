@@ -2394,6 +2394,17 @@ _RSS_FEEDS = [
     ("The Verge",    "https://www.theverge.com/rss/reviews/index.xml"),
     ("The Verge",    "https://www.theverge.com/rss/games/index.xml"),
     ("InfoQ",        "https://feed.infoq.com/"),
+    # Financial Times — official ?format=rss section feeds (verified live & fresh
+    # 06/22/26, 25 items each). Premium finance/markets/economy signal; the paywall is
+    # irrelevant since we extract topics from HEADLINES only. "Financial Times" is
+    # already in the reputable-source list. Reuters-via-GoogleNews was assessed and
+    # SKIPPED (not an official feed, redirect links, redundant with GDELT).
+    ("Financial Times", "https://www.ft.com/news-feed?format=rss"),
+    ("Financial Times", "https://www.ft.com/world?format=rss"),
+    ("Financial Times", "https://www.ft.com/companies?format=rss"),
+    ("Financial Times", "https://www.ft.com/global-economy?format=rss"),
+    ("Financial Times", "https://www.ft.com/markets?format=rss"),
+    ("Financial Times", "https://www.ft.com/technology?format=rss"),
 ]
 
 
