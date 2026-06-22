@@ -90,6 +90,24 @@ export const api = {
   topics: (limit = 200, category = '') =>
     get<{ count: number; topics: TopicRow[] }>(
       `/topics?limit=${limit}${category ? `&category=${encodeURIComponent(category)}` : ''}`),
+  // One page of the grid (engine serves O(1) slices). `total` says when it's complete.
+  topicsPage: (limit = 100, offset = 0, category = '') =>
+    get<{ count: number; total: number; topics: TopicRow[] }>(
+      `/topics?limit=${limit}&offset=${offset}${category ? `&category=${encodeURIComponent(category)}` : ''}`),
+  // The WHOLE grid, fetched 100 at a time (no cap, no giant payload). Optional
+  // onBatch fires after each page so the UI can paint progressively.
+  topicsAll: async (category = '', onBatch?: (rows: TopicRow[], done: boolean) => void): Promise<TopicRow[]> => {
+    const all: TopicRow[] = []; const PAGE = 100; let offset = 0;
+    for (let i = 0; i < 200; i++) {
+      const d = await get<{ total: number; topics: TopicRow[] }>(
+        `/topics?limit=${PAGE}&offset=${offset}${category ? `&category=${encodeURIComponent(category)}` : ''}`);
+      const batch = d.topics || []; all.push(...batch); offset += PAGE;
+      const done = batch.length < PAGE || all.length >= (d.total ?? all.length);
+      onBatch?.(all.slice(), done);
+      if (done) break;
+    }
+    return all;
+  },
   categories: () =>
     get<{ categories: { key: string; label: string; count: number }[] }>('/categories'),
   score: (key: string) => get<any>(`/scores/${encodeURIComponent(key)}`),

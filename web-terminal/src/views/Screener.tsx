@@ -503,20 +503,21 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
   const catParam = SIGNAL_FILTERS.some((f) => f.k === filter) ? '' : filter
 
   useEffect(() => {
-    let alive = true; setLoading(true); setErr(null)
-    Promise.all([api.topics(200, catParam), api.categories().catch(() => ({ categories: [] }))])
-      .then(([t, c]) => {
-        if (!alive) return
-        setRows((t.topics || []).map((r) => {
-          const det = Math.round(r.detection_score ?? 0), conf = Math.round(r.confidence_score ?? 0)
-          // Stage from Detection (stageOf) — NOT the server's current_stage — so the
-          // Stage column always reconciles with the Det column + the filter buckets.
-          return { ...r, det, conf, n: Math.round(r.nowtrendin_score ?? 0), gap: det - conf, stage: stageOf(det), ageMin: minsSince(r.last_seen_at) }
-        }))
-        if ((c.categories || []).length) setCats((c.categories || []).filter((x) => x.count > 0))
-      })
-      .catch((e) => alive && setErr(String(e.message || e)))
-      .finally(() => alive && setLoading(false))
+    let alive = true; setLoading(true); setErr(null); setRows([])
+    // Stage from Detection (stageOf) — NOT the server's current_stage — so the
+    // Stage column always reconciles with the Det column + the filter buckets.
+    const mapRow = (r: TopicRow): Row => {
+      const det = Math.round(r.detection_score ?? 0), conf = Math.round(r.confidence_score ?? 0)
+      return { ...r, det, conf, n: Math.round(r.nowtrendin_score ?? 0), gap: det - conf, stage: stageOf(det), ageMin: minsSince(r.last_seen_at) }
+    }
+    api.categories().then((c) => { if (alive && (c.categories || []).length) setCats((c.categories || []).filter((x) => x.count > 0)) }).catch(() => {})
+    // Load the WHOLE grid 100 at a time — first page paints instantly, the rest
+    // fill in (no 200-row cap, no big single payload).
+    api.topicsAll(catParam, (topics) => {
+      if (!alive) return
+      setRows(topics.map(mapRow))
+      setLoading(false)
+    }).catch((e) => { if (alive) { setErr(String(e?.message || e)); setLoading(false) } })
     return () => { alive = false }
   }, [catParam])
 
