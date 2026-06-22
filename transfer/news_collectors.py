@@ -44,7 +44,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode, quote
-from date_utils import to_iso_date
+from date_utils import to_iso_date, iso_time_of
 
 FINNHUB_API_KEY  = os.getenv("FINNHUB_API_KEY", "")
 GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "")
@@ -517,21 +517,23 @@ def _store_news_signal(conn, mode: str, topic: str, signal: dict):
     ).hexdigest()[:16]
 
     table = "risk_signals" if mode == "risk" else "topic_signals"
-    # Canonical primary date for risk_signals.signal_date — coerce any provider
-    # form (a 'published' may carry time) to ISO 'YYYY-MM-DD'. The precise instant
-    # is kept in collected_at (the secondary timestamp, `now`).
-    date_val = to_iso_date(signal.get("tx_date") or signal.get("published") or now, default_today=True)
+    # Canonical split for risk_signals: signal_date = primary ISO 'YYYY-MM-DD';
+    # signal_time = secondary 'HH:MM:SS' (the source's time if present, else fetch
+    # time — always populated). The precise fetch instant is also kept in collected_at.
+    _src_date = signal.get("tx_date") or signal.get("published") or now
+    date_val = to_iso_date(_src_date, default_today=True)
+    time_val = iso_time_of(_src_date)
 
     try:
         if table == "risk_signals":
             conn.execute("""
                 INSERT OR IGNORE INTO risk_signals
                     (id, risk_topic, signal_type, source, diffusion_stage,
-                     raw_signal, signal_date, collected_at)
-                VALUES (?,?,?,?,?,?,?,?)
+                     raw_signal, signal_date, signal_time, collected_at)
+                VALUES (?,?,?,?,?,?,?,?,?)
             """, (sig_id, topic, signal.get("type", "news"),
                   signal.get("source", "gdelt"), signal.get("diffusion_stage", 4),
-                  signal.get("raw_signal", ""), date_val, now))
+                  signal.get("raw_signal", ""), date_val, time_val, now))
         else:
             # Attention signals table — adapt to your actual schema
             conn.execute("""

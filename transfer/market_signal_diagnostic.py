@@ -92,8 +92,8 @@ def load_diagnostic_input(symbol: str) -> InstrumentInput:
     item_key, rows = None, []
     try:
         for k in dict.fromkeys(candidates):
-            r = conn.execute("SELECT component, value, cycle_at FROM market_signal_history "
-                             "WHERE item_key = ? ORDER BY cycle_at", (k,)).fetchall()
+            r = conn.execute("SELECT component, value, signal_date, signal_time FROM market_signal_history "
+                             "WHERE item_key = ? ORDER BY signal_date, signal_time", (k,)).fetchall()
             if r:
                 item_key, rows = k, r
                 break
@@ -102,7 +102,10 @@ def load_diagnostic_input(symbol: str) -> InstrumentInput:
 
     series = {}
     for name in COMPONENTS:
-        vals = [(rw["cycle_at"], rw["value"]) for rw in rows if rw["component"] == name]
+        # order each component's history by (signal_date, signal_time) — same order
+        # the old full-timestamp cycle_at gave
+        vals = [((rw["signal_date"], rw["signal_time"] or ""), rw["value"])
+                for rw in rows if rw["component"] == name]
         vals.sort()
         hist = [v for _, v in vals]
         current = hist[-1] if hist else None

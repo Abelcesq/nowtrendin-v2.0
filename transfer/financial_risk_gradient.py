@@ -72,7 +72,7 @@ from urllib.parse import urlencode
 
 import requests
 import db_compat
-from date_utils import to_iso_date
+from date_utils import to_iso_date, iso_time_of
 import ingestion_gate
 
 # Share the main engine's database (Postgres on Heroku) so risk topics and
@@ -937,19 +937,21 @@ REDDIT_FINANCE_SUBS = ["investing", "stocks", "wallstreetbets", "SecurityAnalysi
 
 def _persist_risk_signal(conn, risk_display, signal_type, source, stage, raw, signal_date):
     key = _risk_key(risk_display)
-    # CANONICAL primary date via the Ingestion Gate (condition precedent): coerce
-    # every source's signal_date to ISO 'YYYY-MM-DD' BEFORE the dedup md5, so GDELT's
-    # compact '20260606T171500Z' and any datetime collapse to the same key as the
-    # bare-date sources. The exact instant is kept in collected_at (secondary). If a
-    # value is unparseable, the gate quarantines it for human review rather than
-    # writing a corrupt date.
+    # CANONICAL split: signal_date = primary ISO 'YYYY-MM-DD' (via the Ingestion Gate,
+    # condition precedent) so GDELT's compact '20260606T171500Z' and any datetime
+    # collapse to the same key as bare-date sources; signal_time = secondary 'HH:MM:SS'
+    # (the source's time if it has one, else the fetch time — always populated going
+    # forward). The exact fetch instant is also kept in collected_at.
+    signal_time = iso_time_of(signal_date)
     signal_date = ingestion_gate.gate_date(signal_date, table="risk_signals",
                                            column="signal_date", source=source, conn=conn)
     sig_id = hashlib.md5(f"{source}-{key}-{raw}-{signal_date}".encode()).hexdigest()[:24]
     conn.execute(
-        "INSERT OR IGNORE INTO risk_signals VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO risk_signals "
+        "(id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, "
+        " signal_date, signal_time, collected_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (sig_id, key, risk_display, signal_type, source, stage, raw[:300], signal_date,
-         datetime.now(timezone.utc).isoformat()),
+         signal_time, datetime.now(timezone.utc).isoformat()),
     )
 
 
@@ -1688,15 +1690,16 @@ def collect_creator_risk_signals(conn, max_videos: int = 25) -> int:
                 tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
                 if disp.lower() in hay or tkr_re.search(hay):
                     rk = _risk_key(disp)
+                    sig_time = iso_time_of(v.get("published") or now)
                     sig_date = ingestion_gate.gate_date(v.get("published") or now,
                                                         table="risk_signals", column="signal_date",
                                                         source="retail_creator", conn=conn)
                     sig_id = hashlib.md5(f"creator-{cr['handle']}-{rk}-{sig_date}".encode()).hexdigest()[:16]
                     try:
                         conn.execute(
-                            "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, collected_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                            "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, signal_time, collected_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                             (sig_id, rk, disp, "retail_creator", cr["name"], 5,
-                             v["title"][:300], sig_date, now))
+                             v["title"][:300], sig_date, sig_time, now))
                         stored += 1
                     except Exception as e:
                         print(f"[creator] risk insert err: {e}")
@@ -1766,6 +1769,7 @@ def collect_broadcast_risk_signals(conn, max_videos: int = 20) -> int:
                 tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
                 if disp.lower() in hay or tkr_re.search(hay):
                     rk = _risk_key(disp)
+                    sig_time = iso_time_of(v.get("published") or now)
                     sig_date = ingestion_gate.gate_date(v.get("published") or now,
                                                         table="risk_signals", column="signal_date",
                                                         source="broadcast_news", conn=conn)
@@ -1774,9 +1778,9 @@ def collect_broadcast_risk_signals(conn, max_videos: int = 20) -> int:
                     ).hexdigest()[:16]
                     try:
                         conn.execute(
-                            "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, collected_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                            "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, signal_time, collected_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                             (sig_id, rk, disp, "broadcast_news", bc["name"], 5,
-                             v["title"][:300], sig_date, now))
+                             v["title"][:300], sig_date, sig_time, now))
                         stored += 1
                     except Exception as e:
                         print(f"[broadcast] risk insert err: {e}")
@@ -1851,6 +1855,7 @@ def collect_yahoo_finance_risk_signals(conn) -> int:
             tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
             if disp.lower() in hay or tkr_re.search(hay):
                 rk = _risk_key(disp)
+                pub_time = iso_time_of(it.get("published") or now)
                 pub = ingestion_gate.gate_date(it.get("published") or now,
                                                table="risk_signals", column="signal_date",
                                                source="financial_news", conn=conn)
@@ -1859,9 +1864,9 @@ def collect_yahoo_finance_risk_signals(conn) -> int:
                 ).hexdigest()[:16]
                 try:
                     conn.execute(
-                        "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, collected_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                        "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, signal_time, collected_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (sig_id, rk, disp, "financial_news", "Yahoo Finance", 4,
-                         title[:300], pub, now))
+                         title[:300], pub, pub_time, now))
                     stored += 1
                 except Exception as e:
                     print(f"[yahoo_finance] risk insert err: {e}")

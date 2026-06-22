@@ -44,7 +44,7 @@ try:
 except Exception:
     db_compat = None
 import sqlite3
-from date_utils import to_iso_dt
+from date_utils import to_iso_date, iso_time_of, source_has_time
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
@@ -298,7 +298,8 @@ def init_market_signal_db(db_path: str = DB_PATH, conn=None):
             item_key TEXT,
             component TEXT,
             value REAL,
-            cycle_at TEXT
+            signal_date TEXT,
+            signal_time TEXT
         )
     """)
     c.execute("CREATE INDEX IF NOT EXISTS idx_ms_item ON market_signal_history(item_key)")
@@ -308,21 +309,27 @@ def init_market_signal_db(db_path: str = DB_PATH, conn=None):
 
 
 def record_market_cycle(item_key: str, components_current: dict,
-                        cycle_at: Optional[str] = None, db_path: str = DB_PATH, conn=None):
+                        signal_ts: Optional[str] = None, db_path: str = DB_PATH, conn=None):
     own = conn is None
     c = conn or _conn(db_path)
-    # Canonical: cycle_at is uniformly ISO datetime so its YYYY-MM-DD prefix is
-    # always the primary sort key (the baseline windows ORDER BY cycle_at). A bare
-    # date (FINRA/Finnhub backfill seeds) is anchored to midnight UTC — preserving
-    # ordering and the exact intra-day instants of the live cycles (no data lost,
-    # no scoring component changed; this only makes the column format-uniform).
-    now = to_iso_dt(cycle_at, default_now=True)
+    # CANONICAL split: signal_date = primary 'YYYY-MM-DD'; signal_time = secondary
+    # 'HH:MM:SS'. Live writes (signal_ts=None) record the fetch time; a timed source
+    # keeps its time; a bare-date backfill seed has no time -> empty. The baseline
+    # keys on (signal_date, signal_time), which is byte-identical ordering to the old
+    # full timestamp, so NO market score changes.
+    if signal_ts is None:
+        _nowdt = datetime.now(timezone.utc)
+        sig_date = _nowdt.strftime("%Y-%m-%d")
+        sig_time = _nowdt.strftime("%H:%M:%S")
+    else:
+        sig_date = to_iso_date(signal_ts) or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        sig_time = iso_time_of(signal_ts, default_now=False) if source_has_time(signal_ts) else ""
     try:
         for comp, val in components_current.items():
-            rid = hashlib.md5(f"{item_key}-{comp}-{now}".encode()).hexdigest()[:16]
+            rid = hashlib.md5(f"{item_key}-{comp}-{sig_date}T{sig_time}".encode()).hexdigest()[:16]
             c.execute("INSERT OR IGNORE INTO market_signal_history "
-                      "(id, item_key, component, value, cycle_at) VALUES (?,?,?,?,?)",
-                      (rid, item_key, comp, float(val), now))
+                      "(id, item_key, component, value, signal_date, signal_time) VALUES (?,?,?,?,?,?)",
+                      (rid, item_key, comp, float(val), sig_date, sig_time))
         c.commit()
     except Exception as e:
         print(f"  [market_signal] record error ({item_key}): {e}")
@@ -336,8 +343,9 @@ def get_market_baselines(item_key: str, lookback: int = 12,
     own = conn is None
     c = conn or _conn(db_path)
     try:
-        rows = c.execute("SELECT component, value, cycle_at FROM market_signal_history "
-                         "WHERE item_key = ? ORDER BY cycle_at DESC", (item_key,)).fetchall()
+        rows = c.execute("SELECT component, value, signal_date, signal_time FROM market_signal_history "
+                         "WHERE item_key = ? ORDER BY signal_date DESC, signal_time DESC",
+                         (item_key,)).fetchall()
     except Exception:
         rows = []
     finally:
@@ -347,11 +355,15 @@ def get_market_baselines(item_key: str, lookback: int = 12,
         return {}
     def g(r, k, i):
         return r[k] if hasattr(r, "keys") else r[i]
-    cycles = sorted({g(r, "cycle_at", 2) for r in rows}, reverse=True)
+    # A cycle is identified by (signal_date, signal_time) — the same distinct key the
+    # old full-timestamp cycle_at provided, so the baseline window is unchanged.
+    def cyc(r):
+        return (g(r, "signal_date", 2), g(r, "signal_time", 3) or "")
+    cycles = sorted({cyc(r) for r in rows}, reverse=True)
     baseline_cycles = set(cycles[1:lookback + 1])  # skip the most recent cycle
     by_comp = {}
     for r in rows:
-        if g(r, "cycle_at", 2) in baseline_cycles:
+        if cyc(r) in baseline_cycles:
             by_comp.setdefault(g(r, "component", 0), []).append(g(r, "value", 1))
     profile = {}
     for comp, vals in by_comp.items():
@@ -409,7 +421,7 @@ def backfill_from_finra(items: list, db_path: str = DB_PATH) -> dict:
                 dtc = pt.get("days_to_cover") or 0.0
                 val = _norm(min(si_chg, 30) / 30 * 0.6 + min(dtc, 10) / 10 * 0.4)
                 record_market_cycle(item_key, {"positioning_concentration": val},
-                                    cycle_at=sd, conn=conn)
+                                    signal_ts=sd, conn=conn)
                 seeded_points += 1
             seeded_items += 1
     finally:
@@ -464,7 +476,7 @@ def backfill_from_finnhub(items: list, db_path: str = DB_PATH) -> dict:
                 margin = (gross / rev) if (gross and rev) else 0.0
                 val = _norm(min(max(growth, -0.5), 0.5) + 0.5) * 0.6 + _norm(margin) * 0.4
                 record_market_cycle(item_key, {"fundamental_confirmation": round(_norm(val), 3)},
-                                    cycle_at=str(period)[:10], conn=conn)
+                                    signal_ts=str(period)[:10], conn=conn)
                 seeded_points += 1
                 prev_rev = rev
             seeded_items += 1

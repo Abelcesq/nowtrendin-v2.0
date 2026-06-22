@@ -20,9 +20,12 @@ data feeds a formula.
 CONTRACT — date-semantic columns (canonical primary 'YYYY-MM-DD'):
   accuracy_ledger.detection_date, accuracy_ledger.breakout_date,
   pending_detections.detection_date, risk_signals.signal_date,
-  pull_history.snapshot_date, score_archive.snapshot_date, topic_baselines.snapshot_date
-Operational TIMESTAMP columns (scored_at, collected_at, validated_at, cycle_at, *_at …)
-keep their precise instant as the SECONDARY value via date_utils.to_iso_dt.
+  market_signal_history.signal_date, pull_history.snapshot_date,
+  score_archive.snapshot_date, topic_baselines.snapshot_date
+Each date-semantic table may pair its date with a 'HH:MM:SS' SECONDARY time column
+(risk_signals.signal_time, market_signal_history.signal_time). Operational TIMESTAMP
+columns (scored_at, collected_at, validated_at, *_at …) keep their precise instant as
+the secondary value via date_utils.to_iso_dt.
 """
 from __future__ import annotations
 from datetime import datetime, timezone
@@ -32,12 +35,13 @@ from date_utils import to_iso_date
 
 # date-semantic columns → canonical primary 'YYYY-MM-DD' (the sort/score key)
 DATE_SEMANTIC = {
-    "accuracy_ledger":    ["detection_date", "breakout_date"],
-    "pending_detections": ["detection_date"],
-    "risk_signals":       ["signal_date"],
-    "pull_history":       ["snapshot_date"],
-    "score_archive":      ["snapshot_date"],
-    "topic_baselines":    ["snapshot_date"],
+    "accuracy_ledger":       ["detection_date", "breakout_date"],
+    "pending_detections":    ["detection_date"],
+    "risk_signals":          ["signal_date"],
+    "market_signal_history": ["signal_date"],
+    "pull_history":          ["snapshot_date"],
+    "score_archive":         ["snapshot_date"],
+    "topic_baselines":       ["snapshot_date"],
 }
 
 

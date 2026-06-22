@@ -95,6 +95,25 @@ def to_iso_dt(value, default_now: bool = False) -> Optional[str]:
     return dt.astimezone(timezone.utc).isoformat()
 
 
+def source_has_time(value) -> bool:
+    """True iff the raw value carries a time-of-day component (a 'T' separator or a
+    space + ':'), i.e. it is NOT a bare date. A bare 'YYYY-MM-DD' / 'May 22, 2026'
+    returns False."""
+    raw = "" if value is None else str(value).strip()
+    return bool(raw) and (("T" in raw) or (" " in raw and ":" in raw))
+
+
+def iso_time_of(value, default_now: bool = True) -> str:
+    """Canonical SECONDARY time-of-day 'HH:MM:SS' (UTC, 24h). If the source carries
+    a time, returns ITS time; otherwise returns the current fetch time (default_now)
+    or '' — so going-forward rows are always populated in a uniform 'HH:MM:SS'."""
+    if source_has_time(value):
+        full = to_iso_dt(value)
+        if full and "T" in full:
+            return full.split("T", 1)[1][:8]   # 'HH:MM:SS' (drop any +00:00 offset)
+    return datetime.now(timezone.utc).strftime("%H:%M:%S") if default_now else ""
+
+
 def is_iso_date(s) -> bool:
     """True iff s is already a canonical 'YYYY-MM-DD' string."""
     return isinstance(s, str) and len(s) == 10 and s[4] == "-" and s[7] == "-" \
