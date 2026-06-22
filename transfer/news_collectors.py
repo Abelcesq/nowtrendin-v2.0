@@ -518,22 +518,24 @@ def _store_news_signal(conn, mode: str, topic: str, signal: dict):
 
     table = "risk_signals" if mode == "risk" else "topic_signals"
     # Canonical split for risk_signals: signal_date = primary ISO 'YYYY-MM-DD';
-    # signal_time = secondary 'HH:MM:SS' (the source's time if present, else fetch
-    # time — always populated). The precise fetch instant is also kept in collected_at.
+    # source_time = the SOURCE's time-of-day (empty if date-only) — data integrity;
+    # signal_time = OUR pull time — integrity of our time pull. Both 24h UTC. The
+    # full pull instant is also kept in collected_at.
     _src_date = signal.get("tx_date") or signal.get("published") or now
     date_val = to_iso_date(_src_date, default_today=True)
-    time_val = iso_time_of(_src_date)
+    source_time_val = iso_time_of(_src_date, default_now=False)
+    signal_time_val = iso_time_of(now)
 
     try:
         if table == "risk_signals":
             conn.execute("""
                 INSERT OR IGNORE INTO risk_signals
                     (id, risk_topic, signal_type, source, diffusion_stage,
-                     raw_signal, signal_date, signal_time, collected_at)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                     raw_signal, signal_date, source_time, signal_time, collected_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (sig_id, topic, signal.get("type", "news"),
                   signal.get("source", "gdelt"), signal.get("diffusion_stage", 4),
-                  signal.get("raw_signal", ""), date_val, time_val, now))
+                  signal.get("raw_signal", ""), date_val, source_time_val, signal_time_val, now))
         else:
             # Attention signals table — adapt to your actual schema
             conn.execute("""
