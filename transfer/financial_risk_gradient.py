@@ -353,13 +353,17 @@ def _youtube_get(endpoint: str, params: dict) -> Optional[dict]:
 
 
 def resolve_channel_id(handle: str) -> Optional[str]:
-    """Resolve a channel handle (e.g. 'meetkevin') to its channel ID."""
-    data = _youtube_get("channels", {
-        "part":      "id",
-        "forHandle": handle,
-    })
-    if data and data.get("items"):
-        return data["items"][0]["id"]
+    """Resolve a channel handle (e.g. 'meetkevin') OR legacy username to its channel
+    ID. Tries bare forHandle, then @handle, then the legacy forUsername — so legacy
+    channels like 'Bloomberg' (a username, not a handle) still resolve instead of
+    silently returning no data. (Result is cached in _CHANNEL_ID_CACHE, so the extra
+    attempts run at most once per channel.)"""
+    h = (handle or "").lstrip("@")
+    for params in ({"forHandle": h}, {"forHandle": "@" + h}, {"forUsername": h}):
+        params["part"] = "id"
+        data = _youtube_get("channels", params)
+        if data and data.get("items"):
+            return data["items"][0]["id"]
     return None
 
 
