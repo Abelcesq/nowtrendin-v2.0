@@ -118,11 +118,19 @@ WORDPRESS_TAGS = [
     "programming","technology","startup","productivity","python","javascript",
 ]
 
-# Known tech-focused Blogger blog IDs (public — no auth needed to read)
+# Tech/AI Blogger blogs — VERIFIED live 2026-06 via blogs/byurl. Google's
+# *.googleblog.com blogs are devsite-fronted but still Blogger-backed/API-readable.
+# 'url' enables self-healing: if a blog_id 404s (Google rotates IDs), collect_blogger
+# re-resolves it from the URL. (The old hardcoded AI Blog / Developers IDs were dead.)
 BLOGGER_BLOGS = [
-    {"name":"Google AI Blog",       "blog_id":"1565197994926998442", "tier":"expert"},
-    {"name":"Official Google Blog", "blog_id":"2399953",             "tier":"mainstream"},
-    {"name":"Google Developers",    "blog_id":"596072307862157202",  "tier":"expert"},
+    {"name":"Google Research Blog",    "blog_id":"8474926331452026626", "tier":"expert",
+     "url":"https://blog.research.google/"},
+    {"name":"Google for Developers",   "blog_id":"596098824972435195",  "tier":"expert",
+     "url":"https://developers.googleblog.com/"},
+    {"name":"Android Developers Blog", "blog_id":"6755709643044947179", "tier":"expert",
+     "url":"https://android-developers.googleblog.com/"},
+    {"name":"Google Open Source Blog", "blog_id":"8698702854482141883", "tier":"expert",
+     "url":"https://opensource.googleblog.com/"},
 ]
 
 BLOGGER_SEARCH_TERMS = [
@@ -696,14 +704,28 @@ def collect_blogger(conn):
                               "blogger", tier, src, 0, comments, True)
             total_s += 1; total_t += n
 
+    def _posts_for(bid):
+        return _http_get(f"{BASE}/blogs/{bid}/posts",
+                         params={"key": KEY, "maxResults": 20, "status": "live",
+                                 "orderBy": "published"})
+
     for blog in BLOGGER_BLOGS:
-        r = _http_get(f"{BASE}/blogs/{blog['blog_id']}/posts",
-                      params={"key": KEY, "maxResults": 20, "status": "live",
-                              "orderBy": "published"})
+        bid = blog["blog_id"]
+        r = _posts_for(bid)
+        if not r and blog.get("url"):
+            # self-heal: hardcoded id is stale -> re-resolve from the blog URL, retry
+            rb = _http_get(f"{BASE}/blogs/byurl", params={"key": KEY, "url": blog["url"]})
+            if rb:
+                bid = rb.json().get("id", bid)
+                if bid != blog["blog_id"]:
+                    print(f"    [Blogger] {blog['name']}: id rotated -> {bid}")
+                r = _posts_for(bid)
         if r:
             posts = r.json().get("items", [])
             process_posts(posts, f"blogger/{blog['name']}", blog.get("tier", "mainstream"))
             print(f"    {blog['name']}: {len(posts)} posts")
+        else:
+            print(f"    [Blogger] {blog['name']}: no data (id {blog['blog_id']})")
         time.sleep(0.5)
 
     for blog in BLOGGER_BLOGS[:2]:
