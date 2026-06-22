@@ -113,18 +113,34 @@ class Series:
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 def _parse_date_cal(s: str) -> date:
-    """Parse date string to date — tolerates ISO datetime and bare date."""
+    """Parse a date string — tolerates ISO date, ISO datetime, and the engine's
+    human breakout format ('May 22, 2026'). NOTE: try whole-string formats FIRST.
+    A naive split on the first space turns 'May 22, 2026' into 'May' and silently
+    drops every human-formatted ledger row (the accuracy_ledger breakout dates),
+    so we must parse the full string before stripping any time component."""
     s = (s or "").strip().replace("Z", "")
     if not s:
         raise ValueError("empty date string")
-    # strip time component if present
-    day = s.split("T")[0].split(" ")[0]
-    for fmt in ("%Y-%m-%d", "%b %d, %Y", "%m/%d/%Y"):
+    # 1) whole-string formats — handles 'May 22, 2026', 'September 3, 2026',
+    #    '2026-06-05', '05/22/2026' without losing the day/year to a space split.
+    for fmt in ("%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y"):
         try:
-            return datetime.strptime(day, fmt).date()
+            return datetime.strptime(s, fmt).date()
         except ValueError:
             continue
-    return datetime.fromisoformat(day).date()
+    # 2) ISO datetime ('2026-06-21T23:45:00+00:00' or '2026-06-21 23:45:00'):
+    #    only NOW strip the time component, then parse the date head.
+    head = s.split("T")[0].split(" ")[0]
+    try:
+        return datetime.fromisoformat(head).date()
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(head, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"unparseable date: {s!r}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
