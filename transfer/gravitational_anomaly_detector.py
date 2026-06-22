@@ -2009,6 +2009,8 @@ _NEWS_REPUTABLE_SOURCES = {
     "marketwatch", "cnbc", "the economist", "forbes", "fortune", "morningstar",
     "investing.com", "investopedia", "kiplinger", "the motley fool", "moody",
     "s&p global", "fitch", "yahoo finance", "yahoo! finance",
+    # Central banks / official institutions (primary macro sources)
+    "federal reserve", "the fed", "ecb", "european central bank", "fomc",
     # National / international press of record
     "new york times", "nytimes", "washington post", "the guardian", "bbc",
     "npr", "pbs", "the times", "los angeles times", "usa today", "axios",
@@ -2405,6 +2407,24 @@ _RSS_FEEDS = [
     ("Financial Times", "https://www.ft.com/global-economy?format=rss"),
     ("Financial Times", "https://www.ft.com/markets?format=rss"),
     ("Financial Times", "https://www.ft.com/technology?format=rss"),
+    # The Economist — CORRECT domain economist.com (the 'theeconomist.com' URLs were a
+    # dead domain). Verified live/fresh 06/22/26, 300 items each. Premium analysis;
+    # headlines only (paywall irrelevant). Already in the reputable-source list.
+    ("The Economist", "https://www.economist.com/finance-and-economics/rss.xml"),
+    ("The Economist", "https://www.economist.com/business/rss.xml"),
+    ("The Economist", "https://www.economist.com/science-and-technology/rss.xml"),
+    ("The Economist", "https://www.economist.com/leaders/rss.xml"),
+    ("The Economist", "https://www.economist.com/international/rss.xml"),
+    # Federal Reserve — OFFICIAL .gov feeds (FOMC/rate decisions, speeches, testimony).
+    # Low-volume, high-signal primary macro source. (FOMC-specific path 404'd; Press All
+    # carries FOMC announcements.)
+    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
+    ("Federal Reserve", "https://www.federalreserve.gov/feeds/speeches.xml"),
+    ("Federal Reserve", "https://www.federalreserve.gov/feeds/testimony.xml"),
+    # ECB — OFFICIAL feeds at the CORRECT /rss/ paths (the press/shared/rss URLs 404'd).
+    # EU monetary-policy primary source, complements the Fed.
+    ("ECB", "https://www.ecb.europa.eu/rss/press.html"),
+    ("ECB", "https://www.ecb.europa.eu/rss/pub.html"),
 ]
 
 
