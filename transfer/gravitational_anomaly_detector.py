@@ -2374,6 +2374,7 @@ def collect_rss_news(conn) -> int:
     item titles (CDATA-safe) and tags each with the outlet so the reputable filter +
     corroboration count credit them. No third-party aggregator dependency."""
     import re as _re
+    import html as _html
     from urllib.request import Request, urlopen
     total = 0
     for label, url in _RSS_FEEDS:
@@ -2385,7 +2386,10 @@ def collect_rss_news(conn) -> int:
             # item-level titles only (skip the channel <title>, which is index 0)
             titles = _re.findall(r"<item\b.*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>",
                                  xml, _re.DOTALL | _re.IGNORECASE)
-            items = [{"title": t.strip(), "source": label} for t in titles[:40] if t.strip()]
+            # HTML-unescape so entities (&#x27; apostrophe, &amp;, &quot;) don't tokenize
+            # into junk topics like "x27 toy story" — affects every RSS outlet.
+            items = [{"title": _html.unescape(t).strip(), "source": label}
+                     for t in titles[:40] if t.strip()]
             total += _news_write(conn, "rss", items)
         except Exception as e:
             print(f"  rss {label} error: {e}")
