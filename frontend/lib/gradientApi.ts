@@ -138,13 +138,29 @@ export function mapSignal(r: any): Signal {
   };
 }
 
-// Fetch all scored topics from the live engine.
-export async function fetchScores(): Promise<Signal[]> {
-  const res = await fetch(`${GRADIENT_API}/scores?limit=2000`, { headers: { Accept: 'application/json' } });
+// One page of scored topics (engine serves O(1) slices). `total` lets the caller
+// know when it has them all. Small payloads = fast + no mobile crash on big lists.
+export const SCORES_PAGE_SIZE = 100;
+export async function fetchScoresPage(limit = SCORES_PAGE_SIZE, offset = 0): Promise<{ signals: Signal[]; total: number }> {
+  const res = await fetch(`${GRADIENT_API}/scores?limit=${limit}&offset=${offset}`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Gradient API ${res.status}`);
   const data = await res.json();
   const results = Array.isArray(data?.results) ? data.results : [];
-  return results.map(mapSignal);
+  return { signals: results.map(mapSignal), total: Number(data?.total ?? results.length) };
+}
+
+// Fetch ALL scored topics, 100 at a time (never one giant payload). Used by direct
+// callers (favorites/watchlist search). The live feed uses the progressive hook.
+export async function fetchScores(): Promise<Signal[]> {
+  const out: Signal[] = [];
+  let offset = 0;
+  for (let i = 0; i < 200; i++) {   // hard safety cap: 200 pages = 20k topics
+    const { signals, total } = await fetchScoresPage(SCORES_PAGE_SIZE, offset);
+    out.push(...signals);
+    offset += SCORES_PAGE_SIZE;
+    if (signals.length < SCORES_PAGE_SIZE || out.length >= total) break;
+  }
+  return out;
 }
 
 export interface ScoreHistoryRow {

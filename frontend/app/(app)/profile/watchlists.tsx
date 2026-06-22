@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Switch, Alert as RNAlert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Plus, X, Star, Search } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';

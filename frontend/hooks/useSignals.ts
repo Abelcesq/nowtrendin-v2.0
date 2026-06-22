@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchScores, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
+import { useEffect } from 'react';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -11,19 +12,33 @@ export interface SignalsResult {
   refetch: () => void;
 }
 
-// Fetches live Gradient Score data; falls back to the mock dataset on failure.
+// Live Gradient Score feed, loaded PROGRESSIVELY 100 at a time: the first page
+// paints immediately (fast), then the rest fill in the background — so a 1,600-row
+// feed never blocks the UI or ships one giant payload (which crashed the app).
+// Falls back to the mock dataset only if the very first page fails.
 export function useSignals(): SignalsResult {
-  const q = useQuery({
+  const q = useInfiniteQuery({
     queryKey: ['scores'],
-    queryFn: fetchScores,
+    queryFn: ({ pageParam = 0 }) => fetchScoresPage(SCORES_PAGE_SIZE, pageParam as number),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, p) => n + p.signals.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
     staleTime: 60 * 1000,
     retry: 1,
   });
 
-  const live = q.data && q.data.length > 0;
+  // Auto-advance through the remaining pages as soon as each arrives.
+  useEffect(() => {
+    if (q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
+  }, [q.hasNextPage, q.isFetchingNextPage, q.data]);
+
+  const loaded = q.data?.pages.flatMap((p) => p.signals) ?? [];
+  const live = loaded.length > 0;
   return {
-    signals: live ? (q.data as Signal[]) : MOCK_SIGNALS,
-    isLoading: q.isLoading,
+    signals: live ? loaded : MOCK_SIGNALS,
+    isLoading: q.isLoading,        // true only until the FIRST page lands
     isError: q.isError,
     isSample: !live && !q.isLoading,
     refetch: q.refetch,
