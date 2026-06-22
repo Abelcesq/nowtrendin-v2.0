@@ -1,0 +1,18 @@
+# Memory Index
+
+- [Now TrendIn 2.0](project-nowtrendin-2.md) — CURRENT app: Attention Intelligence (expo-router + NativeWind + Lucide, SDK 54). Tiers, phases, mock auth, run steps. Supersedes the todo app.
+- [Original Setup / Backend](project-todo-app-setup.md) — original RN+Django+Heroku wiring; live API URL, EAS link, redeploy steps (backend still applies)
+- [Expo: same WiFi first](feedback-expo-same-network-first.md) — when app times out, ALWAYS confirm phone + PC on same WiFi BEFORE any firewall/port debugging
+- [Expo: port 8081 only](feedback-expo-port-8081.md) — never accept the 8082 fallback; kill stale Metro instead
+- [Expo: firewall rule for 8081](feedback-expo-firewall-rule.md) — TCP 8081 inbound rule can drop after crashes; do NOT change Public→Private network profile
+- [INTEGRITY STANDARD (hard rule)](feedback-integrity-standard.md) — every addition must pass: gradient objectivity, no circular metrics, reputable+licensed sources only, measurement-not-advice. Push back if it fails.
+- [No circular metrics](feedback-no-circular-metrics.md) — a validator must use inputs independent of what it validates (the N-vs-gradient circularity catch)
+- [Gradient calibration model](project-gradient-calibration.md) — dual-pathway + baseline-relative (fame vs diffusion) + community tiers + tier-migration; backtest-before-ship; engine dir is `NowTrendin` (not v2.0)
+- [Verify before ship (hard rule)](feedback-verify-before-ship.md) — fix failures + confirm everything actually pulls (endpoints/filters/buttons, from logs) BEFORE any commit/deploy/MD; never document over broken state
+- [Data building blocks](project-data-building-blocks.md) — DATA_BUILDING_BLOCKS.md: source registry + pipeline invariants (B1–B8) + budgets + failure-mode catalog + 5 monitoring-agent specs. The foundation for data/scoring monitoring agents.
+- [Deploy terminal → gh-pages](deploy-terminal-ghpages.md) — the user's terminal is GitHub Pages (gh-pages branch), NOT the Heroku mirror; deploy there or changes are invisible. Includes the worktree deploy steps.
+- [Deploy topology (full map)](deploy-topology.md) — ONE v2 engine (nowtrendin-v2-engine) for ALL platforms; engine code canonical in v2.0/transfer/. The NowTrendin (1.0) folder/repo/Heroku app is FROZEN legacy (live Android + pre-Apr-2026 data) — a git hook now blocks commits there. Consolidation was done 2026-06-15.
+- [serve_payload cache gotcha](serve-payload-cache-gotcha.md) — after ANY scoring/calibration change, regenerate velocity_scores.serve_payload or /scores+detail serve stale values; apply_calibration lives in signal_calibration_integration.py (not calibration_engine.py); dual-pathway gate keeps mainstream from collapsing.
+- [Date/time canon + same-surge matching](project-date-time-canon.md) — canonical YYYY-MM-DD via date_utils + Ingestion Gate (condition precedent); risk_signals source_time vs signal_time; market cycle_at→signal_date; same-surge breakout floor (since=detection−30d) fixes stale ledger matches. NEVER reintroduce raw [:10] date slicing.
+- [Dark Matter routing (D vs M)](project-dark-matter-routing.md) — the D-vs-M router is platform_tier (NOT is_organic): mainstream tier suppresses the early read; expert/niche = Dark Matter. Route early-signal/research outlets (War on Rocks, Rest of World, Global Issues, Pew, RAND, NBER) via blog_collectors GHOST_FEEDS expert tier, NEVER _news_write. Plus reputable→½/full-on-≥2-distinct-reputable reweighting (in design).
+- [NowTrendin2.0 skill](skill-nowtrendin2.md) — /nowtrendin2.0 session-startup skill: invoke at every session start to load context, run health+skills+agents checks, and arm the auto-save protocol (GitHub = cloud backup).

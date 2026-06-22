@@ -135,6 +135,56 @@ Full env var reference: `docs/ENV_REFERENCE.md` in the v2.0 repo.
 
 ---
 
+## CURRENT BUILD STATE — updated 2026-06-22 (canonical dates · sources · M/D)
+
+> What shipped recently and the active design direction, so you don't re-derive it at
+> session start. Distinguishes **✅ LIVE** (deployed) from **⏳ IN DESIGN** (NOT shipped).
+> Authoritative specs: `CLAUDE.md` §14–15, `DATA_BUILDING_BLOCKS.md` §3a + §5.
+
+### ✅ LIVE — Canonical Date & Time model (the Accuracy-Ledger backbone)
+- Every date-semantic value → PRIMARY `signal_date` = ISO `YYYY-MM-DD` (the ONE
+  sort/match/score key). Two SECONDARY 24h-UTC columns: `source_time` (the SOURCE's own
+  `HH:MM:SS`, empty if date-only) and `signal_time` (OUR fetch `HH:MM:SS`, stamped on
+  every fetched row going forward — `17:15:00` format).
+- Enforced centrally by `date_utils.py` + `ingestion_gate.gate_date()` (condition-precedent;
+  an unparseable non-empty value → `format_review_queue` for human review, never guessed).
+- Same-surge ledger matching floors `detect_breakout_date(..., since=detection−30d)` —
+  turned a −62d stale match into a correct −2d. **Purpose:** streamline all obtained data
+  into one consistent internal sort key → **strengthen the viability of the Accuracy
+  Ledger** (the moat).
+- **Guardrail:** governs SORTING/MATCHING only — removes NO scoring input (all Gradient
+  components + Market-Risk leverage/positioning preserved). Forward-only; 90-day retention
+  untouched. NEVER reintroduce raw `[:10]` date slicing. (Memory: `project-date-time-canon`.)
+
+### ✅ LIVE — Updated sources (engine deployed v98)
+- Trusted-direct reputable RSS roster (official, no aggregators): El País, TechCrunch,
+  BBC, LA Times, CNBC, The Guardian, DW, ABC (AU+US), The Verge, InfoQ, Financial Times,
+  The Economist, Federal Reserve, ECB, **The New Yorker** (news + business).
+- **Risk module: Nasdaq Trade Halts** (official exchange RSS; stage-2 microstructure;
+  `signal_date`=HaltDate, `source_time`=HaltTime). Verified in prod: 29 halts; New Yorker
+  54 raw / 269 topic signals.
+
+### ⏳ IN DESIGN — M / D provenance reweighting (NOT shipped; backtest-before-ship gates it)
+Two coupled changes to the `_news_write` provenance decision:
+1. **Reputable ≠ automatic mainstream full weight.** 1 reputable source = **½ weight**;
+   FULL weight only on **≥2 DISTINCT reputable sources** (keyed on distinct `source_name`
+   to defeat wire-syndication). The "Belgium vs Iran, 2026 World Cup" corroboration case.
+   Extends the catch-all corroboration philosophy (`CATCHALL_MIN_SOURCES ≥2`) from
+   *admission* to *weight*.
+2. **Research / early-signal outlets → Dark Matter (D), not Mainstream (M):** War on
+   Rocks, Rest of World, Global Issues, Pew Research, RAND (blog), NBER — they surface
+   topics BEFORE mainstream (research that reads like blogs).
+   **Mechanism (mapped + anchored):** the D-vs-M router is **`platform_tier`**, NOT
+   `is_organic`. `tier="mainstream"` feeds M and SUPPRESSES the early read (G denominator,
+   raises blend `w`); `tier in {"expert","niche"}` → the Dark-Matter / expert-gradient
+   pathway. `is_organic` only scales D's quality gate; `is_first_timer` is D's numerator.
+   **→ Wire these via `blog_collectors.py` GHOST_FEEDS at expert/niche tier** (the blog
+   template the founder invoked), NOT via `_RSS_FEEDS`/`_news_write` (which forces
+   `mainstream` and would suppress them — the exact failure to avoid). Feeds validated
+   (production UA). Adversarial integrity verify + backtest still required before deploy.
+
+---
+
 ## STEP 1 — MEMORY LOAD
 
 Read these files first (in order). They establish what was built, what's open,
