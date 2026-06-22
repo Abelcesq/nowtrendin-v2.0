@@ -7529,27 +7529,13 @@ def get_trending(
     return result
 
 
-@app.get("/topics")
-def list_topics(
-    limit: int = Query(100, ge=1, le=500),
-    anomalies_only: bool = Query(False),
-    category: str = Query("", description="Filter by content category, e.g. sports, technology"),
-):
-    """
-    List discovered topics with their latest scores.
-
-    Pass ?category=sports to filter to one content category. Because category
-    is classified at serve-time (not stored), filtering scans a larger
-    candidate set then returns the top `limit` of the requested category —
-    so low-scored but on-topic items (e.g. an emerging sports story) still
-    surface under their chip even when buried below tech/news in the global rank.
-    """
-    cat = category.strip().lower()
+def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
+    """The full quality+category-filtered topic grid, computed once and cached so
+    /topics pagination is O(1) slicing (web loads the whole grid 100 at a time)."""
     conn = get_db(DB_PATH)
     filter_str = "AND r.is_anomaly = 1" if anomalies_only else ""
-    # Always scan a wide candidate set before the quality + category filters,
-    # so quality topics still surface even when the top-by-score rows are junk
-    # (the quality filter can otherwise empty a narrow top-N window entirely).
+    # Wide candidate scan before the quality + category filters so quality topics
+    # still surface even when the top-by-score rows are junk.
     scan = 2000
     rows = conn.execute(f"""
         SELECT r.topic_key, r.topic_display, r.current_stage,
@@ -7573,12 +7559,9 @@ def list_topics(
         d = dict(r)
         if not _is_quality_topic(d.get("topic_display", "")):
             continue   # drop profanity / bare-generic junk from the institutional grid
-        # SINGLE SOURCE OF TRUTH: the institutional grid must show the SAME
-        # detection/confidence the /scores feed serves (mainstream dual-pathway
-        # preserved, expert calibrated). The raw v.* columns are pre-serve-
-        # calibration, so override them from the precomputed serve_payload when
-        # present (top-N topics). Long-tail topics without a payload keep the raw
-        # stored value (already the dual-pathway headline for mainstream topics).
+        # SINGLE SOURCE OF TRUTH: the grid must show the SAME detection/confidence
+        # the /scores feed serves. Override raw v.* with the precomputed
+        # serve_payload when present (top-N); long-tail keeps the stored value.
         _pl = d.pop("serve_payload", None)
         if _pl:
             try:
@@ -7593,9 +7576,32 @@ def list_topics(
         if cat and d["category"] != cat:
             continue
         topics.append(d)
-        if len(topics) >= limit:
-            break
-    return {"count": len(topics), "topics": topics, "category": cat or "all"}
+    return topics
+
+
+@app.get("/topics")
+def list_topics(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    anomalies_only: bool = Query(False),
+    category: str = Query("", description="Filter by content category, e.g. sports, technology"),
+):
+    """
+    List discovered topics with their latest scores — PAGINATED.
+    The full quality-filtered grid is computed once and cached; `limit` + `offset`
+    return an O(1) slice so the web can load the whole grid 100 at a time with no
+    cap and no delay. Response includes `total`. Pass ?category= to scope a chip.
+    """
+    cat = category.strip().lower()
+    super_key = f"topics_full:{cat}:{int(anomalies_only)}"
+    full = _cache.get(super_key)
+    if full is None:
+        full = _compute_topics_full(cat, anomalies_only)
+        _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
+    total = len(full)
+    page = full[offset: offset + limit]
+    return {"count": len(page), "topics": page, "category": cat or "all",
+            "total": total, "offset": offset, "limit": limit}
 
 
 @app.get("/categories")
