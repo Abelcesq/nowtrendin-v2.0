@@ -2425,6 +2425,10 @@ _RSS_FEEDS = [
     # EU monetary-policy primary source, complements the Fed.
     ("ECB", "https://www.ecb.europa.eu/rss/press.html"),
     ("ECB", "https://www.ecb.europa.eu/rss/pub.html"),
+    # The New Yorker — OFFICIAL Condé Nast feeds (news + business desks). Long-form
+    # reputable reporting; complements the wire/financial-press roster.
+    ("The New Yorker", "https://www.newyorker.com/feed/news"),
+    ("The New Yorker", "https://www.newyorker.com/feed/business"),
 ]
 
 

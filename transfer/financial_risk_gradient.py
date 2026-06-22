@@ -1118,6 +1118,61 @@ def collect_youtube_risks(conn) -> int:
     return count
 
 
+# Nasdaq trade-halt reason codes → a human-readable hint (the common ones).
+NASDAQ_HALT_REASONS = {
+    "T1": "news pending", "T2": "news released", "T3": "news & resumption times",
+    "T5": "single-stock LULD pause", "T6": "extraordinary market activity",
+    "T8": "ETF halt", "T12": "additional information requested",
+    "H4": "non-compliance", "H9": "not current in regulatory filings",
+    "H10": "SEC trading suspension", "H11": "regulatory concern",
+    "LUDP": "volatility trading pause", "LUDS": "volatility — quoting period",
+    "MWC1": "market-wide circuit breaker L1", "MWC2": "circuit breaker L2",
+    "MWC3": "circuit breaker L3", "M": "volatility — LULD",
+    "D": "non-compliance / deficiency", "IPO": "IPO not yet traded",
+}
+
+
+def collect_nasdaq_halts(conn) -> int:
+    """Stage 2 — official Nasdaq trading halts (real-time market-microstructure event;
+    reputable + licensed: the exchange's own public RSS). Canonical signal_date = the
+    HaltDate; source_time carries the HaltTime, signal_time = our pull time."""
+    count = 0
+    try:
+        r = requests.get("http://www.nasdaqtrader.com/rss.aspx?feed=tradehalts",
+                         headers={"User-Agent": SEC_USER_AGENT}, timeout=20)
+        if r.status_code != 200:
+            print(f"[risk] Nasdaq halts HTTP {r.status_code}")
+            conn.commit()
+            return 0
+        items = re.findall(r"<item\b.*?>(.*?)</item>", r.text, re.DOTALL | re.IGNORECASE)
+        for body in items:
+            def _f(tag, _b=body):
+                m = re.search(rf"<ndaq:{tag}\b[^>]*>(.*?)</ndaq:{tag}>", _b,
+                              re.DOTALL | re.IGNORECASE)
+                return m.group(1).strip() if m else ""
+            sym, name = _f("IssueSymbol"), _f("IssueName")
+            reason, market = _f("ReasonCode"), _f("Market")
+            halt_date, halt_time = _f("HaltDate"), _f("HaltTime")
+            if not (sym or name) or not halt_date:
+                continue
+            iso_d = to_iso_date(halt_date)
+            ht = halt_time.split(".")[0].strip()  # drop the .000 millis
+            src_dt = (f"{iso_d}T{ht}" if iso_d and re.match(r"^\d{2}:\d{2}:\d{2}$", ht)
+                      else (iso_d or halt_date))
+            disp = f"{name} ({sym})" if name and sym else (name or sym)
+            why = NASDAQ_HALT_REASONS.get(reason.upper(), reason or "halt")
+            raw = (f"Nasdaq trading halt: {sym}"
+                   f"{(' — ' + name) if name else ''} [{market or 'NASDAQ'}] "
+                   f"reason {reason} ({why}) at {ht or 'n/a'}")
+            _persist_risk_signal(conn, disp, "trade_halt", "nasdaq", 2, raw, src_dt)
+            count += 1
+    except Exception as e:
+        print(f"[risk] Nasdaq halts error: {e}")
+    conn.commit()
+    print(f"[risk] nasdaq_halts: {count} signals")
+    return count
+
+
 def run_risk_collection(db_path: str = DB_PATH) -> dict:
     """Run every risk collector and persist signals."""
     init_risk_db(db_path)
@@ -1129,6 +1184,7 @@ def run_risk_collection(db_path: str = DB_PATH) -> dict:
         "fred": collect_fred_risks(conn),
         "youtube": collect_youtube_risks(conn),
         "finnhub": collect_finnhub_risks(conn),
+        "nasdaq_halts": collect_nasdaq_halts(conn),
         "creators": collect_creator_risk_signals(conn),
         "broadcast": collect_broadcast_risk_signals(conn),
         "yahoo_finance": collect_yahoo_finance_risk_signals(conn),
