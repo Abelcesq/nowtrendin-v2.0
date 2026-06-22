@@ -16,7 +16,7 @@ import { MethodologyExplainer } from '../../../components/trends/MethodologyExpl
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
 import { useSignal } from '../../../hooks/useSignals';
-import { ageLabel, stageColor, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../../lib/signals';
+import { ageLabel, stageColor, stageLabel, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../../lib/signals';
 
 // Plain-English fallback for each maturity class (used when the engine's live
 // maturity_reason is absent). Explains what the lifecycle stage means for the score.
@@ -135,7 +135,7 @@ export default function SignalDetail() {
         <View className="flex-row justify-around items-start">
           <View className="items-center">
             <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
             </View>
             <GradientScoreRing score={signal.detection} color={SCORE_ROLES.detection.color} size="lg" caption="/100" />
             <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
@@ -143,7 +143,7 @@ export default function SignalDetail() {
           </View>
           <View className="items-center">
             <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
             </View>
             <GradientScoreRing score={signal.confidence} color={SCORE_ROLES.confidence.color} size="lg" caption="/100" />
             <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
@@ -152,7 +152,7 @@ export default function SignalDetail() {
         </View>
         <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: agree ? '#00C89655' : '#2D7EEF55', backgroundColor: agree ? '#00C8960F' : '#2D7EEF0F' }}>
           <Text className="text-sm font-bold" style={{ color: agree ? '#009970' : '#2D7EEF' }}>
-            {gap}-point gap — {agree ? `scores aligned at ${signal.stage}` : 'early stage, confirmation building'}
+            {gap}-point gap — {agree ? `scores aligned at ${stageLabel(signal.stage)}` : 'early stage, confirmation building'}
           </Text>
           {!!signal.gapMeaning && (
             <Text className="text-textMuted text-xs mt-1 leading-5">{signal.gapMeaning}</Text>

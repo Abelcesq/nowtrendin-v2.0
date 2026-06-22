@@ -11,7 +11,7 @@ const FAV_OPTIONS: Record<string, { k: string; label: string }[]> = {
   trends: [
     { k: 'nowtrendin', label: 'Now TrendIn' }, { k: 'all', label: 'All Signals' },
     { k: 'breakout', label: 'Breakout' }, { k: 'strong', label: 'Strong' },
-    { k: 'emerging', label: 'Emerging' }, { k: 'marginal', label: 'Marginal' },
+    { k: 'emerging', label: 'Indicating' }, { k: 'marginal', label: 'Marginal' },
     { k: 'anomalies', label: 'Anomalies' },
   ],
   market: [

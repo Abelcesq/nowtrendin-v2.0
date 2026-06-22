@@ -29,7 +29,8 @@ const BUILTIN_META: Record<string, { title: string; icon: any; color: string }> 
 function stagePill(stage?: string) {
   const s = (stage || '').toUpperCase()
   const cls = ['BREAKOUT', 'STRONG', 'EMERGING', 'WATCHING', 'MARGINAL', 'MONITORING'].includes(s) ? s : 'MONITORING'
-  return <span className={'stage ' + cls}>{s || '—'}</span>
+  // Display rename: EMERGING shown as INDICATING (internal key unchanged for color).
+  return <span className={'stage ' + cls}>{(s === 'EMERGING' ? 'INDICATING' : s) || '—'}</span>
 }
 const num = (v: number, c: string) => <span className="dash-row-v" style={{ color: c }}>{v}</span>
 const pill = (t: string, col: string, bg: string) => <span className="dash-pill" style={{ color: col, background: bg }}>{t}</span>
@@ -277,7 +278,7 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
           <label className="al-lbl">Filter</label>
           <div className="al-chips">
             {section === 'trends'
-              ? STAGES.map((s) => chip(stage === s, s || 'Any stage', () => setStage(s)))
+              ? STAGES.map((s) => chip(stage === s, (s === 'EMERGING' ? 'INDICATING' : s) || 'Any stage', () => setStage(s)))
               : TIERS.map((t) => chip(tier === t, t || 'Any tier', () => setTier(t)))}
           </div>
         </>

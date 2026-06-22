@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity, type LayoutChangeEvent
 import Svg, { Polyline, Line, Circle, G, Text as SvgText } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import { Signal, stageColor } from '../../lib/signals';
+import { Signal, stageColor, stageLabel } from '../../lib/signals';
 import { useScoreHistory } from '../../hooks/useSignals';
 import type { ScoreHistoryRow } from '../../lib/gradientApi';
 
@@ -62,7 +62,7 @@ export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal;
       <View className="flex-row items-center justify-between mb-1">
         <Text className="text-textPrimary text-base font-bold flex-1 pr-2" numberOfLines={1}>{signal.topic}</Text>
         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
-          <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+          <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
         </View>
       </View>
       <View className="flex-row gap-4 mb-2">
@@ -117,7 +117,7 @@ export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal;
 
           {sp ? (
             <View className="bg-bg rounded-lg border border-border p-2.5 mt-2">
-              <Text className="text-textPrimary text-[11px] font-bold mb-1">{fmtTime(sp.scoredAt)}{sp.stage ? ` · ${sp.stage}` : ''}</Text>
+              <Text className="text-textPrimary text-[11px] font-bold mb-1">{fmtTime(sp.scoredAt)}{sp.stage ? ` · ${stageLabel(sp.stage)}` : ''}</Text>
               <View className="flex-row flex-wrap" style={{ columnGap: 14, rowGap: 2 }}>
                 <Text className="text-[11px]" style={{ color: DET }}>Det {sp.detection}<Text className="text-textMuted">{delta(sp.detection, prev?.detection)}</Text></Text>
                 <Text className="text-[11px]" style={{ color: CONF }}>Conf {sp.confidence}<Text className="text-textMuted">{delta(sp.confidence, prev?.confidence)}</Text></Text>

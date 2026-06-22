@@ -3,7 +3,7 @@ import { Star, Bell, Download, X, TrendingUp, TrendingDown, Minus } from 'lucide
 import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
-import { MC, stageColor, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
+import { MC, stageColor, stageLabel, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
 import { ScoreChart } from '../components/ScoreChart'
 
 // Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
@@ -20,7 +20,7 @@ const SIGNAL_FILTERS: { k: string; label: string; test?: (r: Row) => boolean; so
   // stage matches, so the Stage badge always agrees with the selected filter.
   { k: 'breakout', label: 'Breakout ≥85', test: (r) => r.det >= 85 },
   { k: 'strong', label: 'Strong ≥70', test: (r) => r.det >= 70 && r.det < 85 },
-  { k: 'emerging', label: 'Emerging', test: (r) => r.det >= 55 && r.det < 70 },
+  { k: 'emerging', label: 'Indicating', test: (r) => r.det >= 55 && r.det < 70 },
   { k: 'marginal', label: 'Marginal', test: (r) => r.det >= 35 && r.det < 55 },
   // Anomalies = DETECTION running ahead of CONFIRMATION (signed gap ≥ 16) — the
   // "future arriving" shape. NOT |gap| (also caught lagging conf>det topics) and
@@ -214,7 +214,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.topic_display}</div>
-            <div className="detail-cat">{row.category || '—'} · <span style={{ color: scol, fontWeight: 700 }}>{row.stage}</span></div>
+            <div className="detail-cat">{row.category || '—'} · <span style={{ color: scol, fontWeight: 700 }}>{stageLabel(row.stage)}</span></div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -444,7 +444,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
           {loading ? 'Loading live score…'
             : gap >= 20 ? `${row.topic_display} shows a wide ${gap}-point gap — leading indicators run ahead of confirmation. Detected, not yet broadly confirmed.`
               : gap < 0 ? `${row.topic_display} reads with confidence above detection — the hard signal arrived after the early window; the topic is maturing.`
-                : `${row.topic_display} has detection and confidence closely aligned (${gap > 0 ? '+' : ''}${gap}) — a high-conviction read at the ${row.stage} level.`}
+                : `${row.topic_display} has detection and confidence closely aligned (${gap > 0 ? '+' : ''}${gap}) — a high-conviction read at the ${stageLabel(row.stage)} level.`}
         </div>
         <div className="disc">Signal analysis only — not financial, investment, or legal advice.</div>
       </div>
@@ -589,7 +589,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
     if (key === sel) { setSel(null); onRail(null); return }
     setSel(key)
     const row = rows.find((r) => r.topic_key === key)!
-    onRail(<DetailRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
+    onRail(<DetailRail key={row.topic_key} row={row} onClose={() => { setSel(null); onRail(null) }} />)
   }
 
   // Focus = open a SPECIFIC topic's detail rail (from a favorite / watchlist /
@@ -606,7 +606,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
       det: 0, conf: 0, n: 0, gap: 0, stage: 'MONITORING', ageMin: 0,
     } as Row
     setSel(focus.key)
-    onRail(<DetailRail row={row} onClose={() => { setSel(null); onRail(null) }} />)
+    onRail(<DetailRail key={row.topic_key} row={row} onClose={() => { setSel(null); onRail(null) }} />)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.n, rows])
 
@@ -681,7 +681,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                     <td className="r"><span className="score-cell det">{r.det}</span></td>
                     <td className="r"><span className="score-cell conf">{r.conf}</span></td>
                     <td className="r"><div className="gapviz">{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
-                    <td><span className={'stage ' + r.stage}>{r.stage}</span></td>
+                    <td><span className={'stage ' + r.stage}>{stageLabel(r.stage)}</span></td>
                     <td><span className="muted" style={{ textTransform: 'capitalize' }}>{r.category || '—'}</span></td>
                     <td style={{ textAlign: 'center' }}><span style={{ color: dirColor, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{dirIcon}</span></td>
                     <td className="r"><span className="muted">{r.total_mentions ?? '—'}</span></td>

@@ -138,7 +138,7 @@ export function Methodology() {
               Some are the real thing early; some are noise that never confirms.
             </p>
             <p className="mth-p" style={{ marginTop: 10 }}>
-              <b>It is a separate axis from the signal stage.</b> Stage (Breakout / Strong / Emerging /
+              <b>It is a separate axis from the signal stage.</b> Stage (Breakout / Strong / Indicating /
               Marginal) measures <b>strength</b> — how high Detection is. An anomaly measures <b>shape</b>
               — how far Detection LEADS Confirmation. So an anomaly can appear at any stage: a Strong
               topic with a wide lead is a strong early anomaly; a Marginal one with a wide lead is an

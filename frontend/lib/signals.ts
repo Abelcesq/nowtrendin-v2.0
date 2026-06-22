@@ -127,7 +127,7 @@ export const STAGE_META = [
   // We surface the analysis; the user decides any action.
   { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', desc: 'Strongest signal', color: '#00C896' },
   { key: 'STRONG', label: 'STRONG', range: '70–84', desc: 'High signal strength', color: '#2D7EEF' },
-  { key: 'EMERGING', label: 'EMERGING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
+  { key: 'EMERGING', label: 'INDICATING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
   { key: 'MARGINAL', label: 'MARGINAL', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
 ] as const;
 
@@ -236,8 +236,8 @@ export const CATEGORY_DEFS: Array<{
   },
   {
     key: 'emerging',
-    label: 'Emerging',
-    short: 'EMERGING',
+    label: 'Indicating',
+    short: 'INDICATING',
     range: 'Detection Score 55–69',
     color: '#D4A017',
     definition:
@@ -445,6 +445,11 @@ const STAGE_COLORS: Record<Stage, string> = {
   DECAY: '#94A3B8',
 };
 export const stageColor = (s: Stage) => STAGE_COLORS[s] ?? '#9AA3B0';
+
+// Display rename: the EMERGING signal stage is shown to users as INDICATING.
+// Internal keys/values stay EMERGING (type, colors, scoring) — display only.
+export const stageLabel = (s?: string) =>
+  (s || '').toUpperCase() === 'EMERGING' ? 'INDICATING' : (s || '');
 
 export function scoreGap(s: Signal): number {
   return s.gap ?? Math.abs(s.detection - s.confidence);

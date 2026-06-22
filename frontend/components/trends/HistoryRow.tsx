@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flame } from 'lucide-react-native';
-import { Signal, stageColor, timeLabel } from '../../lib/signals';
+import { Signal, stageColor, stageLabel, timeLabel } from '../../lib/signals';
 
 function Metric({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -31,7 +31,7 @@ export function HistoryRow({ signal, onPress, selected }: { signal: Signal; onPr
         <Text className="text-textPrimary text-base font-bold">{signal.topic}</Text>
         <View className="flex-row items-center gap-2 mt-1">
           <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
-            <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{signal.stage}</Text>
+            <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
           </View>
           {signal.isAnomaly && (
             <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#00C8961A' }}>

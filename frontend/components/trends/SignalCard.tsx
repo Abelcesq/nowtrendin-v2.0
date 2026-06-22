@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { ArrowUpRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Signal, ageLabel, stageColor } from '../../lib/signals';
+import { Signal, ageLabel, stageColor, stageLabel } from '../../lib/signals';
 
 export function SignalCard({ signal, onPress }: { signal: Signal; onPress?: () => void }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export function SignalCard({ signal, onPress }: { signal: Signal; onPress?: () =
         <View className="flex-row items-center gap-1">
           <ArrowUpRight size={13} color={color} />
           <Text className="text-xs font-bold" style={{ color }}>
-            {signal.stage}
+            {stageLabel(signal.stage)}
           </Text>
         </View>
         <Text className="text-textMuted text-xs">{ageLabel(signal.createdAt)}</Text>

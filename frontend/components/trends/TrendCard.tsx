@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Sparkles, Flame } from 'lucide-react-native';
-import { Signal, ageLabel, stageColor, scoreGap, gapInsight, STAGE_META, contentCategoryMeta } from '../../lib/signals';
+import { Signal, ageLabel, stageColor, stageLabel, scoreGap, gapInsight, STAGE_META, contentCategoryMeta } from '../../lib/signals';
 import { useExplainer } from '../../hooks/useSignals';
 
 const DET_COLOR = '#2D7EEF';
@@ -61,7 +61,7 @@ export function TrendCard({ signal }: { signal: Signal }) {
           </View>
           <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${stageCol}1A` }}>
             <Text style={{ color: stageCol }} className="text-[10px] font-bold tracking-wide">
-              {signal.stage}
+              {stageLabel(signal.stage)}
             </Text>
           </View>
         </View>

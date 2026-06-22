@@ -24,6 +24,11 @@ export const STAGE_COLOR: Record<string, string> = {
 }
 export const stageColor = (s?: string) => STAGE_COLOR[(s || '').toUpperCase()] ?? '#9AA3B0'
 
+// Display rename: the "EMERGING" signal stage is shown to users as "INDICATING".
+// Internal keys stay EMERGING (engine queries, colors, CSS classes) — display only.
+export const stageLabel = (s?: string) =>
+  (s || '').toUpperCase() === 'EMERGING' ? 'INDICATING' : (s || '')
+
 // Topic maturity → color (frontend maturityColourHex).
 export const MATURITY_COLOR: Record<string, string> = {
   RESURGENT: '#D4A017', EMERGING: '#00C896', NEW: '#2D7EEF',

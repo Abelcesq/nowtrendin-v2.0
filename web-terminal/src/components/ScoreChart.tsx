@@ -109,7 +109,7 @@ export function ScoreChart({ points }: { points: ChartPoint[] }) {
 
       {hp && (
         <div className="sc-tip" style={{ left: tipLeft }}>
-          <div className="sc-tip-t">{fmtTime(hp.t)}{hp.stage ? ` · ${hp.stage}` : ''}</div>
+          <div className="sc-tip-t">{fmtTime(hp.t)}{hp.stage ? ` · ${hp.stage.toUpperCase() === 'EMERGING' ? 'INDICATING' : hp.stage}` : ''}</div>
           <div className="sc-tip-r"><span style={{ color: DET }}>● Detection</span><b>{hp.det}<i>{delta(hp.det, prev?.det)}</i></b></div>
           <div className="sc-tip-r"><span style={{ color: CONF }}>● Confidence</span><b>{hp.conf}<i>{delta(hp.conf, prev?.conf)}</i></b></div>
           {hp.overall != null && <div className="sc-tip-r"><span>Overall</span><b>{hp.overall}</b></div>}

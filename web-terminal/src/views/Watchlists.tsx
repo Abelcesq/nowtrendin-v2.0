@@ -203,7 +203,7 @@ export function Watchlists({ onOpenDetail }: { onOpenDetail?: (key: string, kind
                       <td className="r"><span className="score-cell det">{det}</span></td>
                       <td className="r"><span className="score-cell conf">{conf}</span></td>
                       <td className="r"><div className="gapviz">{gapMicro(det, conf)}<span className={'gapnum ' + gw}>{gap > 0 ? '+' : ''}{gap}</span></div></td>
-                      <td><span className="stage">{it.kind === 'market' ? '—' : stageOf(det)}</span></td>
+                      <td><span className="stage">{it.kind === 'market' ? '—' : (stageOf(det) === 'EMERGING' ? 'INDICATING' : stageOf(det))}</span></td>
                     </>) : (
                       <td className="r muted" colSpan={4} style={{ textAlign: 'left' }}>Not yet scored — will populate when it next appears in a cycle.</td>
                     )}
