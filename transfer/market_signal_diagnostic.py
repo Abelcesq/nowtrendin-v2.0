@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 import math
+import os
 import statistics
 
 # Real values, read from the engine at runtime (see _load_engine_config).
@@ -77,8 +78,12 @@ def load_diagnostic_input(symbol: str) -> InstrumentInput:
     conn = g.get_db(g.DB_PATH)
     # resolve the item_key used in market_signal_history (risk key form)
     candidates = [raw, raw.lower(), raw.lower().replace(" ", "_")]
+    # resolve_ticker() hits a LIVE external ticker API (rate-limited, can hang on
+    # 429s). The read-only nightly audit sets MSD_SKIP_RESOLVE=1 so it reads
+    # market_signal_history by its STORED item_key only — never a live lookup. The
+    # live engine leaves the flag unset and resolves as before.
     try:
-        if getattr(g, "_RISK_AVAILABLE", False):
+        if getattr(g, "_RISK_AVAILABLE", False) and os.getenv("MSD_SKIP_RESOLVE") != "1":
             tkr, disp = g.risk.resolve_ticker(raw)
             if disp:
                 candidates += [disp, disp.lower(), disp.lower().replace(" ", "_")]

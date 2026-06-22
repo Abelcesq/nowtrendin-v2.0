@@ -163,12 +163,15 @@ def run_nightly(adapter: NowTrendInDataAdapter, today: Optional[date] = None) ->
     rep.sources = CA.source_attribution(rows, adapter.source_first_seen)
 
     # 5–6 · offense (lead_moat_agent) — attribution MUST precede the gate
-    # For resolved rows the ledger already has the breakout_date — build the receipt
-    # directly without a live GT call. Only pending rows need GT to check for breakout.
+    # STORED-ONLY: the audited lead vs Google Trends is read from the engine's
+    # accuracy_ledger, which already recorded breakout_date when each topic broke
+    # out on GT. The audit NEVER pulls GT live — that spend lives in the engine's
+    # own 6h validation cycle. Resolved rows → receipt from stored breakout_date;
+    # pending rows → PENDING receipt (the engine's cycle will resolve them later).
     receipts = []
     for r in rows:
         if r.breakout_date is not None:
-            # Already resolved: use stored breakout_date — no API call needed.
+            # Resolved in the ledger: use the STORED breakout_date — no API call.
             lead = (r.breakout_date - r.detection_date).days
             verdict = "LED" if lead >= 1 else ("SAME_DAY" if lead == 0 else "LAGGED")
             text = (f"{r.topic}: we flagged it {r.detection_date}; "
@@ -176,10 +179,13 @@ def run_nightly(adapter: NowTrendInDataAdapter, today: Optional[date] = None) ->
             receipts.append(LMA.Receipt(r.topic, r.detection_date, r.breakout_date,
                                         lead, verdict, adapter.topic_sources(r.topic), text))
         else:
-            # Still pending: call GT to see if it has broken out since last run.
-            receipts.append(LMA.audit_topic(r.topic, r.detection_date,
-                                            adapter.gt_series(r.topic),
-                                            adapter.topic_sources(r.topic)))
+            # Still pending: NO live GT pull. Emit a PENDING receipt — the engine's
+            # validation cycle writes breakout_date to the ledger when GT breaks out.
+            receipts.append(LMA.Receipt(
+                r.topic, r.detection_date, None, None, "PENDING",
+                adapter.topic_sources(r.topic),
+                f"{r.topic}: detected {r.detection_date}; still pending a Google "
+                f"Trends breakout (engine validation cycle will resolve it)."))
     rep.lead_vs_gt = LMA.gt_scorecard(receipts)
     attribution = {s: d["median_lead"] for s, d in rep.sources.items()}
     counts = {s: d["n"] for s, d in rep.sources.items()}

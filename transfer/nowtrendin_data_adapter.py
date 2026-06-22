@@ -4,13 +4,22 @@ nowtrendin_data_adapter.py
 Concrete NowTrendInDataAdapter wired to the NowTrendIn v2 engine's SQLite DB
 (anomaly_detector.db, accessed via GAD_DB_PATH env var).
 
+READ-ONLY CALIBRATOR — STORED DATA ONLY. This adapter never fires a live
+Google-Trends/Apify pull or a live ticker lookup. It CALIBRATES the data the
+engine already collected (accuracy_ledger, velocity_scores, topic_signals); the
+Apify spend lives in the engine's own 6h validation cycle, not here. Abstaining
+(returning [] / None) where stored data is absent is required by the charter's
+reproducibility rule — a fresh GT pull renormalizes per window and would make the
+same run non-reproducible.
+
 Reuses the loaders already implemented in calibration_agent.py for the
-ledger/detection-series/epoch methods. Adds the lead_moat_agent wiring:
-  • gt_series        — google_trends_validation.fetch_trends_curve → (date, value) list
+ledger/epoch methods. Adds the lead_moat_agent wiring:
+  • gt_series        — STORED-ONLY abstain → [] (no live pull; lead comes from ledger)
+  • detection_series — STORED-ONLY abstain → None (no cached GT curve to align to)
   • topic_sources    — topic_signals table, distinct platforms per topic
   • leading_source_feeds — topic_signals grouped by leading platform × day × topic
-  • is_already_tracked   — topic_registry lookup
-  • gt_has_broken_out    — reuses LMA.detect_gt_breakout on the GT series
+  • is_already_tracked   — topic_registry / velocity_scores lookup
+  • gt_has_broken_out    — accuracy_ledger breakout_date lookup (no live pull)
 
 Schema notes (all in anomaly_detector.db):
   velocity_scores : topic_key, topic_display, scored_at, detection_score,
@@ -66,6 +75,11 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or os.getenv("GAD_DB_PATH", "anomaly_detector.db")
         self._gt_cache: dict = {}   # topic → list[(date, float)]; cached per run
+        # Read-only calibrator: NEVER resolve tickers via the live API. The market
+        # engine-health sweep reads market_signal_history by its stored item_key
+        # only (resolve_ticker's 429 retries hung the job for 50 min). See the
+        # MSD_SKIP_RESOLVE guard in market_signal_diagnostic.load_diagnostic_input.
+        os.environ["MSD_SKIP_RESOLVE"] = "1"
 
     # ── reuse calibration_agent's already-wired loaders ──────────────────────
 
@@ -79,7 +93,15 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
         return CA.load_ledger_rows()
 
     def detection_series(self, topic: str):
-        return CA.load_detection_series(topic)
+        """STORED-ONLY abstain. The cross-correlation viability gate needs a
+        day-aligned (Detection, Google Trends) series, but the engine does NOT
+        persist the GT interest curve — so producing one would require a fresh
+        Apify pull, which this read-only calibrator must never do (cost +
+        non-reproducible, since GT renormalizes per window). Returns None; the
+        gate counts it as no-series and falls through to INSUFFICIENT. The
+        headline lead-vs-GT comes from the STORED ledger, not this path.
+        (Follow-up: have the engine cache GT curves so the gate can read them.)"""
+        return None
 
     def source_first_seen(self, topic: str) -> dict:
         return CA.load_source_first_seen(topic)
@@ -93,25 +115,15 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
     # ── lead_moat_agent wiring ───────────────────────────────────────────────
 
     def gt_series(self, topic: str) -> list:
-        """[(date, value)] daily Google Trends. Cached once per run per topic."""
-        if topic in self._gt_cache:
-            return self._gt_cache[topic]
-        series = []
-        try:
-            from google_trends_validation import fetch_trends_curve
-            curve = fetch_trends_curve(topic) or []
-            for pt in curve:
-                try:
-                    ds = str(pt.get("date", ""))[:10]
-                    if ds:
-                        d = date.fromisoformat(ds)
-                        series.append((d, float(pt.get("value", 0))))
-                except Exception:
-                    pass
-        except Exception as e:
-            log.debug("gt_series(%s) error: %s", topic, e)
-        self._gt_cache[topic] = series
-        return series
+        """STORED-ONLY: returns []. The engine does not cache the GT interest
+        curve, so the audit abstains here rather than firing a fresh Apify pull.
+        A live pull would (a) cost credits on every run and (b) break the charter's
+        reproducibility rule (GT is renormalized per query window, so the same
+        topic returns different numbers each pull). The audited lead vs Google
+        Trends is taken from the engine's STORED accuracy_ledger
+        (breakout_date / verdict / lead_time_days) in run_nightly, NOT recomputed
+        here. The Apify spend lives in the engine's own 6h validation cycle."""
+        return []
 
     def topic_sources(self, topic: str) -> list:
         """Distinct platforms that produced signals for this topic."""
@@ -203,8 +215,26 @@ class SQLiteAdapter(AGENT.NowTrendInDataAdapter):
             return False
 
     def gt_has_broken_out(self, term: str) -> bool:
-        """Already mainstream? Use the same breakout rule as the ledger."""
-        return LMA.detect_gt_breakout(self.gt_series(term)) is not None
+        """STORED-ONLY: already mainstream? Read the engine's accuracy_ledger —
+        no live GT pull. The engine's own validation cycle records breakout_date
+        when a topic breaks out on Google Trends; if such a row exists, the term
+        is already mainstream and is NOT a pre-mainstream discovery candidate.
+        Unknown (no ledger row) ⇒ treat as not-yet-broken-out: discovery only
+        PROPOSES candidates, and the engine's cycle validates them later."""
+        try:
+            conn = db_compat.connect(self.db_path)
+            key = term.lower().strip().replace(" ", "_")[:80]
+            row = conn.execute(
+                "SELECT 1 FROM accuracy_ledger "
+                "WHERE (lower(topic_key) = ? OR lower(topic_display) = ?) "
+                "AND breakout_date IS NOT NULL AND breakout_date != '' LIMIT 1",
+                (key, term.lower().strip())
+            ).fetchone()
+            conn.close()
+            return row is not None
+        except Exception as e:
+            log.debug("gt_has_broken_out(%s) error: %s", term, e)
+            return False
 
 
 # ═════════════════════════════════════════════════════════════════════════════
