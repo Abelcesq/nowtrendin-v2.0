@@ -391,16 +391,33 @@ def propose_score(topic: str, research_summary: str) -> dict:
 
 
 def _extract_json(text: str):
-    """Pull the first JSON object out of a model response."""
+    """Pull the first JSON object out of a model response — tolerant of ```json
+    code fences, literal newlines inside string values, and truncation."""
     if not text:
         return None
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return None
+    t = text.strip()
+    # Strip a leading ```json / ``` fence + any trailing ``` (the #1 cause of raw
+    # '```json {...}' leaking into the UI when the model ignores "ONLY JSON").
+    if t.startswith("```"):
+        t = re.sub(r"^```[a-zA-Z0-9]*\s*", "", t)
+        t = re.sub(r"```\s*$", "", t).strip()
+    m = re.search(r"\{.*\}", t, re.DOTALL)
+    blob = m.group(0) if m else t
+    # Strict, then with literal newlines escaped (json.loads rejects raw newlines).
+    for attempt in (blob, blob.replace("\r", "").replace("\n", "\\n")):
+        try:
+            return json.loads(attempt)
+        except Exception:
+            pass
+    # Last resort — pull the fields directly even if the JSON is truncated/invalid.
+    out = {}
+    sm = re.search(r'"short"\s*:\s*"((?:[^"\\]|\\.)*)"', t, re.DOTALL)
+    fm = re.search(r'"full"\s*:\s*"((?:[^"\\]|\\.)*)"', t, re.DOTALL)
+    if sm:
+        out["short"] = sm.group(1).replace("\\n", " ").replace('\\"', '"')
+    if fm:
+        out["full"] = fm.group(1).replace("\\n", " ").replace('\\"', '"')
+    return out or None
 
 
 # ── Orchestration ───────────────────────────────────────────────────

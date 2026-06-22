@@ -6083,6 +6083,32 @@ def _topic_source_context(topic_key: str, limit: int = 10) -> str:
     return "\n".join(lines)
 
 
+def _clean_explainer(short, full):
+    """Repair an explainer whose `short` is a raw/fenced JSON blob (the
+    '```json {"short": ...}' leak). Strips the fence and recovers the real short
+    + full fields. Applied at SERVE time so already-persisted bad rows display
+    cleanly without re-generating. No-op on already-clean text."""
+    s = (short or "").strip()
+    f = (full or "").strip()
+    blob = s
+    if blob.startswith("```"):
+        blob = re.sub(r"^```[a-zA-Z0-9]*\s*", "", blob)
+        blob = re.sub(r"```\s*$", "", blob).strip()
+    if blob.startswith("{") and '"short"' in blob:
+        def _un(x):
+            try:
+                return json.loads('"' + x + '"')
+            except Exception:
+                return x.replace("\\n", " ").replace('\\"', '"')
+        sm = re.search(r'"short"\s*:\s*"((?:[^"\\]|\\.)*)"', blob, re.DOTALL)
+        fm = re.search(r'"full"\s*:\s*"((?:[^"\\]|\\.)*)"', blob, re.DOTALL)
+        if sm:
+            s = _un(sm.group(1))
+        if fm and (not f or f.startswith("```") or f.startswith("{")):
+            f = _un(fm.group(1))
+    return s, f
+
+
 @app.get("/explainer/{topic_key}")
 def topic_explainer(topic_key: str, topic: str = ""):
     """Evergreen plain-English explainer for a topic (what it is + why it
@@ -6105,7 +6131,8 @@ def topic_explainer(topic_key: str, topic: str = ""):
             "SELECT short, full_text FROM topic_explainers WHERE topic_key = ?", (topic_key,)
         ).fetchone()
         if row and row["short"]:
-            out = {"available": True, "short": row["short"], "full": row["full_text"] or "", "cached": True}
+            _s, _f = _clean_explainer(row["short"], row["full_text"] or "")
+            out = {"available": True, "short": _s, "full": _f, "cached": True}
             _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
             return out
     except Exception as e:
@@ -6145,6 +6172,8 @@ def topic_explainer(topic_key: str, topic: str = ""):
             if conn is not None:
                 try: conn.close()
                 except Exception: pass
+        _s, _f = _clean_explainer(ex.get("short"), ex.get("full"))
+        ex["short"], ex["full"] = _s, _f
         _cache.set(cache_key, ex, CACHE_TTL_XSIGNAL)
     return ex
 
