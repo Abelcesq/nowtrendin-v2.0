@@ -2444,12 +2444,19 @@ def collect_rss_news(conn) -> int:
                 xml = resp.read().decode("utf-8", "ignore")
             # entry-level titles only (RSS <item> AND Atom <entry>; skip the feed/channel
             # <title>). <title[^>]*> tolerates Atom's <title type="html"> attribute.
-            titles = _re.findall(r"<(?:item|entry)\b.*?<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>",
-                                 xml, _re.DOTALL | _re.IGNORECASE)
-            # HTML-unescape so entities (&#x27; apostrophe, &amp;, &quot;) don't tokenize
-            # into junk topics like "x27 toy story" — affects every RSS outlet.
-            items = [{"title": _html.unescape(t).strip(), "source": label}
-                     for t in titles[:40] if t.strip()]
+            raw_titles = _re.findall(r"<(?:item|entry)\b.*?<title[^>]*>(.*?)</title>",
+                                     xml, _re.DOTALL | _re.IGNORECASE)
+            items = []
+            for t in raw_titles[:40]:
+                # Strip a CDATA wrapper allowing surrounding whitespace (The Economist
+                # uses '<title> <![CDATA[...]]> </title>' — flush-only matching leaked
+                # a "cdata" token), then HTML-unescape so entities (&#x27; etc.) don't
+                # tokenize into junk. Both fixes apply to every RSS/Atom outlet.
+                t = _re.sub(r"^\s*<!\[CDATA\[\s*", "", t)
+                t = _re.sub(r"\s*\]\]>\s*$", "", t)
+                t = _html.unescape(t).strip()
+                if t:
+                    items.append({"title": t, "source": label})
             total += _news_write(conn, "rss", items)
         except Exception as e:
             print(f"  rss {label} error: {e}")
