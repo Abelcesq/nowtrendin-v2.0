@@ -136,7 +136,15 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
             curve = fetch(p["topic_display"])
         except Exception:
             curve = None
-        breakout = detect_breakout_date(curve, breakout_threshold) if curve else None
+        # SAME-SURGE FLOOR: match only a breakout on/after (detection − MATCH_WINDOW).
+        # A breach earlier than that is a different, older surge (the −92d artifact),
+        # so the engine no longer mis-matches a June detection to a Spring spike.
+        since = None
+        try:
+            since = (_parse(p["detection_date"]) - timedelta(days=MATCH_WINDOW_DAYS)).date().isoformat()
+        except Exception:
+            since = None
+        breakout = detect_breakout_date(curve, breakout_threshold, since=since) if curve else None
         if breakout:
             lead = compute_lead_time(p["detection_date"], breakout)
             if lead:

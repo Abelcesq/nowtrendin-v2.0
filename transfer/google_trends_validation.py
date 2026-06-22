@@ -74,6 +74,10 @@ TRENDS_PROVIDER = os.getenv("TRENDS_PROVIDER") or (
 # creates a new epoch and can't silently alter historical comparisons.
 BREAKOUT_THRESHOLD_MULT = float(os.getenv("LEDGER_BREAKOUT_MULT", "2.5"))
 BREAKOUT_SUSTAIN_DAYS   = int(os.getenv("LEDGER_SUSTAIN_DAYS", "2"))
+# Same-surge window: a breakout must fall within ±this of the detection to be a
+# valid match; beyond it the breakout belongs to a different surge (frozen, mirrors
+# accuracy_ledger_enhanced.MATCH_WINDOW_DAYS).
+MATCH_WINDOW_DAYS       = int(os.getenv("LEDGER_MATCH_WINDOW_DAYS", "30"))
 LEDGER_PARAM_VERSION    = "calib-params-v1"
 
 
@@ -286,7 +290,8 @@ def import_manual_curve(topic: str, csv_path: str) -> list[dict]:
 # ════════════════════════════════════════════════════════════════
 
 def detect_breakout_date(curve: list[dict],
-                         breakout_threshold: float = BREAKOUT_THRESHOLD_MULT) -> Optional[dict]:
+                         breakout_threshold: float = BREAKOUT_THRESHOLD_MULT,
+                         since: object = None) -> Optional[dict]:
     """
     Detect the breakout point in a Google Trends curve.
 
@@ -295,15 +300,23 @@ def detect_breakout_date(curve: list[dict],
       AND stays elevated for at least 2 subsequent points (sustained,
       not a one-day spike).
 
+    SAME-SURGE MATCHING (since): a 90-day curve can contain several distinct
+    surges. When validating a detection, pass `since` = (detection_date −
+    MATCH_WINDOW) so ONLY breaches on/after that floor are considered — a June
+    detection then matches the June surge, never an earlier Spring spike in the
+    same window (the −92d "stale match" artifact). The baseline is still computed
+    over the WHOLE curve (the quiet period is the right reference); only the SEARCH
+    for the breach is floored. Without `since`, behaviour is unchanged (first breach).
+
     Returns {breakout_date, breakout_value, baseline_mean, multiple}
-    or None if no breakout detected (topic still pre-breakout).
+    or None if no qualifying breakout (topic still pre-breakout for this surge).
     """
     if not curve or len(curve) < 5:
         return None
 
     values = [p["value"] for p in curve]
 
-    # Baseline = mean of the lowest 40% of values (the "quiet" period)
+    # Baseline = mean of the lowest 40% of values (the "quiet" period) — whole curve
     sorted_vals = sorted(values)
     baseline_pool = sorted_vals[:max(2, int(len(sorted_vals) * 0.4))]
     baseline_mean = statistics.mean(baseline_pool) if baseline_pool else 1
@@ -311,8 +324,15 @@ def detect_breakout_date(curve: list[dict],
 
     threshold_value = baseline_mean * breakout_threshold
 
-    # Walk forward looking for the first sustained breach
+    # same-surge floor: ignore breaches before `since` (ISO 'YYYY-MM-DD')
+    since_iso = to_iso_date(since) if since is not None else None
+
+    # Walk forward looking for the first sustained breach (on/after `since`)
     for i in range(len(curve) - 2):
+        if since_iso is not None:
+            d_iso = _iso_curve_date(curve[i].get("date", ""))
+            if d_iso and d_iso < since_iso:
+                continue   # earlier surge — not the one this detection is about
         if values[i] >= threshold_value:
             # Confirm sustained: next 2 points also elevated
             if values[i+1] >= threshold_value * 0.8 and \
@@ -326,7 +346,7 @@ def detect_breakout_date(curve: list[dict],
                     "param_version":  LEDGER_PARAM_VERSION,
                 }
 
-    return None  # No breakout yet — topic still pre-mainstream
+    return None  # No breakout yet — topic still pre-mainstream for this surge
 
 
 # ════════════════════════════════════════════════════════════════
@@ -463,7 +483,13 @@ def validate_topic(topic_key: str, topic_display: str,
                 "message": f"No Trends data available for '{topic_display}' "
                            f"(provider: {TRENDS_PROVIDER})"}
 
-    breakout = detect_breakout_date(curve)
+    # SAME-SURGE FLOOR: only match a breakout on/after (detection − MATCH_WINDOW),
+    # so this detection is paired with its own surge, not an earlier Spring spike.
+    try:
+        since = (_parse_date(detection_date) - timedelta(days=MATCH_WINDOW_DAYS)).date().isoformat()
+    except Exception:
+        since = None
+    breakout = detect_breakout_date(curve, since=since)
     if not breakout:
         return {"status": "pre_breakout",
                 "message": f"'{topic_display}' has not yet broken out on Google "
@@ -472,6 +498,12 @@ def validate_topic(topic_key: str, topic_display: str,
     lead = compute_lead_time(detection_date, breakout)
     if not lead:
         return {"status": "error", "message": "Could not compute lead time"}
+
+    # C1 gate: a breakout still outside ±MATCH_WINDOW (e.g. a far-forward re-surge)
+    # is a cross-surge match — record as LATE_REDETECTION so it is excluded from the
+    # honest denominator rather than mislabelled LED/LAGGED.
+    if abs(lead["lead_time_days"]) > MATCH_WINDOW_DAYS:
+        lead = {**lead, "verdict": "LATE_REDETECTION"}
 
     record_validation(topic_key, topic_display, detection_date,
                       detection_score, lead, breakout, db_path)
