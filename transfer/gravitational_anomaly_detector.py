@@ -2429,6 +2429,14 @@ _RSS_FEEDS = [
     # reputable reporting; complements the wire/financial-press roster.
     ("The New Yorker", "https://www.newyorker.com/feed/news"),
     ("The New Yorker", "https://www.newyorker.com/feed/business"),
+    # The Independent — OFFICIAL section feeds (work with our UA; Telegraph 403s edge-blocked,
+    # MSNBC siren-api host is dead). UK national paper; overlap deduped by _news_norm_title.
+    ("The Independent", "https://www.independent.co.uk/news/rss"),
+    ("The Independent", "https://www.independent.co.uk/news/uk/rss"),
+    ("The Independent", "https://www.independent.co.uk/news/world/rss"),
+    ("The Independent", "https://www.independent.co.uk/news/uk/politics/rss"),
+    # NBC News — OFFICIAL feed (the live substitute for the dead MSNBC siren-api URLs).
+    ("NBC News", "https://feeds.nbcnews.com/nbcnews/public/news"),
 ]
 
 
