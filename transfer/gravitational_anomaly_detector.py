@@ -528,6 +528,10 @@ CACHE_TTL_SCORES  = 300   # 5 min  — /scores and /anomalies (expensive JOINs)
 # pagination is O(1) slicing. The worker invalidates the cache when fresh scores
 # land, so a long TTL is safe and keeps every page instant between cycles.
 CACHE_TTL_SCORES_FULL = int(os.getenv("CACHE_TTL_SCORES_FULL", "1800"))  # 30 min
+# Prewarm Agent — refreshes the superset caches just under the TTL so the cache
+# (in THIS, the request-serving, process) is always hot AND at most this-many
+# minutes stale. Set PREWARM_ENABLED=0 to disable.
+PREWARM_INTERVAL_MIN = int(os.getenv("PREWARM_INTERVAL_MIN", "25"))
 CACHE_TTL_STATS   = 60    # 1 min  — /stats (lightweight but polled frequently)
 CACHE_TTL_DETAIL  = 120   # 2 min  — /scores/{topic}
 CACHE_TTL_HISTORY = 180   # 3 min  — /history/{topic}
@@ -4676,15 +4680,9 @@ def start_scheduler():
                 try:
                     _precompute_serve_payloads(int(os.getenv("PRECOMPUTE_TOP_N", "600")))
                     _cache.invalidate()
-                    # Pre-warm the default /scores superset so the first page the
-                    # mobile/web client requests after a cycle is instant (no 20s
-                    # cold compute on a user's first load).
-                    try:
-                        _cache.set("scores_full:overall:all:0.0",
-                                   _compute_scores_full("overall", "all", 0.0),
-                                   CACHE_TTL_SCORES_FULL)
-                    except Exception as _pw:
-                        print(f"[scheduler] scores prewarm error: {_pw}")
+                    # NOTE: the superset /scores + /topics caches are kept hot by the
+                    # dedicated Prewarm Agent thread in the API process (per-process
+                    # cache), not here in the worker — see _prewarm_loop / startup.
                 except Exception as _ppe:
                     print(f"[scheduler] precompute error: {_ppe}")
                 _exp_n = int(os.getenv("EXPLAINER_BACKFILL_PER_CYCLE", "0"))
@@ -4933,10 +4931,69 @@ def start_scheduler():
         return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PREWARM AGENT — dedicated, READ-ONLY, single-purpose.
+# Keeps the full /scores + /topics superset caches hot in THIS request-serving
+# process so the first page every platform (mobile, web, desktop) loads is instant
+# — never the ~20s cold compute that was timing the mobile app out. It only READS
+# the DB to recompute the cache; it never writes to or mutates the database (no
+# scores changed, no rows touched), so it cannot affect any served data.
+# ─────────────────────────────────────────────────────────────────────────────
+_PREWARM_STATUS: dict = {"last_run": None, "warmed": [], "elapsed_s": None}
+
+def _prewarm_caches() -> dict:
+    """Recompute + cache the default /scores and /topics supersets (read-only)."""
+    import time as _t
+    warmed = []
+    t0 = _t.time()
+    try:
+        full = _compute_scores_full("overall", "all", 0.0)
+        _cache.set("scores_full:overall:all:0.0", full, CACHE_TTL_SCORES_FULL)
+        warmed.append({"feed": "scores", "rows": len(full)})
+    except Exception as e:
+        warmed.append({"feed": "scores", "error": str(e)})
+    try:
+        grid = _compute_topics_full("", False)
+        _cache.set("topics_full::0", grid, CACHE_TTL_SCORES_FULL)
+        warmed.append({"feed": "topics", "rows": len(grid)})
+    except Exception as e:
+        warmed.append({"feed": "topics", "error": str(e)})
+    dt = round(_t.time() - t0, 2)
+    _PREWARM_STATUS.update({"last_run": datetime.now(timezone.utc).isoformat(),
+                            "warmed": warmed, "elapsed_s": dt})
+    print(f"[prewarm-agent] warmed {warmed} in {dt}s (every {PREWARM_INTERVAL_MIN}m)")
+    return {"agent": "prewarm", "read_only": True, "interval_min": PREWARM_INTERVAL_MIN,
+            "ttl_s": CACHE_TTL_SCORES_FULL, **_PREWARM_STATUS}
+
+def _prewarm_loop():
+    import time as _t
+    while True:
+        try:
+            _prewarm_caches()
+        except Exception as _e:
+            print(f"[prewarm-agent] loop error: {_e}")
+        _t.sleep(max(60, PREWARM_INTERVAL_MIN * 60))
+
+
+@app.get("/prewarm")
+def prewarm_now():
+    """Manually warm the superset caches now (read-only) + return the agent status."""
+    return _prewarm_caches()
+
+
 @app.on_event("startup")
 async def startup_auto_collect():
     """Auto-collect on first launch if the database is empty."""
     import threading
+
+    # Prewarm Agent: warm the superset caches now (background, non-blocking) and
+    # then on a fixed interval, in THIS request-serving process.
+    if os.getenv("PREWARM_ENABLED", "1").lower() in ("1", "true", "yes"):
+        try:
+            threading.Thread(target=_prewarm_loop, daemon=True, name="prewarm-agent").start()
+            print(f"[startup] prewarm-agent started (every {PREWARM_INTERVAL_MIN}m).")
+        except Exception as _pwe:
+            print(f"[startup] prewarm-agent failed to start: {_pwe}")
 
     # ── Init calibration tables + seed known topics ────────────────
     # Always runs (idempotent) — creates tables if missing, seeds
