@@ -2356,6 +2356,16 @@ _RSS_FEEDS = [
     ("BBC News", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
     ("BBC News", "https://feeds.bbci.co.uk/news/business/rss.xml"),
     ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    # LA Times — OFFICIAL rss2.0.xml verticals (verified live 06/22/26, all fresh <1d,
+    # 96-100 items each). One outlet label "LA Times" (breadth without inflating the
+    # corroboration source-count). WSJ RSS was dead (~17mo stale) and SF Chronicle 404'd,
+    # so those were excluded; NewsAPI rejected (24h-delayed + production-banned).
+    ("LA Times", "https://www.latimes.com/local/rss2.0.xml"),
+    ("LA Times", "https://www.latimes.com/california/rss2.0.xml"),
+    ("LA Times", "https://www.latimes.com/politics/rss2.0.xml"),
+    ("LA Times", "https://www.latimes.com/business/rss2.0.xml"),
+    ("LA Times", "https://www.latimes.com/business/technology/rss2.0.xml"),
+    ("LA Times", "https://www.latimes.com/entertainment-arts/rss2.0.xml"),
 ]
 
 
