@@ -2366,6 +2366,25 @@ _RSS_FEEDS = [
     ("LA Times", "https://www.latimes.com/business/rss2.0.xml"),
     ("LA Times", "https://www.latimes.com/business/technology/rss2.0.xml"),
     ("LA Times", "https://www.latimes.com/entertainment-arts/rss2.0.xml"),
+    # CNBC / Guardian / DW / ABC / Verge / InfoQ — OFFICIAL feeds, verified live & fresh
+    # (06/22/26, <3d). One label per outlet (no corroboration inflation). These are the
+    # main-trend ARTICLE feeds — complementary to the same outlets' YouTube finance-risk
+    # signal. CNN excluded (its rss.cnn.com is 2-9yr dead → stays YouTube-only). Each is
+    # tagged with a name the reputable-source filter already recognizes.
+    ("CNBC",         "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
+    ("CNBC",         "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
+    ("CNBC",         "https://www.cnbc.com/id/19854910/device/rss/rss.html"),
+    ("CNBC",         "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
+    ("The Guardian", "https://www.theguardian.com/international/rss"),
+    ("The Guardian", "https://www.theguardian.com/world/rss"),
+    ("The Guardian", "https://www.theguardian.com/world/usa/rss"),
+    ("The Guardian", "https://www.theguardian.com/uk/business/rss"),
+    ("The Guardian", "https://www.theguardian.com/uk/technology/rss"),
+    ("DW News",      "https://rss.dw.com/rdf/rss-en-top"),
+    ("ABC Australia","https://www.abc.net.au/news/feed/51892/rss.xml"),
+    ("ABC News",     "https://abcnews.go.com/abcnews/topstories"),
+    ("The Verge",    "https://www.theverge.com/rss/index.xml"),
+    ("InfoQ",        "https://feed.infoq.com/"),
 ]
 
 
