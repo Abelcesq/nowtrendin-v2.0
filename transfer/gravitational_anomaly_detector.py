@@ -524,6 +524,10 @@ class _TTLCache:
 
 _cache = _TTLCache()
 CACHE_TTL_SCORES  = 300   # 5 min  — /scores and /anomalies (expensive JOINs)
+# The FULL /scores feed is computed once and cached limit/offset-independently so
+# pagination is O(1) slicing. The worker invalidates the cache when fresh scores
+# land, so a long TTL is safe and keeps every page instant between cycles.
+CACHE_TTL_SCORES_FULL = int(os.getenv("CACHE_TTL_SCORES_FULL", "1800"))  # 30 min
 CACHE_TTL_STATS   = 60    # 1 min  — /stats (lightweight but polled frequently)
 CACHE_TTL_DETAIL  = 120   # 2 min  — /scores/{topic}
 CACHE_TTL_HISTORY = 180   # 3 min  — /history/{topic}
@@ -4672,6 +4676,15 @@ def start_scheduler():
                 try:
                     _precompute_serve_payloads(int(os.getenv("PRECOMPUTE_TOP_N", "600")))
                     _cache.invalidate()
+                    # Pre-warm the default /scores superset so the first page the
+                    # mobile/web client requests after a cycle is instant (no 20s
+                    # cold compute on a user's first load).
+                    try:
+                        _cache.set("scores_full:overall:all:0.0",
+                                   _compute_scores_full("overall", "all", 0.0),
+                                   CACHE_TTL_SCORES_FULL)
+                    except Exception as _pw:
+                        print(f"[scheduler] scores prewarm error: {_pw}")
                 except Exception as _ppe:
                     print(f"[scheduler] precompute error: {_ppe}")
                 _exp_n = int(os.getenv("EXPLAINER_BACKFILL_PER_CYCLE", "0"))
@@ -6420,46 +6433,23 @@ def query_topic(payload: dict = Body(...)):
     return {"found": True, "topic": topic, "topic_key": tkey, "signals_collected": collected, "result": res}
 
 
-@app.get("/scores")
-def get_all_scores(
-    min_score: float = Query(0.0),
-    stage: str = Query("all"),
-    limit: int = Query(600, ge=1, le=5000),
-    sort_by: str = Query("overall", enum=["overall", "detection", "confidence"]),
-):
-    """
-    All scored topics with their velocity scores.
-    Filter by minimum score or stage. Sort by any score type.
-    """
+def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
+    """Heavy path — runs ONCE, result cached limit/offset-independently. Pulls the
+    candidate window, applies calibration + the AI/noise filter, and returns the
+    FULL sorted/filtered feed. /scores then serves O(1) page slices, so mobile and
+    web can pull the whole feed 100 at a time with no per-page recompute."""
     sort_col = {
         "overall":    "overall_score",
         "detection":  "detection_score",
         "confidence": "confidence_score",
     }[sort_by]
-
-    cache_key = f"scores:{sort_by}:{stage}:{min_score}:{limit}"
-    cached = _cache.get(cache_key)
-    if cached is not None:
-        return cached
-
     conn = get_db(DB_PATH)
     stage_filter = "" if stage == "all" else f"AND v.signal_stage = '{stage.upper()}'"
-
     # Over-fetch candidates: the noise filter in _format_score_rows drops
-    # single-word/bigram garbage (e.g. "natural", "hermesplugin") AFTER the
-    # SQL window. If we only pulled `limit` rows and they were all noise, the
-    # served feed would be empty even though plenty of meaningful topics exist
-    # just below them. Pull a larger candidate window, filter, then truncate.
-    # Cap default raised 200 → 600 (2026-06-12, matches the precompute top-N):
-    # with GitHub emitting ~6k signals/cycle the top-200-by-overall window was
-    # 100% tech — cross-domain topics (e.g. world_cup during FIFA 2026) were
-    # scored but never entered the serve window.
-    candidate_cap = max(limit, int(os.getenv("SCORES_CANDIDATE_CAP", "5000")))
-    # Mentions floor: topic extraction emits up to 12 candidate phrases per post,
-    # so blog/GitHub text fragments into thousands of ~3-mention micro-topics.
-    # Real trends carry far more volume (live: 30–97 mentions vs 3–4 for noise),
-    # so a small floor cleanly removes the long-tail fragments at the SQL level
-    # (also shrinks the candidate set → faster). Configurable / disablable via env.
+    # single-word/bigram garbage AFTER the SQL window, so pull a large candidate
+    # set, filter, then page. (Cap independent of `limit` now — we compute the
+    # full feed once and slice it.)
+    candidate_cap = int(os.getenv("SCORES_CANDIDATE_CAP", "5000"))
     mentions_floor = int(os.getenv("MENTIONS_FLOOR", "5"))
     rows = conn.execute(f"""
         SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
@@ -6483,16 +6473,39 @@ def get_all_scores(
     """, (min_score, mentions_floor, candidate_cap)).fetchall()
     conn.close()
     result = _format_score_rows(rows)
-    # Truncate the noise-filtered, calibrated set down to the requested limit.
-    if len(result.get("results", [])) > limit:
-        result["results"] = result["results"][:limit]
-        result["count"] = len(result["results"])
-    # Log each returned topic as a query event for the N component
-    for item in result.get("results", []):
-        if item.get("topic_key"):
-            _log_topic_query(item["topic_key"], "/scores")
-    _cache.set(cache_key, result, CACHE_TTL_SCORES)
-    return result
+    return result.get("results", [])
+
+
+@app.get("/scores")
+def get_all_scores(
+    min_score: float = Query(0.0),
+    stage: str = Query("all"),
+    limit: int = Query(600, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+    sort_by: str = Query("overall", enum=["overall", "detection", "confidence"]),
+):
+    """
+    All scored topics with their velocity scores — PAGINATED.
+    The full filtered/calibrated feed is computed once and cached; `limit` + `offset`
+    return an O(1) slice so the clients can load the whole feed 100 at a time with
+    no delay. Response includes `total` so the client knows when it has them all.
+    """
+    super_key = f"scores_full:{sort_by}:{stage}:{min_score}"
+    full = _cache.get(super_key)
+    if full is None:
+        full = _compute_scores_full(sort_by, stage, min_score)
+        _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
+
+    total = len(full)
+    page = full[offset: offset + limit]
+    # Log the FIRST page as query events for the N component (paging through the
+    # tail must not inflate N — that's not real user demand).
+    if offset == 0:
+        for item in page:
+            if item.get("topic_key"):
+                _log_topic_query(item["topic_key"], "/scores")
+    return {"results": page, "count": len(page), "total": total,
+            "offset": offset, "limit": limit}
 
 
 @app.get("/history")
