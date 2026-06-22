@@ -48,8 +48,18 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Callable
 
 import db_compat
+from date_utils import to_iso_date
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
+
+
+def _iso_curve_date(s: str) -> str:
+    """Normalize a provider curve-point date to the canonical primary ISO
+    'YYYY-MM-DD'. Keeps the raw string ONLY if unparseable (e.g. a rare SerpApi
+    week range), never the corrupt slice the old `[:10]` path produced from
+    'May 22, 2026'. This is the fetch-time chokepoint that guarantees every
+    breakout_date written to accuracy_ledger is canonical ISO."""
+    return to_iso_date(s) or (s or "")
 
 # Provider selection: "official" | "serpapi" | "apify" | "manual"
 SERPAPI_KEY     = os.getenv("SERPAPI_KEY", "")
@@ -114,7 +124,7 @@ def _fetch_serpapi(topic: str, days: int) -> Optional[list[dict]]:
 
         timeline = data.get("interest_over_time", {}).get("timeline_data", [])
         return [{
-            "date":  point.get("date", ""),
+            "date":  _iso_curve_date(point.get("date", "")),
             "value": point.get("values", [{}])[0].get("extracted_value", 0),
         } for point in timeline]
     except Exception as e:
@@ -214,8 +224,8 @@ def _fetch_apify(topic: str, days: int) -> Optional[list[dict]]:
                 if point.get("hasData") in (False, [False]):
                     continue
                 curve.append({
-                    "date":  _clean_time_str(point.get("formattedTime") or point.get("date") or ""),
-                    "time":  point.get("time", ""),  # epoch seconds (string)
+                    "date":  _iso_curve_date(_clean_time_str(point.get("formattedTime") or point.get("date") or "")),
+                    "time":  point.get("time", ""),  # epoch seconds (string) — secondary
                     "value": _point_value(point.get("value")),
                 })
         return curve or None
@@ -235,7 +245,7 @@ def _fetch_official(topic: str, days: int) -> Optional[list[dict]]:
         with urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         return [{
-            "date":  p.get("date", ""),
+            "date":  _iso_curve_date(p.get("date", "")),
             "value": p.get("value", 0),
         } for p in data.get("timeline", [])]
     except Exception as e:
@@ -260,7 +270,7 @@ def import_manual_curve(topic: str, csv_path: str) -> list[dict]:
                 date_str, val_str = parts[0], parts[1]
                 try:
                     val = int(val_str)
-                    curve.append({"date": date_str, "value": val})
+                    curve.append({"date": _iso_curve_date(date_str), "value": val})
                 except ValueError:
                     continue  # skip header/non-numeric rows
     except Exception as e:
@@ -308,7 +318,7 @@ def detect_breakout_date(curve: list[dict],
             if values[i+1] >= threshold_value * 0.8 and \
                values[i+2] >= threshold_value * 0.7:
                 return {
-                    "breakout_date":  curve[i]["date"],
+                    "breakout_date":  _iso_curve_date(curve[i]["date"]),
                     "breakout_value": values[i],
                     "baseline_mean":  round(baseline_mean, 1),
                     "multiple":       round(values[i] / baseline_mean, 1),

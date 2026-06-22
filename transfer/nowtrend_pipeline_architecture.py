@@ -42,6 +42,8 @@ from collections import defaultdict
 
 import numpy as np
 from scipy import stats
+
+from date_utils import to_iso_date
 from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -366,9 +368,11 @@ class PipelineTracker:
         detection_date = datetime.fromisoformat(
             row["gradient_first_detected_at"].replace("Z", "+00:00")
         )
-        spike_dt = datetime.fromisoformat(spike_date).replace(
-            tzinfo=timezone.utc
-        )
+        spike_iso = to_iso_date(spike_date)
+        if not spike_iso:
+            print(f"[skip] unparseable Google Trends spike date: {spike_date!r}")
+            return None
+        spike_dt = datetime.fromisoformat(spike_iso).replace(tzinfo=timezone.utc)
         lead_days = max(0, (spike_dt - detection_date).days)
 
         self.conn.execute("""
@@ -377,7 +381,7 @@ class PipelineTracker:
                 google_trends_peak_value = ?,
                 days_ahead_google_trends = ?
             WHERE id = ?
-        """, (spike_date, peak_value, lead_days, row["id"]))
+        """, (spike_iso, peak_value, lead_days, row["id"]))
         self.conn.commit()
 
         print(f"[OK]Pipeline: '{topic_normalized}' ->Google Trends spike "
@@ -406,7 +410,11 @@ class PipelineTracker:
         detection_date = datetime.fromisoformat(
             row["gradient_first_detected_at"].replace("Z", "+00:00")
         )
-        media_dt = datetime.fromisoformat(media_date).replace(tzinfo=timezone.utc)
+        media_iso = to_iso_date(media_date)
+        if not media_iso:
+            print(f"[skip] unparseable media date: {media_date!r}")
+            return None
+        media_dt = datetime.fromisoformat(media_iso).replace(tzinfo=timezone.utc)
         lead_days = max(0, (media_dt - detection_date).days)
 
         self.conn.execute("""
@@ -417,7 +425,7 @@ class PipelineTracker:
                 days_ahead_mainstream_media = ?,
                 outcome_confirmed = 1
             WHERE id = ?
-        """, (media_date, outlet, url, lead_days, row["id"]))
+        """, (media_iso, outlet, url, lead_days, row["id"]))
         self.conn.commit()
 
         print(f"[OK]Pipeline: '{topic_normalized}' ->{outlet} coverage "
@@ -447,7 +455,11 @@ class PipelineTracker:
         detection_date = datetime.fromisoformat(
             row["gradient_first_detected_at"].replace("Z", "+00:00")
         )
-        fin_dt = datetime.fromisoformat(financial_date).replace(tzinfo=timezone.utc)
+        fin_iso = to_iso_date(financial_date)
+        if not fin_iso:
+            print(f"[skip] unparseable financial signal date: {financial_date!r}")
+            return None
+        fin_dt = datetime.fromisoformat(fin_iso).replace(tzinfo=timezone.utc)
         lead_days = max(0, (fin_dt - detection_date).days)
 
         self.conn.execute("""
@@ -459,7 +471,7 @@ class PipelineTracker:
                 days_ahead_financial_signal = ?,
                 outcome_confirmed = 1
             WHERE id = ?
-        """, (financial_date, signal_type, ticker, magnitude, lead_days, row["id"]))
+        """, (fin_iso, signal_type, ticker, magnitude, lead_days, row["id"]))
         self.conn.commit()
         return lead_days
 

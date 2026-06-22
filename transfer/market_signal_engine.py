@@ -44,6 +44,7 @@ try:
 except Exception:
     db_compat = None
 import sqlite3
+from date_utils import to_iso_dt
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
@@ -310,7 +311,12 @@ def record_market_cycle(item_key: str, components_current: dict,
                         cycle_at: Optional[str] = None, db_path: str = DB_PATH, conn=None):
     own = conn is None
     c = conn or _conn(db_path)
-    now = cycle_at or datetime.now(timezone.utc).isoformat()
+    # Canonical: cycle_at is uniformly ISO datetime so its YYYY-MM-DD prefix is
+    # always the primary sort key (the baseline windows ORDER BY cycle_at). A bare
+    # date (FINRA/Finnhub backfill seeds) is anchored to midnight UTC — preserving
+    # ordering and the exact intra-day instants of the live cycles (no data lost,
+    # no scoring component changed; this only makes the column format-uniform).
+    now = to_iso_dt(cycle_at, default_now=True)
     try:
         for comp, val in components_current.items():
             rid = hashlib.md5(f"{item_key}-{comp}-{now}".encode()).hexdigest()[:16]

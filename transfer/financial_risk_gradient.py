@@ -72,6 +72,8 @@ from urllib.parse import urlencode
 
 import requests
 import db_compat
+from date_utils import to_iso_date
+import ingestion_gate
 
 # Share the main engine's database (Postgres on Heroku) so risk topics and
 # trend topics live together and persist across dyno restarts.
@@ -644,10 +646,11 @@ def _compute_signal_acceleration(signals: list[dict]) -> float:
     now = datetime.now(timezone.utc)
     recent = 0
     for s in signals:
-        date_str = s.get("filing_date") or s.get("published") or ""
+        iso = to_iso_date(s.get("filing_date") or s.get("published") or "")
+        if not iso:
+            continue   # unparseable — skip, but the gate normalizes on write so this is rare
         try:
-            d = datetime.fromisoformat(date_str.replace("Z", "+00:00")) if "T" in date_str \
-                else datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            d = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
             if (now - d).days <= 7:
                 recent += 1
         except Exception:
@@ -660,10 +663,11 @@ def _compute_freshness(signals: list[dict]) -> float:
     now = datetime.now(timezone.utc)
     freshest_days = 999
     for s in signals:
-        date_str = s.get("filing_date") or s.get("published") or ""
+        iso = to_iso_date(s.get("filing_date") or s.get("published") or "")
+        if not iso:
+            continue
         try:
-            d = datetime.fromisoformat(date_str.replace("Z", "+00:00")) if "T" in date_str \
-                else datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            d = datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
             days = (now - d).days
             freshest_days = min(freshest_days, days)
         except Exception:
@@ -933,6 +937,14 @@ REDDIT_FINANCE_SUBS = ["investing", "stocks", "wallstreetbets", "SecurityAnalysi
 
 def _persist_risk_signal(conn, risk_display, signal_type, source, stage, raw, signal_date):
     key = _risk_key(risk_display)
+    # CANONICAL primary date via the Ingestion Gate (condition precedent): coerce
+    # every source's signal_date to ISO 'YYYY-MM-DD' BEFORE the dedup md5, so GDELT's
+    # compact '20260606T171500Z' and any datetime collapse to the same key as the
+    # bare-date sources. The exact instant is kept in collected_at (secondary). If a
+    # value is unparseable, the gate quarantines it for human review rather than
+    # writing a corrupt date.
+    signal_date = ingestion_gate.gate_date(signal_date, table="risk_signals",
+                                           column="signal_date", source=source, conn=conn)
     sig_id = hashlib.md5(f"{source}-{key}-{raw}-{signal_date}".encode()).hexdigest()[:24]
     conn.execute(
         "INSERT OR IGNORE INTO risk_signals VALUES (?,?,?,?,?,?,?,?,?)",
@@ -1676,12 +1688,15 @@ def collect_creator_risk_signals(conn, max_videos: int = 25) -> int:
                 tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
                 if disp.lower() in hay or tkr_re.search(hay):
                     rk = _risk_key(disp)
-                    sig_id = hashlib.md5(f"creator-{cr['handle']}-{rk}-{v['published'][:10]}".encode()).hexdigest()[:16]
+                    sig_date = ingestion_gate.gate_date(v.get("published") or now,
+                                                        table="risk_signals", column="signal_date",
+                                                        source="retail_creator", conn=conn)
+                    sig_id = hashlib.md5(f"creator-{cr['handle']}-{rk}-{sig_date}".encode()).hexdigest()[:16]
                     try:
                         conn.execute(
                             "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, collected_at) VALUES (?,?,?,?,?,?,?,?,?)",
                             (sig_id, rk, disp, "retail_creator", cr["name"], 5,
-                             v["title"][:300], (v["published"] or now)[:10], now))
+                             v["title"][:300], sig_date, now))
                         stored += 1
                     except Exception as e:
                         print(f"[creator] risk insert err: {e}")
@@ -1751,14 +1766,17 @@ def collect_broadcast_risk_signals(conn, max_videos: int = 20) -> int:
                 tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
                 if disp.lower() in hay or tkr_re.search(hay):
                     rk = _risk_key(disp)
+                    sig_date = ingestion_gate.gate_date(v.get("published") or now,
+                                                        table="risk_signals", column="signal_date",
+                                                        source="broadcast_news", conn=conn)
                     sig_id = hashlib.md5(
-                        f"broadcast-{bc['handle']}-{rk}-{v['published'][:10]}".encode()
+                        f"broadcast-{bc['handle']}-{rk}-{sig_date}".encode()
                     ).hexdigest()[:16]
                     try:
                         conn.execute(
                             "INSERT OR IGNORE INTO risk_signals (id, risk_topic, risk_display, signal_type, source, diffusion_stage, raw_signal, signal_date, collected_at) VALUES (?,?,?,?,?,?,?,?,?)",
                             (sig_id, rk, disp, "broadcast_news", bc["name"], 5,
-                             v["title"][:300], (v["published"] or now)[:10], now))
+                             v["title"][:300], sig_date, now))
                         stored += 1
                     except Exception as e:
                         print(f"[broadcast] risk insert err: {e}")
@@ -1833,7 +1851,9 @@ def collect_yahoo_finance_risk_signals(conn) -> int:
             tkr_re = re.compile(rf"(?<![a-z])\$?{re.escape(tkr.lower())}(?![a-z])")
             if disp.lower() in hay or tkr_re.search(hay):
                 rk = _risk_key(disp)
-                pub = (it.get("published") or now)[:10]
+                pub = ingestion_gate.gate_date(it.get("published") or now,
+                                               table="risk_signals", column="signal_date",
+                                               source="financial_news", conn=conn)
                 sig_id = hashlib.md5(
                     f"yfnews-{rk}-{pub}-{title[:60]}".encode()
                 ).hexdigest()[:16]
@@ -2308,8 +2328,12 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
             _venues = len({sr["source"] for sr in sig_rows if sr["source"]})
             _newest_age = None
             try:
-                _dates = [datetime.fromisoformat((sr["signal_date"] or "")[:19])
-                          for sr in sig_rows if sr["signal_date"]]
+                # canonical date per signal (one bad value can't void the whole list)
+                _dates = []
+                for sr in sig_rows:
+                    iso = to_iso_date(sr["signal_date"]) if sr["signal_date"] else None
+                    if iso:
+                        _dates.append(datetime.fromisoformat(iso))
                 if _dates:
                     _newest_age = (datetime.now(timezone.utc).replace(tzinfo=None)
                                    - max(_dates)).total_seconds() / 3600.0

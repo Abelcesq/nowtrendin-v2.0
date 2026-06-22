@@ -254,8 +254,25 @@ def main() -> int:
     adapter = SQLiteAdapter(db)
     rep = AGENT.run_nightly(adapter, today=date.today())
     AGENT.print_report(rep)
+
+    # Ingestion Gate — surface any quarantined format values awaiting a human decision.
+    pending = []
+    try:
+        import ingestion_gate
+        conn = db_compat.connect(db)
+        pending = ingestion_gate.pending_reviews(conn)
+        conn.close()
+    except Exception as e:
+        log.debug("format-review surface error: %s", e)
+    if pending:
+        print(f"\n  ⚠ FORMAT REVIEW QUEUE — {len(pending)} value(s) need a human decision:")
+        for p in pending[:20]:
+            print(f"      • {p['table_name']}.{p['column_name']}  raw={p['raw_value']!r}  "
+                  f"source={p['source']}  candidates=[{p['candidates']}]  (id {p['id']})")
+        print("      Resolve with ingestion_gate.resolve_review(conn, id, 'YYYY-MM-DD').")
+
     strict = os.getenv("NOWTRENDIN_AGENT_STRICT") == "1"
-    return 2 if (strict and rep.alerts) else 0
+    return 2 if (strict and (rep.alerts or pending)) else 0
 
 
 if __name__ == "__main__":

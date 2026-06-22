@@ -44,6 +44,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode, quote
+from date_utils import to_iso_date
 
 FINNHUB_API_KEY  = os.getenv("FINNHUB_API_KEY", "")
 GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY", "")
@@ -516,7 +517,10 @@ def _store_news_signal(conn, mode: str, topic: str, signal: dict):
     ).hexdigest()[:16]
 
     table = "risk_signals" if mode == "risk" else "topic_signals"
-    date_val = (signal.get("tx_date") or signal.get("published") or now[:10])
+    # Canonical primary date for risk_signals.signal_date — coerce any provider
+    # form (a 'published' may carry time) to ISO 'YYYY-MM-DD'. The precise instant
+    # is kept in collected_at (the secondary timestamp, `now`).
+    date_val = to_iso_date(signal.get("tx_date") or signal.get("published") or now, default_today=True)
 
     try:
         if table == "risk_signals":
