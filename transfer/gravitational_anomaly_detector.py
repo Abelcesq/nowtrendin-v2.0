@@ -2384,6 +2384,15 @@ _RSS_FEEDS = [
     ("ABC Australia","https://www.abc.net.au/news/feed/51892/rss.xml"),
     ("ABC News",     "https://abcnews.go.com/abcnews/topstories"),
     ("The Verge",    "https://www.theverge.com/rss/index.xml"),
+    # The Verge topic feeds (Atom; verified live & fresh 06/22/26). Same outlet label.
+    # AI + Tech + Cyber are high-value for the AI/tech thesis; dedup by title handles
+    # overlap with the main feed. (Requires the Atom <entry> parsing in collect_rss_news.)
+    ("The Verge",    "https://www.theverge.com/rss/tech/index.xml"),
+    ("The Verge",    "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
+    ("The Verge",    "https://www.theverge.com/rss/business/index.xml"),
+    ("The Verge",    "https://www.theverge.com/rss/cyber-security/index.xml"),
+    ("The Verge",    "https://www.theverge.com/rss/reviews/index.xml"),
+    ("The Verge",    "https://www.theverge.com/rss/games/index.xml"),
     ("InfoQ",        "https://feed.infoq.com/"),
 ]
 
