@@ -304,6 +304,73 @@ def collect_firecrawl_discovery(conn) -> int:
     return written
 
 
+# ── Google Custom Search JSON API (web-index search; NOT Google Trends) ──────
+# Searches Google's WEB INDEX for emerging-topic content — a web-presence signal,
+# complementary to firecrawl_web. NOTE: this is the *web search* JSON API, which is
+# different from Google TRENDS (handled free above by collect_google_trends_hot) and
+# from the embeddable Programmable Search *Element* (a JS widget, not a data API).
+# DORMANT until CUSTOM_SEARCH_CX is set: it needs (1) the Custom Search API enabled in
+# the Cloud project and (2) a Programmable Search Engine (programmablesearchengine.
+# google.com) configured to "Search the entire web" → its Search-engine ID (cx).
+# Quota: 100 queries/day FREE. 1 rotating query per 6h cycle = 4/day, well within it.
+_CS_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
+_CS_QUERIES = [
+    "emerging AI technology breakthrough",
+    "trending finance crypto market shift",
+    "new biotech health science discovery",
+    "viral culture entertainment sports moment",
+    "fast growing startup business trend",
+]
+
+
+def collect_google_search_discovery(conn) -> int:
+    """Google Custom Search JSON API web-search discovery. Returns 0 (skips) until
+    CUSTOM_SEARCH_CX + CUSTOM_SEARCH_API_KEY are set."""
+    if not _HAS_REQUESTS:
+        return 0
+    cx = os.getenv("CUSTOM_SEARCH_CX", "")
+    api_key = os.getenv("CUSTOM_SEARCH_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    if not cx or not api_key:
+        print("  [discovery] google_search skipped "
+              "(set CUSTOM_SEARCH_CX + CUSTOM_SEARCH_API_KEY to enable)")
+        return 0
+
+    hour = datetime.now(timezone.utc).hour
+    query_idx = (hour // 6) % len(_CS_QUERIES)
+    query = _CS_QUERIES[query_idx]
+    platform, tier, source = "google_web", "niche", f"cse_q{query_idx}"
+
+    written = 0
+    try:
+        r = requests.get(_CS_ENDPOINT, params={
+            "key": api_key, "cx": cx, "q": query,
+            "num": 10, "dateRestrict": "d7", "safe": "off",
+        }, timeout=20)
+        if r.status_code != 200:
+            print(f"  [discovery] google_search HTTP {r.status_code}: {r.text[:200]}")
+            return 0
+        for item in (r.json().get("items") or []):
+            title = (item.get("title") or "").strip()
+            url = (item.get("link") or "").strip()
+            if len(title) < 4 or not url:
+                continue
+            snippet = (item.get("snippet") or "").strip()
+            raw_text = f"{title}. {snippet}" if snippet else title
+            sig_id = hashlib.md5(f"cse-{url}".encode()).hexdigest()[:16]
+            engagement = math.log1p(5)   # no engagement count from web search
+            _write_signal(conn, sig_id=sig_id, platform=platform, tier=tier,
+                          source=source, title=title, url=url,
+                          engagement=engagement, raw_text=raw_text[:500])
+            written += _write_topic(conn, sig_id=sig_id, topic=title,
+                                    platform=platform, tier=tier, source=source,
+                                    engagement=engagement)
+        conn.commit()
+        print(f"  [discovery] google_search: {written} topic signals (query_idx={query_idx})")
+    except Exception as e:
+        print(f"  [discovery] google_search error: {e}")
+    return written
+
+
 # ── Orchestrator ───────────────────────────────────────────────────
 
 def collect_all_discovery(conn, geos=("US",)) -> dict:
@@ -313,6 +380,7 @@ def collect_all_discovery(conn, geos=("US",)) -> dict:
         out[f"google_trends_hot:{geo}"] = collect_google_trends_hot(conn, geo)
     out["wikipedia_hot"] = collect_wikipedia_hot(conn)
     out["firecrawl_web"] = collect_firecrawl_discovery(conn)
+    out["google_web"] = collect_google_search_discovery(conn)
     out["_total"] = sum(v for v in out.values() if isinstance(v, int))
     print(f"  [discovery] TOTAL: {out['_total']} topic signals")
     return out
