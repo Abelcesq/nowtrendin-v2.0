@@ -264,4 +264,65 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD), Cost
   Sentinel, Data Subscriptions, Calibration Auditor. Full spec: `DATA_BUILDING_BLOCKS.md`.
 
-*Last updated: 2026-06-19 — 90-day data retention rule (no quality-based deletes within window), catchall_floor_log trend monitoring, stale window startup validation + COLLECT_INTERVAL_MIN rule*
+## 14. CANONICAL DATE & TIME MODEL — data streamlining → Accuracy-Ledger viability
+
+> **Canonical rule (hard — enforced centrally, do not bypass):** every date-semantic
+> value is normalized to a PRIMARY canonical date `signal_date` = ISO `YYYY-MM-DD` —
+> the ONE key every row is sorted, matched, and scored on. Two SECONDARY 24h-UTC time
+> columns accompany it: `source_time` = the SOURCE's own `HH:MM:SS` (empty if the
+> source is date-only) and `signal_time` = OUR fetch `HH:MM:SS`. Going forward EVERY
+> fetched row carries a `signal_time` stamp (format `17:15:00`).
+
+- Enforced by `date_utils.py` (`to_iso_date` / `to_iso_dt` / `iso_time_of` /
+  `canonical_date_of`) + `ingestion_gate.py` (`gate_date()` — the CONDITION-PRECEDENT
+  filter run before any date-semantic write). An unparseable, non-empty value is
+  QUARANTINED to `format_review_queue` for human review — never a corrupt or guessed date.
+- Date-semantic columns: `accuracy_ledger.detection_date/breakout_date`,
+  `pending_detections.detection_date`, `risk_signals.signal_date` (+ `source_time`,
+  `signal_time`), `market_signal_history.signal_date` (+ `signal_time`),
+  `pull_history.snapshot_date`, `score_archive.snapshot_date`, `topic_baselines.snapshot_date`.
+- Parsers try WHOLE-STRING formats FIRST — NEVER naive-split on a space (the
+  `'May 22, 2026' → 'May'` bug silently dropped 13 accuracy-ledger rows). NEVER
+  reintroduce raw `[:10]` date slicing.
+- **Purpose:** one consistent internal sort key across every source → strengthens the
+  viability of the **Accuracy Ledger** (the moat). Same-surge matching now floors
+  `detect_breakout_date(curve, since=detection−30d)` — fixed stale ledger matches (a
+  −62d stale match became a correct −2d).
+- **Guardrail (do NOT violate):** this model governs SORTING/MATCHING only. It removes
+  NO scoring input — all Gradient-Score components and Market-Risk inputs (incl.
+  leverage/positioning) are preserved exactly. Operational `*_at` timestamps keep their
+  full instant via `to_iso_dt`. Forward-only: it gates NEW writes; it never deletes or
+  rewrites existing rows (respects the 90-day retention + no-quality-delete rules).
+
+## 15. SOURCE ROSTER + M/D PROVENANCE DIRECTION
+
+**Trusted-direct RSS (reputable mainstream, full roster, official/direct — no
+aggregators):** El País, TechCrunch, BBC News, LA Times, CNBC, The Guardian, DW, ABC
+(AU+US), The Verge, InfoQ, Financial Times, The Economist, Federal Reserve, ECB,
+**The New Yorker** (news + business). **Risk module:** **Nasdaq Trade Halts** (official
+exchange RSS; stage-2 market-microstructure; `signal_date`=HaltDate,
+`source_time`=HaltTime). Google: Blogger API (live), YouTube Data API v3
+(coverage/broadcast/creators), Custom Search reviewed; Apify retained for Google Trends.
+
+**M / D provenance reweighting — ⏳ IN DESIGN (next phase, NOT yet shipped; gated by
+backtest-before-ship).** Two coupled changes to the `_news_write` provenance decision:
+1. **Reputable ≠ automatic mainstream full weight.** 1 reputable source = **½ weight**;
+   FULL weight only on **≥2 DISTINCT reputable sources** (keyed on distinct `source_name`
+   to defeat wire-syndication). The "Belgium vs Iran, 2026 World Cup" corroboration case.
+   Extends the catch-all corroboration philosophy (`CATCHALL_MIN_SOURCES ≥2`) from
+   *admission* to *weight*.
+2. **Research / early-signal outlets → Dark Matter (D), NOT Mainstream (M).** War on
+   Rocks, Rest of World, Global Issues, Pew Research, RAND (blog), NBER — they surface
+   topics BEFORE mainstream (research that reads like blogs).
+   **Mechanism (mapped + anchored this session):** the D-vs-M router is **`platform_tier`**,
+   NOT `is_organic`. `tier="mainstream"` feeds M (dual-pathway breadth/magnitude), lands
+   in G's denominator (SUPPRESSES the early read) and raises blend weight `w`; `tier in
+   {"expert","niche"}` → the Dark-Matter / expert-gradient pathway (zero mainstream
+   breadth, `w`~0, G numerator). `is_organic` only scales D's quality gate; `is_first_timer`
+   is D's numerator. **→ Wire these via `blog_collectors.py` GHOST_FEEDS at expert/niche
+   tier** (the blog template the founder invoked), NOT via `_RSS_FEEDS`/`_news_write`
+   (which forces `mainstream` and would suppress them — the exact failure to avoid).
+   Feeds validated (production UA). Adversarial integrity verify + backtest still required
+   before deploy.
+
+*Last updated: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor) for Accuracy-Ledger viability; New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN (platform_tier is the D-vs-M router; reputable→½/full-on-corroboration). Prior: 2026-06-19 — 90-day retention, catchall_floor_log trend, stale-window startup validation.*

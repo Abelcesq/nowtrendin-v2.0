@@ -3,7 +3,40 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-20 (session 2)_
+_Last updated: 2026-06-22_
+
+---
+
+## Session 2026-06-22 — Sources, canonical-date checkpoint, M/D direction
+
+### Completed (✅ LIVE — engine v98)
+- **Nasdaq Trade Halts** wired into the risk module (`financial_risk_gradient.collect_nasdaq_halts`,
+  registered in `run_risk_collection`): official exchange RSS, stage-2 microstructure;
+  canonical `signal_date`=HaltDate, `source_time`=HaltTime. Verified in prod: 29 halts.
+- **The New Yorker** (news + business) added to the reputable-direct RSS roster
+  (`_RSS_FEEDS`). Verified in prod: 54 raw / 269 topic signals, tier=mainstream.
+- **Documentation checkpoint:** CLAUDE.md (§14 canonical date/time model, §15 source roster +
+  M/D direction), DATA_BUILDING_BLOCKS.md (§3a canonical-date block B3a, source registry,
+  §5 M-vs-D router note), the **nowtrendin2.0 skill** (CURRENT BUILD STATE section), and 11
+  data/scoring agent skills (consistent "Canonical dates · sources · M/D" section).
+- Memory: added `project-dark-matter-routing` (the platform_tier D-vs-M finding + gotcha).
+
+### Open / Next (⏳ IN DESIGN — NOT shipped; gated by backtest-before-ship)
+- **M/D provenance reweighting**, two coupled `_news_write` changes:
+  1. Reputable ≠ automatic mainstream full weight → 1 reputable = ½, FULL only on ≥2 DISTINCT
+     reputable (distinct `source_name`; the "Belgium vs Iran" case).
+  2. Research/early-signal outlets (War on Rocks, Rest of World, Global Issues, Pew, RAND-blog,
+     NBER) → Dark Matter via `blog_collectors` GHOST_FEEDS at **expert/niche tier** (NOT
+     `_news_write`). Feeds validated (prod UA). Adversarial integrity verify + `backtest_dual_pathway.py`
+     required before deploy.
+
+### Hard decisions made
+- The D-vs-M router is **`platform_tier`**, NOT `is_organic` (mapped across the engine). Routing
+  research outlets through `_RSS_FEEDS`/`_news_write` would stamp them `mainstream` and SUPPRESS
+  the early signal — so they must go through the blog/expert-tier path. (This corrected an earlier
+  plan that had prepped them for `_RSS_FEEDS`.)
+- Reputable-corroboration weighting extends the catch-all `CATCHALL_MIN_SOURCES≥2` philosophy from
+  *admission* to *weight*; distinct-source counting must key on `source_name` to defeat wire syndication.
 
 ---
 

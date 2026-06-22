@@ -1,5 +1,5 @@
 # Now TrendIn — Data & Scoring Building Blocks
-**The foundation for monitoring agents.** *Last updated 2026-06-16.*
+**The foundation for monitoring agents.** *Last updated 2026-06-22.*
 
 > Why this exists: we keep hitting the same two failure classes — **(a) data not
 > pulling** and **(b) scores wrong/absent**. This document is the single, durable
@@ -39,6 +39,8 @@ criticality) and the collectors in `gravitational_anomaly_detector.start_schedul
 | newsapi_ai | aggregator API | key | 6h | paid tier | — | Event Registry |
 | newsdata_io | aggregator API | key | 6h | paid tier | — | |
 | gdelt | open API | none | 6h | free | — | global media |
+| rss_direct (reputable outlets) | RSS direct | none | 6h | free | — | El País…**The New Yorker**; `_RSS_FEEDS` reputable-allowlist → tier `mainstream`, full weight (no aggregator) |
+| research / early-signal ⏳ | RSS direct | none | (planned) 6h | free | — | War on Rocks · Rest of World · Global Issues · Pew · RAND · NBER → **expert/niche tier = Dark Matter** via `blog_collectors` GHOST_FEEDS, NOT `_news_write` |
 | bluesky / lemmy / mastodon | open API | none | 6h | free | — | early-chatter tier (replaced Reddit) |
 | google_trends | **Apify actor** | token | clock cron 00:30/06:30/12:30/18:30 UTC | ~$0.57/run (~$68/mo) | ✅ | paid → controlled cadence |
 | youtube (mainstream coverage) | YouTube Data API v3 | key | 6h (main cycle) | quota 10k u/day | — | per-topic mainstream denominator |
@@ -57,6 +59,7 @@ criticality) and the collectors in `gravitational_anomaly_detector.start_schedul
 | WhaleWisdom | REST | key | 13F institutional positioning |
 | Alpha Vantage | REST | key (free 25/day) | news/retail coverage, sentiment |
 | Yahoo Finance | scrape/API | none | market news |
+| Nasdaq Trade Halts | exchange RSS | none | official trading halts (stage-2 microstructure); `signal_date`=HaltDate, `source_time`=HaltTime |
 
 ### AI services (definitions + grades)
 | Service | Use | Cost control |
@@ -117,6 +120,34 @@ served list ⇒ extraction regression.
 
 ---
 
+## 3a. CANONICAL DATE & TIME — the single sort key (the Accuracy-Ledger backbone)
+
+Code: `date_utils.py` (`to_iso_date` / `to_iso_dt` / `iso_time_of` / `canonical_date_of`)
++ `ingestion_gate.py` (`gate_date()` — the CONDITION-PRECEDENT filter run before any
+date-semantic write).
+
+- **PRIMARY** `signal_date` = ISO `YYYY-MM-DD` — the ONE value every row is sorted,
+  matched, and scored on. **SECONDARY** `source_time` = the SOURCE's own `HH:MM:SS`
+  (empty if date-only) and `signal_time` = OUR fetch `HH:MM:SS` (every fetched row
+  stamped going forward). Operational `*_at` keep the full instant via `to_iso_dt`.
+- Date-semantic columns: `accuracy_ledger.detection_date/breakout_date`,
+  `pending_detections.detection_date`, `risk_signals.signal_date(+source_time,signal_time)`,
+  `market_signal_history.signal_date(+signal_time)`, `pull_history.snapshot_date`,
+  `score_archive.snapshot_date`, `topic_baselines.snapshot_date`.
+- Parsers try WHOLE-STRING formats FIRST — never naive space-split (`'May 22, 2026'→'May'`
+  dropped 13 ledger rows). Same-surge matching floors
+  `detect_breakout_date(curve, since=detection−30d)` (a −62d stale match → correct −2d).
+
+**INVARIANT (B3a):** every date-semantic write passes through `gate_date()`; an
+unparseable non-empty value is QUARANTINED to `format_review_queue` (human review),
+never guessed. The model governs SORT/MATCH only — it removes NO scoring input
+(Gradient components + Market-Risk leverage/positioning preserved). Forward-only:
+gates NEW writes, never deletes/rewrites existing rows (respects 90-day retention).
+**CHECK:** `format_review_queue` pending count (nightly audit surfaces it); spot-check
+`risk_signals`/`market_signal_history` rows carry `signal_date`+`signal_time`.
+**FAILURE:** any raw `[:10]` date slice reintroduced; corrupt/guessed date in a
+date-semantic column; ledger match using a stale (non-same-surge) breakout date.
+
 ## 4. SCORING COMPLETENESS — did every scoreable topic get scored?
 
 Code: `score_all_topics` (SQL gate `HAVING COUNT>=MIN_TOPIC_APPEARANCES OR
@@ -154,6 +185,20 @@ enhanced` (the **Accuracy Ledger** — the moat).
 **CHECK:** run `backtest_dual_pathway.py`; `/accuracy/ledger` hit-rate + pending;
 spot-check `detection_pathway` / `mainstream_confirmed` on news topics.
 **FAILURE:** a backtest case fails, or a published number lacks a real denominator.
+
+**M-vs-D ROUTER (the early-vs-arrived switch):** the decisive column is `platform_tier`,
+NOT `is_organic`. `tier="mainstream"` feeds M (dual_pathway breadth/magnitude), lands in
+G's DENOMINATOR (suppresses the early read), and raises blend weight `w`; `tier in
+{"expert","niche"}` → the Dark-Matter / expert-gradient pathway (zero mainstream breadth,
+`w`~0, G numerator). `is_organic` only scales D's quality gate (`quality = 0.4 + 0.6·organic_ratio`);
+`is_first_timer` is D's numerator (`compute_dark_matter`).
+
+**⏳ IN DESIGN (gated by backtest-before-ship; NOT shipped):** two coupled `_news_write`
+provenance changes — (1) reputable ≠ automatic mainstream full weight: 1 reputable = ½,
+FULL only on ≥2 DISTINCT reputable sources (distinct `source_name`, defeats wire-syndication
+— the "Belgium vs Iran" case); (2) research/early-signal outlets (War on Rocks, Rest of
+World, Global Issues, Pew, RAND, NBER) → Dark Matter via `blog_collectors` GHOST_FEEDS at
+**expert/niche tier**, NOT `_news_write` (which forces `mainstream` and would suppress them).
 
 ---
 
