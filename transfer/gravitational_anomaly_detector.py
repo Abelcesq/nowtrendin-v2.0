@@ -2348,6 +2348,14 @@ def collect_currents_news(conn) -> int:
 _RSS_FEEDS = [
     ("El País",    "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"),
     ("TechCrunch", "https://techcrunch.com/feed/"),
+    # BBC News — OFFICIAL feeds.bbci.co.uk verticals (verified live 06/22/26, fresh within
+    # hours). All tagged the single outlet "BBC News" so the 4 verticals add breadth
+    # (tech/business/world/top) WITHOUT inflating the corroboration source-count — BBC is
+    # one outlet, not four. Direct from BBC (syndication feeds); no third-party scraper.
+    ("BBC News", "https://feeds.bbci.co.uk/news/rss.xml"),
+    ("BBC News", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
+    ("BBC News", "https://feeds.bbci.co.uk/news/business/rss.xml"),
+    ("BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml"),
 ]
 
 
