@@ -2402,8 +2402,9 @@ def collect_rss_news(conn) -> int:
             req = Request(url, headers={"User-Agent": "NowTrendIn/1.0"})
             with urlopen(req, timeout=15) as resp:
                 xml = resp.read().decode("utf-8", "ignore")
-            # item-level titles only (skip the channel <title>, which is index 0)
-            titles = _re.findall(r"<item\b.*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>",
+            # entry-level titles only (RSS <item> AND Atom <entry>; skip the feed/channel
+            # <title>). <title[^>]*> tolerates Atom's <title type="html"> attribute.
+            titles = _re.findall(r"<(?:item|entry)\b.*?<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>",
                                  xml, _re.DOTALL | _re.IGNORECASE)
             # HTML-unescape so entities (&#x27; apostrophe, &amp;, &quot;) don't tokenize
             # into junk topics like "x27 toy story" — affects every RSS outlet.
