@@ -213,11 +213,63 @@ def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
 #     arrival and still scored it late, that stays LAGGED (the ledger gate is unchanged).
 #   • Descriptive only — a situation is a measured grouping, not a prediction.
 
+# ── Phase B — per-situation category + entity→situations disambiguation ─────────
+_CATCHALL_CATS = ("general", "news", "")
+
+
+def categorize_situations(situations: list, categorizer, display: Optional[dict] = None) -> list:
+    """Tag each situation with a category via MAJORITY VOTE of the engine's shared
+    `_topic_category` over its CORE members (the distinguishing context, NOT the shared
+    hub — "japan" alone is geography; "belgium/naruhito" make it Politics). Prefers a
+    SPECIFIC category over the news/general catch-all when it has real support, which is
+    what fixes the catch-all smear AT THE SITUATION LEVEL. Mutates + returns. display maps
+    topic_key → human name for better classification."""
+    from collections import Counter
+    display = display or {}
+    for s in situations:
+        votes = Counter()
+        for m in s.get("core_members", []):
+            txt = display.get(m) or m.replace("_", " ")
+            try:
+                votes[categorizer(txt) or "general"] += 1
+            except Exception:
+                votes["general"] += 1
+        ranked = votes.most_common()
+        specific = [(c, n) for c, n in ranked if c not in _CATCHALL_CATS]
+        if specific and (specific[0][1] >= 2 or len(s.get("core_members", [])) <= 3):
+            s["category"] = specific[0][0]          # strongest specific with real support
+        elif ranked:
+            s["category"] = ranked[0][0]            # else the honest plurality (may be catch-all)
+        else:
+            s["category"] = "general"
+        s["category_votes"] = dict(votes)
+    return situations
+
+
+def search_situations(situations: list, query: str, limit: int = 25) -> list:
+    """Entity/fragment DISAMBIGUATION: the distinct situations a user could mean by `query`.
+    Matches when every query token is present among a situation's member tokens (so "japan"
+    returns all three japan situations; "world cup" returns the sports one). Read-only."""
+    q = (query or "").strip().lower()
+    if not q:
+        return []
+    qtokens = set(q.replace("_", " ").split())
+    hits = []
+    for s in situations:
+        member_tokens = set()
+        for m in [s.get("anchor", "")] + s.get("members", []):
+            member_tokens |= set(str(m).replace("_", " ").lower().split())
+        if qtokens and qtokens <= member_tokens:
+            hits.append(s)
+    return sorted(hits, key=lambda s: -s.get("size", 0))[:int(limit)]
+
+
 # ── 4. Phase A — build from the REAL corpus (held-out, READ-ONLY) ───────────────
 def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
                   min_pair_docs: int = 3, min_jaccard: float = 0.18,
                   max_signals: int = 120000, display_lookup: Optional[dict] = None,
-                  quality_only: bool = True, registry_only: bool = True, gate=None) -> dict:
+                  quality_only: bool = True, registry_only: bool = True, gate=None,
+                  categorizer=None) -> dict:
     """Assemble situations from REAL topic_signals co-occurrence over a rolling window.
     READ-ONLY: SELECTs topic_signals (+ topic_registry); writes NOTHING and touches no score.
     Topics sharing a signal_id co-occurred in the same source document. Long-tail one-off
@@ -291,6 +343,9 @@ def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
     for s in sits:
         s["label_display"] = " · ".join(
             display.get(m, m) for m in ([s["anchor"]] + s["core_members"][:1]))
+    # Phase B — per-situation category (shared engine classifier, majority over core members)
+    if categorizer is not None:
+        categorize_situations(sits, categorizer, display=display)
     return {"window_hours": window_hours, "documents": len(pruned),
             "candidates": len(candidates), "topics_kept": len(keep),
             "dropped_quality": len(candidates) - len(keep),

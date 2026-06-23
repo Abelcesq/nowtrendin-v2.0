@@ -5881,46 +5881,77 @@ def accuracy_ledger_report():
 _SITUATIONS_CACHE = {"key": None, "at": 0.0, "data": None}
 
 
-@app.get("/situations/preview", dependencies=[Depends(_require_internal)])
-def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
-                       min_jaccard: float = 0.18, limit: int = 60):
-    """Held-out preview of the situation layer (topics-not-words) on the REAL corpus.
-    Read-only: no score is read or written. Cached ~10 min so review is cheap."""
+def _situations_cached(window_hours: int, min_doc_freq: int, min_jaccard: float):
+    """Build (or return cached, ~10 min) the held-out situation set on the REAL corpus.
+    Read-only. Passes the engine's shared quality gate AND category classifier so the
+    situation layer agrees with the rest of the engine on what's a topic + its category."""
     import time as _t
-    try:
-        import situation_clustering
-    except Exception as e:
-        return {"status": "unavailable", "error": str(e)}
+    import situation_clustering
     ck = (window_hours, min_doc_freq, round(min_jaccard, 3))
     if _SITUATIONS_CACHE["data"] and _SITUATIONS_CACHE["key"] == ck \
             and (_t.time() - _SITUATIONS_CACHE["at"]) < 600:
-        res = _SITUATIONS_CACHE["data"]
-    else:
-        conn = get_db(DB_PATH)
-        try:
-            res = situation_clustering.build_from_db(
-                conn, window_hours=window_hours, min_doc_freq=min_doc_freq,
-                min_jaccard=min_jaccard, gate=_is_quality_topic)   # pass the shared gate directly
-        finally:
-            conn.close()
-        _SITUATIONS_CACHE.update(key=ck, at=_t.time(), data=res)
-    sits = []
-    for s in res["situations"][:int(limit)]:
-        sits.append({
-            "situation_key": s["situation_key"],
-            "label": s.get("label_display") or s["label"],
-            "anchor": s["anchor"],
-            "category_hint": None,                       # Phase B: per-situation classifier
-            "size": s["size"],
-            "shared_anchors": s["shared_anchors"],
-            "core_members": s["core_members"][:12],
-            "first_seen": s.get("first_seen"),
-        })
+        return _SITUATIONS_CACHE["data"], situation_clustering
+    conn = get_db(DB_PATH)
+    try:
+        res = situation_clustering.build_from_db(
+            conn, window_hours=window_hours, min_doc_freq=min_doc_freq,
+            min_jaccard=min_jaccard, gate=_is_quality_topic, categorizer=_topic_category)
+    finally:
+        conn.close()
+    _SITUATIONS_CACHE.update(key=ck, at=_t.time(), data=res)
+    return res, situation_clustering
+
+
+def _situation_public(s: dict) -> dict:
+    return {
+        "situation_key": s["situation_key"],
+        "label": s.get("label_display") or s["label"],
+        "anchor": s["anchor"],
+        "category": s.get("category", "general"),        # Phase B — per-situation category
+        "category_votes": s.get("category_votes"),
+        "size": s["size"],
+        "shared_anchors": s["shared_anchors"],
+        "core_members": s["core_members"][:12],
+        "first_seen": s.get("first_seen"),
+    }
+
+
+@app.get("/situations/preview", dependencies=[Depends(_require_internal)])
+def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
+                       min_jaccard: float = 0.18, limit: int = 60, category: str = None):
+    """Held-out preview of the situation layer (topics-not-words) on the REAL corpus,
+    now category-tagged (Phase B). Read-only: no score is read or written."""
+    try:
+        res, _ = _situations_cached(window_hours, min_doc_freq, min_jaccard)
+    except Exception as e:
+        return {"status": "unavailable", "error": str(e)}
+    rows = res["situations"]
+    if category:                                          # optional category filter
+        rows = [s for s in rows if s.get("category") == category]
+    sits = [_situation_public(s) for s in rows[:int(limit)]]
     return {"status": "ok", "held_out": True, "note": "read-only preview — affects no score",
             "window_hours": res["window_hours"], "documents": res["documents"],
             "candidates": res.get("candidates"), "topics_kept": res["topics_kept"],
             "dropped_quality": res.get("dropped_quality"),
             "situation_count": res["situation_count"], "situations": sits}
+
+
+@app.get("/situations/search", dependencies=[Depends(_require_internal)])
+def situations_search(q: str, window_hours: int = 120, min_doc_freq: int = 5,
+                      min_jaccard: float = 0.18, limit: int = 25):
+    """Entity/fragment DISAMBIGUATION (Phase B): the distinct situations a user could mean
+    by `q` — e.g. q=japan → the Belgium-visit / BOJ-rate-hike / World-Cup situations, each
+    with its own category + score-eligible context. Held-out, read-only."""
+    if not (q or "").strip():
+        raise HTTPException(400, "q is required")
+    try:
+        res, sc = _situations_cached(window_hours, min_doc_freq, min_jaccard)
+    except Exception as e:
+        return {"status": "unavailable", "error": str(e)}
+    hits = sc.search_situations(res["situations"], q, limit=limit)
+    return {"status": "ok", "held_out": True, "query": q,
+            "situation_count": len(hits),
+            "situations": [_situation_public(s) for s in hits]}
 
 
 @app.get("/accuracy/ledger/detail")
