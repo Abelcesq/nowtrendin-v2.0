@@ -43,6 +43,17 @@ _Last updated: 2026-06-23_
   (`_record_top_detections`, `validate_recent_detections`) were slicing `detection_date` with
   raw `[:10]` (the forbidden anti-pattern). Now use `date_utils.to_iso_date` (whole-string
   parse, None→skip on unparseable). `accuracy_ledger.detection_date` confirmed clean YYYY-MM-DD live.
+- **Canonical Date Auditor (Agent 16, `/monitor/datecanon`, B3a)** — answers "how did the
+  `[:10]` violations survive the canon sweep, and what stops it recurring." Root cause:
+  `gate_date()` is OPT-IN per call site; the `DATE_SEMANTIC` registry had no consumer
+  verifying compliance; a path that BYPASSES the gate creates no review → invisible to the
+  gate's own audit. No agent owned "every date-semantic write is canonical." Fix: an agent
+  that audits the DATA (every registry column + every `*_date` column discovered from the
+  live schema), so a bad date is caught regardless of code path and a NEW source is covered
+  automatically (coverage by column funnel, not a per-source list). Sink-hardened
+  `record_detection`. Wired into `/monitor` run_all. Verified live: **status ok, 0
+  non-canonical across all 8 date-semantic columns** (incl. market_signal_history 66k,
+  pull_history 228k rows). Operational `timeout_date` allowlisted (it's an instant, not a key).
 
 ### Open / Next
 - Accuracy-Ledger fixes **#4–5** (timeout shorten + fetch prioritization) — deferred,

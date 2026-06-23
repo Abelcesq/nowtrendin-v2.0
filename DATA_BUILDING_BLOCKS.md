@@ -148,6 +148,18 @@ gates NEW writes, never deletes/rewrites existing rows (respects 90-day retentio
 **FAILURE:** any raw `[:10]` date slice reintroduced; corrupt/guessed date in a
 date-semantic column; ledger match using a stale (non-same-surge) breakout date.
 
+> **ENFORCEMENT GAP (closed 2026-06-23):** `gate_date()` is OPT-IN per call site, so a
+> path that *bypasses* it (e.g. a hand-rolled `[:10]`) creates no review and was invisible
+> to the gate's own audit — exactly how two ledger `detection_date` slices survived the
+> canon sweep. The **Canonical Date Auditor** (Agent 16, §10.K) now audits the **DATA** —
+> every `DATE_SEMANTIC` column + every `*_date` column discovered from the live schema —
+> so a bad date is caught no matter which path produced it, and a **new source is covered
+> automatically** the moment it writes a date column (coverage is by the column funnel, not
+> a per-source list). Defense-in-depth: date SINKS (e.g. `record_detection`) also normalize
+> via `to_iso_date`, so a forgetful caller can't bypass. When adding a date-semantic column:
+> register it in `ingestion_gate.DATE_SEMANTIC` + gate its writes (or, if it is an
+> operational instant like `timeout_date`, add it to the auditor's operational allowlist).
+
 ## 4. SCORING COMPLETENESS — did every scoreable topic get scored?
 
 Code: `score_all_topics` (SQL gate `HAVING COUNT>=MIN_TOPIC_APPEARANCES OR
@@ -342,6 +354,17 @@ a typed alert. (These are specs to build; the checks already exist as endpoints.
 - Status: `GET /prewarm` (non-blocking — kicks a background warm, returns last `warmed[]`
   with per-feed row counts + `error` flags). Eliminated the History cold-load
   (~6 s/2.1 MB uncached → ~0.4 s from warm cache). Full spec: `AGENT_CHARTER.md` Agent 15.
+
+### K. Canonical Date Auditor — owns **B3a (the canonical date/time model)** ✅ LIVE (`/monitor/datecanon`, in `run_all`)
+- Confirms every STORED date-semantic value is canonical `YYYY-MM-DD` for **all sources at
+  once**: audits every `ingestion_gate.DATE_SEMANTIC` column **and** every `*_date` column
+  discovered from the live schema (so a NEW source is covered automatically — coverage is by
+  the column funnel, not a per-source list). Flags (a) non-canonical values in a DECLARED
+  column = **critical** (the real §14 violation), (b) an unregistered `*_date` column =
+  **warn** ("classify: gate it, or allowlist as operational"), (c) gate quarantine backlog.
+- **Why it exists:** `gate_date()` is opt-in per call site, so a path that BYPASSES it is
+  invisible to the gate's own audit — how two ledger `[:10]` slices survived the canon sweep.
+  This agent checks the DATA, closing that blind spot. Full spec: `AGENT_CHARTER.md` Agent 16.
 
 ---
 

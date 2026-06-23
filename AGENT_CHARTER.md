@@ -81,6 +81,7 @@ convenience, speed, and any individual spec below.
 | 13 | Terminal Deploy Parity | `/terminal-deploy-parity` (skill) | n/a (manual/CI) | B8 |
 | 14 | Scorer Watchdog | `/monitor/scorer` | ✅ | B4 |
 | 15 | Prewarm Agent | `/prewarm` | n/a (background loop, API process) | B8 |
+| 16 | Canonical Date Auditor | `/monitor/datecanon` | ✅ | B3a |
 
 The combined fleet is reachable at **`/monitor`** (`run_all`). Agents 1–2 and 8 are
 the deliberately-excluded on-demand specialists. Agent 15 (Prewarm) is the lone
@@ -737,6 +738,48 @@ regression, or the agent running in the wrong process). Resolution: check the fe
 **7. Ongoing monitoring.** Background loop (self-scheduling) + manual `/prewarm`
 (non-blocking). Read-only; safe to call anytime. Re-warms automatically after a deploy
 restart (the startup thread fires on boot).
+
+## AGENT 16 — CANONICAL DATE AUDITOR
+
+**1. Identity.** `/monitor/datecanon` (also in `/monitor` `run_all`) · block **B3a** ·
+read-only.
+
+**2. Definition & scope.** The owner of the **canonical date/time model (CLAUDE.md §14)**.
+Confirms every **stored** date-semantic value is canonical `YYYY-MM-DD` across **all
+sources at once** — and stays correct as sources are added. It audits the **DATA, not the
+code path**: for every column in `ingestion_gate.DATE_SEMANTIC` **and** every `*_date`
+column **discovered from the live schema**, it asserts `date_utils.is_iso_date` on all
+rows. Coverage is by the **column funnel every source writes into** + **schema discovery**,
+so a NEW source is audited the moment it writes a date — there is no per-source list to
+maintain. Reports: (a) non-canonical values per column (with examples), (b) any `*_date`
+column NOT in the gate registry — an **ungated write path / unwired new source**, (c)
+values the gate quarantined to `format_review_queue` awaiting a human decision.
+
+**3. Will NOT.** Read-only — it never rewrites a date or deletes a row (forward-only; the
+gate fixes new writes, a human resolves quarantined ones). It does not change a score.
+
+**4. How it supports accuracy & UX.** It closes the structural blind spot that let two
+`[:10]` slices survive the §14 sweep: `gate_date()` is **opt-in per call site**, so a path
+that BYPASSES it creates no review and was invisible to the gate's own nightly audit. The
+`DATE_SEMANTIC` registry existed but **nothing consumed it to verify compliance** — no
+agent owned "every date-semantic write is canonical." This auditor is that owner, and by
+checking the data it catches a bad date no matter which code path (or future source)
+produced it. The Accuracy Ledger's sort/match key depends on this — a corrupt date silently
+breaks lead-time matching (the `'May 22, 2026' → 'May'` bug that dropped 13 ledger rows).
+
+**5. Success looks like.** `non_canonical_total = 0`, `undeclared_date_columns = []`,
+`pending_reviews = 0`. A new `*_date` column appears under `undeclared_date_columns` the
+first cycle after a source ships it — the prompt to wire `gate_date` + register it.
+
+**6. Problem signaling & resolution.** Non-canonical value → `critical`, names
+`table.column` + examples; resolution: route that write through `ingestion_gate.gate_date`
+(or fix the producer) and let a human resolve quarantined rows via
+`ingestion_gate.resolve_review`. Undeclared `*_date` column → `warn`; resolution: add it to
+`DATE_SEMANTIC` and gate its writes. Defense-in-depth: the date sinks (e.g.
+`record_detection`) also normalize via `to_iso_date`, so a forgetful caller can't bypass.
+
+**7. Ongoing monitoring.** Runs in `run_all` every monitoring cycle + on demand at
+`/monitor/datecanon`. Read-only.
 
 ---
 
