@@ -1064,7 +1064,12 @@ def apply_calibration(
     confidence_score= raw_result.get("confidence_score", 0) or 0
     overall_score   = raw_result.get("overall_score", 0) or 0
     ft_ratio        = raw_result.get("first_timer_ratio", 0.0) or 0.0
-    asymmetry       = raw_result.get("engagement_asymmetry_detected", False)
+    # KEY-DRIFT fix: the scorer writes the producer key "engagement_asymmetry" (int 1/0);
+    # the "_detected" alias only exists on the serve path. Read the real key with the
+    # serve alias as fallback (matches calibration_engine.py) so engagement-asymmetry
+    # evidence is live in the scoring-time anomaly gate instead of silently False.
+    asymmetry       = bool(raw_result.get("engagement_asymmetry_detected",
+                                          raw_result.get("engagement_asymmetry", False)))
     stage           = raw_result.get("signal_stage", "MONITORING")
     # Prefer the authoritative lifecycle cycle count — the topic_maturity record's
     # own counter can lag at 0 even after several scoring cycles, which would

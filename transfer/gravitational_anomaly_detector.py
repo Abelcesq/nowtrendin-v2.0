@@ -6755,6 +6755,27 @@ def monitor_datecanon():
             except Exception: pass
 
 
+@app.get("/monitor/scoringcontract")
+def monitor_scoringcontract():
+    """Scoring Contract Auditor — is every scoring field in the declared format
+    (type/unit/range/enum/required), is a derived field (heisenberg_gap) consistent,
+    and is any scoring field DEGENERATE (one value across the universe = missing-as-zero
+    fingerprint)? Audits the live DATA against SCORING_CONTRACT; new scoring-shaped
+    columns are flagged to classify. (block B3b)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.scoring_contract_auditor(conn=conn, db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/monitor/sources")
 def monitor_sources():
     """Source Watchdog — are all sources pulling within SLA? (blocks B1, B2)"""
@@ -7645,10 +7666,13 @@ def get_topic_history(topic_key: str):
                 except Exception:
                     pass
 
-            # Recompute gap after all adjustments
+            # Recompute gap after all adjustments — SIGNED (Detection - Confidence),
+            # never abs(): the sign IS the signal (positive = detected early/ahead of
+            # confirmation; negative = lagging). abs() here previously stomped the
+            # correct signed value set above and inverted the gap's meaning.
             det  = h.get("detection_score",  0) or 0
             conf = h.get("confidence_score", 0) or 0
-            h["heisenberg_gap"] = round(abs(det - conf), 1)
+            h["heisenberg_gap"] = round(det - conf, 1)
 
         except Exception:
             pass
@@ -7994,8 +8018,16 @@ def _calibrate_score_fields(s: dict) -> dict:
             if "engagement_asymmetry_detected" not in s:
                 s["engagement_asymmetry_detected"] = bool(s.get("engagement_asymmetry", False))
             s = apply_calibration(s, db_path=DB_PATH)
-        except Exception:
-            pass  # non-fatal
+        except Exception as _ce:
+            # OBSERVABLE swallow (C8): the module IS present (guarded above), so a raise
+            # here is a real runtime failure that would otherwise serve a RAW, uncalibrated
+            # row indistinguishable from a calibrated one. Log it + stamp a machine-readable
+            # marker so /scores and the monitoring agents can DETECT the downgrade.
+            print(f"[serve-cal] apply_calibration failed topic={s.get('topic_key')}: {_ce}")
+            s.setdefault("calibration_errors", []).append("apply_calibration")
+            cal = s.get("calibration")
+            s["calibration"] = {**cal, "applied": False, "error": str(_ce)[:160]} if isinstance(cal, dict) \
+                else {"applied": False, "error": str(_ce)[:160]}
 
     # ── AI Topic Intelligence — tier-aware taxonomy scoring ────
     if _AI_INTEL_AVAILABLE:
@@ -8008,8 +8040,9 @@ def _calibrate_score_fields(s: dict) -> dict:
                 plat = s.get("platforms_active", [])
                 s["platform_count"] = len(plat) if isinstance(plat, list) else 1
             s = _apply_ai_intelligence(s)
-        except Exception:
-            pass  # non-fatal
+        except Exception as _ie:
+            print(f"[serve-cal] ai_intelligence failed topic={s.get('topic_key')}: {_ie}")
+            s.setdefault("calibration_errors", []).append("ai_intelligence")
 
     # ── AI score floor ────────────────────────────────────────
     if _CORRECTIONS_AVAILABLE:
@@ -8026,8 +8059,9 @@ def _calibrate_score_fields(s: dict) -> dict:
                 s["confidence_score"] = new_conf
                 s["floor_applied"]    = True
                 s["heisenberg_gap"] = round(new_det - new_conf, 1)
-        except Exception:
-            pass  # non-fatal
+        except Exception as _fe:
+            print(f"[serve-cal] ai_floor failed topic={s.get('topic_key')}: {_fe}")
+            s.setdefault("calibration_errors", []).append("ai_floor")
 
     # Clamp 0-100 fields so calibration can't surface an impossible value.
     for _f in ("gradient_strength", "platform_diversity", "inertia_score",
@@ -8050,6 +8084,17 @@ def _calibrate_score_fields(s: dict) -> dict:
         s["nowtrending_gradient_detection"]  = _ntd
         s["nowtrending_gradient_confidence"] = _ntc
         s["nowtrending_gradient_demand_driven"] = _ndd
+
+    # FINAL gap recompute — the ONE authoritative source (invariant: stored
+    # heisenberg_gap == served Detection - Confidence, SIGNED). apply_calibration +
+    # AI-taxonomy can move det/conf WITHOUT the AI floor firing, which left the gap
+    # set from the RAW scores at the top of this function stale (e.g. mcp served
+    # det 74.5 / conf 73.0 but gap -23). Recomputing here, after the 0-100 clamp,
+    # guarantees /scores, /scores/{key}, serve_payload, and score-history all agree.
+    s["heisenberg_gap"] = round(
+        (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1
+    )
+    s["gap_label"] = _gap_label(s["heisenberg_gap"])
     return s
 
 

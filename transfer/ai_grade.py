@@ -307,12 +307,16 @@ def research_topic(topic: str, web_block: str = "") -> dict:
 
 
 # ── Stage 2: SYNTHESIS (Claude → proposed Gradient Score) ────────────
-# Engine component weights (must match velocity_scores schema). The AI estimates
-# the COMPONENTS; we compute detection/confidence with these exact weights so the
-# AI score lands on the SAME scale as engine-collected signals. N (query count)
-# is 0 for a topic that has never been queried.
-_DET_W  = {"G": 0.33, "D": 0.19, "I": 0.16, "M": 0.09, "C": 0.05, "P": 0.06, "N": 0.12}
-_CONF_W = {"I": 0.25, "P": 0.24, "M": 0.20, "G": 0.11, "C": 0.06, "D": 0.04, "N": 0.10}
+# Engine component weights — IDENTICAL to the live engine's renormalized SIX-component
+# vectors (gravitational_anomaly_detector.py / signal_calibration_integration.py:1119).
+# N (on-platform demand) is EXCLUDED from the composite by design (the no-circularity
+# rule) and the remaining six are renormalized to sum to exactly 1.0, so an AI-graded
+# Detection/Confidence lands on the SAME scale as an engine-measured one (apples-to-
+# apples). Previously these were the OLD 7-component weights that INCLUDED N (det 0.12 /
+# conf 0.10); zeroing N without renormalizing left every AI grade ~12%/~10% low and
+# re-introduced N's weight-share into the grade — both fixed by dropping N here.
+_DET_W  = {"G": 0.375, "D": 0.216, "I": 0.182, "M": 0.102, "C": 0.057, "P": 0.068}
+_CONF_W = {"I": 0.278, "P": 0.267, "M": 0.222, "G": 0.122, "C": 0.067, "D": 0.044}
 
 _SCORE_SYSTEM = (
     "You are the scoring engine for Now TrendIn's Gradient Score — an instrument "
@@ -448,7 +452,33 @@ def grade_topic(topic: str) -> dict:
             "detail": score.get("error", "Scoring synthesis unavailable."),
         }
 
-    # AI-estimated components, mapped to the engine's component letters.
+    # C9 contract guard: a VALID JSON that OMITS or renames a component key must NOT be
+    # silently scored on a partially-zeroed vector (the null-coalesce-masking disease).
+    # Require all six components present + numeric; a missing/non-numeric one is a HARD
+    # failure, not a 0.0 default. (freshness allows a 50.0 default by design, so it is
+    # not in the required set.)
+    def _is_num(v):
+        try:
+            float(v); return True
+        except (TypeError, ValueError):
+            return False
+    _REQ = ("niche_concentration", "platform_diversity", "momentum",
+            "dark_matter", "persistence")
+    _missing = [k for k in _REQ if not _is_num(score.get(k))]
+    if _missing:
+        return {
+            "available": bool(research.get("available")),
+            "topic": topic,
+            "proposed": False,
+            "research": research.get("summary", ""),
+            "citations": all_citations,
+            "web_result_count": fc.get("result_count", 0),
+            "detail": ("Scoring synthesis returned an incomplete component set "
+                       f"(missing/non-numeric: {', '.join(_missing)}); not scored."),
+        }
+
+    # AI-estimated components, mapped to the engine's component letters. N (on-platform
+    # demand) is EXCLUDED by design — see _DET_W/_CONF_W (no-circularity rule).
     comps = {
         "G": _num(score.get("niche_concentration")),
         "M": _num(score.get("platform_diversity")),
@@ -456,7 +486,6 @@ def grade_topic(topic: str) -> dict:
         "D": _num(score.get("dark_matter")),
         "P": _num(score.get("persistence")),
         "C": _num(score.get("freshness"), 50.0),
-        "N": 0.0,  # never queried before
     }
     # Detection/Confidence computed with the ENGINE's weights → same scale as
     # collected signals.

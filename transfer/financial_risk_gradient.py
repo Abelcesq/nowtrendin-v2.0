@@ -79,6 +79,16 @@ import ingestion_gate
 # trend topics live together and persist across dyno restarts.
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 
+# ENUM CONTRACT (C6/C7): the served risk_stage column holds the MARKET tier vocabulary
+# (ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT) that the terminal + diagnostics are built
+# for. When a risk topic has no market gradient, map its INTERNAL risk vocabulary into
+# the market vocabulary so one column never carries two disjoint enums (the format-
+# mismatch disease). Ordered by intensity: ACUTE->ELEVATED ... BACKGROUND->DORMANT.
+_RISK_TO_MARKET_TIER = {
+    "ACUTE": "ELEVATED", "ELEVATED": "ACTIVE", "EMERGING": "BUILDING",
+    "WATCH": "ROUTINE", "BACKGROUND": "DORMANT",
+}
+
 # API keys (set as environment variables — never hardcode)
 FRED_API_KEY    = os.getenv("FRED_API_KEY", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
@@ -603,6 +613,9 @@ def compute_risk_gradient(risk_signals: list[dict]) -> dict:
     )
 
     # ── Risk stage classification ─────────────────────────────────
+    # NOTE: this RISK vocabulary (ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND) is INTERNAL.
+    # The served risk_stage column must hold the MARKET tier vocabulary the terminal
+    # consumes; _RISK_TO_MARKET_TIER (module top) maps this -> that at the write site.
     avg = (detection + confidence_score) / 2
     if avg >= 80:
         risk_stage = "ACUTE"        # Act now — risk emerging, not yet priced
@@ -2431,7 +2444,14 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
 
         _det = mkt["detection"] if mkt else score["detection_score"]
         _conf = mkt["confidence"] if mkt else score["confidence_score"]
-        _stage = mkt["tier"] if mkt else score["risk_stage"]
+        # ENUM-CONTRACT fix (C6/C7): risk_stage is consumed by the terminal as the MARKET
+        # tier vocabulary ONLY (ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT). The no-market
+        # fallback previously leaked the DISJOINT risk vocabulary (ACUTE/EMERGING/WATCH/
+        # BACKGROUND) into the same column, which renders unstyled and blinds the
+        # diagnostic's QUIET_TIERS check. Map the risk vocab into the market vocab so the
+        # column always holds ONE declared enum.
+        _stage = mkt["tier"] if mkt else _RISK_TO_MARKET_TIER.get(
+            str(score.get("risk_stage", "")).upper(), "ROUTINE")
         _interp = mkt["interpretation"] if mkt else score["interpretation"]
         _comps = json.dumps(mkt["components"]) if mkt else json.dumps(score["components"])
         # risk_action kept neutral (no buy/sell/hedge advice) — measurement only.

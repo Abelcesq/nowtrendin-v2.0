@@ -1033,12 +1033,71 @@ def canon_date_auditor(conn=None, db_path=None) -> dict:
             "checked_at": _now().isoformat()}
 
 
+def scoring_contract_auditor(conn=None, db_path=None) -> dict:
+    """Agent 17 — Scoring Contract Auditor (block B3b). Read-only. Audits every scoring
+    field against the declared SCORING_CONTRACT (type / unit / range / enum / required /
+    derived-rule), across all live rows, so a silent FORMAT misread is caught no matter
+    which code path produced it - and a new scoring-shaped column is flagged to classify.
+    Generalizes the Canonical Date Auditor (Agent 16) from dates to ALL scoring inputs/
+    outputs. Catches: out-of-range/wrong-type values, off-enum stages/tiers, required-but-
+    null fields, a derived field gone stale (e.g. heisenberg_gap != detection-confidence),
+    and DEGENERATE fields (one value across >=90% of rows = the missing-as-zero fingerprint
+    that flattened Positioning Concentration)."""
+    own = conn is None
+    try:
+        import db_compat, scoring_contract
+    except Exception as e:
+        return {"agent": "scoring_contract_auditor", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3b", "msg": f"deps unavailable: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+    if own:
+        conn = db_compat.connect(db_path)
+    try:
+        rep = scoring_contract.audit(conn)
+    except Exception as e:
+        rep = None
+        err = str(e)
+    finally:
+        if own:
+            try: conn.close()
+            except Exception: pass
+    if rep is None:
+        return {"agent": "scoring_contract_auditor", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3b", "msg": f"audit error: {err}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+    alerts = []
+    for v in rep.get("violations", []):
+        lvl = "critical" if v.get("kind") in ("value", "missing-column") else "warn"
+        msg = f"{v['field']}: {v.get('kind')}"
+        if v.get("count"): msg += f" x{v['count']} {v.get('examples')}"
+        if v.get("detail"): msg += f" - {v['detail']}"
+        alerts.append({"level": lvl, "block": "B3b", "msg": msg})
+    for d in rep.get("derived_mismatch", []):
+        alerts.append({"level": "critical", "block": "B3b",
+            "msg": f"{d['field']} derived-rule broken ({d['rule']}): {d['mismatched_rows']}/{d['of']} rows"})
+    for g in rep.get("degenerate", []):
+        alerts.append({"level": "warn", "block": "B3b",
+            "msg": f"{g['field']} DEGENERATE: value {g['value']} on {int(g['share']*100)}% of "
+                   f"{g['rows']} rows (silent-misread fingerprint)"})
+    for u in rep.get("unregistered_columns", []):
+        alerts.append({"level": "warn", "block": "B3b",
+            "msg": f"unregistered scoring-shaped column {u} (classify: add to SCORING_CONTRACT)"})
+    summary = {"tables": rep.get("tables"), "fields_audited": len(rep.get("fields", [])),
+               "value_violations": sum(1 for v in rep.get("violations", []) if v.get("kind") == "value"),
+               "derived_mismatches": len(rep.get("derived_mismatch", [])),
+               "degenerate_fields": [g["field"] for g in rep.get("degenerate", [])],
+               "unregistered_columns": rep.get("unregistered_columns", [])}
+    return {"agent": "scoring_contract_auditor", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), scorer_watchdog(conn=conn, db_path=db_path),
               pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
               data_subscriptions(), catchall_auditor(conn),
-              canon_date_auditor(conn=conn, db_path=db_path)]
+              canon_date_auditor(conn=conn, db_path=db_path),
+              scoring_contract_auditor(conn=conn, db_path=db_path)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
