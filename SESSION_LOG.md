@@ -7,6 +7,69 @@ _Last updated: 2026-06-23_
 
 ---
 
+## Session 2026-06-23b — Alpha-engine punch list: Step 0 + Step 1 ⚡ fixes + Agent 17
+
+### Completed (✅ LIVE — deployed)
+- **Alpha-engine punch list framing.** Three-phase plan established (CLAUDE.md):
+  - Phase 1 — make the present-tense score correct (Step 0 + Step 1 mechanics)
+  - Phase 2 — Wikipedia + GDELT independent referee (no-gap test → false-early rate)
+  - Phase 3 — prove a predictive lead against PRICE (pre-registered bar, prospective)
+  - No investor performance claim before Phase 3 returns PASS, documented + reproducible.
+- **Step 0 ⚡ (HIGH-severity, no backtest) — all shipped:**
+  - **AI-grade weight integrity (C1/C2):** `grade_tool.py` previously used legacy 7-component
+    weights (N still in denominator even though `comps["N"]=0.0`). Removed N entry;
+    renormalized detection (6→6 components) and confidence (5→5) weight sets to sum to 1.0.
+    Grade scores now land on the engine scale. No-circular-N integrity closed.
+  - **`engagement_asymmetry` key drift (C4):** scoring path used `"engagement_asymmetry"` but
+    signal dict key was `"engagement_asymmetry_score"`. Fixed to match real key.
+  - **Calibration swallows now log + stamp (C8):** three silent `except` blocks in
+    `apply_calibration` that swallowed errors and served raw (uncalibrated) scores now
+    log a warning + record to `calibration_errors` table + stamp `calibration_method="raw"`.
+  - **`risk_stage` single vocabulary (C6/C7):** declared `_RISK_TO_MARKET_TIER` map at
+    module top of `financial_risk_gradient.py`; both the market-gradient path and the
+    no-market fallback now write the single MARKET tier vocabulary
+    (ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT). Off-enum stages can never appear in `risk_stage`.
+  - **`heisenberg_gap` signed + write-path fix (C5):** serve path fixed to signed
+    (det−conf). Write path: added unconditional signed recompute right before INSERT so the
+    stored column always matches the formula (both dual-pathway AND apply_calibration now
+    covered). Agent 17 confirmed 33/800 residual stale rows from before the fix (heal
+    as topics re-score).
+- **SCORING_CONTRACT registry + Agent 17 (Scoring Contract Auditor, `/monitor/scoringcontract`, B3b):**
+  New `scoring_contract.py` module — the declared FORMAT CONTRACT for every scoring field
+  (type/unit/range/enum/required/derived-rule). Agent 17 audits live data against it:
+  catches value violations, off-enum stages, degenerate (flat) fields (the C3 silent-misread
+  fingerprint), derived-field inconsistency (heisenberg_gap==det-conf), and undeclared
+  scoring-shaped columns. Live: 0 value violations, 0 degenerate fields, 1 derived mismatch
+  (33/800 heisenberg_gap stale rows from before the write-path fix — healing).
+- **`/monitor` timeout fix:** `run_all` previously included `catchall_auditor` (full
+  velocity_scores + topic_signals 72h scan, documented "end-of-day") alongside `canon_date_auditor`
+  and `scoring_contract_auditor` — all three did full table scans that pushed the synchronous
+  `/monitor` endpoint past Heroku's 30s router limit. All three moved to their own endpoints
+  (`/monitor/catchall`, `/monitor/datecanon`, `/monitor/scoringcontract`). `run_all` is now
+  the FAST liveness roll-up: 4.1s confirmed.
+- **Step 1 ⚡ (data hygiene, display — all shipped):**
+  - **Alias-merge:** `_TOPIC_ALIASES` in `gravitational_anomaly_detector.py`:
+    `"hormuz" → "strait of hormuz"`, `"mcp" → "model context protocol"`. Forward-only.
+  - **Market interpretation honesty:** `_interpret_gap()` in `market_signal_engine.py` now
+    detects when >50% of market inputs are exactly 0.0 (absent data) and appends a note to
+    the ROUTINE text, distinguishing "genuinely quiet" from "insufficient data coverage."
+  - **Minimum signal guard for market movers:** `get_risk_scores()` now sorts topics with
+    `total_signals < 3` below scored items, so cold-start noise doesn't surface as a top mover.
+
+### Open / Next
+- **Step 0 🔒 (score-moving, backtest-gated — do NOT ship without referee):**
+  - Write-time quarantine: replace `s.get(k, 0) or 0` with `None`-aware reads that
+    distinguish absent from real-zero. Market Positioning Concentration fix (populating
+    upstream FINRA/WhaleWisdom inputs, not just gating).
+  - Weight-recipe consolidation: three copies → one shared definition.
+  - `positioning_concentration` missing-input-as-zero collapse.
+- **Phase 2 (Wikipedia + GDELT referee) — build this next.** No public accuracy claim until
+  this returns a measured false-early rate. Gate that unblocks the 🔒 Step 0 fixes.
+- **Phase 3** (predictive lead against price) — only after Phase 2 shows an acceptable
+  false-early rate.
+
+---
+
 ## Session 2026-06-23 — Read-path performance: Prewarm Agent, pagination, favorites
 
 ### Completed (✅ LIVE — deployed)
