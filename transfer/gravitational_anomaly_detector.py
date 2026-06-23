@@ -4356,6 +4356,15 @@ class GravitationalAnomalyDetector:
             # (P for this cycle was already computed using pre-update history)
             self._update_topic_lifecycle(conn, result)
 
+            # FINAL stored-gap recompute (invariant: persisted heisenberg_gap == stored
+            # detection - confidence, SIGNED). apply_calibration and the dual-pathway
+            # blend both move det/conf AFTER the score-time gap was set at line ~4036;
+            # the dual-pathway branch recomputes it only when it fires, so expert/niche
+            # rows were left stale (the Scoring Contract Auditor flagged 33/800). Recompute
+            # unconditionally here so the persisted column can never drift from its inputs.
+            result["heisenberg_gap"] = round(
+                (result.get("detection_score", 0) or 0) - (result.get("confidence_score", 0) or 0), 1)
+
             # Save to velocity_scores table
             score_id = str(uuid.uuid4())[:16]
             conn.execute("""
