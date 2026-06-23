@@ -94,31 +94,104 @@ def _cluster(nodes: set, edges: dict) -> list[set]:
     return [g for g in groups.values() if len(g) >= 2]
 
 
-# ── 3. Build situations ─────────────────────────────────────────────────────────
+# ── 2b. Hub detection (the "japan" problem) ─────────────────────────────────────
+# A hub is an entity (e.g. "japan") that co-occurs across SEVERAL otherwise-distinct
+# situations — Belgium royal visit, BOJ rate hike, World Cup vs Sweden — and would
+# otherwise GLUE them into one meaningless "japan" blob. We detect a hub as a node whose
+# removal splits its own neighborhood into >=2 disconnected groups, then we CLUSTER WITHOUT
+# hubs (so the situations separate by their distinguishing context) and RE-ATTACH each hub
+# to every situation it touches, as a SHARED, SEARCHABLE ANCHOR — never a merger. This is
+# what lets one searchable entity ("japan") fan out into multiple scoreable situations.
+def _adjacency(edges: dict) -> dict:
+    adj = defaultdict(set)
+    for (a, b) in edges:
+        adj[a].add(b)
+        adj[b].add(a)
+    return adj
+
+
+def _components(nodes: set, adj: dict) -> list[set]:
+    seen, comps = set(), []
+    for n in nodes:
+        if n in seen:
+            continue
+        stack, comp = [n], set()
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x); comp.add(x)
+            for y in adj.get(x, ()):
+                if y in nodes and y not in seen:
+                    stack.append(y)
+        comps.append(comp)
+    return comps
+
+
+def hub_nodes(nodes: set, edges: dict, min_degree: int = 3) -> set:
+    """Entities whose removal fractures their neighborhood into >=2 groups = situation hubs."""
+    adj = _adjacency(edges)
+    hubs = set()
+    for n in nodes:
+        nb = adj.get(n, set())
+        if len(nb) < min_degree:
+            continue
+        sub = defaultdict(set)
+        for (a, b) in edges:
+            if a == n or b == n:
+                continue
+            if a in nb and b in nb:
+                sub[a].add(b); sub[b].add(a)
+        if len(_components(nb, sub)) >= 2:
+            hubs.add(n)
+    return hubs
+
+
+# ── 3. Build situations (hub-aware) ─────────────────────────────────────────────
 def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
                      min_pair_docs: int = 3, min_jaccard: float = 0.18) -> list[dict]:
     """Cluster co-occurring topics into situations. `first_seen` (topic_key → ISO date)
     lets each situation carry its EARLIEST member first-seen (the situation-level discovery
-    date). Returns [{situation, members, anchor, doc_freq, first_seen}] sorted by size."""
+    date). One ENTITY (hub, e.g. "japan") can anchor MULTIPLE situations; it is attached to
+    each as a shared, searchable anchor, never merging them. Returns
+    [{situation_key, label, anchor, core_members, shared_anchors, members, first_seen}]."""
     doc_freq, pair_docs = cooccurrence(signal_topics)
     edges = jaccard_edges(doc_freq, pair_docs, min_pair_docs, min_jaccard)
     nodes = set(doc_freq)
-    clusters = _cluster(nodes, edges)
+    hubs = hub_nodes(nodes, edges)
+    # Cluster WITHOUT hubs so distinct situations separate by their distinguishing context.
+    core_nodes = nodes - hubs
+    core_edges = {e: w for e, w in edges.items() if e[0] not in hubs and e[1] not in hubs}
+    cores = _cluster(core_nodes, core_edges)
     out = []
-    for c in clusters:
-        anchor = max(c, key=lambda t: doc_freq.get(t, 0))   # most-covered member = the label
+    for c in cores:
+        # Re-attach every hub that connects to this core (shared anchor, not a merge).
+        attached = sorted(
+            {h for h in hubs if any((min(h, m), max(h, m)) in edges for m in c)},
+            key=lambda t: -doc_freq.get(t, 0))
+        core_sorted = sorted(c, key=lambda t: -doc_freq.get(t, 0))
+        # Label: anchor entity + the most-distinguishing core term (the context that
+        # separates THIS situation from the entity's other situations).
+        top_core = core_sorted[0]
+        anchor = attached[0] if attached else top_core
+        label = f"{anchor} · {top_core}" if attached else top_core
+        skey = (f"{anchor}__{top_core}" if attached else top_core).replace(" ", "_")
+        members = core_sorted + attached
         sit = {
-            "situation": anchor,
+            "situation_key": skey,
+            "label": label,
             "anchor": anchor,
-            "members": sorted(c, key=lambda t: -doc_freq.get(t, 0)),
-            "size": len(c),
-            "member_doc_freq": {t: doc_freq.get(t, 0) for t in c},
+            "core_members": core_sorted,       # the distinguishing context (what makes it THIS situation)
+            "shared_anchors": attached,        # searchable entities shared with other situations
+            "members": members,
+            "size": len(members),
+            "member_doc_freq": {t: doc_freq.get(t, 0) for t in members},
         }
         if first_seen:
-            seen = [first_seen[t] for t in c if first_seen.get(t)]
+            seen = [first_seen[t] for t in members if first_seen.get(t)]
             if seen:
-                sit["first_seen"] = min(seen)                # situation discovery = earliest facet
-                sit["first_seen_by_member"] = {t: first_seen.get(t) for t in c}
+                sit["first_seen"] = min(seen)              # situation discovery = earliest facet
+                sit["first_seen_by_member"] = {t: first_seen.get(t) for t in members}
         out.append(sit)
     return sorted(out, key=lambda s: -s["size"])
 
@@ -136,27 +209,28 @@ def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
 
 if __name__ == "__main__":
     import json
-    # Realistic co-occurrence: Middle-East situation + an unrelated AI situation, plus a
-    # popular topic ("ai") that touches many docs (must NOT glue the two together).
+    # The "japan" problem: ONE entity, THREE distinct situations across THREE categories.
+    # "japan" co-occurs with all of them and must NOT glue them into one blob — it stays a
+    # shared, searchable anchor while the three situations score separately.
     signal_topics = {
-        "d1": ["iran", "strait of hormuz", "nuclear", "us"],
-        "d2": ["oil", "iran", "strait of hormuz", "oil prices"],
-        "d3": ["us", "iran", "nuclear", "peace talks"],
-        "d4": ["iran", "oil", "strait of hormuz", "blockade"],
-        "d5": ["nuclear", "iran", "us", "peace talks"],
-        "d6": ["oil prices", "oil", "iran", "blockade"],
-        "d7": ["openai", "diffusion models", "ai"],
-        "d8": ["diffusion models", "world models", "ai"],
-        "d9": ["openai", "world models", "deepseek", "ai"],
-        "d10": ["deepseek", "diffusion models", "ai"],
-        "d11": ["world models", "openai", "ai"],
-        "d12": ["us", "ai"],   # a stray cross-link — normalization should keep clusters apart
+        # Politics — royal visit to Belgium
+        "p1": ["japan", "belgium", "naruhito", "royal visit"],
+        "p2": ["japan", "belgium", "naruhito", "masako", "state visit"],
+        "p3": ["japan", "belgium", "royal visit", "masako"],
+        # Economics — Bank of Japan rate hike
+        "e1": ["japan", "bank of japan", "interest rate", "monetary policy"],
+        "e2": ["japan", "bank of japan", "interest rate", "inflation"],
+        "e3": ["japan", "monetary policy", "interest rate", "bank of japan"],
+        # Sports — World Cup vs Sweden
+        "w1": ["japan", "sweden", "world cup"],
+        "w2": ["japan", "sweden", "world cup", "match"],
+        "w3": ["japan", "world cup", "sweden", "knockout"],
     }
-    first_seen = {"iran": "2026-06-01", "nuclear": "2026-06-02", "us": "2026-06-01",
-                  "oil": "2026-06-04", "strait of hormuz": "2026-06-09", "hormuz": "2026-06-09",
-                  "peace talks": "2026-06-05", "oil prices": "2026-06-06", "blockade": "2026-06-08",
-                  "openai": "2026-05-20", "diffusion models": "2026-05-22"}
-    sits = build_situations(signal_topics, first_seen=first_seen)
-    for s in sits:
-        print(json.dumps({k: s[k] for k in ("situation", "members", "first_seen")
-                          if k in s}, ensure_ascii=False))
+    first_seen = {"japan": "2026-06-01", "belgium": "2026-06-08", "naruhito": "2026-06-09",
+                  "bank of japan": "2026-06-18", "interest rate": "2026-06-18",
+                  "sweden": "2026-06-20", "world cup": "2026-06-12"}
+    print("Search 'japan' resolves to these distinct, separately-scoreable situations:\n")
+    for s in build_situations(signal_topics, first_seen=first_seen, min_pair_docs=2):
+        print(f"  • {s['label']:24}  key={s['situation_key']:22} "
+              f"context={s['core_members']}  anchors={s['shared_anchors']}  "
+              f"first_seen={s.get('first_seen')}")
