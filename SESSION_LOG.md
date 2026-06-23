@@ -30,10 +30,23 @@ _Last updated: 2026-06-23_
 - **AI Context fixes** — serve-time `_clean_explainer` + hardened `_extract_json` (raw
   ` ```json ` leak); `key={topic_key}` on the web detail rail (stale-context-on-topic-switch).
 - **Stage rename** — "Emerging" → "Indicating" (display-only via `stageLabel()`, all surfaces).
+- **Accuracy-Ledger backlog (1066 pending) — analysis + the safe fixes (#1–3) shipped.**
+  Root cause: inflow (≤20 detections/score-cycle) ≫ outflow (sweep was once/day, 8/run) AND
+  `sweep_pending` had no `ORDER BY` so it re-checked the same head rows forever (the slow-to-
+  confirm LED wins, which sit in the tail, never got reached). Fixes: (1) rotate
+  oldest-checked-first; (2) resolve past-deadline rows to FALSE_POSITIVE with NO Apify fetch;
+  (3) own cadence `LEDGER_SWEEP_INTERVAL_HOURS` (default 6h = 4×/day), env-tunable vs the
+  Apify budget. Unit-tested; verified live (total 6→7, pending 1067→1066 right after deploy).
+  Deferred (backtest-gated, your call): #4 shorten `LEDGER_TIMEOUT_DAYS` 90→~45; #5 prioritize
+  fetches by breakout-window + conviction.
+- **Canonical date (§14) enforced in the ledger path** — both detection-recording paths
+  (`_record_top_detections`, `validate_recent_detections`) were slicing `detection_date` with
+  raw `[:10]` (the forbidden anti-pattern). Now use `date_utils.to_iso_date` (whole-string
+  parse, None→skip on unparseable). `accuracy_ledger.detection_date` confirmed clean YYYY-MM-DD live.
 
 ### Open / Next
-- **1066 pending Accuracy-Ledger detections** — analysis + backlog-prevention recommendations
-  (in progress this session).
+- Accuracy-Ledger fixes **#4–5** (timeout shorten + fetch prioritization) — deferred,
+  backtest-before-ship.
 - Optional: apply the same progressive load to Alerts/Watchlist/Dashboard typeaheads.
 
 ## Session 2026-06-22 — Sources, canonical-date checkpoint, M/D direction
