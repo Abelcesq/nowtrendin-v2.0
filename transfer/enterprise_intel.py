@@ -64,10 +64,21 @@ COMPONENT_LABEL = {
     "D": "Dark Matter", "C": "Confidence Decay", "P": "Persistence",
     "N": "Now Trending (internal demand — separate signal, not in composite)",
 }
-# 6-component weights renormalized to sum to 1.0 (N removed from the composite).
-W_OVERALL    = {"G": .244, "I": .222, "M": .167, "D": .133, "C": .078, "P": .156, "N": 0.0}
-W_DETECTION  = {"G": .375, "I": .182, "M": .102, "D": .216, "C": .057, "P": .068, "N": 0.0}
-W_CONFIDENCE = {"G": .122, "I": .278, "M": .222, "D": .044, "C": .067, "P": .267, "N": 0.0}
+# 6-component weights renormalized to sum to 1.0 (N removed from the composite),
+# imported from the single source of truth (scoring_weights.py). N:0.0 is appended
+# only for the methodology DISPLAY table (N is shown as a separate signal, never in
+# the composite). Fallback is value-identical if the import fails.
+try:
+    from scoring_weights import (
+        WEIGHTS_OVERALL as _SW_O, WEIGHTS_DETECTION as _SW_D, WEIGHTS_CONFIDENCE as _SW_C,
+    )
+    W_OVERALL    = {**_SW_O, "N": 0.0}
+    W_DETECTION  = {**_SW_D, "N": 0.0}
+    W_CONFIDENCE = {**_SW_C, "N": 0.0}
+except Exception:
+    W_OVERALL    = {"G": .244, "I": .222, "M": .167, "D": .133, "C": .078, "P": .156, "N": 0.0}
+    W_DETECTION  = {"G": .375, "I": .182, "M": .102, "D": .216, "C": .057, "P": .068, "N": 0.0}
+    W_CONFIDENCE = {"G": .122, "I": .278, "M": .222, "D": .044, "C": .067, "P": .267, "N": 0.0}
 
 METHODOLOGY = {
     "weights_overall":    W_OVERALL,

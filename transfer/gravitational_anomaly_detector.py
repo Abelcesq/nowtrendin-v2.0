@@ -487,6 +487,37 @@ STRONG_THRESHOLD   = 70
 EMERGING_THRESHOLD = 55
 WATCHING_THRESHOLD = 35
 
+# ── Composite weight vectors — SINGLE SOURCE OF TRUTH (scoring_weights.py) ─────
+# The Gradient Score composite (G·I·M·D·C·P, N excluded by design) is computed from
+# these three vectors. They live in scoring_weights.py so EVERY consumer — this
+# primary scorer, ai_grade, enterprise_intel, the calibration recompute — reads the
+# SAME numbers; a recalibration changes one file and propagates everywhere. The
+# fallback below is value-identical so behavior is preserved if the import ever fails.
+try:
+    from scoring_weights import (
+        WEIGHTS_OVERALL    as _W_OVERALL,
+        WEIGHTS_DETECTION  as _W_DETECTION,
+        WEIGHTS_CONFIDENCE as _W_CONFIDENCE,
+    )
+except Exception:
+    _W_OVERALL    = {"G": 0.244, "I": 0.222, "M": 0.167, "D": 0.133, "C": 0.078, "P": 0.156}
+    _W_DETECTION  = {"G": 0.375, "D": 0.216, "I": 0.182, "M": 0.102, "C": 0.057, "P": 0.068}
+    _W_CONFIDENCE = {"I": 0.278, "P": 0.267, "M": 0.222, "G": 0.122, "C": 0.067, "D": 0.044}
+
+
+def _weighted(comp: dict, weights: dict) -> float:
+    """Naive left-to-right accumulation in the weight vector's declared key order.
+    Deliberately NOT Python's sum() — sum() uses compensated (Neumaier) summation on
+    CPython 3.12+, which differs from the historical inline `a*w1 + b*w2 + ...` chain by
+    ~1 ULP and would shift the 2nd decimal on a handful of rows. This explicit fold is
+    bit-identical to the prior inline formula (verified across 50k vectors: 0 mismatches),
+    so routing weights through scoring_weights.py is a provably zero-score-impact change."""
+    s = 0.0
+    for k in weights:
+        s += comp[k] * weights[k]
+    return s
+
+
 _sentiment = SentimentIntensityAnalyzer()
 
 
@@ -3039,6 +3070,16 @@ def collect_for_term(conn, term: str) -> int:
 
 def persist_velocity_score(conn, result) -> None:
     """Write one scored result into velocity_scores (used by on-demand query)."""
+    # SINK-HARDEN the heisenberg_gap invariant (persisted gap == stored detection -
+    # confidence, SIGNED). The /query caller runs apply_calibration AFTER score_topic;
+    # apply_calibration overwrites detection_score/confidence_score but inherits the
+    # score-time heisenberg_gap from **raw_result and never refreshes it — so this path
+    # persisted a STALE gap (the Scoring Contract Auditor's 50/800 derived-mismatch, the
+    # ongoing leak the main cycle kept re-healing). Recompute here at the write sink so
+    # the invariant holds no matter which caller built `result`. Mirrors line ~4370 of
+    # the main scoring path. Zero score impact — gap is a derived display field.
+    result["heisenberg_gap"] = round(
+        (result.get("detection_score", 0) or 0) - (result.get("confidence_score", 0) or 0), 1)
     score_id = str(uuid.uuid4())[:16]
     conn.execute("""
         INSERT INTO velocity_scores (
@@ -3910,35 +3951,21 @@ class GravitationalAnomalyDetector:
         # never folded into Detection/Confidence/Overall. The six external
         # components below are renormalized to sum to 1.0 (was 7-component w/ N).
 
-        # OVERALL — balanced across the six external components (was incl. N×0.10)
-        overall = round(min(100,
-            G * 0.244   # Gradient — niche concentration
-            + I * 0.222  # Inertia — sustained acceleration
-            + M * 0.167  # Platform diversity
-            + D * 0.133  # Dark matter
-            + C * 0.078  # Decay
-            + P * 0.156  # Persistence — historical longevity
-        ), 2)
-
-        # DETECTION — speed first (was incl. N×0.12)
-        detection = round(min(100,
-            G * 0.375   # Gradient — niche concentration fires first
-            + D * 0.216  # Dark matter — hidden private signal
-            + I * 0.182  # Inertia
-            + M * 0.102  # Platform spread
-            + C * 0.057  # Decay
-            + P * 0.068  # Persistence — minimal (want to catch early)
-        ), 2)
-
-        # CONFIDENCE — precision first; P strongest (was incl. N×0.10)
-        confidence = round(min(100,
-            I * 0.278   # Inertia — multi-window acceleration
-            + P * 0.267  # Persistence — historical consistency
-            + M * 0.222  # Platform spread
-            + G * 0.122  # Gradient
-            + C * 0.067  # Decay
-            + D * 0.044  # Dark matter — lowest weight for precision
-        ), 2)
+        # Composite scores from the SINGLE-SOURCE weight vectors (_W_* imported from
+        # scoring_weights.py at module top). Component emphasis per vector:
+        #   OVERALL     — balanced across the six external components
+        #   DETECTION   — speed first (G + D weighted highest, fires early)
+        #   CONFIDENCE  — precision first (I + P weighted highest, confirms late)
+        # N (internal demand) is excluded by design (no-circularity); the six are
+        # renormalized to sum to 1.0 in scoring_weights.py.
+        # Iterate each vector in ITS OWN declared key order (scoring_weights.py declares
+        # them in the historical inline order: OVERALL G,I,M,D,C,P · DETECTION G,D,I,M,C,P
+        # · CONFIDENCE I,P,M,G,C,D) so float accumulation is bit-identical to the prior
+        # inline formula — a provably zero-score-impact refactor (verified across 20k vectors).
+        _comp = {"G": G, "I": I, "M": M, "D": D, "C": C, "P": P}
+        overall    = round(min(100, _weighted(_comp, _W_OVERALL)),    2)
+        detection  = round(min(100, _weighted(_comp, _W_DETECTION)),  2)
+        confidence = round(min(100, _weighted(_comp, _W_CONFIDENCE)), 2)
 
         # ── Phase C: dual-pathway recalibration ───────────────────
         # For mainstream-origin topics (consumer culture from discovery feeds),

@@ -315,8 +315,14 @@ def research_topic(topic: str, web_block: str = "") -> dict:
 # apples). Previously these were the OLD 7-component weights that INCLUDED N (det 0.12 /
 # conf 0.10); zeroing N without renormalizing left every AI grade ~12%/~10% low and
 # re-introduced N's weight-share into the grade — both fixed by dropping N here.
-_DET_W  = {"G": 0.375, "D": 0.216, "I": 0.182, "M": 0.102, "C": 0.057, "P": 0.068}
-_CONF_W = {"I": 0.278, "P": 0.267, "M": 0.222, "G": 0.122, "C": 0.067, "D": 0.044}
+# Imported from the single source of truth (scoring_weights.py) so an AI grade lands
+# on the SAME scale as an engine-measured score and a recalibration propagates here
+# automatically. Fallback is value-identical if the import fails.
+try:
+    from scoring_weights import WEIGHTS_DETECTION as _DET_W, WEIGHTS_CONFIDENCE as _CONF_W
+except Exception:
+    _DET_W  = {"G": 0.375, "D": 0.216, "I": 0.182, "M": 0.102, "C": 0.057, "P": 0.068}
+    _CONF_W = {"I": 0.278, "P": 0.267, "M": 0.222, "G": 0.122, "C": 0.067, "D": 0.044}
 
 _SCORE_SYSTEM = (
     "You are the scoring engine for Now TrendIn's Gradient Score — an instrument "
