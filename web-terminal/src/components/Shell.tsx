@@ -82,17 +82,17 @@ export function Shell({
   const [favSection, setFavSection] = useState<'trends' | 'market' | 'history'>('trends')
   const [favFilter, setFavFilter] = useState('breakout')
   const [favQuery, setFavQuery] = useState('')
-  const [favEnts, setFavEnts] = useState<{ key: string; display: string; kind: 'topic' | 'market' }[] | null>(null)
-  const [favPicked, setFavPicked] = useState<{ key: string; display: string; kind: 'topic' | 'market' } | null>(null)
-  // Lazy-load the searchable universe (topics + market instruments) so "Track topic"
-  // can only pin an entity that actually exists in our database.
+  const [favEnts, setFavEnts] = useState<{ key: string; display: string }[] | null>(null)
+  const [favPicked, setFavPicked] = useState<{ key: string; display: string } | null>(null)
+  // Lazy-load the searchable universe — TREND/HISTORY topics ONLY. "Track topic"
+  // pins a topic that lands you in the History section (its scoring trajectory).
+  // Market instruments belong to the Market section's filter-views, not here.
   useEffect(() => {
     if (favSection !== 'history' || favEnts !== null) return
     setFavEnts([])
-    Promise.all([
-      api.topics(500).then((t) => (t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key, kind: 'topic' as const }))).catch(() => []),
-      api.risk(200).then((r) => (r.results || []).map((x) => ({ key: x.risk_topic, display: x.risk_display || x.risk_topic, kind: 'market' as const }))).catch(() => []),
-    ]).then(([ts, ms]) => setFavEnts([...ms, ...ts]))
+    api.topics(500)
+      .then((t) => setFavEnts((t.topics || []).map((x) => ({ key: x.topic_key, display: x.topic_display || x.topic_key }))))
+      .catch(() => setFavEnts([]))
   }, [favSection, favEnts])
   const favMatches = (favEnts || []).filter((e) => favQuery.trim().length >= 2 && e.display.toLowerCase().includes(favQuery.trim().toLowerCase())).slice(0, 6)
   const resetFav = () => { setShowAdd(false); setFavQuery(''); setFavPicked(null) }
@@ -100,7 +100,7 @@ export function Shell({
     let fav: Favorite
     if (favSection === 'history') {
       if (!favPicked) return
-      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favPicked.display, section: 'history', filter: favPicked.key, kind: favPicked.kind, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
+      fav = { id: `fav_${Date.now()}_${_favc++}`, label: favPicked.display, section: 'history', filter: favPicked.key, kind: 'topic', color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
     } else {
       const opt = FAV_OPTIONS[favSection].find((o) => o.k === favFilter) || FAV_OPTIONS[favSection][0]
       fav = { id: `fav_${Date.now()}_${_favc++}`, label: opt.label, section: favSection, filter: favFilter, color: FAV_COLORS[favorites.length % FAV_COLORS.length] }
@@ -188,13 +188,13 @@ export function Shell({
               </div>
               {favSection === 'history' ? (
                 favPicked ? (
-                  <div className="fav-picked" onClick={() => setFavPicked(null)} title="Clear">{favPicked.display} <span>· {favPicked.kind === 'market' ? 'Market' : 'Trend'}</span> <X size={12} /></div>
+                  <div className="fav-picked" onClick={() => setFavPicked(null)} title="Clear">{favPicked.display} <span>· History</span> <X size={12} /></div>
                 ) : (
                   <>
-                    <input className="fav-input" value={favQuery} placeholder="Search a topic or ticker…" onChange={(e) => setFavQuery(e.target.value)} />
+                    <input className="fav-input" value={favQuery} placeholder="Search a topic…" onChange={(e) => setFavQuery(e.target.value)} />
                     {favEnts === null ? <div className="fav-hint">Loading…</div>
-                      : favQuery.trim().length >= 2 && favMatches.length === 0 ? <div className="fav-hint">Not in our database — only existing topics/instruments can be tracked.</div>
-                        : favMatches.map((e) => <div key={e.kind + ':' + e.key} className="fav-sugg" onClick={() => { setFavPicked(e); setFavQuery('') }}>{e.display}<span>{e.kind === 'market' ? 'Market' : 'Trend'}</span></div>)}
+                      : favQuery.trim().length >= 2 && favMatches.length === 0 ? <div className="fav-hint">Not in our database — only existing topics can be tracked.</div>
+                        : favMatches.map((e) => <div key={e.key} className="fav-sugg" onClick={() => { setFavPicked(e); setFavQuery('') }}>{e.display}<span>History</span></div>)}
                   </>
                 )
               ) : (
