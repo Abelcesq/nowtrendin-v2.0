@@ -7,6 +7,42 @@ _Last updated: 2026-06-23c_
 
 ---
 
+## Session 2026-06-23e — Situation model (topics-not-words) + corpus quality gate
+
+### Topics-not-words: the situation layer (held-out, READ-ONLY — affects no score)
+- **Problem (founder):** the engine tracks WORD fragments ("hormuz", "japan"), not SITUATIONS.
+  "japan" is one over-aggregated blob smearing the Belgium royal visit + BOJ rate hike +
+  World Cup, while "bank japan" fragments off and "japan vs Sweden" is missing.
+- **`situation_clustering.py`** — co-occurrence (topic_signals.signal_id, already recorded) →
+  Jaccard-normalized edges → **hub-aware** clustering: detect a hub entity ("japan") that
+  bridges distinct situations, cluster WITHOUT it, re-attach it as a shared searchable anchor.
+  Proven: "japan" → 3 separate situations (belgium / bank-of-japan / world-cup). Situation
+  first_seen = earliest member first-seen (reconciles word-level discovery undercount).
+- **`/situations/preview`** (held-out, internal-key, ~10min cache) — runs it on the REAL
+  corpus. `SITUATION_MODEL.md` = the full recommended solution (entity→situation→fragment;
+  data model + DB-redundancy; search/disambiguation; situation-level scoring 🔒-gated; filter+
+  sort taxonomy; the **Situation Contract** = one protocol for every agent + scorer; rollout).
+
+### Corpus quality gate (the situation layer exposed it; fixed at the ONE shared gate)
+- Phase A on real data surfaced two pollutants the per-word view hid: multilingual casino/SEO
+  spam + HTML/JSON/code boilerplate n-grams. **`_is_quality_topic` strengthened** (the single
+  gate used by extraction, scoring, serve-time, Pipeline Integrity, AND the situation builder):
+  SPAM_TERMS (gambling, multilingual), CLAUSE_FILLER (clause debris), BOILERPLATE bigrams/
+  tokens, MAX_TOPIC_WORDS=5, MAX_TOKEN_LEN=20, **split on `[\s_]+`** (kills underscored
+  field-name fragments like `show_article_date`), + **KNOWN_CONCEPT_PHRASES** recall whitelist
+  (fixes a PRE-EXISTING drop of "interest rate"/"monetary policy"/"world cup"/"vector search"/
+  "model context protocol"). Precision-verified: 27/27 real pass (0 false rejects), junk rejected.
+- Situation builder also applies `registry_only` (tracked-entity requirement) which structurally
+  removes spam the vocabulary can't enumerate (first_seen=None).
+- **VERIFIED LIVE across scoring + agents:** `/situations/preview` 0 junk situations (365 dropped,
+  real events dominate — Greenspan death, SNP/Murrell, Tesla autopilot, Giannis trade, Starmer
+  resigns, Iran oil sanctions); `/scores` 0 junk in the 2,290-topic board, "world cup" now served
+  + scored 94.8 (recall fix live); `/monitor` pipeline_integrity + scorer_watchdog OK (no
+  regression). Engine deployed 5ea4d4b. Still TODO: per-situation category tags (the 78% news
+  catch-all), GDELT-spaced batch, situation persistence (Phase B/C).
+
+---
+
 ## Session 2026-06-23d — Opus fundamentals audit + Phase 2 referee (Wikipedia) begun
 
 ### Audit (verified against LIVE engine, not docs — verify-before-ship)
