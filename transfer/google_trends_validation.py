@@ -598,7 +598,13 @@ def validate_recent_detections(db_path: str = DB_PATH,
            "candidates": len(rows),
            "sample": [r["topic_display"] for r in rows[:5]]}
     for r in rows:
-        det_date = (r["first_at"] or "")[:10]
+        # Canonical PRIMARY date (§14): never raw [:10] — to_iso_date tries whole-
+        # string formats and returns None (skip) on an unparseable value rather than
+        # a corrupt date, so accuracy_ledger.detection_date stays a clean YYYY-MM-DD.
+        det_date = to_iso_date(r["first_at"])
+        if not det_date:
+            out["errors"] += 1
+            continue
         try:
             res = validate_topic(r["topic_key"], r["topic_display"], det_date,
                                   r["detection_score"] or 0, db_path)

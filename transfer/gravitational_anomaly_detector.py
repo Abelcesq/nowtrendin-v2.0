@@ -286,8 +286,13 @@ def _record_top_detections(limit=20, min_detection=None):
             WHERE v.detection_score >= ?
             ORDER BY v.detection_score DESC LIMIT ?
         """, (floor, limit)).fetchall()
+        import date_utils
         for r in rows:
-            dd = (r["det_date"] or "")[:10]
+            # Canonical PRIMARY date (§14): never raw [:10] — to_iso_date tries
+            # whole-string formats and returns None (skip) on an unparseable value
+            # rather than a corrupt/guessed date, so the ledger's detection_date
+            # (a canonical date-semantic column) stays a clean YYYY-MM-DD.
+            dd = date_utils.to_iso_date(r["det_date"])
             if not dd:
                 continue
             ledger_plus.record_detection(r["topic_key"], r["topic_display"], dd,
