@@ -183,6 +183,130 @@ def detect_arrival_date(curve: list[dict], since: object = None) -> Optional[dic
     return None
 
 
+# ── Topic-class reconciliation (the "Strait of Hormuz" research) ─────────────────
+# Empirically, topics fall into THREE classes by their long-window pageview shape, and a
+# single "arrival date" is only well-defined for ONE of them. Measured on the live ledger:
+#   • CLEAN          — one isolated quiet→loud transition (Claude 1% elevated/2994x,
+#                      FIFA 6%/25x). Arrival is precise; the referee is gold here.
+#   • CHURNING       — surges REPEATEDLY, never goes quiet (Strait of Hormuz 42% of days
+#                      elevated, Iran 17%, world models 54%). No single "arrival"; the
+#                      same-surge floor still answers "were we late vs the surge our
+#                      detection was about," but the precise lead is low-confidence.
+#   • STEADY_MAIN    — permanently high, never surges (Russia/China peak/floor ~2x). It
+#                      has ALREADY arrived; detecting it as "emerging" is late by definition.
+# Plus the non-class outcomes UNRESOLVED / NO_DATA (Wikipedia doesn't cover the topic —
+# 38% of our niche-early ledger; these are EXCLUDED from the rate, never guessed).
+# Frozen class thresholds (version-stamped with the surge params):
+CLS_STEADY_MAX_PEAK_FLOOR = 3.0    # peak/p10 below this = never meaningfully surges
+CLS_CHURN_MIN_ELEVATED   = 0.15    # >=15% of days above 3x baseline = churning
+CLS_SIGNATURE_DAYS       = 365     # long window used to read the topic's shape
+
+
+def classify_topic(topic_display: str, window_days: int = CLS_SIGNATURE_DAYS,
+                   _curve: Optional[list] = None, article: Optional[str] = None) -> dict:
+    """Read a topic's long-window pageview SHAPE and assign its class. `_curve`/`article`
+    may be passed to reuse a single fetch. Returns {topic_class, elevated_pct, peak_floor,
+    article, status}. topic_class ∈ {clean, churning, steady_mainstream, unresolved, no_data}."""
+    art = article or resolve_article(topic_display)
+    if not art:
+        return {"topic_class": "unresolved", "article": None, "status": "unresolved"}
+    if _curve is None:
+        end = datetime.now(timezone.utc).date()
+        _curve = fetch_pageviews(art, end - timedelta(days=window_days), end)
+    if not _curve or len(_curve) < 30:
+        return {"topic_class": "no_data", "article": art, "status": "no_data"}
+    v = sorted(p["views"] for p in _curve)
+    base = max(1.0, statistics.mean(v[:max(2, int(len(v) * 0.4))]))
+    p10 = v[len(v) // 10] or 1
+    elevated_pct = round(100 * sum(1 for x in v if x >= base * SURGE_MULT) / len(v), 1)
+    peak_floor = round(max(v) / p10, 1)
+    if peak_floor < CLS_STEADY_MAX_PEAK_FLOOR:
+        cls = "steady_mainstream"
+    elif elevated_pct >= CLS_CHURN_MIN_ELEVATED * 100:
+        cls = "churning"
+    else:
+        cls = "clean"
+    return {"topic_class": cls, "elevated_pct": elevated_pct, "peak_floor": peak_floor,
+            "article": art, "status": "ok"}
+
+
+# ── Observation-window gate (the "we just started in March 2026" reconciliation) ──
+# A false-early verdict is FAIR only if our engine had a real chance to detect the topic
+# early — i.e. we were already TRACKING it before its independent arrival. Two artifacts
+# of a young system (launched ~2026-03) otherwise masquerade as scoring failures:
+#   • PRE_OBSERVATION       — the topic arrived before our data even began. We didn't exist.
+#   • DISCOVERED_AFTER_ARRIVAL — we DID exist, but the topic didn't enter our CORPUS until
+#                             after it surged (a DISCOVERY-LATENCY / collection-breadth gap,
+#                             NOT a scoring false-early — different problem, different fix:
+#                             wider/earlier feeds, not recalibration).
+# Both are EXCLUDED from the false-early rate and reported separately, so the rate measures
+# SCORING earliness on topics we actually watched in time — not our launch date or our feed
+# coverage. OBSERVATION_START is the engine's data start (override via env when wired in).
+import os as _os
+OBSERVATION_START = to_iso_date(_os.getenv("REFEREE_OBSERVATION_START", "2026-03-01"))
+OBSERVATION_WARMUP_DAYS = 21      # baseline the engine needs on a topic before a fair early call
+
+
+def assess(topic_display: str, detection_date, our_first_seen=None) -> dict:
+    """The referee's RECONCILED per-detection verdict — the function the false-early
+    aggregation calls. ONE long fetch drives both the class and the anchored arrival.
+    `our_first_seen` = when the TOPIC first entered our corpus (topic_lifecycle.
+    first_detected_at); pass it so the observation-window gate can separate a scoring
+    false-early from a discovery-latency gap. Returns referee_verdict ∈
+      • FALSE_EARLY        — we were TRACKING it in time, yet an independent surge preceded
+                             our detection (a genuine scoring late-call — the real signal)
+      • LED                — we detected at/before the surge (the 'before it arrives' claim)
+      • ALREADY_MAINSTREAM — steady-mainstream: permanently arrived → counts as NOT-early
+      • NO_SURGE           — clean/churning topic, no surge near detection (inconclusive)
+      • EXCLUDE            — not a fair scoring test: unresolved/no_data (coverage), OR
+                             pre_observation / discovered_after_arrival (young-system artifacts)
+    plus topic_class, lead_days, confidence, and the signature."""
+    anchor = _parse_iso(detection_date) if isinstance(detection_date, str) else detection_date
+    art = resolve_article(topic_display)
+    if not art:
+        return {"referee_verdict": "EXCLUDE", "reason": "unresolved",
+                "topic": topic_display, "topic_class": "unresolved", "lead_days": None}
+    end = datetime.now(timezone.utc).date()
+    curve = fetch_pageviews(art, min(anchor - timedelta(days=CLS_SIGNATURE_DAYS), end - timedelta(days=CLS_SIGNATURE_DAYS)), end)
+    cinfo = classify_topic(topic_display, _curve=curve, article=art)
+    cls = cinfo["topic_class"]
+    _sig = {"elevated_pct": cinfo.get("elevated_pct"), "peak_floor": cinfo.get("peak_floor")}
+    if cls in ("unresolved", "no_data"):
+        return {"referee_verdict": "EXCLUDE", "reason": cls, "topic": topic_display,
+                "article": art, "topic_class": cls, "lead_days": None}
+    if cls == "steady_mainstream":
+        return {"referee_verdict": "ALREADY_MAINSTREAM", "topic": topic_display, "article": art,
+                "topic_class": cls, "lead_days": None, "confidence": "high", "signature": _sig}
+    # clean / churning: anchored same-surge arrival
+    sub = [p for p in (curve or [])
+           if anchor - timedelta(days=PRE_DAYS) <= _parse_iso(p["date"]) <= anchor + timedelta(days=POST_DAYS)]
+    arrival = detect_arrival_date(sub, since=anchor - timedelta(days=MATCH_WINDOW)) if len(sub) >= 5 else None
+    if not arrival:
+        return {"referee_verdict": "NO_SURGE", "topic": topic_display, "article": art,
+                "topic_class": cls, "lead_days": None,
+                "confidence": "high" if cls == "clean" else "low", "signature": _sig}
+    arr_date = arrival["arrival_date"]
+    lead = (anchor - _parse_iso(arr_date)).days
+    # ── Observation-window gate: is this a FAIR scoring test? ──────────────────────
+    if arr_date < OBSERVATION_START:
+        return {"referee_verdict": "EXCLUDE", "reason": "pre_observation",
+                "topic": topic_display, "article": art, "topic_class": cls,
+                "arrival_date": arr_date, "lead_days": lead, "signature": _sig}
+    if our_first_seen is not None:
+        fs = to_iso_date(our_first_seen)
+        if fs and fs > arr_date:
+            return {"referee_verdict": "EXCLUDE", "reason": "discovered_after_arrival",
+                    "topic": topic_display, "article": art, "topic_class": cls,
+                    "arrival_date": arr_date, "our_first_seen": fs, "lead_days": lead,
+                    "discovery_lag_days": (_parse_iso(fs) - _parse_iso(arr_date)).days,
+                    "signature": _sig}
+    return {"referee_verdict": ("FALSE_EARLY" if lead > 0 else "LED"),
+            "topic": topic_display, "article": art, "topic_class": cls,
+            "arrival_date": arr_date, "lead_days": lead,
+            "confidence": "high" if cls == "clean" else "low",
+            "signature": {**_sig, "multiple": arrival.get("multiple")}}
+
+
 def observe(topic_display: str, anchor_date=None,
             pre_days: int = PRE_DAYS, post_days: int = POST_DAYS) -> dict:
     """Full referee read for one topic, ANCHORED on our detection date:

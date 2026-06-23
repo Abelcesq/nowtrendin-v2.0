@@ -51,11 +51,32 @@ _Last updated: 2026-06-23c_
   Live-tested on Hormuz/Iran/DeepSeek/ChatGPT: resolves + dates surges correctly; surfaced
   that continuously-hot topics (Iran/Hormuz) have no clean "arrival" (the referee's honest
   limit — precise on quiet→loud transitions).
-- **NEXT (pre-registration gate):** freeze the arrival / false-early DEFINITION with the
-  founder BEFORE computing any headline rate (punch-list rule: pre-register before looking).
-  Then: held-out `referee_observations` table, GDELT provider, false-early aggregation over
-  the real ledger, `/accuracy/referee` read-only endpoint. NO public accuracy claim before
-  this returns a measured rate.
+- **Founder froze the arrival definition:** EARLIEST of (Wikipedia surge OR GDELT surge);
+  false-early if our detection is after it (strictest against over-claiming early).
+
+### "Strait of Hormuz issue" — RESEARCHED + RECONCILED (the key reframe)
+The founder flagged: the app was only built ~2026-03, so apparent "late" calls may be a
+STARTING-POINT artifact, not an engine defect. Confirmed — decisively.
+- **Topic-class research** (live Wikipedia signatures): topics fall in 3 classes —
+  CLEAN (one isolated arrival; referee precise), CHURNING (Hormuz 42% of days elevated /
+  Iran 17% — surges repeatedly, no single arrival), STEADY_MAINSTREAM (Russia/China
+  peak/floor ~2× — never surges, permanently arrived). Codified `classify_topic()`.
+- **Observation-window gate** (`assess()` + `our_first_seen`): a false-early is FAIR only
+  if we were TRACKING the topic before its arrival. Ran the gate over all 21 REAL ledger
+  detections joined to each topic's `first_detected_at`: **only 1/21 is a fair scoring
+  test** (Daveigh Chase — caught SAME-DAY, LED). 4 are DISCOVERED_AFTER_ARRIVAL (we found
+  diffusion models/world models/Juneteenth/FIFA 2–30 days AFTER their Wikipedia surge — a
+  DISCOVERY-LATENCY gap, NOT a scoring false-early), 8 unresolved (Wikipedia lacks niche
+  tech → GDELT needed), 7 no-surge, 1 already-mainstream.
+- **Conclusion:** the apparent late-calls are overwhelmingly a young-system / discovery-
+  window artifact. The naive "83% false-early" collapses to a non-result; fair sample = 1.
+  Honest verdict = **INSUFFICIENT, claim nothing yet** (punch-list Phase 3). The referee is
+  a PROSPECTIVE instrument — meaningful as detections of post-launch emergences accrue.
+  The real actionable lever it exposes is **discovery latency** (widen/speed collection so
+  topics enter the corpus BEFORE they surge), which is distinct from scoring calibration.
+- **NEXT:** GDELT provider (covers the 38% Wikipedia can't), held-out `referee_observations`
+  table, `/accuracy/referee` endpoint that applies the observation gate + reports the
+  fair-sample count alongside any rate. NO public accuracy claim before a fair sample matures.
 
 ---
 
