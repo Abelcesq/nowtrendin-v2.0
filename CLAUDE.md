@@ -260,9 +260,13 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   `topic_lifecycle` table (cycles + age); ESTABLISHED topics discounted.
 - **Stage from Detection** (`stageOf`) everywhere; `Now TrendIn` view ranks by the
   proprietary **N** (`nowtrendin_score`), `All Signals` by Detection.
-- **7 monitoring agents** (`monitoring_agents.py` → `/monitor`): Source Watchdog,
-  Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD), Cost
-  Sentinel, Data Subscriptions, Calibration Auditor. Full spec: `DATA_BUILDING_BLOCKS.md`.
+- **9 monitoring agents** (`monitoring_agents.py` → `/monitor` `run_all`): Source Watchdog,
+  Scorer Watchdog, Pipeline Integrity, Topic Quality Auditor, Catch-All Auditor (daily EOD),
+  Cost Sentinel, Data Subscriptions, Calibration Auditor, **Canonical Date Auditor** (B3a —
+  `/monitor/datecanon`; audits every date-semantic + discovered `*_date` column so §14
+  compliance is verified for ALL sources, new ones auto-covered). Plus the **Prewarm Agent**
+  (operational, read-only, API-process `/prewarm` — keeps every list-feed superset cache hot).
+  Full specs: `AGENT_CHARTER.md` (Agents 1–16) + `DATA_BUILDING_BLOCKS.md`.
 
 ## 14. CANONICAL DATE & TIME MODEL — data streamlining → Accuracy-Ledger viability
 
@@ -325,4 +329,4 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
    Feeds validated (production UA). Adversarial integrity verify + backtest still required
    before deploy.
 
-*Last updated: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor) for Accuracy-Ledger viability; New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN (platform_tier is the D-vs-M router; reputable→½/full-on-corroboration). Prior: 2026-06-19 — 90-day retention, catchall_floor_log trend, stale-window startup validation.*
+*Last updated: 2026-06-23 — Canonical Date Auditor (Agent 16, `/monitor/datecanon`): audits the DATA by date-semantic column + live-schema `*_date` discovery, so §14 compliance is verified for ALL sources and new sources are auto-covered (closes the "gate_date is opt-in, bypasses invisible" gap that let two ledger `[:10]` slices survive — now refixed via `to_iso_date`). Prewarm Agent (15, read-path superset-cache + 100-at-a-time pagination on all list feeds). Accuracy-Ledger sweep backlog fixes (rotate oldest-checked-first + free timeouts + own cadence). Prior: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor); New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN.*

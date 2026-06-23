@@ -345,6 +345,21 @@ Fleet monitoring agents (in-engine, invoked via `/monitor` endpoint):
 5. Cost Sentinel — per-source cost tracking vs budgets
 6. Data Subscriptions — external API status + quota remaining
 7. Calibration Auditor — dual-pathway gate, baseline-relative sanity
+8. Canonical Date Auditor (`/monitor/datecanon`) — owns B3a. Confirms every stored
+   date-semantic value is canonical YYYY-MM-DD across ALL sources by auditing the
+   DATE_SEMANTIC columns + every `*_date` column discovered from the live schema (new
+   sources auto-covered — coverage is by column, not a per-source list). Flags non-
+   canonical values (critical, declared cols), unregistered `*_date` columns (warn), and
+   the gate's quarantine backlog. Closes the "gate_date is opt-in, bypasses are invisible"
+   blind spot that let `[:10]` slices survive. Full spec: AGENT_CHARTER.md Agent 16.
+
+Operational agent (NOT under `/monitor` — runs in the API process):
+8. Prewarm Agent (`/prewarm`) — daemon thread that keeps every list-feed superset hot
+   (`/scores`, `/topics`, `/history/recent` 7d/24h/12h, `/risk/scores`), re-warming every
+   25 min inside the 30-min cache TTL. Read-only re: data (writes only the in-memory read
+   cache). Must run in the API process (worker dyno has a separate cache). `GET /prewarm`
+   is non-blocking. Killed the History cold-load (~6 s → ~0.4 s). Full spec: AGENT_CHARTER.md
+   Agent 15. All list endpoints serve O(1) (offset, limit) slices → clients page 100 at a time.
 
 Full specs in `DATA_BUILDING_BLOCKS.md` §Monitoring Agents.
 

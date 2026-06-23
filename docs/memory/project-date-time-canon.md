@@ -36,5 +36,32 @@ a June detection matches the June surge, not an earlier Spring spike (the −41d
 `sweep_pending` and `validate_topic` pass `since`; `validate_topic` also got the C1 gate
 (breakout still outside ±MATCH_WINDOW → `LATE_REDETECTION`, excluded from the honest denominator).
 
-See [[serve-payload-cache-gotcha]] and [[feedback-verify-before-ship]]. The nightly audit
-(`nowtrendin_data_adapter.py`) is read-only/stored-data-only — see [[deploy-topology]].
+**ENFORCEMENT GAP + the guardrail (2026-06-23).** `gate_date()` is OPT-IN per call site, and
+the `DATE_SEMANTIC` registry had NO consumer verifying compliance — so a path that BYPASSES the
+gate (a hand-rolled `[:10]`) creates no review and is INVISIBLE to the gate's own nightly audit.
+That is how two ledger `detection_date` slices survived the "complete" canon sweep
+(`_record_top_detections` in `gravitational_anomaly_detector.py` + `validate_recent_detections`
+in `google_trends_validation.py`). The data was NOT actually corrupted (the sliced inputs were
+our own ISO `scored_at`/`first_at`, so `[:10]` happened to give a correct date) — it was a latent
+code violation. Both now use `date_utils.to_iso_date`. **The guardrail: the Canonical Date Auditor
+(Agent 16, `monitoring_agents.canon_date_auditor`, `/monitor/datecanon`, in `run_all`).** It audits
+the DATA not the code path — every `DATE_SEMANTIC` column AND every `*_date` column DISCOVERED from
+the live schema — so a bad date is caught regardless of producer and a NEW source is covered
+AUTOMATICALLY (coverage by the column funnel + schema discovery, not a per-source list). Critical
+only on declared columns; an unregistered `*_date` column = warn ("classify: gate it, or allowlist
+as operational"); operational instants like `pending_detections.timeout_date` are allowlisted (full
+ISO datetime is fine, it's a deadline not a sort key). Sinks (e.g. `record_detection`) also
+normalize via `to_iso_date` (defense-in-depth). **When adding a date column: register it in
+`DATE_SEMANTIC` + gate its writes, or Agent 16 flags it next cycle.** Verified live 2026-06-23:
+status ok, 0 non-canonical across all 8 date-semantic columns.
+
+**Ledger pending-backlog (same session).** The Accuracy-Ledger sweep (`sweep_pending`) had no
+`ORDER BY` (re-checked the same head rows forever) + ran once/day at 8/run vs ~20 detections/score-
+cycle inflow → 1066 stuck pending, with the slow-to-confirm LED wins stranded in the tail. Fixed
+(safe set): (1) rotate oldest-checked-first; (2) past-deadline rows resolve FALSE_POSITIVE with NO
+Apify fetch; (3) own cadence `LEDGER_SWEEP_INTERVAL_HOURS` (default 6h), env-tunable vs Apify budget.
+Deferred (backtest-gated): shorten `LEDGER_TIMEOUT_DAYS` 90→~45; prioritize fetches by window+conviction.
+
+See [[serve-payload-cache-gotcha]], [[feedback-verify-before-ship]], [[project-read-path-prewarm]],
+and [[feedback-integrity-standard]]. The nightly audit (`nowtrendin_data_adapter.py`) is
+read-only/stored-data-only — see [[deploy-topology]].
