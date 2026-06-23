@@ -4958,6 +4958,16 @@ def _prewarm_caches() -> dict:
         warmed.append({"feed": "topics", "rows": len(grid)})
     except Exception as e:
         warmed.append({"feed": "topics", "error": str(e)})
+    # History view (web + mobile): warm every user-facing window at the default
+    # points=12 so the heavy trajectory build never blocks a load. Shorter windows
+    # are cheaper; all stay hot because prewarm re-runs inside the cache TTL.
+    for _win in ("7d", "24h", "12h"):
+        try:
+            hist = _compute_history_full(_win, 12)
+            _cache.set(f"history_full:{_win}:12", hist, CACHE_TTL_SCORES_FULL)
+            warmed.append({"feed": f"history:{_win}", "rows": len(hist)})
+        except Exception as e:
+            warmed.append({"feed": f"history:{_win}", "error": str(e)})
     dt = round(_t.time() - t0, 2)
     _PREWARM_STATUS.update({"last_run": datetime.now(timezone.utc).isoformat(),
                             "warmed": warmed, "elapsed_s": dt})
@@ -7233,17 +7243,16 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
     return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True}
 
 
-@app.get("/history/recent")
-def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2000),
-                   points: int = Query(12, ge=2, le=40)):
-    """Recent scoring TRAJECTORY per topic — powers the History view (web + mobile,
-    one shared source). One call returns each topic's current score (from the
-    calibrated serve_payload, so it matches /scores) plus its last `points` cycles
-    within `window` and a slope-based up/down/flat trend, so clients draw sparklines
-    without N requests."""
+HISTORY_FULL_CAP = int(os.getenv("HISTORY_FULL_CAP", "2000"))
+
+def _compute_history_full(window: str, points: int) -> list:
+    """Heavy per-topic trajectory build for the History view — computed at the full
+    cap (limit-INDEPENDENT) so the endpoint can cache it once per (window, points)
+    and serve O(1) slices. Read-only: pulls from velocity_scores, writes nothing."""
     import datetime as _dt
     hours = {"12h": 12, "24h": 24, "7d": 168, "30d": 720}.get(window, 168)
     cut = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=hours)).isoformat()
+    cap = HISTORY_FULL_CAP
     conn = get_db(DB_PATH)
     try:
         latest = conn.execute(
@@ -7254,14 +7263,14 @@ def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2
               ON v.topic_key = l.topic_key AND v.scored_at = l.m
             ORDER BY v.overall_score DESC NULLS LAST
             LIMIT ?
-            """, (cut, limit * 3)).fetchall()
+            """, (cut, cap * 3)).fetchall()
         picked = []
         for r in latest:
             disp = r["topic_display"] or r["topic_key"]
             if not _is_quality_topic(disp):
                 continue
             picked.append(dict(r))
-            if len(picked) >= limit:
+            if len(picked) >= cap:
                 break
         keys = [r["topic_key"] for r in picked]
         series = {}
@@ -7304,7 +7313,29 @@ def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2
             "is_anomaly": bool(cur.get("is_gravitational_anomaly")),
             "scored_at": r["scored_at"], "series": s, "trend": trend, "slope": slope,
         })
-    return {"window": window, "count": len(out), "results": out}
+    return out
+
+
+@app.get("/history/recent")
+def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2000),
+                   points: int = Query(12, ge=2, le=40)):
+    """Recent scoring TRAJECTORY per topic — powers the History view (web + mobile,
+    one shared source). One call returns each topic's current score (from the
+    calibrated serve_payload, so it matches /scores) plus its last `points` cycles
+    within `window` and a slope-based up/down/flat trend, so clients draw sparklines
+    without N requests.
+
+    Superset-cached per (window, points) and kept hot by the Prewarm Agent, then
+    sliced to `limit` — so the heavy per-topic trajectory build runs at most once
+    per cache window instead of on every load (was ~6s/2MB uncached on the 7d view).
+    Same shape, fields, and ordering as before; cache is read-only."""
+    super_key = f"history_full:{window}:{points}"
+    full = _cache.get(super_key)
+    if full is None:
+        full = _compute_history_full(window, points)
+        _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
+    page = full[:limit]
+    return {"window": window, "count": len(page), "total": len(full), "results": page}
 
 
 @app.get("/history/{topic_key}/analysis")
