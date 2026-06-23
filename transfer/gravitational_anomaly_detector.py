@@ -4736,15 +4736,27 @@ def start_scheduler():
                     accuracy.validate_recent_detections(DB_PATH)
                 except Exception as _ae:
                     print(f"[scheduler] accuracy error: {_ae}")
-            # Honest-denominator ledger: resolve pending detections (breakout →
-            # LED/LAGGED; past deadline → FALSE_POSITIVE), capped per day to
-            # respect the Apify Trends budget.
-            if _LEDGER_PLUS_AVAILABLE:
-                try:
-                    ledger_plus.sweep_pending(
-                        DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
-                except Exception as _se:
-                    print(f"[scheduler] ledger sweep error: {_se}")
+            # NOTE: the honest-denominator ledger sweep moved OUT of this once-daily
+            # velocity recompute into its own job (_scheduled_ledger_sweep), so it can
+            # run several times a day and drain the pending pool faster — see below.
+
+        def _scheduled_ledger_sweep():
+            """Resolve pending detections into hits / counted misses — a capped batch
+            per run (LEDGER_SWEEP_LIMIT), rotating OLDEST-CHECKED-FIRST so the whole
+            pool drains over time (fix #1) instead of re-checking the same head rows.
+            Decoupled from the daily velocity recompute and run every
+            LEDGER_SWEEP_INTERVAL_HOURS so the slow-to-confirm LED wins surface sooner.
+            COST: each still-in-window row spends one Apify Trends fetch; rows already
+            past their timeout resolve FREE — no fetch (fix #2). Tune cadence/limit
+            against the Apify budget (Cost Sentinel /monitor/cost, apify_trends)."""
+            if not _LEDGER_PLUS_AVAILABLE:
+                return
+            try:
+                out = ledger_plus.sweep_pending(
+                    DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
+                print(f"[scheduler] ledger sweep: {out}")
+            except Exception as _se:
+                print(f"[scheduler] ledger sweep error: {_se}")
 
         _sched = BackgroundScheduler(timezone="UTC")
         # ── Hybrid role gating ──
@@ -4804,6 +4816,17 @@ def start_scheduler():
         _sched.add_job(_scheduled_velocities, "cron", hour=6, minute=0,
                        id="recompute_velocities", max_instances=1,
                        coalesce=True)
+        # Ledger sweep on its OWN cadence (default every 6h = 4×/day, up from the old
+        # once-daily piggyback) so pending detections — especially the slow-to-confirm
+        # LED wins — drain faster. Capped at LEDGER_SWEEP_LIMIT/run; timed-out rows
+        # resolve without a fetch. Cadence/limit are env-tunable against the Apify
+        # Trends budget (each in-window row = one Apify run; watch /monitor/cost).
+        _ledger_sweep_h = int(os.getenv("LEDGER_SWEEP_INTERVAL_HOURS", "6"))
+        _sched.add_job(_scheduled_ledger_sweep, "interval", hours=_ledger_sweep_h,
+                       id="ledger_sweep", max_instances=1, coalesce=True,
+                       misfire_grace_time=600, next_run_time=_soon)
+        print(f"[scheduler] LEDGER SWEEP job every {_ledger_sweep_h}h "
+              f"(limit {os.getenv('LEDGER_SWEEP_LIMIT', '8')}/run, oldest-checked-first)")
         # X velocity-trigger scan every 6h over the top-N topics. The volume
         # scan (counts/recent) is FREE vs the post cap; deep author-gradient
         # pulls are spent only on movers AND capped by the monthly post budget.

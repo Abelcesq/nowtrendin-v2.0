@@ -120,11 +120,25 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
-    """Resolve pending detections into hits or counted misses."""
+    """Resolve pending detections into hits or counted misses.
+
+    ROTATION (fix #1): order by oldest-checked first (`last_checked` ASC, NULLs
+    first) so each capped run advances through the WHOLE pool instead of re-hitting
+    the same head-of-table rows every time — a `LIMIT n` with no order would re-check
+    the first n forever and never reach the tail (where the slow-to-confirm LED wins
+    sit). Every row that stays pending gets its `last_checked` stamped to `now`, which
+    sends it to the back of the queue.
+
+    TIMEOUT-FIRST (fix #2): a row already past its deadline is a FALSE_POSITIVE that
+    needs NO Trends curve to confirm — resolve it before spending an Apify fetch, so
+    the paid budget is spent only on rows that might still be breaking out."""
     if not _HAS_BASE:
         return {"available": False}
     conn = db_compat.connect(db_path)
-    q = "SELECT * FROM pending_detections WHERE status='pending'"
+    # Oldest-checked first; never-checked (NULL) rows lead. Portable across PG + SQLite
+    # (avoids relying on NULLS FIRST support).
+    q = ("SELECT * FROM pending_detections WHERE status='pending' "
+         "ORDER BY (last_checked IS NULL) DESC, last_checked ASC")
     if limit:
         q += f" LIMIT {int(limit)}"
     pending = [dict(r) for r in conn.execute(q).fetchall()]
@@ -132,6 +146,21 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     now = datetime.now(timezone.utc)
     led = lagged = same = fp = still = late = 0
     for p in pending:
+        # TIMEOUT-FIRST (free): past the deadline → FALSE_POSITIVE with no Trends fetch.
+        timed_out = False
+        if p.get("timeout_date"):
+            try:
+                timed_out = now > _parse(p["timeout_date"])
+            except Exception:
+                timed_out = False
+        if timed_out:
+            rec_id = hashlib.md5(f"fp-{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
+            _upsert_ledger(conn, rec_id, p, None, None, None, "FALSE_POSITIVE", "timeout")
+            conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
+            conn.commit()
+            fp += 1
+            continue
+        # Still within the window → spend a Trends fetch to see if it has broken out.
         try:
             curve = fetch(p["topic_display"])
         except Exception:
@@ -167,23 +196,12 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                 elif lead["verdict"] == "LAGGED": lagged += 1
                 else: same += 1
                 continue
-        timed_out = False
-        if p.get("timeout_date"):
-            try:
-                timed_out = now > _parse(p["timeout_date"])
-            except Exception:
-                timed_out = False
-        if timed_out:
-            rec_id = hashlib.md5(f"fp-{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
-            _upsert_ledger(conn, rec_id, p, None, None, None, "FALSE_POSITIVE", "timeout")
-            conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
-            conn.commit()
-            fp += 1
-        else:
-            conn.execute("UPDATE pending_detections SET last_checked=? WHERE id=?",
-                         (now.isoformat(), p["id"]))
-            conn.commit()
-            still += 1
+        # No breakout, not timed out → stays pending; stamp last_checked so rotation
+        # moves past it to the next-oldest row on the following run.
+        conn.execute("UPDATE pending_detections SET last_checked=? WHERE id=?",
+                     (now.isoformat(), p["id"]))
+        conn.commit()
+        still += 1
     conn.close()
     out = {"resolved_led": led, "resolved_lagged": lagged, "resolved_same_day": same,
            "resolved_false_positive": fp, "resolved_late_redetection": late,
