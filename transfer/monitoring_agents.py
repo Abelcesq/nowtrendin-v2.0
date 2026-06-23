@@ -975,15 +975,23 @@ def canon_date_auditor(conn=None, db_path=None) -> dict:
     alerts = []
     declared = ingestion_gate.DATE_SEMANTIC
     declared_set = {(t, c) for t, cols in declared.items() for c in cols}
-    discovered = _discover_date_columns(conn)
-    # (b) drift — a date-named column nobody registered/gated (likely a new source)
+    # Date-NAMED columns that are intentionally operational INSTANTS (full ISO datetime),
+    # NOT canonical primary sort keys — §14 allows these to keep their precise instant.
+    # Allowlisted so they are neither flagged as drift nor value-audited as bare dates.
+    operational = {("pending_detections", "timeout_date")}
+    discovered = _discover_date_columns(conn) - operational
+    # (b) drift — a date-named column nobody registered/gated (likely a new source).
+    #     WARN (classify it: gate + register it, OR add to the operational allowlist) —
+    #     NOT critical, since an unclassified column might be an operational instant.
     undeclared = sorted(discovered - declared_set)
     if undeclared:
         alerts.append({"level": "warn", "block": "B3a",
             "msg": f"{len(undeclared)} '*_date' column(s) NOT in the gate registry "
-                   f"(possible ungated source — wire ingestion_gate.gate_date + add to "
-                   f"DATE_SEMANTIC): " + ", ".join(f"{t}.{c}" for t, c in undeclared[:8])})
-    # (a) canonical compliance per column (declared ∪ discovered)
+                   f"(classify: gate_date + add to DATE_SEMANTIC, or allowlist as "
+                   f"operational): " + ", ".join(f"{t}.{c}" for t, c in undeclared[:8])})
+    # (a) canonical compliance per column. CRITICAL only for DECLARED canonical columns
+    #     (a bad value there is a real §14 violation — the bug this agent exists to catch);
+    #     undeclared columns are covered by the WARN above (values shown for context).
     by_col, total_bad = [], 0
     for t, c in sorted(declared_set | discovered):
         if not (_IDENT_RE.match(str(t)) and _IDENT_RE.match(str(c))):
@@ -992,16 +1000,20 @@ def canon_date_auditor(conn=None, db_path=None) -> dict:
             rows = conn.execute(
                 f"SELECT {c} AS v FROM {t} WHERE {c} IS NOT NULL AND {c} <> ''").fetchall()
         except Exception:
-            continue   # column/table absent on this DB — skip silently
+            continue   # column/table absent on this DB - skip silently
         vals = [(r["v"] if hasattr(r, "keys") else r[0]) for r in rows]
         bad = [v for v in vals if not is_iso_date(v)]
-        total_bad += len(bad)
-        rec = {"column": f"{t}.{c}", "rows": len(vals), "non_canonical": len(bad)}
+        is_declared = (t, c) in declared_set
+        if is_declared:
+            total_bad += len(bad)
+        rec = {"column": f"{t}.{c}", "declared": is_declared,
+               "rows": len(vals), "non_canonical": len(bad)}
         if bad:
             rec["examples"] = sorted({str(v) for v in bad})[:3]
-            alerts.append({"level": "critical", "block": "B3a",
-                "msg": f"{t}.{c}: {len(bad)}/{len(vals)} non-canonical date(s), "
-                       f"e.g. {rec['examples']}"})
+            if is_declared:
+                alerts.append({"level": "critical", "block": "B3a",
+                    "msg": f"{t}.{c}: {len(bad)}/{len(vals)} non-canonical date(s), "
+                           f"e.g. {rec['examples']}"})
         by_col.append(rec)
     # (c) gate escalations awaiting a human decision
     try:
