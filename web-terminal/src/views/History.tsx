@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
 import { ScoreChart, type ChartPoint } from '../components/ScoreChart'
@@ -36,9 +36,15 @@ export function History({ initialQ }: { initialQ?: string }) {
   // (e.g. a low-scoring topic like SpaceX at ~40 that doesn't rank in the top 80).
   const [directHit, setDirectHit] = useState<HistoryRow | null>(null)
 
+  // Progressive load — 100 topics at a time so the list paints on the first page
+  // instead of blocking on one ~2MB payload. A token guards against a stale window's
+  // batches landing after the user switched windows.
+  const loadTok = useRef(0)
   const load = (w: string) => {
+    const tok = ++loadTok.current
     setLoading(true)
-    api.historyRecent(w, 2000).then((d) => setRows(d.results || [])).catch(() => setRows([])).finally(() => setLoading(false))
+    api.historyAll(w, (batch) => { if (loadTok.current === tok) { setRows(batch); setLoading(false) } })
+      .catch(() => { if (loadTok.current === tok) { setRows([]); setLoading(false) } })
   }
   useEffect(() => load(win), [win])
   // When a dashboard tile navigates here with a topic pre-set, apply the filter.

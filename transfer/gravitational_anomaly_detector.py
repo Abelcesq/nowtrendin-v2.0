@@ -4968,6 +4968,14 @@ def _prewarm_caches() -> dict:
             warmed.append({"feed": f"history:{_win}", "rows": len(hist)})
         except Exception as e:
             warmed.append({"feed": f"history:{_win}", "error": str(e)})
+    # Market Signal (/risk/scores): warm the full instrument universe so the Market
+    # tab paints instantly too — full parity with scores/topics/history.
+    try:
+        rf = _compute_risk_full()
+        _cache.set("risk_full", rf, CACHE_TTL_SCORES_FULL)
+        warmed.append({"feed": "risk", "rows": len(rf.get("results") or [])})
+    except Exception as e:
+        warmed.append({"feed": "risk", "error": str(e)})
     dt = round(_t.time() - t0, 2)
     _PREWARM_STATUS.update({"last_run": datetime.now(timezone.utc).isoformat(),
                             "warmed": warmed, "elapsed_s": dt})
@@ -5411,12 +5419,30 @@ def get_anomalies(limit: int = Query(20, ge=1, le=100)):
     return result
 
 
-@app.get("/risk/scores")
-def risk_scores(limit: int = Query(50, ge=1, le=200)):
-    """Risk Gradient Scores — emerging financial risks scored by diffusion stage."""
+RISK_FULL_CAP = int(os.getenv("RISK_FULL_CAP", "300"))
+
+def _compute_risk_full() -> dict:
+    """Full Market-Signal universe computed at the cap (limit-INDEPENDENT) so the
+    endpoint can cache it once + serve O(1) slices. Read-only: get_risk_scores reads
+    risk_signals/serve payloads, writes nothing."""
     if not _RISK_AVAILABLE:
         return {"count": 0, "results": []}
-    return risk.get_risk_scores(DB_PATH, limit)
+    return risk.get_risk_scores(DB_PATH, RISK_FULL_CAP)
+
+@app.get("/risk/scores")
+def risk_scores(limit: int = Query(50, ge=1, le=300), offset: int = Query(0, ge=0)):
+    """Risk Gradient Scores — emerging financial risks scored by diffusion stage;
+    the Market Signal data source. Superset-cached and kept hot by the Prewarm
+    Agent, then sliced to (offset, limit) so the web can page 100 at a time instead
+    of pulling the whole rich payload at once. Read-only; same shape + ordering."""
+    full = _cache.get("risk_full")
+    if full is None:
+        full = _compute_risk_full()
+        _cache.set("risk_full", full, CACHE_TTL_SCORES_FULL)
+    all_results = full.get("results") or []
+    page = all_results[offset: offset + limit]
+    return {"count": len(page), "total": len(all_results),
+            "offset": offset, "limit": limit, "results": page}
 
 
 @app.get("/macro/leverage")
@@ -7324,7 +7350,7 @@ def _compute_history_full(window: str, points: int) -> list:
 
 @app.get("/history/recent")
 def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2000),
-                   points: int = Query(12, ge=2, le=40)):
+                   offset: int = Query(0, ge=0), points: int = Query(12, ge=2, le=40)):
     """Recent scoring TRAJECTORY per topic — powers the History view (web + mobile,
     one shared source). One call returns each topic's current score (from the
     calibrated serve_payload, so it matches /scores) plus its last `points` cycles
@@ -7332,16 +7358,18 @@ def history_recent(window: str = Query("7d"), limit: int = Query(300, ge=1, le=2
     without N requests.
 
     Superset-cached per (window, points) and kept hot by the Prewarm Agent, then
-    sliced to `limit` — so the heavy per-topic trajectory build runs at most once
-    per cache window instead of on every load (was ~6s/2MB uncached on the 7d view).
+    sliced to (offset, limit) — so the heavy per-topic trajectory build runs at most
+    once per cache window instead of on every load (was ~6s/2MB uncached on the 7d
+    view), and the web can page 100 at a time instead of pulling 2MB at once.
     Same shape, fields, and ordering as before; cache is read-only."""
     super_key = f"history_full:{window}:{points}"
     full = _cache.get(super_key)
     if full is None:
         full = _compute_history_full(window, points)
         _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
-    page = full[:limit]
-    return {"window": window, "count": len(page), "total": len(full), "results": page}
+    page = full[offset: offset + limit]
+    return {"window": window, "count": len(page), "total": len(full),
+            "offset": offset, "limit": limit, "results": page}
 
 
 @app.get("/history/{topic_key}/analysis")

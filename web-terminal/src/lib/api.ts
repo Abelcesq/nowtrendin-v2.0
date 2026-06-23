@@ -80,10 +80,40 @@ export const api = {
   historyRecent: (window = '7d', limit = 80) =>
     get<{ window: string; count: number; results: HistoryRow[] }>(
       `/history/recent?window=${window}&limit=${limit}`),
+  // The WHOLE History window, fetched 100 at a time (engine serves O(1) slices from
+  // its prewarmed superset). onBatch fires after each page so the list paints
+  // progressively instead of waiting on one ~2MB payload.
+  historyAll: async (window = '7d', onBatch?: (rows: HistoryRow[], done: boolean) => void): Promise<HistoryRow[]> => {
+    const all: HistoryRow[] = []; const PAGE = 100; let offset = 0;
+    for (let i = 0; i < 100; i++) {
+      const d = await get<{ total: number; results: HistoryRow[] }>(
+        `/history/recent?window=${window}&limit=${PAGE}&offset=${offset}`);
+      const batch = d.results || []; all.push(...batch); offset += PAGE;
+      const done = batch.length < PAGE || all.length >= (d.total ?? all.length);
+      onBatch?.(all.slice(), done);
+      if (done) break;
+    }
+    return all;
+  },
   historyAnalysis: (key: string, topic = '') =>
     get<{ available: boolean; direction?: string; short?: string; full?: string; citations?: string[]; reason?: string }>(
       `/history/${encodeURIComponent(key)}/analysis${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
+  // The WHOLE Market universe, fetched 100 at a time (engine serves O(1) slices from
+  // its prewarmed superset). onBatch fires after each page so the table paints
+  // progressively despite the rich per-instrument payloads.
+  riskAll: async (onBatch?: (rows: RiskRow[], done: boolean) => void): Promise<RiskRow[]> => {
+    const all: RiskRow[] = []; const PAGE = 100; let offset = 0;
+    for (let i = 0; i < 100; i++) {
+      const d = await get<{ total: number; results: RiskRow[] }>(
+        `/risk/scores?limit=${PAGE}&offset=${offset}`);
+      const batch = d.results || []; all.push(...batch); offset += PAGE;
+      const done = batch.length < PAGE || all.length >= (d.total ?? all.length);
+      onBatch?.(all.slice(), done);
+      if (done) break;
+    }
+    return all;
+  },
   ledgerDetail: (verdict = '') =>
     get<{ status: string; count: number; rows: LedgerRow[] }>(
       `/accuracy/ledger/detail?limit=500${verdict ? `&verdict=${verdict}` : ''}`),

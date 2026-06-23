@@ -367,10 +367,12 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
     } finally { setPulling(false) }
   }
 
+  // Progressive load — 100 instruments at a time so the table paints on the first
+  // page instead of blocking on the whole rich payload (engine serves O(1) slices
+  // from its prewarmed superset).
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
-    api.risk(200)
-      .then((d) => { if (alive) setRows((d.results || []).map(toRow)) })
+    api.riskAll((batch) => { if (alive) { setRows(batch.map(toRow)); setLoading(false) } })
       .catch((e) => alive && setErr(String(e.message || e)))
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
