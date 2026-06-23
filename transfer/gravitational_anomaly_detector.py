@@ -4987,8 +4987,14 @@ def _prewarm_loop():
 
 @app.get("/prewarm")
 def prewarm_now():
-    """Manually warm the superset caches now (read-only) + return the agent status."""
-    return _prewarm_caches()
+    """Kick a fresh warm in the BACKGROUND (non-blocking) + return the most recent
+    agent status. Warming all supersets (scores + topics + history×3) synchronously
+    exceeds Heroku's 30s router limit, so the manual endpoint must not block on it;
+    the background loop warms on its own schedule regardless. Read-only."""
+    _threading.Thread(target=_prewarm_caches, daemon=True, name="prewarm-manual").start()
+    return {"agent": "prewarm", "read_only": True, "kicked": True,
+            "interval_min": PREWARM_INTERVAL_MIN, "ttl_s": CACHE_TTL_SCORES_FULL,
+            **_PREWARM_STATUS}
 
 
 @app.on_event("startup")
