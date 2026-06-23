@@ -1235,7 +1235,10 @@ def _is_quality_topic(display: str) -> bool:
     t = (display or "").strip().lower()
     if not t:
         return False
-    toks = t.split()
+    # Split on whitespace AND underscores — some sources emit underscored field-name
+    # fragments ("show_article_date") that would otherwise dodge the word/bigram checks
+    # as a single token. For clean space-separated displays this is identical to .split().
+    toks = [w for w in re.split(r"[\s_]+", t) if w]
     if any(w in PROFANITY for w in toks):
         return False
     # concatenated-junk token (onlinedynamicbatching) + promotional/gambling spam —
@@ -1245,7 +1248,8 @@ def _is_quality_topic(display: str) -> bool:
     if any(w in SPAM_TERMS for w in toks):
         return False
     # Known real concept-phrase (recall whitelist) — passes the all-common-words rule.
-    if t in KNOWN_CONCEPT_PHRASES:
+    # Use the normalized (space-joined) form so underscored inputs still match.
+    if " ".join(toks) in KNOWN_CONCEPT_PHRASES:
         return True
     if len(toks) == 1:
         w = toks[0]
