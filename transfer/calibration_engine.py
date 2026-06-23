@@ -1346,17 +1346,27 @@ class CalibrationEngine:
         )
 
         # ── 5. Recalculate scores with calibrated gradient ───────
-        I   = raw_result.get("inertia_score", 0)
-        M   = raw_result.get("platform_diversity", 0)
-        D   = raw_result.get("dark_matter_score", 0)
-        C   = raw_result.get("confidence_decay", 0)
+        # NOTE: this recompute is a LEGACY path retained for calibration_agent
+        # comparisons only. The AUTHORITATIVE score recompute is in
+        # signal_calibration_integration.apply_calibration (lines ~1127-1145),
+        # which is the path that actually writes to velocity_scores. Weights
+        # imported from scoring_weights.py (the single source of truth).
+        try:
+            from scoring_weights import WEIGHTS_OVERALL, WEIGHTS_DETECTION, WEIGHTS_CONFIDENCE
+        except ImportError:
+            WEIGHTS_OVERALL    = {"G": .244, "I": .222, "M": .167, "D": .133, "C": .078, "P": .156}
+            WEIGHTS_DETECTION  = {"G": .375, "D": .216, "I": .182, "M": .102, "C": .057, "P": .068}
+            WEIGHTS_CONFIDENCE = {"I": .278, "P": .267, "M": .222, "G": .122, "C": .067, "D": .044}
+        I   = raw_result.get("inertia_score", 0) or 0
+        M   = raw_result.get("platform_diversity", 0) or 0
+        D   = raw_result.get("dark_matter_score", 0) or 0
+        C   = raw_result.get("confidence_decay", 0) or 0
+        P   = raw_result.get("persistence_score", 0) or 0
 
-        overall_cal = round(min(100,
-            cal_G * 0.30 + I * 0.25 + M * 0.20 + D * 0.15 + C * 0.10), 2)
-        detection_cal = round(min(100,
-            cal_G * 0.40 + D * 0.25 + I * 0.20 + M * 0.10 + C * 0.05), 2)
-        confidence_cal = round(min(100,
-            I * 0.35 + M * 0.30 + cal_G * 0.20 + C * 0.10 + D * 0.05), 2)
+        comps = {"G": cal_G, "I": I, "M": M, "D": D, "C": C, "P": P}
+        overall_cal    = round(min(100, sum(comps[k] * WEIGHTS_OVERALL[k]    for k in comps)), 2)
+        detection_cal  = round(min(100, sum(comps[k] * WEIGHTS_DETECTION[k]  for k in comps)), 2)
+        confidence_cal = round(min(100, sum(comps[k] * WEIGHTS_CONFIDENCE[k] for k in comps)), 2)
         gap_cal = round(detection_cal - confidence_cal, 1)
 
         # Recalculate stage from calibrated overall

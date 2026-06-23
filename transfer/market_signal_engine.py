@@ -47,6 +47,15 @@ import sqlite3
 from date_utils import to_iso_date, iso_time_of, source_has_time
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
+
+# ── Score-quarantine feature flag (mirrors signal_calibration_integration) ────
+# When True: assemble_market_components returns None for positioning_concentration
+# when both FINRA (short_interest) and WhaleWisdom (institutional_holdings) are
+# absent, so compute_market_signal excludes it and renormalizes weights rather than
+# treating the artificial 0.0 default as a real reading.
+# DEFAULT = False. Flip only after Phase 2 (Wikipedia+GDELT referee) validates.
+_MKT_QUARANTINE = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "true"
+
 MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
 # Cold-start guard (Fix #1, market diagnostic): a baseline of 3–9 cycles passes the
 # MIN_BASELINE_CYCLES gate but is too thin to trust — the 0.05 stdev floor dominates
@@ -146,7 +155,16 @@ def compute_market_signal(item_key: str, item_name: str,
                           components_current: dict,
                           baselines: Optional[dict] = None) -> dict:
     baselines = baselines or {}
-    scored = {n: score_component(components_current.get(n, 0.0), baselines.get(n))
+    # When _MKT_QUARANTINE=True a component may be None (structurally absent,
+    # e.g. positioning_concentration when FINRA+WhaleWisdom are both unavailable).
+    # Gate absent-set on the flag so the default-off path is byte-identical to
+    # the original: get(n, 0.0) for missing keys, no renormalization.
+    absent = ({n for n in COMPONENT_LABELS if components_current.get(n) is None}
+              if _MKT_QUARANTINE else set())
+    scored = {n: score_component(
+                  (components_current.get(n, 0.0) if n not in absent
+                   else 0.0),
+                  baselines.get(n))
               for n in COMPONENT_LABELS}
     any_calibrating = any(s.get("calibrating") for s in scored.values())
     # Count components with current=0.0 (absent inputs treated as zero).
@@ -154,10 +172,20 @@ def compute_market_signal(item_key: str, item_name: str,
     # read reflects missing data coverage — not a genuinely quiet market.
     zero_inputs = sum(1 for s in scored.values() if s.get("current", -1) == 0.0)
 
-    detection = round(sum(DETECTION_WEIGHTS[c] * scored[c]["score"]
-                          for c in DETECTION_WEIGHTS) * 100, 1)
-    confidence = round(sum(CONFIDENCE_WEIGHTS[c] * scored[c]["score"]
-                           for c in CONFIDENCE_WEIGHTS) * 100, 1)
+    def _weighted(weights: dict) -> float:
+        if absent:
+            # Renormalize over present components so absent ones don't drag the
+            # weighted sum down artificially. Preserves the relative emphasis of
+            # the present inputs.
+            present = {c: w for c, w in weights.items() if c not in absent}
+            total_w = sum(present.values())
+            if not total_w:
+                return 0.0
+            return sum(present[c] * scored[c]["score"] / total_w for c in present) * 100
+        return sum(weights[c] * scored[c]["score"] for c in weights) * 100
+
+    detection  = round(_weighted(DETECTION_WEIGHTS), 1)
+    confidence = round(_weighted(CONFIDENCE_WEIGHTS), 1)
     gap = round(detection - confidence, 1)
     interp = _interpret_gap(detection, confidence, gap, any_calibrating, zero_inputs, len(scored))
 
@@ -244,12 +272,20 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
     cov = sum(1 for c in (cc.get("creators") or []) if c.get("covered")) + len(bcov.get("channels") or [])
     analyst = _norm(math.log1p(art) / math.log1p(50) * 0.6 + sent * 0.3 + min(cov, 8) / 8 * 0.1)
 
-    # Positioning Concentration — shorts + 13F change + insider (stage-1)
-    si_chg = abs(si.get("change_pct") or 0.0)
+    # Positioning Concentration — shorts + 13F change + insider (stage-1).
+    # When _MKT_QUARANTINE=True and BOTH FINRA (si) and WhaleWisdom (iw) are
+    # absent, return None so compute_market_signal renormalizes weights over
+    # present components only (absent ≠ genuinely zero). Flag is default False;
+    # flip only after Phase 2 referee validates direction.
+    si_chg   = abs(si.get("change_pct") or 0.0)
     inst_chg = abs(iw.get("shares_change_pct") or 0.0)
-    insider = stages.get(1, 0)
-    pos_conc = _norm(min(si_chg, 30) / 30 * 0.4 + min(inst_chg, 40) / 40 * 0.4
-                     + math.log1p(insider) / math.log1p(20) * 0.2)
+    insider  = stages.get(1, 0)
+    _both_absent = (not si) and (not iw)
+    if _MKT_QUARANTINE and _both_absent and insider == 0:
+        pos_conc = None  # structurally absent — exclude from weighted sum
+    else:
+        pos_conc = _norm(min(si_chg, 30) / 30 * 0.4 + min(inst_chg, 40) / 40 * 0.4
+                         + math.log1p(insider) / math.log1p(20) * 0.2)
 
     # Dark Positioning — macro / cross-market (OFR funding stress + repo change)
     stress = ((macro.get("funding_stress") or {}).get("label") or "").lower()
@@ -291,7 +327,9 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
 
     return {
         "dark_positioning": round(dark, 3),
-        "positioning_concentration": round(pos_conc, 3),
+        # pos_conc may be None (absent) when _MKT_QUARANTINE=True and both
+        # FINRA + WhaleWisdom are unavailable. compute_market_signal handles None.
+        "positioning_concentration": (None if pos_conc is None else round(pos_conc, 3)),
         "analyst_signal": round(analyst, 3),
         "fundamental_confirmation": round(fundamental, 3),
         "market_momentum": round(momentum, 3),

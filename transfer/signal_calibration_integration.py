@@ -93,6 +93,32 @@ except ImportError:
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 
+# ── Score-quarantine feature flag ────────────────────────────────────────────
+# When True: None-aware component reads in apply_calibration — absent inputs
+# are excluded from the weighted sum (weights renormalized over present
+# components only) rather than defaulting to 0.0, which is indistinguishable
+# from a genuine zero signal.
+#
+# DEFAULT = False. Production scores are unchanged until Phase 2 (Wikipedia
+# + GDELT referee) validates the direction. Flip to "true" only after backtest.
+SCORE_QUARANTINE_ENABLED = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "true"
+
+
+def _quarantine_weighted_sum(components: dict, weights: dict) -> float:
+    """
+    None-aware weighted average used when SCORE_QUARANTINE_ENABLED is True.
+    Absent (None) components are excluded; weights are renormalized over the
+    present subset so the sum of active weights still equals 1.0.
+    Returns 0.0 when ALL components are absent (prevents division by zero).
+    """
+    active = {k: v for k, v in components.items() if v is not None}
+    if not active:
+        return 0.0
+    total_w = sum(weights[k] for k in active)
+    if total_w == 0:
+        return 0.0
+    return sum(active[k] * weights[k] / total_w for k in active)
+
 
 # ════════════════════════════════════════════════════════════════
 # KNOWN TOPICS SEED DATABASE
@@ -1111,37 +1137,66 @@ def apply_calibration(
     # separate columns — the engine persists one value per component. Fall back to
     # the actual stored column so Platform Diversity, Dark Matter and Confidence
     # Decay aren't silently zeroed in the serve recompute AND the breakdown display.
-    _platform = raw_result.get("platform_diversity", 0) or 0
-    _dark     = raw_result.get("dark_matter_score", 0) or 0
-    _decay    = raw_result.get("confidence_decay", 0) or 0
-    platform_d = raw_result.get("platform_diversity_detection", _platform) or 0
-    platform_c = raw_result.get("platform_diversity_confidence", _platform) or 0
-    dark_d     = raw_result.get("dark_matter_detection", _dark) or 0
-    dark_c     = raw_result.get("dark_matter_confidence", _dark) or 0
-    decay_d    = raw_result.get("confidence_decay_detection", _decay) or 0
-    decay_c    = raw_result.get("confidence_decay_confidence", _decay) or 0
+    # Raw component reads. When SCORE_QUARANTINE_ENABLED=True, None (absent data)
+    # is preserved so _quarantine_weighted_sum can renormalize over present inputs.
+    # When False (default/production): or-0 collapses None → 0.0 (current behavior).
+    if SCORE_QUARANTINE_ENABLED:
+        _platform  = raw_result.get("platform_diversity")
+        _dark      = raw_result.get("dark_matter_score")
+        _decay     = raw_result.get("confidence_decay")
+        platform_d = raw_result.get("platform_diversity_detection", _platform)
+        platform_c = raw_result.get("platform_diversity_confidence", _platform)
+        dark_d     = raw_result.get("dark_matter_detection", _dark)
+        dark_c     = raw_result.get("dark_matter_confidence", _dark)
+        decay_d    = raw_result.get("confidence_decay_detection", _decay)
+        decay_c    = raw_result.get("confidence_decay_confidence", _decay)
+        _persist   = raw_result.get("persistence_score")
+    else:
+        _platform  = raw_result.get("platform_diversity", 0) or 0
+        _dark      = raw_result.get("dark_matter_score", 0) or 0
+        _decay     = raw_result.get("confidence_decay", 0) or 0
+        platform_d = raw_result.get("platform_diversity_detection", _platform) or 0
+        platform_c = raw_result.get("platform_diversity_confidence", _platform) or 0
+        dark_d     = raw_result.get("dark_matter_detection", _dark) or 0
+        dark_c     = raw_result.get("dark_matter_confidence", _dark) or 0
+        decay_d    = raw_result.get("confidence_decay_detection", _decay) or 0
+        decay_c    = raw_result.get("confidence_decay_confidence", _decay) or 0
+        _persist   = raw_result.get("persistence_score", 0) or 0
 
     # 6-component external weights (N excluded by design; renormalized to 1.0).
     # Matches the authoritative scoring formula in gravitational_anomaly_detector.
-    _persist = raw_result.get("persistence_score", 0) or 0
-    new_detection = round(
-        cal_gradient_d * 0.375 +
-        dark_d         * 0.216 +
-        inertia_d      * 0.182 +
-        platform_d     * 0.102 +
-        decay_d        * 0.057 +
-        _persist       * 0.068,
-        1
-    )
-    new_confidence = round(
-        inertia_c      * 0.278 +
-        _persist       * 0.267 +
-        platform_c     * 0.222 +
-        cal_gradient_c * 0.122 +
-        decay_c        * 0.067 +
-        dark_c         * 0.044,
-        1
-    )
+    try:
+        from scoring_weights import WEIGHTS_DETECTION as _WD, WEIGHTS_CONFIDENCE as _WC
+    except ImportError:
+        _WD = {"G": .375, "D": .216, "I": .182, "M": .102, "C": .057, "P": .068}
+        _WC = {"I": .278, "P": .267, "M": .222, "G": .122, "C": .067, "D": .044}
+
+    if SCORE_QUARANTINE_ENABLED:
+        det_comps  = {"G": cal_gradient_d, "D": dark_d,  "I": inertia_d,
+                      "M": platform_d,     "C": decay_d,  "P": _persist}
+        conf_comps = {"G": cal_gradient_c, "D": dark_c,  "I": inertia_c,
+                      "M": platform_c,     "C": decay_c,  "P": _persist}
+        new_detection  = round(min(100, _quarantine_weighted_sum(det_comps,  _WD)), 1)
+        new_confidence = round(min(100, _quarantine_weighted_sum(conf_comps, _WC)), 1)
+    else:
+        new_detection = round(
+            cal_gradient_d * 0.375 +
+            dark_d         * 0.216 +
+            inertia_d      * 0.182 +
+            platform_d     * 0.102 +
+            decay_d        * 0.057 +
+            _persist       * 0.068,
+            1
+        )
+        new_confidence = round(
+            inertia_c      * 0.278 +
+            _persist       * 0.267 +
+            platform_c     * 0.222 +
+            cal_gradient_c * 0.122 +
+            decay_c        * 0.067 +
+            dark_c         * 0.044,
+            1
+        )
     new_overall = round((new_detection + new_confidence) / 2, 1)
 
     # ── Pathway gate: the expert-component recompute above is valid ONLY for
