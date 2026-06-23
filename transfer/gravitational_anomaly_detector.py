@@ -5896,7 +5896,7 @@ def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
         try:
             res = situation_clustering.build_from_db(
                 conn, window_hours=window_hours, min_doc_freq=min_doc_freq,
-                min_jaccard=min_jaccard)
+                min_jaccard=min_jaccard, gate=_is_quality_topic)   # pass the shared gate directly
         finally:
             conn.close()
         _SITUATIONS_CACHE.update(key=ck, at=_t.time(), data=res)
@@ -5914,8 +5914,9 @@ def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
         })
     return {"status": "ok", "held_out": True, "note": "read-only preview — affects no score",
             "window_hours": res["window_hours"], "documents": res["documents"],
-            "topics_kept": res["topics_kept"], "situation_count": res["situation_count"],
-            "situations": sits}
+            "candidates": res.get("candidates"), "topics_kept": res["topics_kept"],
+            "dropped_quality": res.get("dropped_quality"),
+            "situation_count": res["situation_count"], "situations": sits}
 
 
 @app.get("/accuracy/ledger/detail")

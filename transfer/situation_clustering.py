@@ -217,7 +217,7 @@ def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
 def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
                   min_pair_docs: int = 3, min_jaccard: float = 0.18,
                   max_signals: int = 120000, display_lookup: Optional[dict] = None,
-                  quality_only: bool = True, registry_only: bool = True) -> dict:
+                  quality_only: bool = True, registry_only: bool = True, gate=None) -> dict:
     """Assemble situations from REAL topic_signals co-occurrence over a rolling window.
     READ-ONLY: SELECTs topic_signals (+ topic_registry); writes NOTHING and touches no score.
     Topics sharing a signal_id co-occurred in the same source document. Long-tail one-off
@@ -268,8 +268,8 @@ def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
     # 4. QUALITY GATE — the engine's ONE shared gate (spam/boilerplate/fragments) + the
     #    tracked-entity requirement. Same function every scorer/agent uses, so the cluster
     #    layer can never disagree with what the rest of the engine considers a real topic.
-    gate = None
-    if quality_only:
+    #    The caller passes `gate` directly (robust); fall back to import only if not given.
+    if quality_only and gate is None:
         try:
             from gravitational_anomaly_detector import _is_quality_topic as gate
         except Exception:
