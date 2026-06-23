@@ -7,6 +7,58 @@ _Last updated: 2026-06-23c_
 
 ---
 
+## Session 2026-06-23d — Opus fundamentals audit + Phase 2 referee (Wikipedia) begun
+
+### Audit (verified against LIVE engine, not docs — verify-before-ship)
+- **Congruency audit of all scoring models / agents / contracts.** Confirmed the
+  fundamentals are largely solid LIVE, and found + fixed the gaps below.
+- **Date canon (§14) — VERIFIED CLEAN live.** `/monitor/datecanon`: 0 non-canonical
+  across all declared columns (`market_signal_history.signal_date` 71,146 rows;
+  `risk_signals.signal_date` 2,226; `accuracy_ledger.breakout_date` 21 — all 0 bad).
+  **`DB_DATA_DICTIONARY.md` is STALE** (committed 2026-06-21, pre-migration): it still
+  shows `market_signal_history.cycle_at` + MIXED formats that the live schema no longer
+  has. Doc-hygiene only — regenerate it. (Auditor blind spot noted: a declared-but-absent
+  column is silently skipped at monitoring_agents.py:1002 — fine today since the column
+  exists, fragile if a future rename desyncs DATE_SEMANTIC.)
+- **INV-1 / serve consistency — clean.** `pipeline_integrity = ok` live (no stale
+  serve_payload, no mainstream collapse). `scorer_watchdog = ok`.
+
+### Fixed (✅ shipped + deployed, engine c0705b9)
+- **heisenberg_gap derived-rule break (was live CRITICAL: 50/800).** Root cause: the
+  Enterprise `/query` path (`persist_velocity_score`) wrote the SCORE-TIME gap;
+  `apply_calibration` overwrites det/conf but inherits the stale `heisenberg_gap` from
+  `**raw_result`. The contract auditor samples the latest row per topic, so every
+  `/query` re-introduced a stale row → oscillated 33↔50, never "healed" (the SESSION_LOG
+  "healing" claim was wrong). Fix: **sink-harden** `persist_velocity_score` to recompute
+  `gap = det − conf` right before INSERT (mirrors the main path L4370). Invariant now holds
+  at the write sink regardless of caller. Zero score impact (derived display field).
+- **Weight single-source migration COMPLETED** (the "3 disagreeing recipes → 1" Step 0
+  item, finished). `scoring_weights.py` existed but the primary scorer + `ai_grade` +
+  `enterprise_intel` each kept their OWN hardcoded copy (agree-by-value, not enforced).
+  Now ALL import from `scoring_weights.py` (value-identical fallback). Primary scorer uses
+  an explicit naive left-fold `_weighted()` (NOT `sum()` — CPython 3.12 compensated
+  summation shifts the 2nd decimal on ~0.01% of rows). **Proven BIT-IDENTICAL across 200k
+  random vectors (0 mismatches)** → zero score impact, single source now real.
+
+### Phase 2 — Independent referee (Wikipedia Pageviews) — STARTED
+- **`referee_wikipedia.py` built + live-validated.** HELD-OUT (imported by NOTHING in the
+  scoring path; read-only to the score, forever — the falsifiability guard). Resolve
+  (MediaWiki opensearch, confidence-gated, quarantine-on-no-match) → daily pageviews
+  (Wikimedia REST, anchored window around our detection date) → **arrival date** = first
+  SUSTAINED surge above a lowest-40% quiet baseline, with same-surge `since` floor —
+  MIRRORS the ledger's frozen `detect_breakout_date` so both providers define "arrival"
+  identically. `lead_days = detection − arrival` (positive = we were LATE = false-early).
+  Live-tested on Hormuz/Iran/DeepSeek/ChatGPT: resolves + dates surges correctly; surfaced
+  that continuously-hot topics (Iran/Hormuz) have no clean "arrival" (the referee's honest
+  limit — precise on quiet→loud transitions).
+- **NEXT (pre-registration gate):** freeze the arrival / false-early DEFINITION with the
+  founder BEFORE computing any headline rate (punch-list rule: pre-register before looking).
+  Then: held-out `referee_observations` table, GDELT provider, false-early aggregation over
+  the real ledger, `/accuracy/referee` read-only endpoint. NO public accuracy claim before
+  this returns a measured rate.
+
+---
+
 ## Session 2026-06-23c — Step 0 🔒 feature-flagged quarantine (continued)
 
 ### Completed (✅ LIVE — pushed, deploy next)
