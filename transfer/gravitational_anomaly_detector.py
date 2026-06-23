@@ -5954,6 +5954,60 @@ def situations_search(q: str, window_hours: int = 120, min_doc_freq: int = 5,
             "situations": [_situation_public(s) for s in hits]}
 
 
+@app.get("/audit/topics", dependencies=[Depends(_require_internal)])
+def audit_topics(days: int = 7, max_topics: int = 9000):
+    """READ-ONLY audit of the current scored-topic universe (latest score per topic within
+    `days`). Writes NOTHING, deletes NOTHING (respects the 90-day retention rule). Reports:
+    quality (junk vs real via the shared gate), category distribution + catch-all %, and
+    duplicate-spelling groups — so a human can decide the compliant cleanups (serve-filter is
+    already live; this surfaces what to consolidate / what lexicon terms to add)."""
+    from datetime import datetime, timezone, timedelta
+    from collections import Counter, defaultdict
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days))).isoformat()
+    conn = get_db(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT v.topic_key AS topic_key, v.topic_display AS topic_display "
+            "FROM velocity_scores v INNER JOIN ("
+            "  SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
+            "  WHERE scored_at >= ? GROUP BY topic_key) l "
+            "ON v.topic_key=l.topic_key AND v.scored_at=l.m LIMIT ?",
+            (cutoff, int(max_topics))).fetchall()
+    finally:
+        conn.close()
+
+    def _v(r, k, i):
+        return (r[k] if hasattr(r, "keys") else r[i])
+
+    total = len(rows)
+    real = 0
+    junk, cats, groups = [], Counter(), defaultdict(set)
+    for r in rows:
+        tk = _v(r, "topic_key", 0)
+        disp = _v(r, "topic_display", 1) or (tk or "").replace("_", " ")
+        if _is_quality_topic(disp):
+            real += 1
+        elif len(junk) < 40:
+            junk.append(disp)
+        cats[_topic_category(disp) or "general"] += 1
+        groups[_topic_key(disp)].add(disp)            # same canonical key, different spellings
+    dup = {k: sorted(v) for k, v in groups.items() if len(v) > 1}
+    catchall = cats.get("news", 0) + cats.get("general", 0) + cats.get("", 0)
+    pct = lambda n: (round(100 * n / total, 1) if total else 0.0)
+    return {
+        "status": "ok", "held_out": True, "read_only": True,
+        "note": "audit only — no rows written or deleted (90-day retention rule respected)",
+        "window_days": days, "total_topics_scored": total,
+        "quality": {"real": real, "junk": total - real, "junk_pct": pct(total - real),
+                    "junk_examples": junk},
+        "category": {"distribution": dict(cats.most_common()),
+                     "catchall_pct": pct(catchall),
+                     "note": "catch-all = news/general; high % => lexicon gaps to enrich"},
+        "duplicates": {"groups": len(dup),
+                       "examples": dict(sorted(dup.items(), key=lambda kv: -len(kv[1]))[:15])},
+    }
+
+
 @app.get("/accuracy/ledger/detail")
 def accuracy_ledger_detail(limit: int = Query(300, ge=1, le=1000),
                            verdict: str = Query("", description="LED|SAME_DAY|LAGGED|FALSE_POSITIVE")):
