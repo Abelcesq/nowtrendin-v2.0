@@ -80,9 +80,13 @@ convenience, speed, and any individual spec below.
 | 12 | Frontend Consistency | `/frontend-consistency` (skill) | n/a (manual/CI) | B8 |
 | 13 | Terminal Deploy Parity | `/terminal-deploy-parity` (skill) | n/a (manual/CI) | B8 |
 | 14 | Scorer Watchdog | `/monitor/scorer` | ✅ | B4 |
+| 15 | Prewarm Agent | `/prewarm` | n/a (background loop, API process) | B8 |
 
 The combined fleet is reachable at **`/monitor`** (`run_all`). Agents 1–2 and 8 are
-the deliberately-excluded on-demand specialists.
+the deliberately-excluded on-demand specialists. Agent 15 (Prewarm) is the lone
+**operational** agent — it runs as a background daemon thread in the API process,
+not under `/monitor`; it is read-only with respect to data (it writes only the
+in-memory read cache, never a score).
 
 ### 0.5 Operational invariants & gotchas (hard rules, learned the hard way)
 
@@ -691,6 +695,48 @@ site).
 
 **7. Ongoing monitoring.** Run on demand and after every terminal deploy (manual or
 CI). Read-only.
+
+## AGENT 15 — PREWARM AGENT
+
+**1. Identity.** `/prewarm` · block B8 (serve-path) · **operational, not diagnostic** ·
+read-only with respect to data. Runs as a daemon thread (`prewarm-agent`) started in the
+**API process** at `@app.on_event("startup")`, gated by `PREWARM_ENABLED`.
+
+**2. Definition & scope.** Keeps the read-path **supersets hot** for every list feed the
+three surfaces read, so a cold cache never blocks a user load. Each cycle it recomputes +
+caches: `/scores` (overall/all/0.0), `/topics` (all categories), `/history/recent` at all
+three user windows (`7d`/`24h`/`12h`), and `/risk/scores` (the Market universe) — the same
+limit-independent `_compute_*_full()` builders the endpoints slice O(1) from. It re-warms
+every `PREWARM_INTERVAL_MIN` (default 25 min) — deliberately **inside** the cache TTL
+`CACHE_TTL_SCORES_FULL` (default 30 min) — so the cache never lapses. The manual `/prewarm`
+endpoint kicks a fresh warm on a background thread and returns the last status immediately
+(warming all five supersets synchronously, ~38–44 s, exceeds Heroku's 30 s router limit).
+
+**3. Will NOT.** Never writes a score, calibration weight, or any DB row — it only
+populates the in-memory **read** cache (`_cache`). Never blocks a request thread. It does
+**not** change what a score *is*, only how fast it serves. **Per-process caveat (hard):**
+it MUST run in the API/web process — the worker dyno has a *separate* `_cache`, so warming
+there warms the wrong cache (the original mobile cold-load bug).
+
+**4. How it supports accuracy & UX.** A fast, consistent read path is part of
+credibility: a 6 s spinner reads as "broken," and a slow surface gets reloaded, doubling
+load. It eliminated the History cold-load (was ~6 s / 2.1 MB uncached on the 7d view → ~0.4 s
+compute from warm cache) and keeps Trends/Market/History uniformly instant. It changes no
+score — INV-1 (one score everywhere) is preserved because it caches the same `serve_payload`
+the endpoints already serve.
+
+**5. Success looks like.** `GET /prewarm` shows a recent `last_run` and `warmed[]` listing
+all feeds with row counts (`scores`, `topics`, `history:7d/24h/12h`, `risk`) and no `error`
+entries; first user load of any list feed is a cache hit.
+
+**6. Problem signaling & resolution.** Each warmed feed reports `{feed, rows}` or
+`{feed, error}`; an `error` entry or a 0-row feed is the signal (DB issue, a `_compute_*`
+regression, or the agent running in the wrong process). Resolution: check the feed's
+`_compute_*_full()` and confirm `PREWARM_ENABLED` is set on the **API** dyno.
+
+**7. Ongoing monitoring.** Background loop (self-scheduling) + manual `/prewarm`
+(non-blocking). Read-only; safe to call anytime. Re-warms automatically after a deploy
+restart (the startup thread fires on boot).
 
 ---
 

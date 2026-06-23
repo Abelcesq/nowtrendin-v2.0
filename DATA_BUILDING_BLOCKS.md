@@ -244,6 +244,13 @@ mobile `frontend`) read the **same** v2 engine; none re-score. Serve-time filter
 **CHECK:** same topic shows the same score on web vs mobile; `/scores` returns
 `category` + audit fields. **FAILURE:** a client computing its own scores, or
 divergent numbers across platforms.
+**READ PATH (performance):** every list feed (`/scores`, `/topics`, `/history/recent`,
+`/risk/scores`) computes a **limit-independent superset once**, caches it, and serves
+**O(1) `(offset, limit)` slices** — so clients page **100 at a time** (no caps, no giant
+payloads) and the heavy build runs at most once per cache window. The **Prewarm Agent**
+(§10.J) keeps those supersets hot in the API process so the first load is already a cache
+hit. Caching/pagination govern *serving only* — they change no score (INV-1 holds because
+the cache holds the same `serve_payload`).
 
 ---
 
@@ -322,6 +329,19 @@ a typed alert. (These are specs to build; the checks already exist as endpoints.
   corroboration-floor health (`CATCHALL_MIN_SOURCES`, ≥2 distinct sources; single-source
   LEAK = floor disabled/purge overdue), misclassified tracked calls (ledger/pending stuck
   in catch-all), and the top lexicon-candidate terms to reclassify into `topic_categories._LEX`.
+
+### J. Prewarm Agent — owns **B8 (serve-path performance)** ✅ LIVE (`/prewarm`) — OPERATIONAL, read-only re: data
+- The lone **operational** agent (not a `/monitor` diagnostic). Runs as a daemon thread
+  in the **API process** (startup, gated by `PREWARM_ENABLED`); writes ONLY the in-memory
+  read cache (`_cache`), never a score or DB row. Each cycle (`PREWARM_INTERVAL_MIN`,
+  default 25 min — deliberately inside the `CACHE_TTL_SCORES_FULL` 30-min TTL so the cache
+  never lapses) it recomputes + caches the limit-independent supersets every list feed
+  slices O(1): `/scores`, `/topics`, `/history/recent` (`7d`/`24h`/`12h`), `/risk/scores`.
+- **Per-process caveat (hard):** must run in the API/web process — the worker dyno has a
+  separate `_cache`; warming there warms the wrong cache (the mobile cold-load bug).
+- Status: `GET /prewarm` (non-blocking — kicks a background warm, returns last `warmed[]`
+  with per-feed row counts + `error` flags). Eliminated the History cold-load
+  (~6 s/2.1 MB uncached → ~0.4 s from warm cache). Full spec: `AGENT_CHARTER.md` Agent 15.
 
 ---
 

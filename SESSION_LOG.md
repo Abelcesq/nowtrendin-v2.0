@@ -3,9 +3,38 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-22_
+_Last updated: 2026-06-23_
 
 ---
+
+## Session 2026-06-23 — Read-path performance: Prewarm Agent, pagination, favorites
+
+### Completed (✅ LIVE — deployed)
+- **Prewarm Agent (Agent 15 — operational, read-only re: data).** Daemon thread in the
+  **API process** that keeps every list-feed superset hot (`/scores`, `/topics`,
+  `/history/recent` 7d/24h/12h, `/risk/scores`), re-warming every 25 min inside the 30-min
+  cache TTL. `GET /prewarm` is non-blocking (kicks a background warm — synchronous warm
+  ~38–44 s exceeds Heroku's 30 s router limit). Documented in `AGENT_CHARTER.md` (Agent 15),
+  `DATA_BUILDING_BLOCKS.md` (§10.J + §8 read-path), and the nowtrendin2.0 skill.
+- **History endpoint cached + prewarmed.** `/history/recent` was uncached → ~6 s/2.1 MB on
+  the 7d view (the visible "Loading…" delay). Refactored to the scores/topics superset-cache
+  pattern (`_compute_history_full`, limit-independent) → ~0.4 s compute from warm cache.
+- **Progressive pagination for all list sections.** `/history/recent` + `/risk/scores` now
+  take `offset`; web `api.ts` got `historyAll()` + `riskAll()` (fetch 100 at a time, paint
+  per batch). History.tsx + MarketSignal.tsx load progressively (Trends `/topics` already did).
+  All three list surfaces now match.
+- **Market Signal prewarm parity** — `/risk/scores` superset-cached (`risk_full`) + warmed
+  each cycle. All five web/mobile feeds are now prewarmed.
+- **Favorites "Track topic" fix** — scoped to trend/history topics only (was mixing market
+  instruments); clicking opens **History** pre-filtered to the topic (was the Market detail rail).
+- **AI Context fixes** — serve-time `_clean_explainer` + hardened `_extract_json` (raw
+  ` ```json ` leak); `key={topic_key}` on the web detail rail (stale-context-on-topic-switch).
+- **Stage rename** — "Emerging" → "Indicating" (display-only via `stageLabel()`, all surfaces).
+
+### Open / Next
+- **1066 pending Accuracy-Ledger detections** — analysis + backlog-prevention recommendations
+  (in progress this session).
+- Optional: apply the same progressive load to Alerts/Watchlist/Dashboard typeaheads.
 
 ## Session 2026-06-22 — Sources, canonical-date checkpoint, M/D direction
 
