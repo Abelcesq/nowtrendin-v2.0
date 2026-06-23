@@ -3,7 +3,53 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-23_
+_Last updated: 2026-06-23c_
+
+---
+
+## Session 2026-06-23c — Step 0 🔒 feature-flagged quarantine (continued)
+
+### Completed (✅ LIVE — pushed, deploy next)
+- **`scoring_weights.py` — single source of truth for weight vectors.** New module.
+  Defines `WEIGHTS_OVERALL / WEIGHTS_DETECTION / WEIGHTS_CONFIDENCE / COMPONENTS`.
+  All 6-component (G·I·M·D·C·P, N excluded). Canonical values unchanged.
+- **`calibration_engine.py` — dead 5-component block replaced.** Legacy recompute
+  at the end of `compute_calibrated_gradient()` now imports from `scoring_weights.py`
+  and includes the P (persistence) component. This code path is never called by the
+  live scoring path (owned by `signal_calibration_integration.apply_calibration`), so
+  zero score impact. Documented with a `NOTE:` comment.
+- **`signal_calibration_integration.py` — write-time quarantine (feature-flagged):**
+  - `SCORE_QUARANTINE_ENABLED = os.getenv(..., "false")` — default off
+  - `_quarantine_weighted_sum()` helper: None-aware weighted average, renormalizes
+    over present components only (absent ≠ genuine zero → no fake-zero deflation)
+  - `apply_calibration()`: when flag=True, component reads omit `or 0` so absent
+    values stay None and feed `_quarantine_weighted_sum`. When flag=False (default),
+    byte-identical to original `or 0` behavior — production scores unchanged.
+- **`market_signal_engine.py` — market component quarantine (feature-flagged):**
+  - `_MKT_QUARANTINE` mirrors same env var
+  - `assemble_market_components()`: when flag=True and both FINRA (`short_interest`)
+    AND WhaleWisdom (`institutional_holdings`) are absent AND no insider stage-1
+    signals, `positioning_concentration` returns `None` (structurally missing data —
+    not a genuine zero reading)
+  - `compute_market_signal()`: `absent` set is always empty when flag=False → non-
+    renormalization path → byte-identical to original. When flag=True, renormalizes
+    `DETECTION_WEIGHTS` / `CONFIDENCE_WEIGHTS` over present-only components.
+- Commit: `7a8a511` — `git push origin main` done.
+
+### Open / Next
+- **Phase 2 (Wikipedia + GDELT referee) — build this next.** The gate that unblocks
+  the 🔒 quarantine fixes. No public accuracy claim before this returns a measured
+  false-early rate. Design: held-out validation table (topic → Wikipedia breakout
+  date, GDELT corroboration), `detect_vs_breakout` delta distribution, false-early
+  rate metric. Endpoint: `/accuracy/referee`.
+- **After Phase 2 validates direction:** set `SCORE_QUARANTINE_ENABLED=true` on
+  `nowtrendin-v2-engine` Heroku app → Phase 2 backtest confirms improvement →
+  commit as permanent default.
+- **`positioning_concentration` data gap** — requires populating upstream FINRA /
+  WhaleWisdom data (a separate collection task). The quarantine gate above correctly
+  surfaces this as absent rather than zeroing it.
+- **Phase 3** (predictive lead against price) — only after Phase 2 shows an
+  acceptable false-early rate.
 
 ---
 
@@ -57,14 +103,11 @@ _Last updated: 2026-06-23_
     `total_signals < 3` below scored items, so cold-start noise doesn't surface as a top mover.
 
 ### Open / Next
-- **Step 0 🔒 (score-moving, backtest-gated — do NOT ship without referee):**
-  - Write-time quarantine: replace `s.get(k, 0) or 0` with `None`-aware reads that
-    distinguish absent from real-zero. Market Positioning Concentration fix (populating
-    upstream FINRA/WhaleWisdom inputs, not just gating).
-  - Weight-recipe consolidation: three copies → one shared definition.
-  - `positioning_concentration` missing-input-as-zero collapse.
+- **Step 0 🔒 (score-moving, feature-flagged) → COMPLETED in session 2026-06-23c.**
+  `scoring_weights.py` created; quarantine gated on `SCORE_QUARANTINE_ENABLED=false`;
+  commit `7a8a511`.
 - **Phase 2 (Wikipedia + GDELT referee) — build this next.** No public accuracy claim until
-  this returns a measured false-early rate. Gate that unblocks the 🔒 Step 0 fixes.
+  this returns a measured false-early rate. Gate that unblocks flipping the 🔒 flag.
 - **Phase 3** (predictive lead against price) — only after Phase 2 shows an acceptable
   false-early rate.
 
