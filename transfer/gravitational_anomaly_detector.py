@@ -1338,6 +1338,11 @@ _TOPIC_ALIASES = {
     "gpt": "chatgpt", "openai gpt": "chatgpt",
     "us": "united states", "usa": "united states", "u s": "united states",
     "uk": "united kingdom",
+    # Geographic fragments: bare "hormuz" is ambiguous (island vs strait).
+    # Fold into the unambiguous canonical geographic entity.
+    "hormuz": "strait of hormuz",
+    # Protocol / acronym: MCP overwhelmingly means Model Context Protocol in this corpus.
+    "mcp": "model context protocol",
     # High-profile people — fold FULL NAME onto the surname the feed uses, so
     # "Donald Trump" and "trump" are one topic. Curated/current on purpose
     # (blind surname-stemming would mis-merge common surnames).

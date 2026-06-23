@@ -149,13 +149,17 @@ def compute_market_signal(item_key: str, item_name: str,
     scored = {n: score_component(components_current.get(n, 0.0), baselines.get(n))
               for n in COMPONENT_LABELS}
     any_calibrating = any(s.get("calibrating") for s in scored.values())
+    # Count components with current=0.0 (absent inputs treated as zero).
+    # If a majority are zero AND the baseline is also near-zero, the ROUTINE
+    # read reflects missing data coverage — not a genuinely quiet market.
+    zero_inputs = sum(1 for s in scored.values() if s.get("current", -1) == 0.0)
 
     detection = round(sum(DETECTION_WEIGHTS[c] * scored[c]["score"]
                           for c in DETECTION_WEIGHTS) * 100, 1)
     confidence = round(sum(CONFIDENCE_WEIGHTS[c] * scored[c]["score"]
                            for c in CONFIDENCE_WEIGHTS) * 100, 1)
     gap = round(detection - confidence, 1)
-    interp = _interpret_gap(detection, confidence, gap, any_calibrating)
+    interp = _interpret_gap(detection, confidence, gap, any_calibrating, zero_inputs, len(scored))
 
     return {
         "item_key": item_key, "item_name": item_name,
@@ -180,16 +184,24 @@ def compute_market_signal(item_key: str, item_name: str,
     }
 
 
-def _interpret_gap(detection, confidence, gap, calibrating) -> dict:
+def _interpret_gap(detection, confidence, gap, calibrating,
+                   zero_inputs: int = 0, total_inputs: int = 7) -> dict:
     if calibrating:
         return {"state": "CALIBRATING",
                 "text": "Building this item's baseline — not enough history yet to "
                         "judge whether current activity is abnormal. Treat as a "
                         "snapshot, not a confirmed market signal."}
     if detection < 35 and confidence < 35:
+        # If a majority of inputs are zero (absent), the ROUTINE read reflects
+        # missing data coverage — not a confirmed quiet market.
+        absent_note = (
+            " (Note: several data inputs are absent for this item — "
+            "scores reflect partial coverage, not a confirmed quiet reading.)"
+            if zero_inputs > total_inputs // 2 else ""
+        )
         return {"state": "ROUTINE",
                 "text": "No unusual market signal versus this item's own baseline — "
-                        "leading and hard indicators are both quiet."}
+                        "leading and hard indicators are both quiet." + absent_note}
     if gap >= 36 and detection >= 45:
         return {"state": "EARLY",
                 "text": "EARLY — leading indicators (analyst, smart-money positioning, "

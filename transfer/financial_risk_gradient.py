@@ -2536,10 +2536,16 @@ def get_risk_scores(db_path: str = DB_PATH, limit: int = 50) -> dict:
     """).fetchall()
     conn.close()
     results = [_format_risk_row(r) for r in rows]
-    # Rank by the baseline-relative positioning score (anomaly), not raw volume.
-    # CALIBRATING items sort below scored ones at equal value via the secondary key.
-    results.sort(key=lambda d: (d.get("positioning_score") or d.get("detection_score") or 0,
-                                1 if d.get("sufficient_baseline") else 0), reverse=True)
+    # Minimum signal count guard: topics with fewer than 3 total signals have
+    # insufficient evidence to rank as movers — they're noise at the cold-start
+    # stage. Sort them below items with real signal presence.
+    # Rank by: (has_signals, positioning_score, sufficient_baseline)
+    _MIN_SIGNALS = 3
+    results.sort(key=lambda d: (
+        1 if (d.get("total_signals") or 0) >= _MIN_SIGNALS else 0,
+        d.get("positioning_score") or d.get("detection_score") or 0,
+        1 if d.get("sufficient_baseline") else 0,
+    ), reverse=True)
     return {"count": len(results[:limit]), "results": results[:limit]}
 
 
