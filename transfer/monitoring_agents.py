@@ -905,11 +905,128 @@ def market_universe_coverage(conn, sample: int = 250, max_resolve: int = 20) -> 
 
 
 # ── Combined run ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Canonical Date Auditor (Agent 16) — owns B3a (the canonical date/time model).
+# Verifies every STORED date-semantic value is canonical 'YYYY-MM-DD' across ALL
+# sources. Coverage is by COLUMN (the funnel every source writes into) PLUS live-
+# schema discovery of every '*_date' column — so a NEW source is audited the moment
+# it writes a date, with NO per-source list to maintain. This closes the structural
+# blind spot in the gate: the gate only sees values that PASS THROUGH it, so a path
+# that bypasses gate_date() (e.g. a hand-rolled [:10]) was invisible. The auditor
+# checks the DATA, so a bad date is caught no matter which code path produced it.
+# Read-only.
+# ─────────────────────────────────────────────────────────────────────────────
+import re as _re
+_IDENT_RE = _re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _discover_date_columns(conn) -> set:
+    """Every column in the live schema whose name ends in '_date' (the canonical
+    primary-date naming convention) → set of (table, column). Works on Postgres
+    (information_schema) and SQLite (sqlite_master + PRAGMA)."""
+    found = set()
+    try:
+        import db_compat
+        use_pg = bool(getattr(db_compat, "USE_PG", False))
+    except Exception:
+        use_pg = False
+    try:
+        if use_pg:
+            for r in conn.execute(
+                "SELECT table_name, column_name FROM information_schema.columns "
+                "WHERE table_schema='public' AND column_name LIKE '%_date'").fetchall():
+                t = r["table_name"] if hasattr(r, "keys") else r[0]
+                c = r["column_name"] if hasattr(r, "keys") else r[1]
+                found.add((t, c))
+        else:
+            for tr in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'").fetchall():
+                t = tr["name"] if hasattr(tr, "keys") else tr[0]
+                if not _IDENT_RE.match(str(t)):
+                    continue
+                for cr in conn.execute(f"PRAGMA table_info({t})").fetchall():
+                    c = cr["name"] if hasattr(cr, "keys") else cr[1]
+                    if str(c).endswith("_date"):
+                        found.add((t, c))
+    except Exception:
+        pass
+    return found
+
+
+def canon_date_auditor(conn=None, db_path=None) -> dict:
+    """Agent 16 — Canonical Date Auditor (B3a). Read-only. Confirms every stored
+    date-semantic value is canonical 'YYYY-MM-DD', for ALL sources at once: it audits
+    the COLUMNS every source funnels into and DISCOVERS new '*_date' columns from the
+    live schema, so new sources are covered automatically. Flags: (a) non-canonical
+    values per column, (b) a '*_date' column NOT registered in ingestion_gate.
+    DATE_SEMANTIC (an ungated write path / unwired new source), (c) values the gate
+    quarantined for a human format decision."""
+    own = conn is None
+    try:
+        import db_compat
+        from date_utils import is_iso_date
+        import ingestion_gate
+    except Exception as e:
+        return {"agent": "canon_date_auditor", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3a", "msg": f"deps unavailable: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+    if own:
+        conn = db_compat.connect(db_path)
+    alerts = []
+    declared = ingestion_gate.DATE_SEMANTIC
+    declared_set = {(t, c) for t, cols in declared.items() for c in cols}
+    discovered = _discover_date_columns(conn)
+    # (b) drift — a date-named column nobody registered/gated (likely a new source)
+    undeclared = sorted(discovered - declared_set)
+    if undeclared:
+        alerts.append({"level": "warn", "block": "B3a",
+            "msg": f"{len(undeclared)} '*_date' column(s) NOT in the gate registry "
+                   f"(possible ungated source — wire ingestion_gate.gate_date + add to "
+                   f"DATE_SEMANTIC): " + ", ".join(f"{t}.{c}" for t, c in undeclared[:8])})
+    # (a) canonical compliance per column (declared ∪ discovered)
+    by_col, total_bad = [], 0
+    for t, c in sorted(declared_set | discovered):
+        if not (_IDENT_RE.match(str(t)) and _IDENT_RE.match(str(c))):
+            continue
+        try:
+            rows = conn.execute(
+                f"SELECT {c} AS v FROM {t} WHERE {c} IS NOT NULL AND {c} <> ''").fetchall()
+        except Exception:
+            continue   # column/table absent on this DB — skip silently
+        vals = [(r["v"] if hasattr(r, "keys") else r[0]) for r in rows]
+        bad = [v for v in vals if not is_iso_date(v)]
+        total_bad += len(bad)
+        rec = {"column": f"{t}.{c}", "rows": len(vals), "non_canonical": len(bad)}
+        if bad:
+            rec["examples"] = sorted({str(v) for v in bad})[:3]
+            alerts.append({"level": "critical", "block": "B3a",
+                "msg": f"{t}.{c}: {len(bad)}/{len(vals)} non-canonical date(s), "
+                       f"e.g. {rec['examples']}"})
+        by_col.append(rec)
+    # (c) gate escalations awaiting a human decision
+    try:
+        pend = ingestion_gate.pending_reviews(conn, limit=50)
+    except Exception:
+        pend = []
+    if pend:
+        alerts.append({"level": "warn", "block": "B3a",
+            "msg": f"{len(pend)} date value(s) quarantined awaiting a human format decision"})
+    if own:
+        try: conn.close()
+        except Exception: pass
+    return {"agent": "canon_date_auditor", "status": _roll_up(alerts), "alerts": alerts,
+            "summary": {"columns_audited": len(by_col), "non_canonical_total": total_bad,
+                        "undeclared_date_columns": [f"{t}.{c}" for t, c in undeclared],
+                        "pending_reviews": len(pend), "by_column": by_col},
+            "checked_at": _now().isoformat()}
+
+
 def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), scorer_watchdog(conn=conn, db_path=db_path),
               pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
-              data_subscriptions(), catchall_auditor(conn)]
+              data_subscriptions(), catchall_auditor(conn),
+              canon_date_auditor(conn=conn, db_path=db_path)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

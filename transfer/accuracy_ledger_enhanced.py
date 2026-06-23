@@ -78,6 +78,16 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
     own = conn is None
     if own:
         conn = db_compat.connect(db_path)
+    # Sink-harden (§14): normalize to canonical 'YYYY-MM-DD' HERE too, so even a caller
+    # that forgets to gate can't write a non-canonical detection_date. Defense at the
+    # boundary (the same principle as the catch-all floor: enforce at the write, not
+    # the caller). to_iso_date returns None on an unparseable value → keep the original
+    # so the existing _parse-based behaviour/skip still applies.
+    try:
+        from date_utils import to_iso_date
+        detection_date = to_iso_date(detection_date) or detection_date
+    except Exception:
+        pass
     now = datetime.now(timezone.utc).isoformat()
     try:
         timeout_dt = (_parse(detection_date) + timedelta(days=timeout_days)).isoformat()

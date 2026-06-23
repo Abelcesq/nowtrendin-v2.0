@@ -6734,6 +6734,27 @@ def monitor_all():
             except Exception: pass
 
 
+@app.get("/monitor/datecanon")
+def monitor_datecanon():
+    """Canonical Date Auditor — is every stored date-semantic value canonical
+    YYYY-MM-DD, across ALL sources? Audits the date COLUMNS (the funnel every source
+    writes into) + discovers new *_date columns from the live schema, so new sources
+    are covered automatically. Flags non-canonical values, ungated *_date columns,
+    and pending human format reviews. (block B3a)"""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.canon_date_auditor(conn=conn, db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/monitor/sources")
 def monitor_sources():
     """Source Watchdog — are all sources pulling within SLA? (blocks B1, B2)"""
