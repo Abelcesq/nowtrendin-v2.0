@@ -216,12 +216,16 @@ def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
 # ── 4. Phase A — build from the REAL corpus (held-out, READ-ONLY) ───────────────
 def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
                   min_pair_docs: int = 3, min_jaccard: float = 0.18,
-                  max_signals: int = 120000, display_lookup: Optional[dict] = None) -> dict:
+                  max_signals: int = 120000, display_lookup: Optional[dict] = None,
+                  quality_only: bool = True, registry_only: bool = True) -> dict:
     """Assemble situations from REAL topic_signals co-occurrence over a rolling window.
-    READ-ONLY: SELECTs topic_signals (+ topic_registry for first-seen); writes NOTHING and
-    touches no score. Topics sharing a signal_id co-occurred in the same source document.
-    Long-tail one-off fragments (doc_freq < min_doc_freq) are dropped to keep the graph
-    meaningful + tractable. Returns {window_hours, documents, topics_kept, situations}."""
+    READ-ONLY: SELECTs topic_signals (+ topic_registry); writes NOTHING and touches no score.
+    Topics sharing a signal_id co-occurred in the same source document. Long-tail one-off
+    fragments (doc_freq < min) are dropped. QUALITY GATE: `quality_only` runs each topic
+    through the engine's single shared `_is_quality_topic` (drops spam/boilerplate);
+    `registry_only` requires the topic to be a real TRACKED entity (in topic_registry) —
+    which structurally removes the multilingual SEO spam the vocabulary list can't enumerate.
+    Returns {window_hours, documents, candidates, topics_kept, dropped_quality, situations}."""
     from datetime import datetime, timezone, timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
 
@@ -239,22 +243,21 @@ def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
         if sid and tk:
             sig_topics[sid].append(tk)
 
-    # 2. drop the long tail (one-off fragments) — keep topics seen in >= min_doc_freq docs
+    # 2. drop the long tail (one-off fragments) — candidates seen in >= min_doc_freq docs
     df = defaultdict(int)
     for tks in sig_topics.values():
         for t in set(tks):
             df[t] += 1
-    keep = {t for t, c in df.items() if c >= min_doc_freq}
-    pruned = {s: [t for t in set(tks) if t in keep] for s, tks in sig_topics.items()}
-    pruned = {s: tks for s, tks in pruned.items() if len(tks) >= 2}
+    candidates = {t for t, c in df.items() if c >= min_doc_freq}
 
-    # 3. first-seen + display name per topic (one registry pass)
-    first_seen, display = {}, dict(display_lookup or {})
+    # 3. registry pass (first-seen + display + tracked-entity membership) for candidates
+    first_seen, display, registered = {}, dict(display_lookup or {}), set()
     try:
         for r in conn.execute(
                 "SELECT topic_key, first_seen_at, topic_display FROM topic_registry").fetchall():
             tk, fs, disp = _val(r, 0, "topic_key"), _val(r, 1, "first_seen_at"), _val(r, 2, "topic_display")
-            if tk in keep:
+            if tk in candidates:
+                registered.add(tk)
                 if fs:
                     first_seen[tk] = to_iso_date(fs)
                 if disp and tk not in display:
@@ -262,14 +265,36 @@ def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
     except Exception:
         pass
 
-    sits = build_situations(pruned, first_seen=first_seen,
+    # 4. QUALITY GATE — the engine's ONE shared gate (spam/boilerplate/fragments) + the
+    #    tracked-entity requirement. Same function every scorer/agent uses, so the cluster
+    #    layer can never disagree with what the rest of the engine considers a real topic.
+    gate = None
+    if quality_only:
+        try:
+            from gravitational_anomaly_detector import _is_quality_topic as gate
+        except Exception:
+            gate = None
+
+    def _ok(t):
+        if registry_only and t not in registered:
+            return False
+        if gate is not None and not gate(display.get(t) or t.replace("_", " ")):
+            return False
+        return True
+
+    keep = {t for t in candidates if _ok(t)}
+    pruned = {s: [t for t in set(tks) if t in keep] for s, tks in sig_topics.items()}
+    pruned = {s: tks for s, tks in pruned.items() if len(tks) >= 2}
+
+    sits = build_situations(pruned, first_seen={t: first_seen[t] for t in first_seen if t in keep},
                             min_pair_docs=min_pair_docs, min_jaccard=min_jaccard)
-    # human-readable label: anchor + most-distinguishing core term
     for s in sits:
         s["label_display"] = " · ".join(
             display.get(m, m) for m in ([s["anchor"]] + s["core_members"][:1]))
     return {"window_hours": window_hours, "documents": len(pruned),
-            "topics_kept": len(keep), "situation_count": len(sits), "situations": sits}
+            "candidates": len(candidates), "topics_kept": len(keep),
+            "dropped_quality": len(candidates) - len(keep),
+            "situation_count": len(sits), "situations": sits}
 
 
 if __name__ == "__main__":

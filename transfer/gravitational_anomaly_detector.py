@@ -1171,20 +1171,82 @@ def _is_common_word(w: str) -> bool:
     return w in COMMON_WORDS and w not in DOMAIN_TERMS
 
 
-def _is_quality_topic(display: str) -> bool:
-    """Reject profanity, generic common words, and bare junk so the grid reads
-    clean. Applied at extraction AND serve-time (clears the existing pool without
-    re-collection). Multi-word entities, brands, and domain terms pass.
+# ── Junk classes the SITUATION layer exposed (2026-06-23) — high-precision gates ──
+# The co-occurrence clustering made visible two pollutant classes that the per-word view
+# hid: (a) multilingual casino/SEO spam, (b) HTML/JSON/code boilerplate n-gram fragments.
+# These sets reject them at the ONE gate every consumer shares (extraction, scoring,
+# serve, Pipeline Integrity, situation builder). Tuned for PRECISION — verified to reject
+# zero real topics (strait of hormuz / bank of japan / diffusion models / giannis … pass).
+SPAM_TERMS = {
+    "casino", "casinos", "slot", "slots", "slotmachine", "spielautomat", "spielautomaten",
+    "sweepstake", "sweepstakes", "sweepnext", "sweepcoins", "pokies", "roulette",
+    "blackjack", "jackpot", "jackpots", "freispiel", "freispiele", "bonuscode",
+    "auszahlung", "auszahlungsquote", "auszahlungsquoten", "vermittlungsgebuhr",
+    "einzahlung", "gewinnchance", "hitnspin", "wagering",
+}
+# Clause-fragment indicators — in extraction DEBRIS ("reviewer that runs", "years you
+# probably") but ~never in a clean noun-phrase topic. Pure connectors (of/the/and/for/in)
+# are intentionally EXCLUDED so "bank of japan" / "strait of hormuz" pass.
+CLAUSE_FILLER = {
+    "that", "you", "your", "such", "have", "has", "having", "will", "this", "these",
+    "those", "which", "who", "whom", "whose", "what", "when", "where", "why", "how",
+    "been", "being", "were", "into", "than", "then", "very", "just", "even", "they",
+    "them", "their", "probably", "cannot", "because", "however", "regarding", "depending",
+    "einen", "eine", "einer", "eines", "dem", "des", "les", "une", "diese", "dieser",
+}
+# Web/structured-data/code boilerplate that leaks from HTML/JSON feeds — reject the
+# fragment, keep the real entity.
+BOILERPLATE_BIGRAMS = {
+    "article date", "article type", "article id", "show article", "related articles",
+    "section related", "related article", "show article date", "article date false",
+}
+BOILERPLATE_TOKENS = {"provenance", "commenter", "commenters", "redaction", "permalink",
+                      "breadcrumb", "onlinedynamicbatching"}
+MAX_TOPIC_WORDS = 5     # 6+ words = a headline/boilerplate fragment, not a topic
+MAX_TOKEN_LEN   = 20    # a 21+ char single token = concatenated junk (onlinedynamicbatching)
 
-    The common-word gate is what separates real trends from everyday vocabulary:
-    'japan'/'chatgpt'/'ozempic' pass; 'suffering'/'saying'/'exclusive' do not —
-    and volume can never rescue a generic word (the gate ignores signal count)."""
+# Real CONCEPT PHRASES built entirely from common words — legit topics the all-common-words
+# rule would otherwise drop (surfaced by the situation layer: "interest rate", "world cup").
+# A whitelist can only ADD recall, never cause a false reject. Extensible; keep curated.
+KNOWN_CONCEPT_PHRASES = {
+    # economics / markets
+    "interest rate", "interest rates", "monetary policy", "fiscal policy", "central bank",
+    "rate hike", "rate cut", "rate hikes", "quantitative easing", "yield curve",
+    "basis points", "inflation rate", "supply chain", "trade war", "debt ceiling",
+    # sports
+    "world cup", "champions league", "super bowl", "grand slam", "formula one",
+    "premier league", "stanley cup", "world series",
+    # tech / AI
+    "vector search", "semantic search", "model context protocol", "large language model",
+    "world model", "world models", "context window", "machine learning", "deep learning",
+    "neural network", "reinforcement learning", "self driving", "quantum computing",
+}
+
+
+def _is_quality_topic(display: str) -> bool:
+    """Reject profanity, spam, boilerplate fragments, generic common words, and bare junk
+    so the grid reads clean. Applied at extraction AND serve-time (clears the existing pool
+    without re-collection) AND by the Pipeline Integrity / situation layers — the ONE shared
+    quality gate. Multi-word entities, brands, and domain terms pass.
+
+    The common-word gate separates real trends from everyday vocabulary:
+    'japan'/'chatgpt'/'ozempic' pass; 'suffering'/'saying'/'exclusive' do not — and volume
+    can never rescue a generic word (the gate ignores signal count)."""
     t = (display or "").strip().lower()
     if not t:
         return False
     toks = t.split()
     if any(w in PROFANITY for w in toks):
         return False
+    # concatenated-junk token (onlinedynamicbatching) + promotional/gambling spam —
+    # reject regardless of word count (single OR multi-word).
+    if any(len(w) > MAX_TOKEN_LEN for w in toks):
+        return False
+    if any(w in SPAM_TERMS for w in toks):
+        return False
+    # Known real concept-phrase (recall whitelist) — passes the all-common-words rule.
+    if t in KNOWN_CONCEPT_PHRASES:
+        return True
     if len(toks) == 1:
         w = toks[0]
         if w in DOMAIN_TERMS:
@@ -1192,12 +1254,19 @@ def _is_quality_topic(display: str) -> bool:
         # reject curated junk OR any frequent common word — a single common word
         # is never a trend, no matter how many times it is posted.
         return not (w in GENERIC_JUNK or _is_common_word(w))
-    # multi-word: reject HEADLINE FRAGMENTS anchored by a news-filler verb/noun at
-    # either end ("iran deal", "says iran deal", "iran deal signed", "leaders
-    # meet") — these are clauses, not topics; the real entity ("iran") survives as
-    # its own unigram. Enforced here so it applies at BOTH extraction AND serve
-    # (incl. capitalized entities from _extract_entities, which skip the n-gram
-    # filler check). Then keep the phrase UNLESS every token is generic vocabulary.
+    # multi-word: reject over-long fragments, clause debris, and web/code boilerplate
+    # BEFORE the entity exemptions (a boilerplate n-gram must never pass on a domain token).
+    if len(toks) > MAX_TOPIC_WORDS:
+        return False
+    if any(w in CLAUSE_FILLER for w in toks):
+        return False
+    if any(w in BOILERPLATE_TOKENS for w in toks):
+        return False
+    if {f"{toks[i]} {toks[i+1]}" for i in range(len(toks) - 1)} & BOILERPLATE_BIGRAMS:
+        return False
+    # reject HEADLINE FRAGMENTS anchored by a news-filler verb/noun at either end
+    # ("iran deal", "says iran deal", "leaders meet") — the real entity survives as its
+    # own unigram. Then keep the phrase UNLESS every token is generic vocabulary.
     if toks[0] in NEWS_FILLER or toks[-1] in NEWS_FILLER:
         return False
     if any(w in DOMAIN_TERMS for w in toks):
