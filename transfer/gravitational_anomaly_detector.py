@@ -5801,6 +5801,54 @@ def accuracy_ledger_report():
     return {"status": "unavailable"}
 
 
+# Phase A — situation model preview. HELD-OUT + READ-ONLY: assembles co-occurring topic
+# fragments into candidate SITUATIONS from the live topic_signals corpus, writes NOTHING
+# and touches no score. Lets us review whether the situation layer forms clean clusters on
+# real data before any of it influences scoring/serving (SITUATION_MODEL.md, Phase A).
+_SITUATIONS_CACHE = {"key": None, "at": 0.0, "data": None}
+
+
+@app.get("/situations/preview", dependencies=[Depends(_require_internal)])
+def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
+                       min_jaccard: float = 0.18, limit: int = 60):
+    """Held-out preview of the situation layer (topics-not-words) on the REAL corpus.
+    Read-only: no score is read or written. Cached ~10 min so review is cheap."""
+    import time as _t
+    try:
+        import situation_clustering
+    except Exception as e:
+        return {"status": "unavailable", "error": str(e)}
+    ck = (window_hours, min_doc_freq, round(min_jaccard, 3))
+    if _SITUATIONS_CACHE["data"] and _SITUATIONS_CACHE["key"] == ck \
+            and (_t.time() - _SITUATIONS_CACHE["at"]) < 600:
+        res = _SITUATIONS_CACHE["data"]
+    else:
+        conn = get_db(DB_PATH)
+        try:
+            res = situation_clustering.build_from_db(
+                conn, window_hours=window_hours, min_doc_freq=min_doc_freq,
+                min_jaccard=min_jaccard)
+        finally:
+            conn.close()
+        _SITUATIONS_CACHE.update(key=ck, at=_t.time(), data=res)
+    sits = []
+    for s in res["situations"][:int(limit)]:
+        sits.append({
+            "situation_key": s["situation_key"],
+            "label": s.get("label_display") or s["label"],
+            "anchor": s["anchor"],
+            "category_hint": None,                       # Phase B: per-situation classifier
+            "size": s["size"],
+            "shared_anchors": s["shared_anchors"],
+            "core_members": s["core_members"][:12],
+            "first_seen": s.get("first_seen"),
+        })
+    return {"status": "ok", "held_out": True, "note": "read-only preview — affects no score",
+            "window_hours": res["window_hours"], "documents": res["documents"],
+            "topics_kept": res["topics_kept"], "situation_count": res["situation_count"],
+            "situations": sits}
+
+
 @app.get("/accuracy/ledger/detail")
 def accuracy_ledger_detail(limit: int = Query(300, ge=1, le=1000),
                            verdict: str = Query("", description="LED|SAME_DAY|LAGGED|FALSE_POSITIVE")):

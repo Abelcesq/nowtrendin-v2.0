@@ -36,6 +36,12 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Optional
 
+try:
+    from date_utils import to_iso_date
+except Exception:
+    def to_iso_date(s):
+        return (str(s)[:10] if s else None)
+
 
 # ── 1. Co-occurrence ────────────────────────────────────────────────────────────
 def cooccurrence(signal_topics: dict) -> tuple[dict, dict]:
@@ -206,6 +212,65 @@ def build_situations(signal_topics: dict, first_seen: Optional[dict] = None,
 #     turn a genuine scoring miss into a win: if we were watching a situation before its
 #     arrival and still scored it late, that stays LAGGED (the ledger gate is unchanged).
 #   • Descriptive only — a situation is a measured grouping, not a prediction.
+
+# ── 4. Phase A — build from the REAL corpus (held-out, READ-ONLY) ───────────────
+def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
+                  min_pair_docs: int = 3, min_jaccard: float = 0.18,
+                  max_signals: int = 120000, display_lookup: Optional[dict] = None) -> dict:
+    """Assemble situations from REAL topic_signals co-occurrence over a rolling window.
+    READ-ONLY: SELECTs topic_signals (+ topic_registry for first-seen); writes NOTHING and
+    touches no score. Topics sharing a signal_id co-occurred in the same source document.
+    Long-tail one-off fragments (doc_freq < min_doc_freq) are dropped to keep the graph
+    meaningful + tractable. Returns {window_hours, documents, topics_kept, situations}."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+
+    def _val(r, i, k):
+        return (r[k] if hasattr(r, "keys") else r[i])
+
+    # 1. co-occurrence (topics per source document), most-recent-bounded for a fast preview
+    rows = conn.execute(
+        "SELECT signal_id, topic_key FROM topic_signals "
+        "WHERE signal_id IS NOT NULL AND extracted_at >= ? "
+        "ORDER BY extracted_at DESC LIMIT ?", (cutoff, int(max_signals))).fetchall()
+    sig_topics = defaultdict(list)
+    for r in rows:
+        sid, tk = _val(r, 0, "signal_id"), _val(r, 1, "topic_key")
+        if sid and tk:
+            sig_topics[sid].append(tk)
+
+    # 2. drop the long tail (one-off fragments) — keep topics seen in >= min_doc_freq docs
+    df = defaultdict(int)
+    for tks in sig_topics.values():
+        for t in set(tks):
+            df[t] += 1
+    keep = {t for t, c in df.items() if c >= min_doc_freq}
+    pruned = {s: [t for t in set(tks) if t in keep] for s, tks in sig_topics.items()}
+    pruned = {s: tks for s, tks in pruned.items() if len(tks) >= 2}
+
+    # 3. first-seen + display name per topic (one registry pass)
+    first_seen, display = {}, dict(display_lookup or {})
+    try:
+        for r in conn.execute(
+                "SELECT topic_key, first_seen_at, topic_display FROM topic_registry").fetchall():
+            tk, fs, disp = _val(r, 0, "topic_key"), _val(r, 1, "first_seen_at"), _val(r, 2, "topic_display")
+            if tk in keep:
+                if fs:
+                    first_seen[tk] = to_iso_date(fs)
+                if disp and tk not in display:
+                    display[tk] = disp
+    except Exception:
+        pass
+
+    sits = build_situations(pruned, first_seen=first_seen,
+                            min_pair_docs=min_pair_docs, min_jaccard=min_jaccard)
+    # human-readable label: anchor + most-distinguishing core term
+    for s in sits:
+        s["label_display"] = " · ".join(
+            display.get(m, m) for m in ([s["anchor"]] + s["core_members"][:1]))
+    return {"window_hours": window_hours, "documents": len(pruned),
+            "topics_kept": len(keep), "situation_count": len(sits), "situations": sits}
+
 
 if __name__ == "__main__":
     import json
