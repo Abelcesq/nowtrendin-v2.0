@@ -1092,17 +1092,17 @@ def scoring_contract_auditor(conn=None, db_path=None) -> dict:
 
 
 def run_all(conn, db_path=None) -> dict:
-    # NOTE: the two DATA-SCANNING auditors — canon_date_auditor (Agent 16) and
-    # scoring_contract_auditor (Agent 17) — are DELIBERATELY excluded from this
-    # synchronous combined report. They full-scan large tables (the date auditor alone
-    # is ~24s over pull_history ~228k + market_signal_history ~66k), and including them
-    # pushes /monitor past Heroku's 30s router limit (503). They run on their own
-    # endpoints (/monitor/datecanon, /monitor/scoringcontract) and on the nightly audit
-    # instead. run_all stays the FAST liveness/health roll-up.
+    # HEAVY DATA-SCANNING auditors excluded from this synchronous roll-up — they
+    # do full-table scans that push /monitor past Heroku's 30s router limit (503):
+    #   • canon_date_auditor (16)       → /monitor/datecanon       (24s+ on 228k rows)
+    #   • scoring_contract_auditor (17) → /monitor/scoringcontract
+    #   • catchall_auditor (I)          → /monitor/catchall         (full velocity_scores +
+    #                                       topic_signals 72h; designed for end-of-day)
+    # run_all stays the FAST liveness/health roll-up (~3–5s).
     agents = [source_watchdog(conn=conn, db_path=db_path), scorer_watchdog(conn=conn, db_path=db_path),
               pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
-              data_subscriptions(), catchall_auditor(conn)]
+              data_subscriptions()]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
