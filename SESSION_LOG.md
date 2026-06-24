@@ -38,8 +38,30 @@ _Last updated: 2026-06-23c_
   real events dominate — Greenspan death, SNP/Murrell, Tesla autopilot, Giannis trade, Starmer
   resigns, Iran oil sanctions); `/scores` 0 junk in the 2,290-topic board, "world cup" now served
   + scored 94.8 (recall fix live); `/monitor` pipeline_integrity + scorer_watchdog OK (no
-  regression). Engine deployed 5ea4d4b. Still TODO: per-situation category tags (the 78% news
-  catch-all), GDELT-spaced batch, situation persistence (Phase B/C).
+  regression). Engine deployed 5ea4d4b.
+
+### Phase B (LIVE, held-out) — per-situation category + entity disambiguation
+- `categorize_situations()` — each situation tagged via majority vote of the shared
+  `_topic_category` over its CORE members (prefers a specific category over the catch-all).
+  Live: llm·claude→technology, senate→politics, clive·davis→entertainment, gong→current_events.
+- `search_situations()` + **`/situations/search?q=`** — entity disambiguation: q=iran → 6 distinct
+  situations (oil sanctions / congressional funding / Pakistan-Iran / Trump-Iran war), each
+  categorized. Exactly the founder's "make words searchable, user picks the situation."
+- Honest limit: some still read "news" (giannis→news not sports) — the category LEXICON has
+  gaps, which the audit (below) quantifies as the top cleanup target.
+
+### Audit (LIVE, READ-ONLY) — `/audit/topics`, no deletes (90-day retention respected)
+- Scored universe (30d, 9,000 latest-per-topic): **80.3% real / 19.7% junk** (clause fragments
+  like "easier the narrative", "bike ride" — now filtered at serve-time by the gate, history
+  retained). **75.3% catch-all** (news/general) = the category LEXICON gap, the #1 UX cleanup
+  (working cats: technology 955, current_events 332, politics 319, sports 249, business 110).
+  **0 exact duplicate-spelling groups** (canonical-key + alias consolidation is working; the
+  remaining duplication is SEMANTIC, which the situation layer handles).
+- The audit caught + fixed gate false-positives the unit test missed (hyphenated tech compounds
+  `retrieval-augmented-generation`, geo `west bank`) — keep hyphens intact, whitelist geo/tech.
+- COMPLIANT cleanups available (no deletes): serve-filter (live) · regenerate serve_payload to
+  propagate immediately · enrich `_LEX` to drain the 75% catch-all (Catch-All Auditor candidates).
+  Engine deployed 9a84a88.
 
 ---
 
