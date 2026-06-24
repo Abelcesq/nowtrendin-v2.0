@@ -141,6 +141,10 @@ Verified live: **94 halted/micro-cap · 15 covered · 3 macro themes**.
     context-dependent entities → structural fix is situation-level categorization.
   - Auditor also flags (separate): corroboration-floor **WORSENING** (single-source catch-all
     leak +230) and **542 tracked topics stuck in catch-all** — data-quality follow-ups.
+    **→ SUPERSEDED by 2026-06-23f:** the "WORSENING / 10,488 leaks" was a MEASUREMENT
+    ARTIFACT (dormant pre-floor pile + missing floor exemptions + window drift). True
+    current leak ≈5; the floor is healthy. The 542 tracked were fixed at the source
+    (lexicon + record_detection gate + sweep quarantine). See the 2026-06-23f entry.
   Engine deployed 55ff376. NO velocity_scores deleted (90-day retention respected throughout).
 
 ---
@@ -499,7 +503,8 @@ STARTING-POINT artifact, not an engine defect. Confirmed — decisively.
 | Surface | URL | Notes |
 |---|---|---|
 | **Web app** (use from anywhere) | https://nowtrendin-web-8c1bb8c9f7f2.herokuapp.com/ | Static Expo web build on Heroku app `nowtrendin-web`. Snapshot — rebuild with `./redeploy-web.sh`. |
-| Engine (FastAPI) | https://nowtrendin-e62dcb9ecb69.herokuapp.com | Heroku `nowtrendin`. Deploy: `git push heroku HEAD:main` from `NowTrendin/`. |
+| **Engine (FastAPI) — v2, the ONLY active engine** | https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com | Heroku `nowtrendin-v2-engine`. Deploy: `git subtree push --prefix=transfer heroku-v2engine main` from `NowTrendin v2.0/` (foreground). |
+| ⛔ Engine 1.0 — **FROZEN, DO NOT DEPLOY** | https://nowtrendin-e62dcb9ecb69.herokuapp.com | Heroku `nowtrendin`. Legacy/frozen (live Android + pre-Apr-2026 data). A git hook blocks commits in `NowTrendin/`. The old `git push heroku HEAD:main` here caused the accidental 1.0 deploy on 2026-06-19 — never use it. |
 | Backend (Django) | https://nowtrendin-backend-acb79c396814.herokuapp.com | Heroku `nowtrendin-backend`. Deploy: `git subtree push --prefix backend heroku main` from `NowTrendin v2.0/`. |
 | Frontend source | `origin` (GitHub) | Expo Go phone preview needs same-WiFi LAN (`exp://192.168.68.52:8081`) + firewall rule for TCP 8081. |
 
