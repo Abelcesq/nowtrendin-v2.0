@@ -3,7 +3,54 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-23f_
+_Last updated: 2026-06-24a_
+
+---
+
+## Session 2026-06-24a — Overbroad "news" fixed + quarantine review loop + log corrections
+
+### The "news" category was 77% UNCLASSIFIED, mislabeled (display-only fix, big drain)
+- **Root cause:** `topic_categories.classify_topic` returned **'news' on NO lexicon match** —
+  but 'news' has no lexicon of its own (real news/geopolitics matches `current_events`). So
+  the 77% "news" catch-all was really 77% *unclassified*, wearing a News label.
+- **Fix 1a:** no-match fallback → honest **'general'** (matches the module's own documented
+  intent + the empty-blob case). 'news' as a produced category is now ~0.
+- **Fix 1b (the real drain):** **context classification** — a background map (`_CONTEXT_CAT`)
+  classifies each topic against its OWN signal **headlines** (`raw_signals.title`), so a bare
+  entity with no lexicon hit ("lilly"→health, "britain"→politics, "wembanyama"→sports) resolves
+  from real source text. Conservative 0.35 confidence floor; catch-all results dropped.
+  `_category_for` now layers **situation(event) → context(headline) → bare lexicon → general**.
+- **Verified live: catch-all 77.0% → 55.7% (−21.2 pts)**, 63,450 topics context-classified,
+  883/4000 reclassified — spread PROPORTIONALLY across tech/politics/sports/business/health
+  (healthy, not dumped). Display-only: scoring method + corroboration gate still use the bare
+  lexicon → no score impact, no circularity. Web terminal chips are data-driven (`/categories`)
+  so "General" appears + "News" drops automatically. **Mobile chip row (`frontend/lib/signals.ts`
+  CATEGORY_DEFS) is hardcoded with a 'news' chip — small parity follow-up (swap to 'general').**
+- **Bug caught + fixed:** `/categories` had 500'd since v133 — audit #1 changed its count to
+  `_category_for(topic_key, …)` but the SELECT only returned `topic_display` (KeyError). Added
+  `topic_key` to the SELECT. (Web-terminal category chips were silently broken until now.)
+
+### Quarantine review loop — the date queue had no exit path (now closed)
+- `format_review_queue` (unparseable dates → human review) was WRITE-ONLY: `pending_reviews()`
+  + `resolve_review()` existed but **no endpoint exposed them**, and **`gate_date` never
+  consulted `format_rules`** (so the "learned rule auto-applies" the docstring promised was
+  never wired). Queue currently empty (0), but the loop was broken.
+- **Fix 2a:** `gate_date` consults `format_rules` BEFORE quarantining (auto-applies a
+  human-approved normalization to identical future inputs). **Fix 2b:** `GET /quarantine/dates`
+  (list pending + candidates) + `POST /quarantine/dates/resolve` (human picks chosen_value,
+  validated canonical, learns a rule). Flag-never-force.
+
+### SESSION_LOG corrections (per external review of the log)
+- **Live URLs table:** the Engine row pointed to the FROZEN 1.0 app + the `git push heroku
+  HEAD:main` command that caused the 2026-06-19 accidental 1.0 deploy. Corrected to the v2
+  engine + `heroku-v2engine` remote; 1.0 row relabeled "FROZEN, DO NOT DEPLOY".
+- Forward-referenced the stale corroboration "WORSENING +230 / 10,488 leaks" alarm → its
+  2026-06-23f correction (artifact; true leak ≈5).
+- Verified live: **GUARDIAN_API_KEY still missing** on the engine (deliberate 06-20 deferral, but
+  every score is computed without that mainstream signal — user decision to set it or not).
+  SECRET_KEY is **present** (the review's "insecure default" claim is stale). Apify/Dev.to set;
+  Reddit deferred. **Retention 90 vs 365: §13 hard-rules 90 — needs a canonical call to retire
+  the "365 pending" note.** `DB_DATA_DICTIONARY.md` confirmed stale (regenerate from live schema).
 
 ---
 
