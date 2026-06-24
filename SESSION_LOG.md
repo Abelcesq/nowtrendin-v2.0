@@ -32,6 +32,16 @@ the predictive backtest before it moves a live score.
   blending IMPROVE, not just change, the Market Signal — needs a historical signal×forward-return
   harness using the Congress `/bulk` history + 13F snapshots), then `heroku config:set
   DARK_POSITIONING_V2=1`. The held-out modules' "imported by nothing in scoring" holds while off.
+- **PREDICTIVE BACKTEST — DONE. VERDICT: not predictive → flag STAYS OFF.** `dark_positioning_backtest.py`
+  (held-out, NO-lookahead: signal as-of T uses only Congress trades FILED ≤ T; forward returns from
+  Yahoo, independent of QuiverQuant). Swept 4 horizons × net/buy-only, ~1,900 obs each, 35 liquid
+  large-caps, 2021-2026. Long-short spread **NEGATIVE at every horizon** (21d −0.03 / 63d −0.12 /
+  126d −0.64 / 252d −0.47%; net-sell slightly outperforms net-buy), IC ≈0 (−0.039..+0.023), buy
+  hit-rate ~51-53% (coin-flip), buy-only worse. Forward returns ≈identical across cohorts — they track
+  market drift, not the signal. Mechanism: by the public FILED date the edge in liquid names is gone
+  (30-45d disclosure lag); 13F is staler → same prior. **DO NOT flip the flag** — blending adds noise,
+  not alpha. Signal stays valid as DISPLAY/transparency context (real + interesting), not a predictive
+  score input. Backtest-before-ship worked exactly as intended.
 
 ---
 
