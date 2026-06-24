@@ -3,7 +3,35 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24c_
+_Last updated: 2026-06-24d_
+
+---
+
+## Session 2026-06-24d — Dark-Positioning integration (SEC 13F + Congress → Market Signal, flag-OFF)
+
+Integrated the two held-out positioning sources into Market Signal's smart-money component —
+**built, wired, verified, and shipped INERT behind `DARK_POSITIONING_V2` (default off)**, pending
+the predictive backtest before it moves a live score.
+
+- **`positioning_intel.py`** (new): inverts the held-out 13F holdings (curated funds) + Congress
+  trades into ONE per-TICKER signal — `signal_for(ticker, name)` → `positioning_signal` 0-1 +
+  net `direction`. 13F matched by issuer NAME (`_norm_name`), Congress by ticker. Cached (daily).
+  Non-circular (external SEC/Congress filings only).
+- **Wiring (flag-gated, default OFF):** `market_signal_engine.assemble_market_components` blends
+  the signal into `positioning_concentration` (`DARK_POS_WEIGHT=0.4`) ONLY when the flag is on AND
+  the ticker has 13F/congress activity. `financial_risk_gradient` attaches
+  `payload['dark_positioning_intel']` at both market-signal call sites when on (off = `positioning_intel`
+  never imported → held-out preserved, zero overhead). **Verified: flag off = byte-identical
+  (`pos_conc` 0.333 unchanged, no `dark_positioning_intel` in the live feed); on+signal=1.0 → 0.600;
+  on+no-data → base unchanged.**
+- **`GET /research/dark-positioning`** (internal-key) = the review surface — the EXACT signal that
+  blends in. Live: 17 ranked tickers — AAPL/NVDA/GOOGL sig=1.00 net-selling (6-8 funds + 9-13
+  congress members), AMZN 0.95 net-buying, down to LMT/MS at 0.
+- **Sanity backtest PASSES** (discriminates 0-1; known cases correct; direction-aware; non-circular).
+  **NOT live** — `DARK_POSITIONING_V2=0` on Heroku. To activate: run the PREDICTIVE backtest (does
+  blending IMPROVE, not just change, the Market Signal — needs a historical signal×forward-return
+  harness using the Congress `/bulk` history + 13F snapshots), then `heroku config:set
+  DARK_POSITIONING_V2=1`. The held-out modules' "imported by nothing in scoring" holds while off.
 
 ---
 
