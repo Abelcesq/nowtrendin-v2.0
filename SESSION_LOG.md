@@ -54,9 +54,25 @@ no scoring input altered, no circularity.** Engine deployed v133→v138.
   is not a failed prediction, so this protects the Accuracy Ledger's honest denominator (the
   moat). Auditor's misclassified count now skips quarantined rows.
 
+### Tier 1 Market Signal triage — DONE (engine v139 + gh-pages)
+The Market Signal universe mixed three instrument types one template can't fairly serve,
+producing ~86% "insufficient coverage" — much of it a CATEGORY ERROR, not a real gap.
+Verified live: **94 halted/micro-cap · 15 covered · 3 macro themes**.
+- **Coverage LANE** (`market_signal_engine.compute_market_signal` gains `lane` +
+  `na_components`; `financial_risk_gradient._market_lane()` types each item from the existing
+  `_risk_maturity`): covered / halted_microcap / macro_theme.
+- **Macro themes** (recession, inflation — no ticker) mark `positioning_concentration` +
+  `fundamental_confirmation` STRUCTURALLY N/A: excluded from BOTH the weighted score
+  (renormalized) AND the coverage denominator — not a data gap, a category error to ask for.
+  Result: inflation/recession moved insufficient→partial; **covered lane = 7 full / 8 partial /
+  0 insufficient** (the real signal, no longer buried under halt micro-caps).
+- Default path (lane=covered, no N/A) is byte-identical — no Gradient/Market score input changed.
+- **Web terminal**: Lane chip axis (Covered N / Halted·micro-cap N / Macro themes N) above the
+  Tier chips; row subline + detail-rail lane chip; macro-theme N/A note; Market Factors render
+  N/A components as greyed "n/a". `MarketGradient` type extended. Build clean, deployed gh-pages.
+
 ### Next
-- Tier 1 Market Signal triage (split covered instruments vs halted/micro-cap lane; drop
-  macro themes from positioning_concentration) — researched, not yet built.
+- (Optional) extend the lane axis to the mobile Market tab for 3-platform parity.
 
 ---
 
