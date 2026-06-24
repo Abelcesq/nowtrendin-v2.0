@@ -15,7 +15,7 @@ import { Disclaimer } from '../components/Disclaimer'
 interface MRow {
   key: string; name: string; det: number; conf: number; gap: number
   tier: string; cls: string; pct: number | null; lev: number | null
-  sigs: number; ageMin: number; calibrating: boolean
+  sigs: number; ageMin: number; calibrating: boolean; dc?: string
   interp: string; comps: [string, number, string][]
   raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
@@ -78,6 +78,7 @@ function toRow(r: RiskRow): MRow {
     pct: r.percent_delta ?? null, lev: mg.leverage_health ?? null,
     sigs: r.total_signals ?? 0, ageMin: minsSince(r.scored_at),
     calibrating: !!mg.calibrating || r.sufficient_baseline === false,
+    dc: mg.data_coverage,
     interp: mg.interpretation || r.interpretation || '',
     comps, raw: r,
   }
@@ -506,10 +507,12 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                 return (
                   <tr key={r.key} className={r.key === sel ? 'sel' : ''} onClick={() => select(r.key)}>
                     <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}</div><div className="topic-cat">{r.cls ? r.cls.toLowerCase() : 'market'}</div></td>
-                    <td className="r"><span className="score-cell det">{r.det}</span></td>
-                    <td className="r"><span className="score-cell conf">{r.conf}</span></td>
-                    <td className="r"><div className="gapviz">{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
-                    <td><span className={'tier ' + r.tier}>{r.tier}</span></td>
+                    <td className="r"><span className="score-cell det" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.det}</span></td>
+                    <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
+                    <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
+                    <td>{r.dc === 'insufficient'
+                      ? <span className="tier" style={{ color: MC.muted, background: '#EEF0F2' }} title="Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this item yet — limited coverage, not a confirmed quiet market.">LTD DATA</span>
+                      : <span className={'tier ' + r.tier}>{r.tier}</span>}</td>
                     <td className="r"><span className={'pct ' + (r.pct == null ? 'na' : r.pct > 0 ? 'up' : r.pct < 0 ? 'down' : 'flat')}>{r.pct == null ? '—' : `${r.pct > 0 ? '+' : ''}${Math.round(r.pct)}%`}</span></td>
                     <td className="r"><span className="muted">{r.lev == null ? '—' : Math.round(r.lev)}</span></td>
                     <td className="r"><span className="muted">{r.sigs || '—'}</span></td>
