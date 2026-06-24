@@ -109,15 +109,18 @@ def signal_for(ticker: str, name: str = "") -> dict:
                 sm_value += v["value"]
 
     import math
-    # Intensity: breadth of smart-money holders + breadth of congressional interest.
+    # INTENSITY of money MOVEMENT: breadth of smart-money holders + congressional interest.
+    # This is a MEASUREMENT of where money is moving — NOT a prediction or a buy/sell call.
     sm_norm = min(1.0, len(sm_funds) / 6.0)             # 6+ curated funds = saturated
     cg_norm = min(1.0, n_members / 8.0)                 # 8+ members trading = saturated
     positioning_signal = round(min(1.0, 0.6 * sm_norm + 0.4 * cg_norm), 3)
-    direction = ("net_buying" if net > 1 else "net_selling" if net < -1 else "mixed")
+    # DIRECTION of flow (a fact about what the filings show): money moving IN vs OUT.
+    flow = ("inflow" if net > 1 else "outflow" if net < -1 else "neutral")
     return {
         "ticker": tkr, "name": name,
-        "positioning_signal": positioning_signal,
-        "direction": direction,
+        "movement_intensity": positioning_signal,       # 0-1: how much money is moving here
+        "positioning_signal": positioning_signal,       # (alias, kept for the flag-gated blend)
+        "flow": flow,                                    # inflow | outflow | neutral (factual)
         "smart_money": {"funds_holding": len(sm_funds), "funds": sorted(sm_funds),
                         "total_value_usd": round(sm_value, 0)},
         "congress": {"members": n_members, "buys": cg["buys"], "sells": cg["sells"], "net": net},
@@ -136,12 +139,14 @@ def all_signals(watchlist: dict, top_congress: int = 25) -> dict:
     for tkr, _ in busy[:top_congress]:
         if tkr not in sigs:
             sigs[tkr] = signal_for(tkr, tkr)
-    ranked = sorted(sigs.values(), key=lambda s: s["positioning_signal"], reverse=True)
+    ranked = sorted(sigs.values(), key=lambda s: s["movement_intensity"], reverse=True)
     return {"available": True, "held_out": True,
             "built_at": _CACHE["built_at"], "count": len(ranked),
             "signals": ranked,
-            "note": "HELD-OUT until DARK_POSITIONING_V2=1 — augments Market Signal "
-                    "positioning_concentration only when the flag is on (post-backtest)."}
+            "note": "MONEY-MOVEMENT measurement (where institutional + Congressional money is "
+                    "moving IN/OUT + how intensely) — a FACT from filings, NOT a prediction or "
+                    "buy/sell signal. Feeds Market Signal as a movement input when "
+                    "DARK_POSITIONING_V2=1."}
 
 
 if __name__ == "__main__":
@@ -154,6 +159,6 @@ if __name__ == "__main__":
     out = all_signals(wl, top_congress=10)
     print("signals:", out["count"])
     for s in out["signals"][:18]:
-        print(f"  {s['ticker']:6} sig={s['positioning_signal']:.2f} {s['direction']:11} "
+        print(f"  {s['ticker']:6} intensity={s['movement_intensity']:.2f} flow={s['flow']:8} "
               f"funds={s['smart_money']['funds_holding']} congress={s['congress']['members']}m "
               f"net{s['congress']['net']:+d}")

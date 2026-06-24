@@ -1,9 +1,19 @@
 """
-Predictive backtest for the dark-positioning (Congress) signal — HELD-OUT, backtest-only.
+Return-prediction probe for the Congress signal — HELD-OUT, transparency record.
 
-The gate before flipping DARK_POSITIONING_V2 on: does the congressional positioning signal
-PREDICT forward returns (i.e., would blending it into Market Signal Detection add a real
-leading edge), not just *change* the score?
+⚠ FRAMING (corrected 2026-06-24): this asks "does Congressional trading PREDICT forward
+returns?" — an INVESTMENT-ALPHA question Now TrendIn does NOT ask. We do not predict prices
+or recommend trades. The platform MEASURES MOVEMENT (attention + money) and states leverage
+FACTS; it is not a financial/investment service. So this is NOT the integration gate. It is
+kept only as an honest transparency record (and it confirms, usefully, that the public
+Congressional feed carries no return edge — which is exactly why we make no such claim).
+
+The REAL criterion for the dark-positioning signal is MEASUREMENT FIDELITY: does it faithfully
+report where institutional/Congressional money is moving (in/out + intensity), straight from
+the filings? It does, by construction (positioning_intel reads the filings directly). That is
+the basis for integration — as a money-MOVEMENT input, never as a price predictor.
+
+[Original probe below — does the signal predict forward returns, no-lookahead, vs Yahoo prices?]
 
 INTEGRITY — NO LOOKAHEAD:
   • The signal at decision date T uses ONLY trades whose **Filed** date <= T (the date the
