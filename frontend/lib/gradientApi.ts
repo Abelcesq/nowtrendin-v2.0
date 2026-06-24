@@ -228,9 +228,15 @@ export interface RiskScore {
     gapState?: string;             // EARLY | CONFIRMING | CONFIRMED | ROUTINE | LAGGING | MIXED | CALIBRATING
     calibrating?: boolean;
     leverageHealth?: number | null; // 1-100, HIGH = lower debt (companies only)
-    // label -> { score, feeds: detection|confidence|both, baselineRelative, z }
-    components: Record<string, { score: number; feeds: string; baselineRelative: boolean; z: number | null }>;
+    // label -> { score, feeds: detection|confidence|both, baselineRelative, z, notApplicable }
+    components: Record<string, { score: number | null; feeds: string; baselineRelative: boolean; z: number | null; notApplicable?: boolean }>;
     interpretation?: string;
+    // Coverage LANE (Tier 1) — covered / halted_microcap / macro_theme. macro themes have
+    // no ticker, so positioning + fundamentals are structurally N/A (naComponents).
+    lane?: string;
+    laneLabel?: string;
+    dataCoverage?: string;           // full | partial | insufficient (over APPLICABLE inputs)
+    naComponents?: string[];
   };
   // ── Positioning engine (baseline-relative; now a component of the above) ──
   positioningScore?: number;       // 0–100 anomaly vs the item's own baseline
@@ -401,11 +407,16 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       components: Object.fromEntries(
         Object.entries(r.market_gradient.components || {}).map(([label, v]: [string, any]) => [
           label,
-          { score: Number(v?.score ?? 0), feeds: v?.feeds || 'both',
-            baselineRelative: Boolean(v?.baseline_relative), z: v?.z ?? null },
+          { score: v?.score == null ? null : Number(v.score), feeds: v?.feeds || 'both',
+            baselineRelative: Boolean(v?.baseline_relative), z: v?.z ?? null,
+            notApplicable: Boolean(v?.not_applicable) },
         ])
       ),
       interpretation: r.market_gradient.interpretation || undefined,
+      lane: r.market_gradient.lane || undefined,
+      laneLabel: r.market_gradient.lane_label || undefined,
+      dataCoverage: r.market_gradient.data_coverage || undefined,
+      naComponents: Array.isArray(r.market_gradient.na_components) ? r.market_gradient.na_components : undefined,
     } : undefined,
     // Positioning (baseline-relative) fields — now a component of the above.
     positioningScore: r.positioning_score != null ? Math.round(Number(r.positioning_score)) : undefined,

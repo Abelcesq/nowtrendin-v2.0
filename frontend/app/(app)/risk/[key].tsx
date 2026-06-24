@@ -153,6 +153,26 @@ export default function RiskDetail() {
               how early the move is. Measurement only — not financial advice.
             </Text>
 
+            {/* Coverage-lane caveat — same lane axis as the web terminal. */}
+            {mg?.lane === 'macro_theme' ? (
+              <View className="rounded-xl p-3 mb-3" style={{ backgroundColor: '#EEF2F7', borderWidth: 1, borderColor: '#D5DCE5' }}>
+                <Text className="text-[11px] leading-4" style={{ color: '#4A5568' }}>
+                  <Text className="font-bold">Macro theme.</Text> A market-wide theme has no single ticker, so
+                  smart-money positioning (FINRA short interest · 13F) and company fundamentals are{' '}
+                  <Text className="font-bold">not applicable</Text> — the score reflects only the macro /
+                  cross-market inputs that can be measured.
+                </Text>
+              </View>
+            ) : mg?.dataCoverage === 'insufficient' ? (
+              <View className="rounded-xl p-3 mb-3" style={{ backgroundColor: '#FFF4E5', borderWidth: 1, borderColor: '#F0C27B' }}>
+                <Text className="text-[11px] leading-4" style={{ color: '#8A5A00' }}>
+                  <Text className="font-bold">Insufficient positioning data.</Text> Smart-money / short-interest
+                  sources aren't populated for this instrument yet, so it sits near baseline by default — not a
+                  confirmed quiet market.
+                </Text>
+              </View>
+            ) : null}
+
             {/* Component breakdown — the seven market factors, colored by which
                 score they feed. ✓ = baseline-relative (scored vs this item's own
                 history); otherwise still calibrating on absolute scale. */}
@@ -160,19 +180,21 @@ export default function RiskDetail() {
               <View className="bg-surface rounded-2xl border border-border p-4 mb-3">
                 <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">Market factors</Text>
                 {Object.entries(mg.components).map(([label, c]) => {
-                  const col = FEEDS_COLOR[c.feeds] ?? '#9AA3B0';
+                  const na = c.notApplicable || c.score == null;
+                  const col = na ? '#9AA3B0' : (FEEDS_COLOR[c.feeds] ?? '#9AA3B0');
+                  const pct = na ? 0 : Math.max(4, Math.min(100, c.score ?? 0));
                   return (
-                    <View key={label} className="mb-2.5">
+                    <View key={label} className="mb-2.5" style={na ? { opacity: 0.5 } : undefined}>
                       <View className="flex-row justify-between mb-1">
                         <View className="flex-row items-center gap-1.5 flex-1 pr-2">
                           <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: col }} />
                           <Text className="text-textSecondary text-[11px] flex-1" numberOfLines={1}>{label}</Text>
-                          {c.baselineRelative && <Text className="text-[9px]" style={{ color: '#00C896' }}>✓ base</Text>}
+                          {!na && c.baselineRelative && <Text className="text-[9px]" style={{ color: '#00C896' }}>✓ base</Text>}
                         </View>
-                        <Text className="text-textPrimary text-[12px] font-bold">{Math.round(c.score)}</Text>
+                        <Text className="text-textPrimary text-[12px] font-bold">{na ? 'n/a' : Math.round(c.score ?? 0)}</Text>
                       </View>
                       <View className="h-1.5 rounded-full bg-border overflow-hidden">
-                        <View style={{ width: `${Math.max(4, Math.min(100, c.score))}%`, backgroundColor: col }} className="h-full rounded-full" />
+                        <View style={{ width: `${pct}%`, backgroundColor: col }} className="h-full rounded-full" />
                       </View>
                     </View>
                   );

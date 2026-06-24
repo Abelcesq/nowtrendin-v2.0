@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Activity, Globe } from 'lucide-react-native';
 import { RiskScore } from '../../lib/gradientApi';
+import { LANE_SHORT } from '../../lib/marketCategories';
 
 // Positioning classification → colour.
 const CLASS_COLOR: Record<string, string> = {
@@ -48,6 +49,22 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           <Text style={{ color }} className="text-[10px] font-bold tracking-wide">{cls}</Text>
         </View>
       </View>
+
+      {/* Coverage LANE + data caveat — same lane axis as the web terminal. */}
+      {!!risk.marketGradient?.lane && (
+        <View className="flex-row items-center gap-1.5 mt-1">
+          <Text className="text-textMuted text-[10px]">{LANE_SHORT[risk.marketGradient.lane] ?? risk.marketGradient.lane}</Text>
+          {risk.marketGradient.lane === 'macro_theme' ? (
+            <View className="px-1.5 py-0.5 rounded" style={{ backgroundColor: '#EEF2F7' }}>
+              <Text className="text-[9px] font-bold" style={{ color: '#5B6472' }}>positioning N/A</Text>
+            </View>
+          ) : risk.marketGradient.dataCoverage === 'insufficient' ? (
+            <View className="px-1.5 py-0.5 rounded" style={{ backgroundColor: '#EEF0F2' }}>
+              <Text className="text-[9px] font-bold" style={{ color: '#9AA3B0' }}>LTD DATA</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       <View className="flex-row items-end gap-3 mt-2">
         <View>

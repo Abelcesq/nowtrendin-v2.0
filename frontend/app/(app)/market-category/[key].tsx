@@ -10,7 +10,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { TierID, isDataAccessible } from '../../../constants/tiers';
 import { dataWindowLabel } from '../../../lib/signals';
 import { useRiskScores } from '../../../hooks/useSignals';
-import { MARKET_CATEGORY_DEFS, getMarketCategory, leverageOf } from '../../../lib/marketCategories';
+import { MARKET_CATEGORY_DEFS, getMarketCategory, leverageOf, laneOf, MARKET_LANES } from '../../../lib/marketCategories';
 
 export default function MarketCategoryPage() {
   const router = useRouter();
@@ -21,19 +21,29 @@ export default function MarketCategoryPage() {
   const tier = (user?.tier ?? 'consumer') as TierID;
   const { risks, isLoading } = useRiskScores();
   const [query, setQuery] = useState('');
+  const [lane, setLane] = useState('all');   // coverage-lane axis (Tier 1) — web parity
 
   const accessible = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
   const lockedCount = risks.length - accessible.length;
 
+  const isMS = cat.key === 'marketsignal';
+  const isLeverage = cat.key === 'leverage';
+
+  // Lane counts over the category view (before the lane filter) for the chip labels.
+  const laneCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of accessible.filter(cat.filter)) c[laneOf(r) || 'unknown'] = (c[laneOf(r) || 'unknown'] || 0) + 1;
+    return c;
+  }, [accessible, cat]);
+
   const list = useMemo(() => {
     let l = accessible.filter(cat.filter);
+    const lf = MARKET_LANES.find((x) => x.key === lane);
+    if (lf?.lane) l = l.filter((r) => laneOf(r) === lf.lane);
     if (query) l = l.filter((r) => r.display.toLowerCase().includes(query.toLowerCase()));
     l = [...l].sort(cat.sort ?? ((a, b) => (b.marketGradient?.detection ?? b.detection ?? 0) - (a.marketGradient?.detection ?? a.detection ?? 0)));
     return l;
-  }, [accessible, cat, query]);
-
-  const isMS = cat.key === 'marketsignal';
-  const isLeverage = cat.key === 'leverage';
+  }, [accessible, cat, query, lane]);
 
   return (
     <Screen scroll>
@@ -77,6 +87,24 @@ export default function MarketCategoryPage() {
         <TextInput value={query} onChangeText={setQuery} placeholder={`Search within ${cat.short}`}
           placeholderTextColor="#9AA3B0" className="flex-1 ml-3 text-textPrimary text-base" style={{ color: '#1A1A2E' }} />
       </View>
+
+      {/* Coverage-LANE chips (Tier 1) — same lane axis as the web terminal: separates names
+          with real institutional positioning from halt-surfaced micro-caps and macro themes. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3" contentContainerStyle={{ gap: 8 }}>
+        {MARKET_LANES.map((lf) => {
+          const active = lane === lf.key;
+          const n = lf.lane ? (laneCounts[lf.lane] || 0) : list.length;
+          return (
+            <TouchableOpacity key={lf.key} onPress={() => setLane(lf.key)}
+              className="px-3 py-1.5 rounded-full border"
+              style={{ borderColor: active ? cat.color : '#E4E7EC', backgroundColor: active ? `${cat.color}18` : '#FFFFFF' }}>
+              <Text className="text-[12px] font-semibold" style={{ color: active ? cat.color : '#5B6472' }}>
+                {lf.label}{lf.key !== 'all' ? ` ${n}` : ''}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
       <PullMarketButton />
 

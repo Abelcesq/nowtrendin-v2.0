@@ -303,7 +303,10 @@ export const CONTENT_CATEGORIES: Array<{ key: string; label: string; color: stri
   { key: 'fashion',        label: 'Fashion',        color: '#DB2777' },
   { key: 'education',      label: 'Education',       color: '#7C5CFC' },
   { key: 'religion',       label: 'Religion',        color: '#B5341B' },
-  { key: 'news',           label: 'News',            color: '#5B6472' },
+  // 'general' = the honest UNCLASSIFIED bucket (the engine's no-match fallback). Replaces
+  // the old 'news' chip: 'news' has no lexicon of its own and is now ~0 (real news =
+  // current_events). Matches the web terminal's data-driven /categories chips.
+  { key: 'general',        label: 'General',         color: '#9AA3B0' },
 ];
 
 const CONTENT_CATEGORY_INDEX: Record<string, { key: string; label: string; color: string }> =

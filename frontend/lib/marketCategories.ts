@@ -13,6 +13,20 @@ const tierOf = (r: RiskScore) => r.marketGradient?.tier ?? r.stage ?? 'DORMANT';
 const detOf = (r: RiskScore) => r.marketGradient?.detection ?? r.detection ?? 0;
 export const leverageOf = (r: RiskScore): number | null =>
   r.marketGradient?.leverageHealth ?? null;
+export const laneOf = (r: RiskScore): string => r.marketGradient?.lane ?? '';
+
+// Coverage-LANE axis (Tier 1) — EXACT parity with the web terminal's LANE_FILTERS so all
+// three platforms share the same lane chips. Covered = institutional positioning available;
+// halted_microcap = ticker but limited coverage; macro_theme = no ticker (positioning N/A).
+export const MARKET_LANES: Array<{ key: string; label: string; lane?: string }> = [
+  { key: 'all', label: 'All lanes' },
+  { key: 'covered', label: 'Covered', lane: 'covered' },
+  { key: 'halted_microcap', label: 'Halted / micro-cap', lane: 'halted_microcap' },
+  { key: 'macro_theme', label: 'Macro themes', lane: 'macro_theme' },
+];
+export const LANE_SHORT: Record<string, string> = {
+  covered: 'covered', halted_microcap: 'halt · micro-cap', macro_theme: 'macro theme',
+};
 
 export const MARKET_CATEGORY_DEFS: Array<{
   key: MarketCategoryKey;
