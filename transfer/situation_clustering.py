@@ -352,6 +352,28 @@ def build_from_db(conn, window_hours: int = 120, min_doc_freq: int = 5,
             "situation_count": len(sits), "situations": sits}
 
 
+# ── 5. Situation → category routing (drains the news/general catch-all) ──────────
+def category_map_from_db(conn, gate=None, categorizer=None, window_hours: int = 120,
+                         min_doc_freq: int = 5) -> dict:
+    """Build a {topic_key: category} OVERRIDE from the situation clustering: each
+    situation's SPECIFIC category (skipping the news/general catch-all) is applied to all
+    its member topics. This routes a context-dependent entity by its SITUATION's context
+    (canada in a hockey situation → sports; canada in an election situation → politics) —
+    what the bare-word lexicon cannot do. DISPLAY-ONLY: category is navigation metadata,
+    never the Gradient Score (no circularity). Returns {map, situations, topics}."""
+    res = build_from_db(conn, window_hours=window_hours, min_doc_freq=min_doc_freq,
+                        gate=gate, categorizer=categorizer)
+    out = {}
+    # situations are sorted largest-first, so the largest situation a topic belongs to wins.
+    for s in res.get("situations", []):
+        cat = s.get("category")
+        if not cat or cat in _CATCHALL_CATS:
+            continue
+        for m in s.get("members", []):
+            out.setdefault(m, cat)
+    return {"map": out, "situations": res.get("situation_count", 0), "topics": len(out)}
+
+
 if __name__ == "__main__":
     import json
     # The "japan" problem: ONE entity, THREE distinct situations across THREE categories.

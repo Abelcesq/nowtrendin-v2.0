@@ -177,6 +177,69 @@ def _topic_category(display: str) -> str:
     except Exception:
         return "general"
 
+# ── Situation → category routing (drains the news/general catch-all) ──────────────
+# A topic_key→category OVERRIDE built from the held-out situation clustering: a
+# context-dependent entity (a bare country, a name) is routed by its SITUATION's
+# category — "canada" in a hockey situation reads Sports, in an election situation
+# reads Politics — which the bare-word lexicon structurally cannot do. Refreshed by a
+# background thread (below). DISPLAY-ONLY navigation metadata: it never feeds the
+# Gradient Score (no circularity), consistent with the held-out situation layer.
+_SITUATION_CAT: dict = {}
+SITUATION_CATEGORY_ENABLED = os.getenv("SITUATION_CATEGORY_ENABLED", "1") == "1"
+SITUATION_CAT_REFRESH_MIN = int(os.getenv("SITUATION_CAT_REFRESH_MIN", "30"))
+_CATCHALL_CATS = ("general", "news", "")
+
+
+def _category_for(topic_key: str, display: str) -> str:
+    """Serve-time category: prefer a topic's SITUATION category (context-aware) over the
+    bare-word lexicon, so 'canada' in a hockey situation reads Sports instead of the
+    news/general catch-all. Falls back to the lexicon when the topic isn't in a
+    specific-category situation. Display-only — no scoring impact."""
+    if SITUATION_CATEGORY_ENABLED and topic_key:
+        c = _SITUATION_CAT.get(topic_key)
+        if c and c not in _CATCHALL_CATS:
+            return c
+    return _topic_category(display or "")
+
+
+def _refresh_situation_categories() -> int:
+    """Rebuild the topic_key→category override map from the current situation clustering.
+    Best-effort: on any error the previous map is kept (never wiped to empty)."""
+    if not SITUATION_CATEGORY_ENABLED:
+        return 0
+    try:
+        import situation_clustering
+        conn = get_db()
+        try:
+            res = situation_clustering.category_map_from_db(
+                conn, gate=_is_quality_topic, categorizer=_topic_category)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        new_map = res.get("map", {})
+        if new_map:
+            global _SITUATION_CAT
+            _SITUATION_CAT = new_map
+        print(f"[situation-cat] refreshed: {len(new_map)} topic→category overrides "
+              f"from {res.get('situations', 0)} situations")
+        return len(new_map)
+    except Exception as e:
+        print(f"[situation-cat] refresh skipped: {e}")
+        return 0
+
+
+def _situation_category_loop():
+    """Daemon: refresh the situation→category map on startup, then every N minutes."""
+    import time as _t
+    while True:
+        try:
+            _refresh_situation_categories()
+        except Exception as e:
+            print(f"[situation-cat] loop error: {e}")
+        _t.sleep(max(5, SITUATION_CAT_REFRESH_MIN) * 60)
+
 # dual_pathway.py — Phase C recalibration. Mainstream-origin topics (consumer
 # culture surfaced by discovery feeds) are scored by attention MAGNITUDE +
 # velocity instead of the expert-gradient that is structurally ~0 for them.
@@ -5168,6 +5231,17 @@ async def startup_auto_collect():
         except Exception as _pwe:
             print(f"[startup] prewarm-agent failed to start: {_pwe}")
 
+    # Situation→category routing: build the topic_key→category override map from the
+    # held-out situation clustering, then refresh on an interval. Drains the news/general
+    # catch-all by context-routing bare entities. Display-only — never feeds the score.
+    if SITUATION_CATEGORY_ENABLED:
+        try:
+            threading.Thread(target=_situation_category_loop, daemon=True,
+                             name="situation-cat").start()
+            print(f"[startup] situation-cat router started (every {SITUATION_CAT_REFRESH_MIN}m).")
+        except Exception as _sce:
+            print(f"[startup] situation-cat router failed to start: {_sce}")
+
     # ── Init calibration tables + seed known topics ────────────────
     # Always runs (idempotent) — creates tables if missing, seeds
     # 60+ known topics so calibration works from day 1.
@@ -6013,7 +6087,8 @@ def audit_topics(days: int = 7, max_topics: int = 9000):
 
     total = len(rows)
     real = 0
-    junk, cats, groups = [], Counter(), defaultdict(set)
+    junk, cats, cats_routed, groups = [], Counter(), Counter(), defaultdict(set)
+    routed_moved = 0
     for r in rows:
         tk = _v(r, "topic_key", 0)
         disp = _v(r, "topic_display", 1) or (tk or "").replace("_", " ")
@@ -6021,10 +6096,17 @@ def audit_topics(days: int = 7, max_topics: int = 9000):
             real += 1
         elif len(junk) < 40:
             junk.append(disp)
-        cats[_topic_category(disp) or "general"] += 1
+        raw_cat = _topic_category(disp) or "general"
+        routed_cat = _category_for(tk, disp) or "general"
+        cats[raw_cat] += 1
+        cats_routed[routed_cat] += 1
+        if routed_cat != raw_cat:                     # situation layer reclassified this topic
+            routed_moved += 1
         groups[_topic_key(disp)].add(disp)            # same canonical key, different spellings
     dup = {k: sorted(v) for k, v in groups.items() if len(v) > 1}
-    catchall = cats.get("news", 0) + cats.get("general", 0) + cats.get("", 0)
+    _catchall_of = lambda c: c.get("news", 0) + c.get("general", 0) + c.get("", 0)
+    catchall = _catchall_of(cats)
+    catchall_routed = _catchall_of(cats_routed)
     pct = lambda n: (round(100 * n / total, 1) if total else 0.0)
     return {
         "status": "ok", "held_out": True, "read_only": True,
@@ -6035,6 +6117,18 @@ def audit_topics(days: int = 7, max_topics: int = 9000):
         "category": {"distribution": dict(cats.most_common()),
                      "catchall_pct": pct(catchall),
                      "note": "catch-all = news/general; high % => lexicon gaps to enrich"},
+        # Situation→category routing effect (display-only): how much the held-out
+        # situation layer drains the catch-all by context-routing bare entities.
+        "category_routed": {
+            "distribution": dict(cats_routed.most_common()),
+            "catchall_pct": pct(catchall_routed),
+            "catchall_drained_pts": round(pct(catchall) - pct(catchall_routed), 1),
+            "topics_reclassified": routed_moved,
+            "overrides_loaded": len(_SITUATION_CAT),
+            "enabled": SITUATION_CATEGORY_ENABLED,
+            "note": "routed = served category after situation-context routing; "
+                    "display-only, no scoring impact",
+        },
         "duplicates": {"groups": len(dup),
                        "examples": dict(sorted(dup.items(), key=lambda kv: -len(kv[1]))[:15])},
     }
@@ -7401,7 +7495,7 @@ def get_topic_detail(topic_key: str):
     result = {
         "topic":        s["topic_display"],
         "topic_key":    topic_key,
-        "category":     _topic_category(s["topic_display"]),
+        "category":     _category_for(topic_key, s["topic_display"]),
         "scored_at":    s["scored_at"],
 
         # ── THE DUAL SCORE ──────────────────────────────────────
@@ -7686,7 +7780,7 @@ def _compute_history_full(window: str, points: int) -> list:
         out.append({
             "topic_key": r["topic_key"],
             "topic_display": r["topic_display"] or r["topic_key"],
-            "category": _topic_category(r["topic_display"] or ""),
+            "category": _category_for(r["topic_key"], r["topic_display"] or ""),
             "overall": round(cur.get("overall_score") or 0),
             "det": round(cur.get("detection_score") or 0),
             "conf": round(cur.get("confidence_score") or 0),
@@ -8025,7 +8119,7 @@ def get_trending(
             continue   # drop profanity / bare-generic junk
         s["gap_label"]  = _gap_label(s["heisenberg_gap"])
         s["is_anomaly"] = bool(s.get("is_gravitational_anomaly"))
-        s["category"]   = _topic_category(s.get("topic_display", ""))
+        s["category"]   = _category_for(s.get("topic_key", ""), s.get("topic_display", ""))
         results.append(s)
 
     result = {"count": len(results), "results": results}
@@ -8080,7 +8174,7 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
                         d[_k] = _p[_k]
             except Exception:
                 pass
-        d["category"] = _topic_category(d.get("topic_display", ""))
+        d["category"] = _category_for(d.get("topic_key", ""), d.get("topic_display", ""))
         if cat and d["category"] != cat:
             continue
         topics.append(d)
@@ -8137,7 +8231,7 @@ def list_categories():
         LIMIT 2000
     """).fetchall()
     conn.close()
-    counts = Counter(_topic_category(r["topic_display"]) for r in rows
+    counts = Counter(_category_for(r["topic_key"], r["topic_display"]) for r in rows
                      if _is_quality_topic(r["topic_display"]))
     cats = []
     try:
@@ -8419,7 +8513,7 @@ def _format_score_rows(rows) -> dict:
         if not _is_quality_topic(disp):
             continue
         if not s.get("category"):
-            s["category"] = _topic_category(disp)
+            s["category"] = _category_for(s.get("topic_key", ""), disp)
         cleaned.append(s)
     results = cleaned
 
