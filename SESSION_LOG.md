@@ -34,6 +34,26 @@ founder to review `/research/13f`, then backtest-before-ship.**
 Research findings to note: **BlackRock CIK (0001364742) returns a 2024-Q2 13F** (others are
 2026-Q1) — BlackRock files under multiple entities; that CIK needs verification before use.
 
+**CIK curation (B) — done.** Verified all 10: 8 hedge funds return current Q1-2026 13F-HR.
+FINDING: the index/asset-management GIANTS (BlackRock, increasingly Vanguard) file 13F-**NT**
+*notices* and split holdings across sub-advisor entities, so no single CIK has their full book.
+**Dropped BlackRock** (0001364742 = "BlackRock Finance Inc", last HR 2024-Q2; no active consolidated
+HR found). Kept Vanguard at its last HR (Q4-2025; it filed 13F-NT for Q1-2026). 9 funds remain, all
+returning usable holdings.
+
+**Congressional-trading sources — 5-gate review (NONE onboarded; the rule did its job).** Applied
+§16 to the 4 given URLs — all FAIL as provided: House & Senate **Stock Watcher** S3 JSON →
+**403 AccessDenied** (buckets no longer public, all paths/hostnames); **CapitolTrades** /buzz →
+**429** + HTML (not a feed); **QuiverQuant** /congresstrading → HTTP 200 but a 2.2 MB **HTML page**
+(structured data is behind their paid API). The SIGNAL is valuable, but ENGINE routing is
+**Market Signal "Dark Positioning"** (positioning data, alongside SEC 13F + insider Form-4), NOT a
+blog/Dark-Matter *trend* feed. VIABLE primary path (verified live): the OFFICIAL **House Clerk** FD
+dataset (`disclosures-clerk.house.gov/public_disc/financial-pdfs/{YEAR}FD.zip` → tab-delimited index,
+FilingType "P" = PTR stock trades; 1,230 filings in 2026) + **Senate EFD** (efdsearch.senate.gov) —
+free + durable, but transaction details are in per-filing PDFs (parsing effort, like the stock-watcher
+project did before its bucket went private). Recommend a held-out collector against the official
+sources (or QuiverQuant's paid API) — verify + backtest before integration.
+
 ---
 
 ## Session 2026-06-24b — Founder 10-day QA + source cleanup + new-source review
