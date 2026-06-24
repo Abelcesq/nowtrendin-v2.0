@@ -3,7 +3,36 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24b_
+_Last updated: 2026-06-24c_
+
+---
+
+## Session 2026-06-24c — Source Onboarding Protocol (hard rule + gotcha) + SEC fund-13F (held-out)
+
+**SOURCE ONBOARDING PROTOCOL (§16 hard rule, founder-mandated).** Before linking ANY media/data
+source, 5 gates pass IN ORDER: **TYPE → ENGINE → FORMAT → CURRENCY+ACCESS → TEST→LINK→DEPLOY**
+(score-affecting ⇒ backtest-before-ship). Documented in CLAUDE.md §16, DATA_BUILDING_BLOCKS B1a
+(Source Watchdog owns), AGENT_CHARTER GOTCHA G-SRC + fleet table, `/data-watchdog` skill, and
+memory `feedback-source-onboarding-protocol`. **Enforced by `.githooks/commit-msg`** (a "gotcha"):
+detects a source-shaped commit (feed URL / new collector / `COLLECTOR_EXPECTATIONS` entry in the
+`transfer/*` collectors) and BLOCKS unless the message asserts `[source-onboarded]`. Tracked in
+`.githooks/` with `.gitattributes` forcing LF (CRLF broke the bash parse); install once:
+`git config core.hooksPath .githooks`. Verified: blocks without marker, allows with it, ignores
+non-source commits.
+
+**SEC fund-13F institutional positioning — built HELD-OUT (research-before-integrate).**
+`transfer/sec_13f_research.py` — imported by NOTHING in scoring (like `referee_wikipedia`).
+Onboarded through all 5 gates. Curated `FUND_CIKS` (Berkshire, Bridgewater, RenTech, BlackRock,
+Vanguard, State Street, Citadel, Two Sigma, Tiger Global, Soros). `latest_13f(cik)` → SEC
+submissions API → 13F-HR info-table XML → namespace-agnostic parse → per-CUSIP-aggregated holdings
++ total value + top-10 concentration. **`GET /research/13f?fund=<name|cik|all>`** (internal-key) =
+the review surface. **Verified live from the engine** (SEC doesn't block Heroku IPs): Berkshire
+Q1-2026 — 29 positions, $263B, Apple 22% / Amex 17% / Coca-Cola 12% (matches the known portfolio);
+Bridgewater 993 pos / $22B; BlackRock 5230 pos / $4.4T; Citadel 6733 pos / $618B. Format-gate fix:
+HTML entities decoded (S&amp;P → S&P). **NOT integrated into `positioning_concentration` yet —
+founder to review `/research/13f`, then backtest-before-ship.**
+Research findings to note: **BlackRock CIK (0001364742) returns a 2024-Q2 13F** (others are
+2026-Q1) — BlackRock files under multiple entities; that CIK needs verification before use.
 
 ---
 
