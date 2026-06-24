@@ -1220,6 +1220,11 @@ KNOWN_CONCEPT_PHRASES = {
     "vector search", "semantic search", "model context protocol", "large language model",
     "world model", "world models", "context window", "machine learning", "deep learning",
     "neural network", "reinforcement learning", "self driving", "quantum computing",
+    "artificial intelligence", "retrieval augmented generation", "natural language",
+    "computer vision", "language model", "sentence transformers", "context compression",
+    # geo / geopolitical entities that are common-word phrases (real topics, not generic)
+    "west bank", "gaza strip", "middle east", "south china sea", "north korea",
+    "south korea", "hong kong", "new york", "white house", "united nations",
 }
 
 
@@ -1235,10 +1240,12 @@ def _is_quality_topic(display: str) -> bool:
     t = (display or "").strip().lower()
     if not t:
         return False
-    # Split on whitespace AND underscores — some sources emit underscored field-name
-    # fragments ("show_article_date") that would otherwise dodge the word/bigram checks
-    # as a single token. For clean space-separated displays this is identical to .split().
-    toks = [w for w in re.split(r"[\s_]+", t) if w]
+    # Split on whitespace, underscores AND hyphens — sources emit underscored field-name
+    # fragments ("show_article_date") and hyphenated compounds ("retrieval-augmented-
+    # generation", "artificial-intelligence") that would otherwise dodge the word/bigram
+    # checks (or trip the long-token guard) as single tokens. For clean space-separated
+    # displays this is identical to .split().
+    toks = [w for w in re.split(r"[\s_\-]+", t) if w]
     if any(w in PROFANITY for w in toks):
         return False
     # concatenated-junk token (onlinedynamicbatching) + promotional/gambling spam —
