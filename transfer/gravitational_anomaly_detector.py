@@ -7267,6 +7267,45 @@ def quarantine_dates_resolve(payload: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/schema", dependencies=[Depends(_require_internal)])
+def db_schema():
+    """Live DB schema introspection (information_schema + planner row estimates) — the
+    source of truth for regenerating DB_DATA_DICTIONARY.md so it never drifts stale again.
+    Read-only."""
+    conn = get_db(DB_PATH)
+    try:
+        cols = conn.execute(
+            "SELECT table_name, column_name, data_type, is_nullable, ordinal_position "
+            "FROM information_schema.columns WHERE table_schema='public' "
+            "ORDER BY table_name, ordinal_position").fetchall()
+        est = {}
+        try:
+            for r in conn.execute(
+                "SELECT relname, reltuples::bigint AS n FROM pg_class c "
+                "JOIN pg_namespace ns ON ns.oid=c.relnamespace "
+                "WHERE ns.nspname='public' AND c.relkind='r'").fetchall():
+                est[(r["relname"] if hasattr(r, "keys") else r[0])] = \
+                    int(r["n"] if hasattr(r, "keys") else r[1])
+        except Exception:
+            pass
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+    def _g(r, k, i):
+        return (r[k] if hasattr(r, "keys") else r[i])
+    tables = {}
+    for r in cols:
+        t = _g(r, "table_name", 0)
+        tables.setdefault(t, []).append({
+            "column": _g(r, "column_name", 1),
+            "type": _g(r, "data_type", 2),
+            "nullable": _g(r, "is_nullable", 3) == "YES"})
+    out = [{"table": t, "row_estimate": est.get(t), "columns": c}
+           for t, c in sorted(tables.items())]
+    return {"table_count": len(out), "generated_for": "DB_DATA_DICTIONARY.md", "tables": out}
+
+
 @app.get("/monitor/scoringcontract")
 def monitor_scoringcontract():
     """Scoring Contract Auditor — is every scoring field in the declared format
