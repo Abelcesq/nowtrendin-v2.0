@@ -3,7 +3,43 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24a_
+_Last updated: 2026-06-24b_
+
+---
+
+## Session 2026-06-24b — Founder 10-day QA + source cleanup + new-source review
+
+**Founder QA review (2026-06-10 features):** the pasted runbook targeted the FROZEN 1.0 engine
+(nowtrendin-e62…) — ran every check against **v2** instead. All 4 features verified live + working:
+Signal Convergence (`/convergence`, sensible CONFLICTING/MIXED verdicts, warming_up cleared at 7
+snapshots), Dark Matter recalibration (`100*ratio^0.7`, D spans 0–49, **no clustering at 65**),
+news provenance tiering (per cycle: ~33–38 promoted dark-matter, ~118–149 mainstream, quarantine
+firing), reputable allowlist (~80 publishers). The prior "/usage doesn't track news aggregators"
+flag was a **measurement artifact** (truncated 900-char output) — all aggregators ARE tracked.
+
+**Source cleanup (engine deployed):**
+- **HackerNews was DOWN** (0 signals) — `hn.algolia.com/api/v1/search` now returns 0 for
+  `points>50` numericFilters (verified live; `/search_by_date` returns results with the same
+  filters). Switched the collector to `/search_by_date`. Moat source FIXED, not removed.
+- **yahoo_finance REMOVED** — RapidAPI 429 every cycle (quota exhausted), 0 signals, ~600 wasted
+  calls/30d. Gated both collectors behind `YAHOO_FINANCE_ENABLED=0` (default off) + removed its
+  collector_health expectation. Reversible.
+- **newsapi_ai ("newai") kept** — it IS producing (100 art/cycle → 573–635 signals); not dead.
+- **QA runbook repointed:** `monitoring/integrity-check.ps1` `$BASE` + README were checking the
+  frozen 1.0 engine — corrected to v2.
+
+**New Market-Signal sources reviewed (tested before wiring — none shipped):**
+- **Mises Institute Literature** (mises.org/rss/library): **REJECT** — HTTP 404 (dead URL) AND it's
+  classic economic *literature* (historical books), not current signal.
+- **NBER** (real URL `back.nber.org/rss/new.xml`, the given one 301-redirects): works, but academic
+  paper titles **extract poorly** (fail the quality gate; sub-phrases are noise like "times
+  geopolitical fragmentation"). It's also a macro-research/TREND source, NOT Market-Signal
+  positioning. **Recommend against wiring as-is** — would need a research-concept extractor first.
+- **SEC EDGAR 13F** (Berkshire CIK atom feed): **HTTP 200, 40 real 13F filings — the strong fit.**
+  SEC EDGAR is already a live collector (`sec_edgar`, ~334 sig/cycle, does Form 4 / 8‑K / 13F for
+  watchlist COMPANIES). The enhancement = track specific mega-cap FUND 13F-HRs (Berkshire et al.)
+  to see where institutions move billions → feeds `positioning_concentration`. Real win, but
+  score-affecting (needs a validated build + 13F-HR holdings-table parsing) — recommended, not shipped.
 
 ---
 
