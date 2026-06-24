@@ -7763,7 +7763,11 @@ def history_analysis(topic_key: str, topic: str = ""):
                "citations": res.get("citations", [])}
         _cache.set(ck, out, int(os.getenv("HISTORY_ANALYSIS_TTL", "21600")))
         return out
-    return {"available": False, "reason": res.get("error", "analysis unavailable")}
+    # Never surface a raw provider error (e.g. "401 ... api.perplexity.ai") to the UI —
+    # log it, return a clean, user-safe reason.
+    if res.get("error"):
+        print(f"[history-analysis] {name}: {res.get('error')}")
+    return {"available": False, "reason": "Driving-factor analysis is temporarily unavailable."}
 
 
 @app.get("/scores/{topic_key}/history")

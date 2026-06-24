@@ -291,36 +291,39 @@ _MOVEMENT_PROMPT = (
 
 
 def analyze_movement(topic: str, movement: str, direction: str, context: str = "") -> dict:
-    """Explain WHY a topic's score has been rising/falling/flat — one Perplexity
-    call, grounded in the real movement + coverage. Caller caches + meters."""
-    if not PERPLEXITY_API_KEY:
-        return {"available": False}
+    """Explain WHY a topic's score has been rising/falling/flat. PRIMARY = Perplexity
+    (cheap, web-grounded); FALLBACK = Claude when Perplexity is unavailable/unauthorized.
+    Caller caches + meters. Never leaks a raw provider error to the caller."""
     prompt = _MOVEMENT_PROMPT.format(topic=topic, movement=movement[:600],
                                      direction=direction, context=(context or "")[:2200])
-    try:
-        _api("perplexity")
-        r = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                     "Content-Type": "application/json"},
-            json={"model": PPLX_MODEL, "messages": [{"role": "user", "content": prompt}]},
-            timeout=45,
-        )
-        r.raise_for_status()
-        data = r.json()
-        content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-        citations = data.get("citations", []) or []
-        cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
-        _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
-        parsed = _extract_json(content)
-        if parsed and parsed.get("short"):
-            return {"available": True, "short": str(parsed.get("short", ""))[:300],
-                    "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
-        return {"available": True, "short": content[:200], "full": content,
-                "citations": citations, "cost": _c}
-    except Exception as e:
-        print(f"[ai_grade] movement analysis error for '{topic}': {e}")
-        return {"available": False, "error": str(e)}
+    if PERPLEXITY_API_KEY:
+        try:
+            _api("perplexity")
+            r = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                         "Content-Type": "application/json"},
+                json={"model": PPLX_MODEL, "messages": [{"role": "user", "content": prompt}]},
+                timeout=45,
+            )
+            r.raise_for_status()
+            data = r.json()
+            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            citations = data.get("citations", []) or []
+            cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
+            _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
+            parsed = _extract_json(content)
+            if parsed and parsed.get("short"):
+                return {"available": True, "short": str(parsed.get("short", ""))[:300],
+                        "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
+            return {"available": True, "short": content[:200], "full": content,
+                    "citations": citations, "cost": _c}
+        except Exception as e:
+            print(f"[ai_grade] movement (perplexity) error for '{topic}': {e} — trying Claude fallback")
+            # fall through to the Claude fallback below
+    if EXPLAINER_CLAUDE_FALLBACK and ANTHROPIC_API_KEY:
+        return _explain_via_claude(topic, prompt)
+    return {"available": False}
 
 
 def research_topic(topic: str, web_block: str = "") -> dict:
