@@ -8353,7 +8353,7 @@ def list_categories():
     from collections import Counter
     conn = get_db(DB_PATH)
     rows = conn.execute("""
-        SELECT r.topic_display
+        SELECT r.topic_key, r.topic_display
         FROM topic_registry r
         LEFT JOIN (
             SELECT topic_key, MAX(scored_at) as max_at
