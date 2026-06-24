@@ -691,8 +691,20 @@ def catchall_auditor(conn) -> dict:
     # corroboration per topic — MUST replicate the SCORING floor's signals exactly
     # (distinct sources + peak engagement + any expert-tier row), else the leak metric
     # counts topics the floor legitimately admitted via its high-magnitude exemption.
+    #
+    # WINDOW ALIGNMENT: the floor counts distinct sources over the scoring window
+    # (score_all_topics hours=72) AT SCORING TIME. A topic scored T hours ago was judged
+    # on sources in [T-72h, T]; if the auditor only looks back 72h from NOW it misses
+    # [T-72h, now-72h] and a topic that WAS corroborated then looks single-source now (a
+    # phantom leak). So the corroboration window is widened to (score+recent) hours, which
+    # is a SUPERSET of [T-72h, T] for every topic scored within RECENT_LEAK_H — making the
+    # source count conservative (never under-counts the floor's sources → no false leak).
+    SCORE_WINDOW_H = 72        # matches AnomalyDetector.score_all_topics(hours=72)
+    RECENT_LEAK_H = 24         # "current admission" sample = last day (≈4 collect cycles)
     agg = {}
-    cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=72)).isoformat()
+    cut = (datetime.datetime.utcnow()
+           - datetime.timedelta(hours=SCORE_WINDOW_H + RECENT_LEAK_H)).isoformat()
+    recent_cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=RECENT_LEAK_H)).isoformat()
     try:
         for r in conn.execute(
             "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
@@ -746,7 +758,7 @@ def catchall_auditor(conn) -> dict:
         # 72h window that still lacks ≥min_src distinct sources is a real current leak —
         # AND must not be one the floor legitimately exempts (expert tier, tracked call,
         # or HIGH-MAGNITUDE mass attention). Replicate _passes_corroboration exactly.
-        recent = (r["scored_at"] or "") >= cut
+        recent = (r["scored_at"] or "") >= recent_cut
         exempt = hasx or (maxe >= hi_mag) or (k in protect)
         if nsrc < min_src and not exempt:
             if recent:
@@ -809,9 +821,10 @@ def catchall_auditor(conn) -> dict:
     summary = {
         "total_scored": total, "catchall_count": catch, "catchall_pct": catch_pct,
         "floor_min_sources": min_src,
-        "single_source_catchall_leak": single_src,        # CURRENT admission leak (scored ≤72h)
+        "single_source_catchall_leak": single_src,        # CURRENT admission leak (scored ≤24h)
         "dormant_catchall_pile": dormant_pile,            # aged pre-floor rows, retained (not a leak)
-        "leak_window_hours": 72,
+        "leak_window_hours": RECENT_LEAK_H,
+        "corroboration_window_hours": SCORE_WINDOW_H + RECENT_LEAK_H,
         "floor_trend": trend,
         "floor_leak_delta": leak_delta,
         "misclassified_tracked": len(misclassified_real),
@@ -825,9 +838,9 @@ def catchall_auditor(conn) -> dict:
                               f"Top lexicon candidates to reclassify: {[t for t, _ in top_terms[:10]]}"})
     if single_src > 50:
         alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"{single_src} single-source catch-all topics ADMITTED in the last 72h "
-                              f"without corroboration (min_sources={min_src}) — floor may be leaking. "
-                              f"(Dormant pre-floor pile, retained, not counted: {dormant_pile}.)"})
+                       "msg": f"{single_src} single-source catch-all topics ADMITTED in the last "
+                              f"{RECENT_LEAK_H}h without corroboration (min_sources={min_src}) — floor "
+                              f"may be leaking. (Dormant pre-floor pile, retained, not counted: {dormant_pile}.)"})
     if trend == "WORSENING":
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"catch-all floor trend WORSENING: single-source leaks grew by "
