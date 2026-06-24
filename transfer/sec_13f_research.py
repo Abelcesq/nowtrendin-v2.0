@@ -31,17 +31,23 @@ SEC_USER_AGENT = os.getenv("SEC_USER_AGENT", "NowTrendIn Research contact@nowtre
 
 # Curated mega-cap institutional managers (13F filers) — the funds whose moves matter.
 # CIK = the FUND's SEC Central Index Key (NOT a portfolio company's).
+# CURATED + VERIFIED 2026-06-24: every CIK below returns a current 13F-HR holdings report
+# (Q1-2026, except Vanguard — see note). HEDGE FUNDS file clean consolidated 13F-HRs; the
+# INDEX/ASSET-MANAGEMENT GIANTS (BlackRock, and increasingly Vanguard) file 13F-NT *notices*
+# and split holdings across dozens of sub-advisor entities, so no single CIK captures their
+# full book — they were dropped (would need sub-entity aggregation, a separate build).
 FUND_CIKS = {
-    "Berkshire Hathaway":       "0001067983",
-    "Bridgewater Associates":   "0001350694",
-    "Renaissance Technologies": "0001037389",
-    "BlackRock":                "0001364742",
-    "Vanguard Group":           "0000102909",
-    "State Street":             "0000093751",
-    "Citadel Advisors":         "0001423053",
-    "Two Sigma Investments":    "0001179392",
-    "Tiger Global Management":  "0001167483",
-    "Soros Fund Management":    "0001029160",
+    "Berkshire Hathaway":       "0001067983",   # Q1-2026, 29 pos, $263B
+    "Bridgewater Associates":   "0001350694",   # Q1-2026, 993 pos, $22B
+    "Renaissance Technologies": "0001037389",   # Q1-2026, 3213 pos, $64B
+    "State Street":             "0000093751",   # Q1-2026, 4269 pos, $2.9T
+    "Citadel Advisors":         "0001423053",   # Q1-2026, 6733 pos, $618B
+    "Two Sigma Investments":    "0001179392",   # Q1-2026, 3742 pos, $124B
+    "Tiger Global Management":  "0001167483",   # Q1-2026, 54 pos, $23B
+    "Soros Fund Management":    "0001029160",   # Q1-2026, 255 pos, $9B
+    "Vanguard Group":           "0000102909",   # Q4-2025 HR (filed 13F-NT for Q1-2026); $6.9T
+    # DROPPED — BlackRock (0001364742 = "BlackRock Finance Inc", last 13F-HR 2024-Q2; the
+    # firm files 13F-NT now). Re-add only with a verified CIK that returns a current 13F-HR.
 }
 
 
