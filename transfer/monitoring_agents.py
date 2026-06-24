@@ -686,16 +686,20 @@ def catchall_auditor(conn) -> dict:
     nf = getattr(g, "NEWS_FILLER", set())
     min_src = getattr(g, "CATCHALL_MIN_SOURCES", 2)
     catch_cats = getattr(g, "_CATCHALL_CATS", ("news", "general", ""))
+    hi_mag = getattr(g, "HIGH_MAGNITUDE_ENG", 9.9)   # floor's mass-attention exemption
 
-    # corroboration per topic (distinct sources + any expert-tier signal), 72h
+    # corroboration per topic — MUST replicate the SCORING floor's signals exactly
+    # (distinct sources + peak engagement + any expert-tier row), else the leak metric
+    # counts topics the floor legitimately admitted via its high-magnitude exemption.
     agg = {}
     cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=72)).isoformat()
     try:
         for r in conn.execute(
             "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
+            "MAX(engagement_raw) maxe, "
             "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
             "FROM topic_signals WHERE extracted_at >= ? GROUP BY topic_key", (cut,)).fetchall():
-            agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0))
+            agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0.0))
     except Exception as e:
         alerts.append({"level": "warn", "block": "B3", "msg": f"corroboration read failed: {e}"})
 
@@ -732,16 +736,19 @@ def catchall_auditor(conn) -> dict:
         if cat not in catch_cats:
             continue
         catch += 1
-        nsrc, hasx = agg.get(k, (0, 0))
+        nsrc, hasx, maxe = agg.get(k, (0, 0, 0.0))
         # ADMISSION leak vs DORMANT pile. The corroboration map `agg` only sees the
         # last 72h of topic_signals, so a topic whose LATEST score predates that window
         # has had its corroborating signals age out → a low nsrc there is a 72h-window
         # artifact, NOT a floor failure. The floor is enforced at SCORING time
         # (forward-only); old single-source rows are the pre-floor pile we RETAIN under
         # the 90-day rule (it shrinks as rows age out). Only a topic scored WITHIN the
-        # 72h window that still lacks ≥min_src distinct sources is a real current leak.
+        # 72h window that still lacks ≥min_src distinct sources is a real current leak —
+        # AND must not be one the floor legitimately exempts (expert tier, tracked call,
+        # or HIGH-MAGNITUDE mass attention). Replicate _passes_corroboration exactly.
         recent = (r["scored_at"] or "") >= cut
-        if nsrc < min_src and not hasx and k not in protect:
+        exempt = hasx or (maxe >= hi_mag) or (k in protect)
+        if nsrc < min_src and not exempt:
             if recent:
                 single_src += 1                   # CURRENT admission leak (≈0 expected)
             else:
