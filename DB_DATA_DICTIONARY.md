@@ -1,459 +1,489 @@
-# NowTrendIn DB — Data Dictionary (auto-generated, read-only)
+# NowTrendIn DB — Data Dictionary
 
-_32 tables. Format buckets shown for date-ish TEXT columns._
+_Regenerated **2026-06-24** from the LIVE Postgres schema (`GET /schema`) + the Canonical Date Auditor (`GET /monitor/datecanon`). This is the source of truth — earlier versions were pre-migration (showed dropped columns like `market_signal_history.cycle_at` and mixed date formats the live schema no longer has). To refresh: re-fetch both endpoints and re-run `_audit_work/gen_dict.py`._
 
+**32 app tables** (Postgres `pg_stat_statements*` extension tables excluded). Row counts are planner estimates (`reltuples`; `-1`/`?` = not yet analyzed). Engine: `nowtrendin-v2-engine`.
 
-## accuracy_ledger  (13 rows, 11 cols)
+> **Canonical date model (§14):** every date-semantic value normalizes to a PRIMARY `signal_date` = ISO `YYYY-MM-DD`; secondary `source_time` (source's own HH:MM:SS) + `signal_time` (our fetch). Enforced by `ingestion_gate.gate_date()`. Live: **0 non-canonical across all declared date columns**.
+> **Retention:** `velocity_scores` rows kept **365 days** (canonical, 2026-06-24); never deleted within the window.
 
-| column | type | null | format (if date/text) |
+---
+
+## `accuracy_ledger`  (5 rows · 11 cols)
+
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| topic_key | text | YES |  |
-| topic_display | text | YES |  |
-| detection_date | text | YES | iso_date:13 |
-| detection_score | real | YES |  |
-| breakout_date | text | YES | human:13 |
-| breakout_multiple | real | YES |  |
-| lead_time_days | integer | YES |  |
-| verdict | text | YES |  |
-| validated_at | text | YES | iso_dt:13 |
-| provider | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `topic_key` | text |  |  |
+| `topic_display` | text |  |  |
+| `detection_date` | text |  | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/36 non-canonical |
+| `detection_score` | real |  |  |
+| `breakout_date` | text |  | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/36 non-canonical |
+| `breakout_multiple` | real |  |  |
+| `lead_time_days` | integer |  |  |
+| `verdict` | text |  |  |
+| `validated_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `provider` | text |  |  |
 
-## ai_costs  (690 rows, 7 cols)
+## `ai_costs`  (2,501 rows · 7 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| kind | text | YES |  |
-| topic | text | YES |  |
-| perplexity_cost | real | YES |  |
-| anthropic_cost | real | YES |  |
-| total_cost | real | YES |  |
-| created_at | text | YES | iso_dt:690 |
+| `id` | text | NOT NULL |  |
+| `kind` | text |  |  |
+| `topic` | text |  |  |
+| `perplexity_cost` | real |  |  |
+| `anthropic_cost` | real |  |  |
+| `total_cost` | real |  |  |
+| `created_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## ai_grade_costs  (18 rows, 6 cols)
+## `ai_grade_costs`  (15 rows · 6 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| topic | text | YES |  |
-| perplexity_cost | real | YES |  |
-| anthropic_cost | real | YES |  |
-| total_cost | real | YES |  |
-| created_at | text | YES | iso_dt:18 |
+| `id` | text | NOT NULL |  |
+| `topic` | text |  |  |
+| `perplexity_cost` | real |  |  |
+| `anthropic_cost` | real |  |  |
+| `total_cost` | real |  |  |
+| `created_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## anomaly_log  (511356 rows, 10 cols)
+## `anomaly_log`  (530,230 rows · 10 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| flagged_at | text | NO | iso_dt:511356 |
-| topic_key | text | NO |  |
-| topic_display | text | NO |  |
-| overall_score | real | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| anomaly_reason | text | YES |  |
-| was_confirmed | integer | YES |  |
-| confirmed_at | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `flagged_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text | NOT NULL |  |
+| `overall_score` | real |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `anomaly_reason` | text |  |  |
+| `was_confirmed` | integer |  |  |
+| `confirmed_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## api_usage  (250 rows, 4 cols)
+## `api_usage`  (289 rows · 4 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| source | text | NO |  |
-| day | text | NO |  |
-| calls | integer | YES |  |
-| last_call_at | text | YES | iso_dt:250 |
+| `source` | text | NOT NULL |  |
+| `day` | text | NOT NULL |  |
+| `calls` | integer |  |  |
+| `last_call_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## author_history  (28853 rows, 5 cols)
+## `author_history`  (32,084 rows · 5 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| author | text | NO |  |
-| platform | text | NO |  |
-| community | text | NO |  |
-| first_seen_at | text | YES | iso_dt:28853 |
-| post_count | integer | YES |  |
+| `author` | text | NOT NULL |  |
+| `platform` | text | NOT NULL |  |
+| `community` | text | NOT NULL |  |
+| `first_seen_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `post_count` | integer |  |  |
 
-## blog_collection_log  (3053 rows, 7 cols)
+## `blog_collection_log`  (3,370 rows · 7 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| collected_at | text | YES | iso_dt:3053 |
-| platform | text | NO |  |
-| source_name | text | YES |  |
-| signals_collected | integer | YES |  |
-| topics_extracted | integer | YES |  |
-| error_message | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `collected_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `platform` | text | NOT NULL |  |
+| `source_name` | text |  |  |
+| `signals_collected` | integer |  |  |
+| `topics_extracted` | integer |  |  |
+| `error_message` | text |  |  |
 
-## calibration_epochs  (1 rows, 10 cols)
+## `calibration_epochs`  (? rows · 10 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| run_at | text | NO | iso_dt:1 |
-| methodology_version | text | YES |  |
-| param_version | text | YES |  |
-| gate_status | text | YES |  |
-| gate_n | integer | YES |  |
-| gate_median_lead | real | YES |  |
-| led_rate | real | YES |  |
-| fp_rate | real | YES |  |
-| payload | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `run_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `methodology_version` | text |  |  |
+| `param_version` | text |  |  |
+| `gate_status` | text |  |  |
+| `gate_n` | integer |  |  |
+| `gate_median_lead` | real |  |  |
+| `led_rate` | real |  |  |
+| `fp_rate` | real |  |  |
+| `payload` | text |  |  |
 
-## collector_health  (21 rows, 7 cols)
+## `catchall_floor_log`  (? rows · 7 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| collector | text | NO |  |
-| last_success_at | text | YES | iso_dt:21 |
-| last_run_at | text | YES | iso_dt:21 |
-| last_signal_count | integer | YES |  |
-| consecutive_failures | integer | YES |  |
-| total_runs | integer | YES |  |
-| total_signals | integer | YES |  |
+| `logged_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `total_scored` | integer |  |  |
+| `catchall_count` | integer |  |  |
+| `catchall_pct` | real |  |  |
+| `single_source_leak` | integer |  |  |
+| `misclassified_tracked` | integer |  |  |
+| `min_sources` | integer |  |  |
 
-## market_signal_history  (57930 rows, 5 cols)
+## `collector_health`  (21 rows · 7 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| item_key | text | YES |  |
-| component | text | YES |  |
-| value | real | YES |  |
-| cycle_at | text | YES | iso_date:180, iso_dt:57750  ⚠MIXED |
+| `collector` | text | NOT NULL |  |
+| `last_success_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `last_run_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `last_signal_count` | integer |  |  |
+| `consecutive_failures` | integer |  |  |
+| `total_runs` | integer |  |  |
+| `total_signals` | integer |  |  |
 
-## pending_detections  (1045 rows, 8 cols)
+## `market_signal_history`  (87,771 rows · 6 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| topic_key | text | YES |  |
-| topic_display | text | YES |  |
-| detection_date | text | YES | iso_date:1045 |
-| detection_score | real | YES |  |
-| timeout_date | text | YES | iso_dt:1045 |
-| last_checked | text | YES | iso_dt:1045 |
-| status | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `item_key` | text |  |  |
+| `component` | text |  |  |
+| `value` | real |  |  |
+| `signal_date` | text |  | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/91166 non-canonical |
+| `signal_time` | text |  | 24h-UTC time `HH:MM:SS` (§14 secondary) |
 
-## pg_stat_statements_info  (1 rows, 2 cols)
+## `pending_detections`  (1,096 rows · 8 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| dealloc | bigint | YES |  |
-| stats_reset | timestamp with time zone | YES |  |
+| `id` | text | NOT NULL |  |
+| `topic_key` | text |  |  |
+| `topic_display` | text |  |  |
+| `detection_date` | text |  | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/1117 non-canonical |
+| `detection_score` | real |  |  |
+| `timeout_date` | text |  | canonical date (ISO YYYY-MM-DD) via `gate_date()` |
+| `last_checked` | text |  |  |
+| `status` | text |  |  |
 
-## positioning_history  (30780 rows, 5 cols)
+## `positioning_history`  (37,588 rows · 5 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| item_key | text | YES |  |
-| stage | integer | YES |  |
-| signal_count | integer | YES |  |
-| cycle_at | text | YES | iso_dt:30780 |
+| `id` | text | NOT NULL |  |
+| `item_key` | text |  |  |
+| `stage` | integer |  |  |
+| `signal_count` | integer |  |  |
+| `cycle_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## pull_history  (190580 rows, 11 cols)
+## `pull_history`  (252,217 rows · 11 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| snapshot_date | text | NO | iso_date:190580 |
-| feed | text | NO |  |
-| topic_key | text | NO |  |
-| topic_display | text | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| overall_score | real | YES |  |
-| signal_stage | text | YES |  |
-| total_signals | integer | YES |  |
-| scored_at | text | YES | iso_dt:190580 |
-| archived_at | text | YES | iso_dt:190580 |
+| `snapshot_date` | text | NOT NULL | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/252217 non-canonical |
+| `feed` | text | NOT NULL |  |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `overall_score` | real |  |  |
+| `signal_stage` | text |  |  |
+| `total_signals` | integer |  |  |
+| `scored_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `archived_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## raw_signals  (64816 rows, 15 cols)
+## `raw_signals`  (62,312 rows · 15 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| collected_at | text | NO | iso_dt:64816 |
-| platform | text | NO |  |
-| platform_tier | text | NO |  |
-| source_name | text | YES |  |
-| title | text | YES |  |
-| url | text | YES |  |
-| author | text | YES |  |
-| upvotes | integer | YES |  |
-| comments | integer | YES |  |
-| engagement_raw | real | YES |  |
-| sentiment | real | YES |  |
-| is_first_timer | integer | YES |  |
-| is_organic | integer | YES |  |
-| raw_text | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `collected_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `platform` | text | NOT NULL |  |
+| `platform_tier` | text | NOT NULL |  |
+| `source_name` | text |  |  |
+| `title` | text |  |  |
+| `url` | text |  |  |
+| `author` | text |  |  |
+| `upvotes` | integer |  |  |
+| `comments` | integer |  |  |
+| `engagement_raw` | real |  |  |
+| `sentiment` | real |  |  |
+| `is_first_timer` | integer |  |  |
+| `is_organic` | integer |  |  |
+| `raw_text` | text |  |  |
 
-## research_history_cache  (16 rows, 5 cols)
+## `research_history_cache`  (1 rows · 5 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| topic_key | text | NO |  |
-| researched_at | text | NO | iso_dt:16 |
-| expires_at | text | NO | iso_dt:16 |
-| result_json | text | NO |  |
-| sources_found | integer | YES |  |
+| `topic_key` | text | NOT NULL |  |
+| `researched_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `expires_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `result_json` | text | NOT NULL |  |
+| `sources_found` | integer |  |  |
 
-## risk_scores  (14716 rows, 20 cols)
+## `risk_scores`  (18,946 rows · 20 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| risk_topic | text | YES |  |
-| risk_display | text | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| risk_stage | text | YES |  |
-| risk_action | text | YES |  |
-| interpretation | text | YES |  |
-| components | text | YES |  |
-| diffusion | text | YES |  |
-| total_signals | integer | YES |  |
-| scored_at | text | YES | iso_dt:14716 |
-| source_provenance | text | YES |  |
-| maturity | text | YES |  |
-| maturity_note | text | YES |  |
-| baseline_signals | real | YES |  |
-| baseline_cycles | integer | YES |  |
-| abnormality | real | YES |  |
-| baseline_status | text | YES |  |
-| positioning_json | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `risk_topic` | text |  |  |
+| `risk_display` | text |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `risk_stage` | text |  |  |
+| `risk_action` | text |  |  |
+| `interpretation` | text |  |  |
+| `components` | text |  |  |
+| `diffusion` | text |  |  |
+| `total_signals` | integer |  |  |
+| `scored_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `source_provenance` | text |  |  |
+| `maturity` | text |  |  |
+| `maturity_note` | text |  |  |
+| `baseline_signals` | real |  |  |
+| `baseline_cycles` | integer |  |  |
+| `abnormality` | real |  |  |
+| `baseline_status` | text |  |  |
+| `positioning_json` | text |  |  |
 
-## risk_signals  (1947 rows, 9 cols)
+## `risk_signals`  (2,284 rows · 11 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| risk_topic | text | YES |  |
-| risk_display | text | YES |  |
-| signal_type | text | YES |  |
-| source | text | YES |  |
-| diffusion_stage | integer | YES |  |
-| raw_signal | text | YES |  |
-| signal_date | text | YES | iso_date:1829, iso_dt:52, compactZ:66  ⚠MIXED |
-| collected_at | text | YES | iso_dt:1947 |
+| `id` | text | NOT NULL |  |
+| `risk_topic` | text |  |  |
+| `risk_display` | text |  |  |
+| `signal_type` | text |  |  |
+| `source` | text |  |  |
+| `diffusion_stage` | integer |  |  |
+| `raw_signal` | text |  |  |
+| `signal_date` | text |  | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/2368 non-canonical |
+| `collected_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `signal_time` | text |  | 24h-UTC time `HH:MM:SS` (§14 secondary) |
+| `source_time` | text |  | 24h-UTC time `HH:MM:SS` (§14 secondary) |
 
-## score_archive  (1050 rows, 9 cols)
+## `score_archive`  (1,050 rows · 9 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| snapshot_date | text | NO | iso_date:1050 |
-| topic_key | text | NO |  |
-| topic_display | text | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| overall_score | real | YES |  |
-| signal_stage | text | YES |  |
-| scored_at | text | YES | iso_dt:1050 |
-| total_mentions | integer | YES |  |
+| `snapshot_date` | text | NOT NULL | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/1050 non-canonical |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `overall_score` | real |  |  |
+| `signal_stage` | text |  |  |
+| `scored_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `total_mentions` | integer |  |  |
 
-## themes_blocklist  (0 rows, 3 cols)
+## `themes_blocklist`  (? rows · 3 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| theme_key | text | NO |  |
-| reason | text | YES |  |
-| blocked_at | text | NO |  |
+| `theme_key` | text | NOT NULL |  |
+| `reason` | text |  |  |
+| `blocked_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
 
-## themes_extension  (0 rows, 10 cols)
+## `themes_extension`  (? rows · 10 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| theme_key | text | NO |  |
-| label | text | NO |  |
-| keywords | text | NO |  |
-| sectors | text | NO |  |
-| detection_score | real | YES |  |
-| source_signals | integer | YES |  |
-| stage | text | YES |  |
-| promoted_at | text | NO |  |
-| last_seen_at | text | YES |  |
-| confirmed_by_human | integer | YES |  |
+| `theme_key` | text | NOT NULL |  |
+| `label` | text | NOT NULL |  |
+| `keywords` | text | NOT NULL |  |
+| `sectors` | text | NOT NULL |  |
+| `detection_score` | real |  |  |
+| `source_signals` | integer |  |  |
+| `stage` | text |  |  |
+| `promoted_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `last_seen_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `confirmed_by_human` | integer |  |  |
 
-## topic_baselines  (0 rows, 7 cols)
+## `topic_baselines`  (? rows · 7 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| topic_key | text | NO |  |
-| snapshot_date | text | NO |  |
-| avg_gradient | real | YES |  |
-| avg_overall | real | YES |  |
-| avg_detection | real | YES |  |
-| avg_confidence | real | YES |  |
-| signal_count | integer | YES |  |
+| `topic_key` | text | NOT NULL |  |
+| `snapshot_date` | text | NOT NULL | **canonical `signal_date` (ISO YYYY-MM-DD)** · datecanon: 0/0 non-canonical |
+| `avg_gradient` | real |  |  |
+| `avg_overall` | real |  |  |
+| `avg_detection` | real |  |  |
+| `avg_confidence` | real |  |  |
+| `signal_count` | integer |  |  |
 
-## topic_lifecycle  (32137 rows, 16 cols)
+## `topic_lifecycle`  (39,349 rows · 16 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| topic_key | text | NO |  |
-| first_detected_at | text | NO | iso_dt:32137 |
-| last_scored_at | text | YES | iso_dt:32137 |
-| total_scoring_cycles | integer | YES |  |
-| cycles_above_emerging | integer | YES |  |
-| cycles_above_strong | integer | YES |  |
-| cycles_above_breakout | integer | YES |  |
-| peak_overall_score | real | YES |  |
-| peak_detection_score | real | YES |  |
-| peak_confidence_score | real | YES |  |
-| current_streak_cycles | integer | YES |  |
-| longest_streak_cycles | integer | YES |  |
-| persistence_rate | real | YES |  |
-| trend_age_hours | real | YES |  |
-| confirmed_trend | integer | YES |  |
-| updated_at | text | YES | iso_dt:32137 |
+| `topic_key` | text | NOT NULL |  |
+| `first_detected_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `last_scored_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `total_scoring_cycles` | integer |  |  |
+| `cycles_above_emerging` | integer |  |  |
+| `cycles_above_strong` | integer |  |  |
+| `cycles_above_breakout` | integer |  |  |
+| `peak_overall_score` | real |  |  |
+| `peak_detection_score` | real |  |  |
+| `peak_confidence_score` | real |  |  |
+| `current_streak_cycles` | integer |  |  |
+| `longest_streak_cycles` | integer |  |  |
+| `persistence_rate` | real |  |  |
+| `trend_age_hours` | real |  |  |
+| `confirmed_trend` | integer |  |  |
+| `updated_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## topic_maturity  (48 rows, 18 cols)
+## `topic_maturity`  (48 rows · 18 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| topic_key | text | NO |  |
-| topic_display | text | YES |  |
-| first_detected_at | text | YES | iso_dt:48 |
-| last_scored_at | text | YES | iso_dt:48 |
-| times_scored | integer | YES |  |
-| days_in_system | integer | YES |  |
-| maturity_class | text | YES |  |
-| maturity_reason | text | YES |  |
-| baseline_gradient | real | YES |  |
-| baseline_overall | real | YES |  |
-| baseline_detection | real | YES |  |
-| baseline_confidence | real | YES |  |
-| gradient_velocity | real | YES |  |
-| score_velocity | real | YES |  |
-| velocity_trend | text | YES |  |
-| calibration_multiplier | real | YES |  |
-| anomaly_gate_passed | integer | YES |  |
-| updated_at | text | YES | iso_dt:48 |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text |  |  |
+| `first_detected_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `last_scored_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `times_scored` | integer |  |  |
+| `days_in_system` | integer |  |  |
+| `maturity_class` | text |  |  |
+| `maturity_reason` | text |  |  |
+| `baseline_gradient` | real |  |  |
+| `baseline_overall` | real |  |  |
+| `baseline_detection` | real |  |  |
+| `baseline_confidence` | real |  |  |
+| `gradient_velocity` | real |  |  |
+| `score_velocity` | real |  |  |
+| `velocity_trend` | text |  |  |
+| `calibration_multiplier` | real |  |  |
+| `anomaly_gate_passed` | integer |  |  |
+| `updated_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## topic_queries  (139508 rows, 4 cols)
+## `topic_queries`  (178,505 rows · 4 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | integer | NO |  |
-| queried_at | text | NO | iso_dt:139508 |
-| topic_key | text | NO |  |
-| endpoint | text | NO |  |
+| `id` | integer | NOT NULL |  |
+| `queried_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `topic_key` | text | NOT NULL |  |
+| `endpoint` | text | NOT NULL |  |
 
-## topic_registry  (32137 rows, 13 cols)
+## `topic_registry`  (39,349 rows · 13 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| topic_key | text | NO |  |
-| topic_display | text | NO |  |
-| first_seen_at | text | YES | iso_dt:32137 |
-| first_seen_platform | text | YES |  |
-| last_seen_at | text | YES | iso_dt:32137 |
-| total_mentions | integer | YES |  |
-| niche_mentions | integer | YES |  |
-| mainstream_mentions | integer | YES |  |
-| platforms_seen | text | YES |  |
-| current_stage | text | YES |  |
-| is_anomaly | integer | YES |  |
-| created_at | text | YES | iso_dt:32137 |
-| updated_at | text | YES | iso_dt:32137 |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text | NOT NULL |  |
+| `first_seen_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `first_seen_platform` | text |  |  |
+| `last_seen_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `total_mentions` | integer |  |  |
+| `niche_mentions` | integer |  |  |
+| `mainstream_mentions` | integer |  |  |
+| `platforms_seen` | text |  |  |
+| `current_stage` | text |  |  |
+| `is_anomaly` | integer |  |  |
+| `created_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `updated_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## topic_score_history  (0 rows, 12 cols)
+## `topic_score_history`  (? rows · 12 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| topic_key | text | NO |  |
-| scored_at | text | NO |  |
-| overall_score | real | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| gradient_raw | real | YES |  |
-| gradient_cal | real | YES |  |
-| inertia_score | real | YES |  |
-| platform_count | integer | YES |  |
-| total_mentions | integer | YES |  |
-| maturity_at_time | text | YES |  |
+| `id` | text | NOT NULL |  |
+| `topic_key` | text | NOT NULL |  |
+| `scored_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `overall_score` | real |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `gradient_raw` | real |  |  |
+| `gradient_cal` | real |  |  |
+| `inertia_score` | real |  |  |
+| `platform_count` | integer |  |  |
+| `total_mentions` | integer |  |  |
+| `maturity_at_time` | text |  |  |
 
-## topic_signals  (489719 rows, 13 cols)
+## `topic_signals`  (425,284 rows · 13 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| extracted_at | text | NO | iso_dt:489719 |
-| topic | text | NO |  |
-| topic_key | text | NO |  |
-| signal_id | text | YES |  |
-| platform | text | NO |  |
-| platform_tier | text | NO |  |
-| source_name | text | YES |  |
-| upvotes | integer | YES |  |
-| comments | integer | YES |  |
-| engagement_raw | real | YES |  |
-| is_first_timer | integer | YES |  |
-| is_organic | integer | YES |  |
+| `id` | text | NOT NULL |  |
+| `extracted_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `topic` | text | NOT NULL |  |
+| `topic_key` | text | NOT NULL |  |
+| `signal_id` | text |  |  |
+| `platform` | text | NOT NULL |  |
+| `platform_tier` | text | NOT NULL |  |
+| `source_name` | text |  |  |
+| `upvotes` | integer |  |  |
+| `comments` | integer |  |  |
+| `engagement_raw` | real |  |  |
+| `is_first_timer` | integer |  |  |
+| `is_organic` | integer |  |  |
 
-## velocity_scores  (936614 rows, 37 cols)
+## `velocity_scores`  (1,237,546 rows · 37 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| id | text | NO |  |
-| scored_at | text | NO | iso_dt:936614 |
-| topic_key | text | NO |  |
-| topic_display | text | NO |  |
-| gradient_strength | real | YES |  |
-| inertia_score | real | YES |  |
-| platform_diversity | real | YES |  |
-| dark_matter_score | real | YES |  |
-| confidence_decay | real | YES |  |
-| persistence_score | real | YES |  |
-| nowtrendin_score | real | YES |  |
-| overall_score | real | YES |  |
-| detection_score | real | YES |  |
-| confidence_score | real | YES |  |
-| heisenberg_gap | real | YES |  |
-| total_mentions | integer | YES |  |
-| niche_mentions | integer | YES |  |
-| mainstream_mentions | integer | YES |  |
-| platforms_active | text | YES |  |
-| first_timer_ratio | real | YES |  |
-| engagement_asymmetry | integer | YES |  |
-| gradient_ratio | real | YES |  |
-| signal_stage | text | YES |  |
-| is_gravitational_anomaly | integer | YES |  |
-| anomaly_reason | text | YES |  |
-| why_this_matters | text | YES |  |
-| what_to_watch | text | YES |  |
-| created_at | text | YES | iso_dt:936614 |
-| serve_payload | text | YES |  |
-| attention_magnitude | real | YES |  |
-| n_mainstream_platforms | integer | YES |  |
-| detection_pathway | text | YES |  |
-| mainstream_ratio | real | YES |  |
-| mainstream_breadth | real | YES |  |
-| news_outlets | integer | YES |  |
-| mainstream_confirmed | integer | YES |  |
-| tier_migration | integer | YES |  |
+| `id` | text | NOT NULL |  |
+| `scored_at` | text | NOT NULL | ISO datetime (operational instant via `to_iso_dt`) |
+| `topic_key` | text | NOT NULL |  |
+| `topic_display` | text | NOT NULL |  |
+| `gradient_strength` | real |  |  |
+| `inertia_score` | real |  |  |
+| `platform_diversity` | real |  |  |
+| `dark_matter_score` | real |  |  |
+| `confidence_decay` | real |  |  |
+| `persistence_score` | real |  |  |
+| `nowtrendin_score` | real |  |  |
+| `overall_score` | real |  |  |
+| `detection_score` | real |  |  |
+| `confidence_score` | real |  |  |
+| `heisenberg_gap` | real |  |  |
+| `total_mentions` | integer |  |  |
+| `niche_mentions` | integer |  |  |
+| `mainstream_mentions` | integer |  |  |
+| `platforms_active` | text |  |  |
+| `first_timer_ratio` | real |  |  |
+| `engagement_asymmetry` | integer |  |  |
+| `gradient_ratio` | real |  |  |
+| `signal_stage` | text |  |  |
+| `is_gravitational_anomaly` | integer |  |  |
+| `anomaly_reason` | text |  |  |
+| `why_this_matters` | text |  |  |
+| `what_to_watch` | text |  |  |
+| `created_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
+| `serve_payload` | text |  |  |
+| `attention_magnitude` | real |  |  |
+| `n_mainstream_platforms` | integer |  |  |
+| `detection_pathway` | text |  |  |
+| `mainstream_ratio` | real |  |  |
+| `mainstream_breadth` | real |  |  |
+| `news_outlets` | integer |  |  |
+| `mainstream_confirmed` | integer |  |  |
+| `tier_migration` | integer |  |  |
 
-## worker_heartbeat  (2 rows, 2 cols)
+## `worker_heartbeat`  (2 rows · 2 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| role | text | NO |  |
-| beat_at | text | YES | iso_dt:2 |
+| `role` | text | NOT NULL |  |
+| `beat_at` | text |  | ISO datetime (operational instant via `to_iso_dt`) |
 
-## x_post_usage  (1 rows, 2 cols)
+## `x_post_usage`  (1 rows · 2 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| month | text | NO |  |
-| posts | integer | YES |  |
+| `month` | text | NOT NULL |  |
+| `posts` | integer |  |  |
 
-## x_pull_usage  (5 rows, 2 cols)
+## `x_pull_usage`  (1 rows · 2 cols)
 
-| column | type | null | format (if date/text) |
+| column | type | null | notes |
 |---|---|---|---|
-| day | text | NO |  |
-| pulls | integer | YES |  |
+| `day` | text | NOT NULL |  |
+| `pulls` | integer |  |  |
+
+---
+
+## Canonical date columns (datecanon-verified)
+
+| column | rows | non-canonical |
+|---|---|---|
+| `accuracy_ledger.breakout_date` | 36 | 0 |
+| `accuracy_ledger.detection_date` | 36 | 0 |
+| `market_signal_history.signal_date` | 91166 | 0 |
+| `pending_detections.detection_date` | 1117 | 0 |
+| `pull_history.snapshot_date` | 252217 | 0 |
+| `risk_signals.signal_date` | 2368 | 0 |
+| `score_archive.snapshot_date` | 1050 | 0 |
+| `topic_baselines.snapshot_date` | 0 | 0 |
+

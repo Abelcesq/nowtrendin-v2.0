@@ -49,8 +49,23 @@ _Last updated: 2026-06-24a_
 - Verified live: **GUARDIAN_API_KEY still missing** on the engine (deliberate 06-20 deferral, but
   every score is computed without that mainstream signal — user decision to set it or not).
   SECRET_KEY is **present** (the review's "insecure default" claim is stale). Apify/Dev.to set;
-  Reddit deferred. **Retention 90 vs 365: §13 hard-rules 90 — needs a canonical call to retire
-  the "365 pending" note.** `DB_DATA_DICTIONARY.md` confirmed stale (regenerate from live schema).
+  Reddit deferred. `DB_DATA_DICTIONARY.md` confirmed stale.
+
+### Founder decisions actioned (2026-06-24)
+- **Guardian + Reddit:** proceed WITHOUT both (deliberate; not gaps to chase).
+- **Retention → 365 days canonical** (resolves the long-standing 90-vs-365 ambiguity). All
+  `_prune_velocity_scores`/`prune_velocity_scores` defaults + env fallbacks
+  (`VELOCITY_RETENTION_DAYS`/`VELOCITY_KEEP_DAYS`) 90→365; CLAUDE.md §13 + DATA_BUILDING_BLOCKS
+  + all retention comments updated. ⚠ **STORAGE:** ~5.4GB@90d → ~22GB@365d **exceeds the 10GB
+  Essential-1 Postgres plan** — a larger plan (or downsample-after-90d) is needed before the
+  year-tail fills in (no immediate effect — app is ~3 months old). Flagged in-code at the prune site.
+- **3-platform UI parity (Market lane axis + category chips):** web terminal already had lanes +
+  data-driven chips; desktop = Tauri over the web build (inherits). **Mobile** brought in line:
+  `CONTENT_CATEGORIES` news→general; `MARKET_LANES` (All / Covered / Halted·micro-cap / Macro)
+  mirrors the web `LANE_FILTERS` exactly → lane chip row on the market-category view, lane subline
+  + LTD-DATA/"positioning N/A" on `RiskCard`, N/A components + macro caveat in the risk detail.
+  `RiskScore.marketGradient` threaded with lane/dataCoverage/naComponents. tsc clean; ships on next
+  Metro reload/EAS build. **DB_DATA_DICTIONARY.md regenerated from the live schema** (see that file).
 
 ---
 
