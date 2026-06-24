@@ -7307,6 +7307,18 @@ def research_13f(fund: str = Query("", description="fund name or CIK; '' = Berks
     return _f.latest_13f(cik, name)
 
 
+@app.get("/research/congress", dependencies=[Depends(_require_internal)])
+def research_congress(limit: int = Query(25, ge=1, le=100), top_n: int = Query(15, ge=1, le=50)):
+    """HELD-OUT congressional-trading research (QuiverQuant) — recent trades + per-ticker
+    concentration (where political money moves). NOT wired into any score (research-before-
+    integrate per §16). Token from env QUIVER_API_KEY. Lazy-import keeps it out of scoring."""
+    try:
+        import quiver_research as _q
+    except Exception as e:
+        return {"available": False, "error": f"module load: {e}"}
+    return _q.congress_recent(limit=limit, top_n=top_n)
+
+
 @app.get("/schema", dependencies=[Depends(_require_internal)])
 def db_schema():
     """Live DB schema introspection (information_schema + planner row estimates) — the
