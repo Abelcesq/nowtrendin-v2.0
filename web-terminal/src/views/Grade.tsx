@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { grade as gradeApi, gradeHistory, gradedAll, type User } from '../lib/auth'
 import { api } from '../lib/api'
 import { MC, stageColor, marketTierColor, GAP_BANDS, gapBandIndex } from '../lib/mobileTheme'
+import { Disclaimer } from '../components/Disclaimer'
 
 // GRADE — the AI Grade tool, web parity with the mobile GradeTool. Three tabs:
 // New Grade (token-metered AI proposed score), History (this member's grades,
@@ -82,6 +83,8 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
           <div>• <b style={{ color: MC.orange }}>N · Now Trending</b> — how often NowTrendIn users ask about it. A separate demand signal, never folded into the Gradient.</div>
         </div>
       </div>
+      {/* Legal disclaimer — top, above the Market Signal score */}
+      <Disclaimer style={{ marginBottom: 12 }} />
       {/* Market read first (companies) */}
       {ms && (() => {
         const tc = marketTierColor(ms.tier)
@@ -171,6 +174,8 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         )}
         <div className="disc">Proposed score — an AI estimate from public web evidence, not a measured engine score.</div>
       </div>
+      {/* Legal disclaimer — bottom of the grade result */}
+      <Disclaimer style={{ marginTop: 12 }} />
     </div>
   )
 }

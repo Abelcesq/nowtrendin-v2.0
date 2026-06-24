@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
 import { ScoreChart, type ChartPoint } from '../components/ScoreChart'
+import { Disclaimer } from '../components/Disclaimer'
 
 // History — windowed list of recently-scored topics, plus a featured axed chart of
 // the selected topic's full scoring trajectory (Detection/Confidence over time, with
@@ -144,6 +145,8 @@ export function History({ initialQ }: { initialQ?: string }) {
               <span className="hv-feat-scores"><b style={{ color: 'var(--det)' }}>DET {sel.det}</b> &nbsp; <b style={{ color: 'var(--conf)' }}>CONF {sel.conf}</b></span>
             </div>
             <div className="hv-chartslot">{hist === null ? <div className="hv-loading">Loading trajectory…</div> : <ScoreChart points={chartPoints} />}</div>
+            {/* Legal disclaimer — above the AI "Explain this move" section */}
+            <Disclaimer style={{ margin: '6px 0 8px' }} />
             <div className="hv-ai">
               {an?.available ? (
                 <>

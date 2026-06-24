@@ -4,6 +4,7 @@ import { api, type RiskRow } from '../lib/api'
 import { pullMarket } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, marketTierColor, FEEDS_COLOR, MARKET_TIERS, RISK_PIPELINE, BASELINE_META } from '../lib/mobileTheme'
+import { Disclaimer } from '../components/Disclaimer'
 
 // Market Signal — the finance-native dual score, wired to the live /risk/scores
 // (the SAME data the mobile Market tab renders). Detection = analyst sentiment +
@@ -134,6 +135,8 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         </div>
       </div>
 
+      {/* Legal disclaimer — top, above the score */}
+      <Disclaimer style={{ marginBottom: 10 }} />
       {/* Market Gradient — dual score, mobile colors */}
       <div className="gauges" style={mg.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
         <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">analysts + positioning</div></div>
@@ -340,6 +343,8 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
 
       <div className="disc" style={{ padding: '0 16px 14px', textAlign: 'center' }}>Positioning analysis for informational purposes only — not financial, investment, or legal advice, and not a risk rating.</div>
 
+      {/* Legal disclaimer — bottom, above the actions */}
+      <Disclaimer style={{ margin: '0 16px 10px' }} />
       <div className="detail-actions">
         <button className="btn" onClick={onWatch}><Star size={17} color="var(--early)" /> Add to Watchlist</button>
         <button className="btn" onClick={onAlert}><Bell size={17} color="var(--early)" /> Add to Alert</button>

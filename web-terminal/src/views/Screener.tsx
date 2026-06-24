@@ -5,6 +5,7 @@ import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, stageColor, stageLabel, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
 import { ScoreChart } from '../components/ScoreChart'
+import { Disclaimer } from '../components/Disclaimer'
 
 // Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
 // so the two surfaces match. `gap` here is abs(detection − confidence), matching
@@ -244,6 +245,8 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         </div>
       )}
 
+      {/* Legal disclaimer — top, above the score */}
+      <Disclaimer style={{ marginBottom: 10 }} />
       {/* Dual Gradient Score — mobile colors (Detection blue / Confidence green) */}
       <div className="gauges">
         <div className="gauge det">{ring(det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">speed · ~22% FP</div></div>
@@ -467,6 +470,8 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="narr">Two scores from one engine. <b style={{ color: MC.detection }}>Detection</b> weights early-edge components (niche concentration, dark matter, acceleration) — speed. <b style={{ color: MC.confidence }}>Confidence</b> weights cross-platform confirmation — precision. The gap between them is how early you are. The N (Now Trending) demand signal is shown separately and never feeds the Gradient (objectivity).</div>
       </div>
 
+      {/* Legal disclaimer — bottom, above the actions */}
+      <Disclaimer style={{ margin: '4px 0 10px' }} />
       <div className="detail-actions">
         <button className="btn" onClick={onWatch}><Star size={17} color="var(--early)" /> Add to Watchlist</button>
         <button className="btn" onClick={onAlert}><Bell size={17} color="var(--early)" /> Add to Alert</button>
