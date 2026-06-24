@@ -22,6 +22,7 @@ We surface the report period so the unit is unambiguous; the latest filing is al
 from __future__ import annotations
 import os
 import re
+import html
 import time
 import requests
 from typing import Optional
@@ -78,6 +79,7 @@ def _parse_info_table(xml: str) -> list:
         issuer = _tag(b, "nameOfIssuer")
         if not issuer:
             continue
+        issuer = re.sub(r"\s+", " ", html.unescape(issuer)).strip()   # FORMAT gate: decode &amp; etc.
         out.append({
             "issuer": issuer,
             "class": _tag(b, "titleOfClass"),
