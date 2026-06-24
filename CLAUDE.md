@@ -346,4 +346,39 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
    Feeds validated (production UA). Adversarial integrity verify + backtest still required
    before deploy.
 
-*Last updated: 2026-06-24 — Retention extended to **365 days** canonical (§13; founder decision — ⚠ ~4× storage, exceeds the 10GB plan, needs a larger Postgres tier as the tail fills). **Overbroad "news" fixed** (§13): the no-match fallback was 'news' but 'news' has no lexicon — now → honest 'general'; added headline-context classification (`_category_for` layers situation→context→lexicon→general), live catch-all 77%→56%, display-only/non-circular. **Quarantine review loop closed** (§14): `gate_date` consults `format_rules` + new `GET/POST /quarantine/dates[/resolve]`. Market Signal **coverage lanes** (Tier 1) covered/halted-microcap/macro (macro themes drop positioning+fundamentals as N/A). Guardian + Reddit keys deliberately deferred (proceeding without). Fixed `/categories` 500 (missing topic_key in SELECT, regression since v133). Prior: 2026-06-23 — Canonical Date Auditor (Agent 16, `/monitor/datecanon`): audits the DATA by date-semantic column + live-schema `*_date` discovery, so §14 compliance is verified for ALL sources and new sources are auto-covered (closes the "gate_date is opt-in, bypasses invisible" gap that let two ledger `[:10]` slices survive — now refixed via `to_iso_date`). Prewarm Agent (15, read-path superset-cache + 100-at-a-time pagination on all list feeds). Accuracy-Ledger sweep backlog fixes (rotate oldest-checked-first + free timeouts + own cadence). Prior: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor); New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN.*
+## 16. SOURCE ONBOARDING PROTOCOL (hard rule — no source is linked until ALL 5 gates pass)
+
+> **Before linking ANY new media/data source** (RSS, API, feed, collector) you MUST clear all
+> five gates below, IN ORDER. No exceptions. This is the codified lesson of three failures caught
+> in onboarding: **yahoo_finance** (HTTP 429 every cycle — access gate), **Mises Literature**
+> (HTTP 404 + classic *literature*, not current signal — currency/type gate), **NBER** (academic
+> titles extract to noise like "times geopolitical fragmentation" — format gate). Enforced by the
+> `.githooks/commit-msg` gotcha, which blocks a source-shaped commit until the message asserts
+> `[source-onboarded]`.
+
+1. **TYPE** — Identify what the source actually provides and classify it: *attention/trend
+   signal · market positioning · risk/microstructure · reference/research*. Macro-research ≠
+   positioning data.
+2. **ENGINE** — State the EXACT pipeline it will feed and confirm it's the right one. A source
+   feeds exactly ONE primary engine:
+   - Trend / Gradient Score → `news_collectors` (mainstream **M**) · `blog_collectors.GHOST_FEEDS`
+     (expert/niche → Dark Matter **D**) · `discovery_collectors`.
+   - Market Signal / risk positioning → `financial_risk_gradient` (SEC/FINRA/WhaleWisdom/OFR).
+   - Held-out referee → never feeds the score (e.g., `referee_wikipedia`).
+3. **FORMAT** — Confirm the data structures to OUR formatting systems BEFORE wiring: dates pass
+   `gate_date()` → canonical `signal_date` (§14); topic text extracts to CLEAN topics through
+   `_is_quality_topic` + the extractor (no academic-title fragments / boilerplate); a provenance
+   tier is assignable (mainstream/expert/niche).
+4. **CURRENCY + ACCESS** — Confirm BOTH: **current** (fresh, dated items — not stale/archival) AND
+   **regular access** (stable URL, HTTP 200, no 404/429/auth-block, declared UA where required,
+   rate-limit headroom).
+5. **TEST → LINK → DEPLOY** — TEST FIRST on a LIVE sample (run real items through the gate +
+   extractor + classifier and eyeball the output), THEN wire it, THEN deploy. A **score-affecting**
+   source ADDITIONALLY requires **backtest-before-ship**: build it held-out, research the output,
+   review, and only then integrate into any score.
+
+*Last updated: 2026-06-24 — **§16 SOURCE ONBOARDING PROTOCOL** added (hard 5-gate rule before
+linking ANY source: TYPE → ENGINE → FORMAT → CURRENCY+ACCESS → TEST→LINK→DEPLOY; enforced by the
+`.githooks/commit-msg` gotcha). Source cleanup: HackerNews fixed (algolia `/search`→`/search_by_date`),
+yahoo_finance removed (429/dead), QA runbook (`monitoring/integrity-check.ps1`) repointed 1.0→v2.
+SEC fund-13F being built held-out (research-before-integrate). Retention extended to **365 days** canonical (§13; founder decision — ⚠ ~4× storage, exceeds the 10GB plan, needs a larger Postgres tier as the tail fills). **Overbroad "news" fixed** (§13): the no-match fallback was 'news' but 'news' has no lexicon — now → honest 'general'; added headline-context classification (`_category_for` layers situation→context→lexicon→general), live catch-all 77%→56%, display-only/non-circular. **Quarantine review loop closed** (§14): `gate_date` consults `format_rules` + new `GET/POST /quarantine/dates[/resolve]`. Market Signal **coverage lanes** (Tier 1) covered/halted-microcap/macro (macro themes drop positioning+fundamentals as N/A). Guardian + Reddit keys deliberately deferred (proceeding without). Fixed `/categories` 500 (missing topic_key in SELECT, regression since v133). Prior: 2026-06-23 — Canonical Date Auditor (Agent 16, `/monitor/datecanon`): audits the DATA by date-semantic column + live-schema `*_date` discovery, so §14 compliance is verified for ALL sources and new sources are auto-covered (closes the "gate_date is opt-in, bypasses invisible" gap that let two ledger `[:10]` slices survive — now refixed via `to_iso_date`). Prewarm Agent (15, read-path superset-cache + 100-at-a-time pagination on all list feeds). Accuracy-Ledger sweep backlog fixes (rotate oldest-checked-first + free timeouts + own cadence). Prior: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor); New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN.*

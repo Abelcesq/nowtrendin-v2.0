@@ -68,7 +68,7 @@ convenience, speed, and any individual spec below.
 |---|-------|----------|:---:|---|
 | 1 | Market Signal Diagnostic | `/diagnostic/market/{symbol}` | no (on-demand) | B4/B5 |
 | 2 | Trend Signal Diagnostic | `/diagnostic/trend/{topic}`, `/diagnostic/trend-distribution` | no (on-demand) | B4/B5 |
-| 3 | Source Watchdog | `/monitor/sources` | ✅ | B1, B2 |
+| 3 | Source Watchdog | `/monitor/sources` | ✅ | B1, B1a, B2 |
 | 4 | Pipeline Integrity | `/monitor/pipeline` | ✅ | B3, B4, B8 |
 | 5 | Topic Quality Auditor | `/monitor/quality` | ✅ | B3 |
 | 6 | Catch-All Auditor | `/monitor/catchall` | ✅ | B3 |
@@ -125,6 +125,17 @@ catching it is itself a defect.
 
 - **INV-3 — N never feeds the Gradient** (no circular metric); see Integrity Standard #3.
   *Owner: Trend Signal Diagnostic.*
+
+- **GOTCHA G-SRC — SOURCE ONBOARDING PROTOCOL (hard rule, CLAUDE.md §16 / DBB B1a).** No new
+  media/data source is linked until ALL 5 gates pass IN ORDER: **(1) TYPE** (trend · positioning ·
+  risk · reference), **(2) ENGINE** (the ONE pipeline it feeds — Trends vs Market Signal vs
+  held-out), **(3) FORMAT** (dates pass `gate_date()`; topics extract CLEAN through
+  `_is_quality_topic`), **(4) CURRENCY+ACCESS** (fresh dated items AND stable HTTP-200, no
+  404/429/auth-block), **(5) TEST→LINK→DEPLOY** (test a live sample FIRST; score-affecting sources
+  also need backtest-before-ship). Enforced by the **`.githooks/commit-msg`** gotcha, which blocks
+  a source-shaped commit unless the message asserts `[source-onboarded]`. Codifies three caught
+  failures: yahoo_finance (429), Mises (404+archival), NBER (titles→noise). *Owner: Source Watchdog
+  (B1a) — and every agent/human that proposes a source applies it before wiring.*
 
 When a new accuracy/consistency trap is discovered, add it here with its owning agent —
 the Charter is the durable home for these, mirrored in the `serve-payload-cache-gotcha`

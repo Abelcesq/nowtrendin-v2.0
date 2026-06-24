@@ -72,6 +72,19 @@ criticality) and the collectors in `gravitational_anomaly_detector.start_schedul
 + `GET /usage`. **FAILURE:** a `critical:true` source is `DOWN`, or a paid source
 shows 0 calls when it should be running.
 
+**INVARIANT (B1a) — SOURCE ONBOARDING (hard rule, CLAUDE.md §16):** no new media/data
+source is linked until ALL FIVE gates pass, in order: **(1) TYPE** — classify the info
+(trend signal · market positioning · risk · reference); **(2) ENGINE** — name the ONE
+pipeline it feeds (`news_collectors`/`blog_collectors` GHOST_FEEDS/`discovery` → Trends;
+`financial_risk_gradient` → Market Signal; held-out referee → neither); **(3) FORMAT** —
+dates pass `gate_date()`, topics extract CLEAN through `_is_quality_topic` (no academic-title
+fragments/boilerplate); **(4) CURRENCY+ACCESS** — fresh dated items AND stable HTTP-200 access
+(no 404/429/auth-block, UA where required); **(5) TEST→LINK→DEPLOY** — test a live sample
+through the gate+extractor FIRST, then wire, then deploy; score-affecting sources also need
+**backtest-before-ship** (held-out + research + review). **CHECK:** the `.githooks/commit-msg`
+gotcha blocks a source-shaped commit lacking `[source-onboarded]`. **FAILURE:** a source linked
+that 404s/429s (yahoo_finance), is archival not current (Mises), or extracts to noise (NBER).
+
 ---
 
 ## 2. COLLECTION HEALTH — is data actually arriving?

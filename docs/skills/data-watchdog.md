@@ -13,6 +13,16 @@ wrong/absent**, **(C) junk topics / catch-all congestion**, **(D) cost drift**.
 **Engine (v2.0)**: `https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com`
 (no key needed — `/monitor` is public read-only).
 
+## Source onboarding (B1a — hard rule, owned by Source Watchdog)
+
+Before ANY new media/data source is linked, all 5 gates must pass (CLAUDE.md §16 /
+DATA_BUILDING_BLOCKS B1a): **TYPE → ENGINE → FORMAT → CURRENCY+ACCESS → TEST→LINK→DEPLOY**.
+If the user proposes a source, run the gates BEFORE wiring: classify the info type; name the
+ONE pipeline it feeds; confirm dates pass `gate_date()` and topics extract clean through
+`_is_quality_topic`; confirm it's current + reachable (HTTP 200, no 404/429); then test a live
+sample, and only then wire + deploy (score-affecting sources also need backtest-before-ship).
+The `.githooks/commit-msg` gotcha blocks a source-shaped commit lacking `[source-onboarded]`.
+
 ## The fleet (7 agents — `/monitor` returns ALL of them)
 1. **source_watchdog** (`/monitor/sources`) — is data pulling? (B1/B2)
 2. **pipeline_integrity** (`/monitor/pipeline`) — are scores fresh + honest? (B3/B4/B8)

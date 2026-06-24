@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# ── SOURCE ONBOARDING GOTCHA (CLAUDE.md §16 / DATA_BUILDING_BLOCKS B1a) ───────────────
+# Blocks a commit that ADDS/LINKS a new media/data source unless the message asserts the
+# 5 onboarding gates passed via the marker [source-onboarded]. Reminder guardrail — the
+# author confirms the gates; the hook refuses to let a source-shaped change land silently.
+# Install: git config core.hooksPath .githooks
+set -u
+msg_file="${1:-}"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then exit 0; fi
+msg="$(tr -d '\r' < "$msg_file" 2>/dev/null)"
+
+# Already asserted, or a merge/revert → allow.
+case "$msg" in
+  *"[source-onboarded]"*|"Merge "*|"Revert "*) exit 0 ;;
+esac
+
+# Collector / source-registry files where a new source gets wired (single line — no
+# backslash continuations, which break under CRLF checkout on Windows).
+SRC_FILES="transfer/blog_collectors.py transfer/news_collectors.py transfer/discovery_collectors.py transfer/financial_risk_gradient.py transfer/collector_health.py transfer/gravitational_anomaly_detector.py"
+
+# Added lines only (staged diff), minus the +++ header lines.
+added="$(git diff --cached --unified=0 -- $SRC_FILES 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+')"
+if [ -z "$added" ]; then exit 0; fi
+
+# Source-shaped addition = a feed URL (rss/feed/atom/.xml) OR a new collector-health
+# expectation (max_gap_minutes) OR a source-list marker (GHOST_FEEDS/_RSS_FEEDS/reputable).
+hits="$(printf '%s\n' "$added" | grep -Eic 'https?://[^ ]*(rss|/feed|atom|\.xml)|max_gap_minutes|GHOST_FEEDS|_RSS_FEEDS|_NEWS_REPUTABLE_SOURCES')"
+
+if [ "${hits:-0}" -gt 0 ]; then
+  cat >&2 <<'EOF'
+
+  SOURCE ONBOARDING GATE  (CLAUDE.md §16 / DATA_BUILDING_BLOCKS B1a)
+  ----------------------------------------------------------------------
+  This commit looks like it adds/links a new media/data source. Confirm ALL
+  5 gates passed, IN ORDER, before it lands:
+
+    1. TYPE      what info? (trend signal | market positioning | risk | reference)
+    2. ENGINE    the ONE pipeline it feeds (Trends | Market Signal | held-out)
+    3. FORMAT    dates pass gate_date(); topics extract CLEAN via _is_quality_topic
+    4. CURRENCY  fresh dated items AND stable HTTP 200 (no 404 / 429 / auth-block)
+       + ACCESS
+    5. TEST -> LINK -> DEPLOY   tested a LIVE sample first; score-affecting source
+                               also needs backtest-before-ship (held-out + review)
+
+  When all five pass, re-commit with the marker in your message:
+
+      [source-onboarded]
+
+  (Caught failures this exists for: yahoo_finance 429, Mises 404/archival, NBER titles->noise.)
+  ----------------------------------------------------------------------
+EOF
+  exit 1
+fi
+exit 0
