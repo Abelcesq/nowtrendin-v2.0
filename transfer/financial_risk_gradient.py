@@ -101,6 +101,15 @@ SEC_USER_AGENT  = os.getenv("SEC_USER_AGENT", "NowTrendIn Research contact@nowtr
 # blend it. Off = positioning_intel is never imported (held-out preserved, zero overhead).
 DARK_POSITIONING_V2 = os.getenv("DARK_POSITIONING_V2", "0") == "1"
 
+# Market Signal v2.0 — the Money Gradient (see MARKET_SIGNAL_V2.md). Default OFF. When on,
+# money sources re-tier into Dark Matter (D = early/informed: congress, insider, smart-money 13F,
+# quality finance analysts) vs Mainstream (M = broad economic/market APIs), validated by the
+# Accuracy Ledger — money-MOVEMENT measurement, NOT alpha/advice.
+MARKET_SIGNAL_V2 = os.getenv("MARKET_SIGNAL_V2", "0") == "1"
+# Quality finance YouTube whose ORIGINAL market analysis is an EARLY/informed read → Dark Matter,
+# NOT lagging Stage-5 retail (the old classification). Generic/personal-finance channels stay retail.
+QUALITY_ANALYST_CHANNELS = {"meetkevin", "TheCompoundNews"}
+
 
 # ════════════════════════════════════════════════════════════════
 # SECTION 1: LEGITIMATE DATA SOURCE REGISTRY
@@ -444,14 +453,20 @@ def collect_youtube_finance_topics(channel_handle: str, max_videos: int = 15) ->
         # Extract financial topics from title + description
         topics = extract_financial_topics(f"{title} {desc}")
 
+        # v2.0 (MARKET_SIGNAL_V2): a quality analyst's ORIGINAL market analysis (Meet Kevin,
+        # The Compound) is an EARLY/informed read → Dark Matter (stage 2), NOT lagging Stage-5
+        # retail. Flag-gated, so v1 keeps the retail classification until v2 is validated.
+        _analyst = MARKET_SIGNAL_V2 and channel_handle in QUALITY_ANALYST_CHANNELS
+        _stage = 2 if _analyst else 5
+
         for topic in topics:
             signals.append({
-                "type":            "retail_finance_attention",
+                "type":            "analyst_market_signal" if _analyst else "retail_finance_attention",
                 "source":          f"youtube:{channel_handle}",
                 "topic":           topic,
                 "video_title":     title,   # for attribution/audit, not republishing
                 "published":       published,
-                "diffusion_stage": 5,
+                "diffusion_stage": _stage,
                 "raw_signal":      f"{channel_handle} discussed: {topic}",
             })
 
