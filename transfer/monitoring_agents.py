@@ -723,6 +723,15 @@ def catchall_auditor(conn) -> dict:
                 protect.add(r["topic_key"])
         except Exception:
             pass
+    # Pendings already resolved as non-quality (sweep_pending quarantine) are being
+    # REMOVED from tracking, not "stuck" — don't report them as misclassified-tracked.
+    quarantined = set()
+    try:
+        for r in conn.execute("SELECT DISTINCT topic_key FROM pending_detections "
+                              "WHERE status='excluded_nonquality'").fetchall():
+            quarantined.add(r["topic_key"])
+    except Exception:
+        pass
 
     try:
         rows = conn.execute(
@@ -765,8 +774,8 @@ def catchall_auditor(conn) -> dict:
                 single_src += 1                   # CURRENT admission leak (≈0 expected)
             else:
                 dormant_pile += 1                 # aged pre-floor pile (retained, not a leak)
-        if k in protect:
-            misclassified_real.append(disp)       # tracked call stuck in catch-all
+        if k in protect and k not in quarantined:
+            misclassified_real.append(disp)       # tracked call stuck in catch-all (excl. quarantined)
         for tok in disp.lower().split():          # lexicon-candidate tally
             tok = tok.strip(".,:;!?\"'()[]")
             if (len(tok) >= 4 and not tok.isdigit()
