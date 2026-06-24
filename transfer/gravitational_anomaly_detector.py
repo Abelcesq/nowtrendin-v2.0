@@ -189,16 +189,34 @@ SITUATION_CATEGORY_ENABLED = os.getenv("SITUATION_CATEGORY_ENABLED", "1") == "1"
 SITUATION_CAT_REFRESH_MIN = int(os.getenv("SITUATION_CAT_REFRESH_MIN", "30"))
 _CATCHALL_CATS = ("general", "news", "")
 
+# ── Context → category (drains the UNCLASSIFIED 'general' bucket) ──────────────────
+# The bare-word classifier only ever sees the topic STRING, so a context-dependent
+# entity ("hokit", "lilly") with no lexicon hit falls through to 'general'. This map
+# classifies a topic against its OWN signal HEADLINES (raw_signals.title) — real source
+# text the topic actually appeared in — so "hokit" reading "Hokit raises $40M Series B"
+# resolves to business. Built by a background thread (below); conservative confidence
+# floor so only a confident headline read overrides. DISPLAY-ONLY, non-circular (uses
+# source text, never the score).
+_CONTEXT_CAT: dict = {}
+CONTEXT_CATEGORY_ENABLED = os.getenv("CONTEXT_CATEGORY_ENABLED", "1") == "1"
+CONTEXT_CAT_MIN_CONF = float(os.getenv("CONTEXT_CAT_MIN_CONF", "0.35"))
+
 
 def _category_for(topic_key: str, display: str) -> str:
-    """Serve-time category: prefer a topic's SITUATION category (context-aware) over the
-    bare-word lexicon, so 'canada' in a hockey situation reads Sports instead of the
-    news/general catch-all. Falls back to the lexicon when the topic isn't in a
-    specific-category situation. Display-only — no scoring impact."""
-    if SITUATION_CATEGORY_ENABLED and topic_key:
-        c = _SITUATION_CAT.get(topic_key)
-        if c and c not in _CATCHALL_CATS:
-            return c
+    """Serve-time category with three context layers, strongest first, all DISPLAY-ONLY
+    (no scoring impact, no circularity):
+      1. SITUATION category — the topic's co-occurring EVENT context (canada+hockey→sports)
+      2. CONTEXT category — the topic's own signal HEADLINES (hokit raises $40M→business)
+      3. bare-word lexicon — and finally the honest 'general' bucket if nothing matches."""
+    if topic_key:
+        if SITUATION_CATEGORY_ENABLED:
+            c = _SITUATION_CAT.get(topic_key)
+            if c and c not in _CATCHALL_CATS:
+                return c
+        if CONTEXT_CATEGORY_ENABLED:
+            c = _CONTEXT_CAT.get(topic_key)
+            if c and c not in _CATCHALL_CATS:
+                return c
     return _topic_category(display or "")
 
 
@@ -230,14 +248,75 @@ def _refresh_situation_categories() -> int:
         return 0
 
 
+def _refresh_context_categories(window_hours: int = 120, max_rows: int = 200000,
+                                heads_per_topic: int = 6) -> int:
+    """Rebuild the topic_key→category map from each topic's own signal HEADLINES.
+    Joins topic_signals→raw_signals for recent titles, aggregates up to N per topic, and
+    classifies with the headline text as context. Only a SPECIFIC category above the
+    confidence floor is kept (catch-all results are dropped so the bare lexicon still
+    governs them). Best-effort: previous map kept on error. Display-only."""
+    if not CONTEXT_CATEGORY_ENABLED:
+        return 0
+    try:
+        from topic_categories import classify_topic
+        from collections import defaultdict
+        conn = get_db()
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+            rows = conn.execute(
+                "SELECT ts.topic_key AS tk, ts.topic AS topic, rs.title AS title "
+                "FROM topic_signals ts JOIN raw_signals rs ON rs.id = ts.signal_id "
+                "WHERE ts.extracted_at >= ? AND rs.title IS NOT NULL AND rs.title <> '' "
+                "ORDER BY ts.extracted_at DESC LIMIT ?",
+                (cutoff, int(max_rows))).fetchall()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        heads, disp = defaultdict(list), {}
+        for r in rows:
+            tk = r["tk"] if hasattr(r, "keys") else r[0]
+            if not tk:
+                continue
+            if tk not in disp:
+                disp[tk] = (r["topic"] if hasattr(r, "keys") else r[1]) or tk.replace("_", " ")
+            lst = heads[tk]
+            if len(lst) < heads_per_topic:
+                lst.append((r["title"] if hasattr(r, "keys") else r[2]) or "")
+        out = {}
+        for tk, titles in heads.items():
+            try:
+                res = classify_topic(disp.get(tk, ""), text=" | ".join(titles))
+            except Exception:
+                continue
+            cat = res.get("category")
+            if cat and cat not in _CATCHALL_CATS and res.get("confidence", 0) >= CONTEXT_CAT_MIN_CONF:
+                out[tk] = cat
+        if out:
+            global _CONTEXT_CAT
+            _CONTEXT_CAT = out
+        print(f"[context-cat] refreshed: {len(out)} topic→category from headlines "
+              f"({len(heads)} topics with titles)")
+        return len(out)
+    except Exception as e:
+        print(f"[context-cat] refresh skipped: {e}")
+        return 0
+
+
 def _situation_category_loop():
-    """Daemon: refresh the situation→category map on startup, then every N minutes."""
+    """Daemon: refresh the situation→ and context→category maps on startup, then every
+    N minutes. Both are display-only catch-all drains (event-context + headline-context)."""
     import time as _t
     while True:
         try:
             _refresh_situation_categories()
         except Exception as e:
             print(f"[situation-cat] loop error: {e}")
+        try:
+            _refresh_context_categories()
+        except Exception as e:
+            print(f"[context-cat] loop error: {e}")
         _t.sleep(max(5, SITUATION_CAT_REFRESH_MIN) * 60)
 
 # dual_pathway.py — Phase C recalibration. Mainstream-origin topics (consumer
@@ -5231,16 +5310,17 @@ async def startup_auto_collect():
         except Exception as _pwe:
             print(f"[startup] prewarm-agent failed to start: {_pwe}")
 
-    # Situation→category routing: build the topic_key→category override map from the
-    # held-out situation clustering, then refresh on an interval. Drains the news/general
-    # catch-all by context-routing bare entities. Display-only — never feeds the score.
-    if SITUATION_CATEGORY_ENABLED:
+    # Category enrichment: build the topic_key→category override maps (situation
+    # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
+    # news/general catch-all by context — display-only, never feed the score.
+    if SITUATION_CATEGORY_ENABLED or CONTEXT_CATEGORY_ENABLED:
         try:
             threading.Thread(target=_situation_category_loop, daemon=True,
-                             name="situation-cat").start()
-            print(f"[startup] situation-cat router started (every {SITUATION_CAT_REFRESH_MIN}m).")
+                             name="category-enrich").start()
+            print(f"[startup] category-enrich router started (situation={SITUATION_CATEGORY_ENABLED}, "
+                  f"context={CONTEXT_CATEGORY_ENABLED}, every {SITUATION_CAT_REFRESH_MIN}m).")
         except Exception as _sce:
-            print(f"[startup] situation-cat router failed to start: {_sce}")
+            print(f"[startup] category-enrich router failed to start: {_sce}")
 
     # ── Init calibration tables + seed known topics ────────────────
     # Always runs (idempotent) — creates tables if missing, seeds
@@ -6124,10 +6204,11 @@ def audit_topics(days: int = 7, max_topics: int = 9000):
             "catchall_pct": pct(catchall_routed),
             "catchall_drained_pts": round(pct(catchall) - pct(catchall_routed), 1),
             "topics_reclassified": routed_moved,
-            "overrides_loaded": len(_SITUATION_CAT),
-            "enabled": SITUATION_CATEGORY_ENABLED,
-            "note": "routed = served category after situation-context routing; "
-                    "display-only, no scoring impact",
+            "situation_overrides_loaded": len(_SITUATION_CAT),
+            "context_overrides_loaded": len(_CONTEXT_CAT),
+            "enabled": {"situation": SITUATION_CATEGORY_ENABLED, "context": CONTEXT_CATEGORY_ENABLED},
+            "note": "routed = served category after situation(event) + context(headline) "
+                    "routing; display-only, no scoring impact",
         },
         "duplicates": {"groups": len(dup),
                        "examples": dict(sorted(dup.items(), key=lambda kv: -len(kv[1]))[:15])},
@@ -7127,6 +7208,59 @@ def monitor_datecanon():
         if conn is not None:
             try: conn.close()
             except Exception: pass
+
+
+@app.get("/quarantine/dates", dependencies=[Depends(_require_internal)])
+def quarantine_dates(limit: int = Query(50, ge=1, le=500)):
+    """The date-format human-review queue: values gate_date() could not parse, escalated
+    to format_review_queue, each with candidate normalizations. This is the REVIEW
+    interface the quarantine was missing — read-only; resolve via the POST below."""
+    try:
+        import ingestion_gate
+        conn = get_db(DB_PATH)
+        try:
+            pending = ingestion_gate.pending_reviews(conn, limit=limit)
+        finally:
+            try: conn.close()
+            except Exception: pass
+        return {"available": True, "count": len(pending), "pending": pending,
+                "note": "POST /quarantine/dates/resolve {id, chosen_value} to apply a "
+                        "human decision (learns a rule so identical inputs auto-normalize)"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.post("/quarantine/dates/resolve", dependencies=[Depends(_require_internal)])
+def quarantine_dates_resolve(payload: dict = Body(...)):
+    """Apply a HUMAN decision to a quarantined date and learn a format_rule so identical
+    future inputs auto-normalize (gate_date consults it). Body: {id, chosen_value,
+    save_rule?}. chosen_value must be canonical (validated) or empty to discard.
+    Flag-never-force: nothing changes until a human posts here."""
+    rid = (payload.get("id") or "").strip()
+    chosen = (payload.get("chosen_value") or "").strip()
+    save_rule = bool(payload.get("save_rule", True))
+    if not rid:
+        raise HTTPException(status_code=400, detail="id required")
+    if chosen:                                   # validate — never learn a non-canonical rule
+        from date_utils import to_iso_date
+        norm = to_iso_date(chosen)
+        if not norm:
+            raise HTTPException(status_code=400,
+                                detail=f"chosen_value '{chosen}' is not a parseable date")
+        chosen = norm
+    learn = save_rule and bool(chosen)           # discard (empty) marks resolved, learns nothing
+    try:
+        import ingestion_gate
+        conn = get_db(DB_PATH)
+        try:
+            ingestion_gate.resolve_review(conn, rid, chosen, save_rule=learn)
+        finally:
+            try: conn.close()
+            except Exception: pass
+        return {"status": "resolved", "id": rid, "chosen_value": chosen,
+                "rule_learned": learn}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/monitor/scoringcontract")

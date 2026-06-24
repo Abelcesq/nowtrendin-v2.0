@@ -112,7 +112,15 @@ def gate_date(value, *, table=None, column=None, source=None, conn=None,
     raw = "" if value is None else str(value).strip()
     if not raw:
         return to_iso_date("", default_today=default_today)
-    # unparseable, non-empty → ESCALATE to a human
+    # CLOSE THE LOOP: a human may already have resolved this exact malformed value via
+    # resolve_review(), which learned a format_rule. Auto-apply it (the "identical future
+    # inputs auto-normalize" the module docstring promises) — forward-only, and the
+    # normalized value was chosen by a human, never guessed.
+    if conn is not None:
+        learned = _learned_rule(conn, table, column, raw)
+        if learned:
+            return learned
+    # unparseable, non-empty, no learned rule → ESCALATE to a human
     if conn is not None:
         try:
             ensure_tables(conn)
@@ -120,6 +128,24 @@ def gate_date(value, *, table=None, column=None, source=None, conn=None,
         except Exception:
             pass
     return datetime.now(timezone.utc).strftime("%Y-%m-%d") if default_today else None
+
+
+def _learned_rule(conn, table, column, raw):
+    """Return the human-approved normalization for this exact (table, column, raw) value
+    if one was learned via resolve_review(), else None. The auto-apply half of the
+    review loop — keyed on the same fields resolve_review writes."""
+    try:
+        ensure_tables(conn)
+        row = conn.execute(
+            "SELECT normalized FROM format_rules "
+            "WHERE table_name=? AND column_name=? AND raw_pattern=? "
+            "ORDER BY created_at DESC LIMIT 1",
+            (table or "?", column or "?", str(raw))).fetchone()
+        if row:
+            return row["normalized"] if hasattr(row, "keys") else row[0]
+    except Exception:
+        return None
+    return None
 
 
 def pending_reviews(conn, limit: int = 50) -> list:

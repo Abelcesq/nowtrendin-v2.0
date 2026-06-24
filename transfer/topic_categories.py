@@ -239,7 +239,13 @@ def classify_topic(topic: str, text: str = "", hints=None) -> dict:
                 matched.setdefault(cat, []).append(f"hint:{syn}")
 
     if not scores:
-        return {"category": "news", "label": "News", "confidence": 0.15, "matched": []}
+        # HONEST FALLBACK: nothing in any lexicon matched. This is "unclassified",
+        # NOT "news" — labeling the unknown bucket "News" is what made the catch-all
+        # read as 77% news when it is really 77% UNCLASSIFIED. "news" has no lexicon of
+        # its own (real news/geopolitics matches current_events); it was ONLY ever the
+        # fallback. Return the honest 'general' bucket (matches the empty-blob case above
+        # and the module's documented intent) so "news" stops masquerading as a category.
+        return {"category": "general", "label": "General", "confidence": 0.0, "matched": []}
 
     top = max(scores.values())
     winners = [c for c, v in scores.items() if v == top]
