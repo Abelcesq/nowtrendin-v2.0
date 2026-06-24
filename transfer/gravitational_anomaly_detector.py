@@ -5531,6 +5531,31 @@ def run_scoring():
     }
 
 
+@app.post("/precompute", dependencies=[Depends(_require_internal)])
+def precompute_payloads(top_n: int = 600):
+    """Regenerate velocity_scores.serve_payload (GOTCHA G1) WITHOUT a full re-score — so the
+    strengthened serve-time quality gate + latest calibration are baked into every cached
+    list immediately rather than waiting for the next 6h cycle. Non-blocking: kicks the
+    rebuild on a background thread (clears all payloads, rebuilds the top-N; ~30-60s) and
+    returns at once. No score is changed — only the precomputed serve blob is refreshed."""
+    import threading
+
+    def _job():
+        try:
+            n = _precompute_serve_payloads(int(top_n))
+            try:
+                _cache.invalidate()
+            except Exception:
+                pass
+            print(f"[precompute] serve_payload rebuilt: {n} rows")
+        except Exception as exc:
+            print(f"[precompute] error: {exc}")
+
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started", "top_n": top_n,
+            "note": "serve_payload rebuild running in background (~30-60s); no score changed"}
+
+
 @app.get("/anomalies")
 def get_anomalies(limit: int = Query(20, ge=1, le=100)):
     """
