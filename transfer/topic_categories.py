@@ -82,7 +82,9 @@ _LEX = {
          # dev/AI tooling that fell into the catch-all (Catch-All Auditor candidates)
          "streamlit", "fastapi", "copilot", "kubernetes", "dockerfile", "pytorch",
          "langchain", "bioinformatics", "semantic search", "prompt engineering",
-         "diffusion model", "object detection", "vector database", "hugging face"],
+         "diffusion model", "object detection", "vector database", "hugging face",
+         # unambiguous tech entities (Catch-All Auditor candidates 2026-06-23)
+         "google", "bsky", "bluesky"],
     ),
     "politics": (
         ["election", "president", "senate", "congress", "parliament",
@@ -94,7 +96,7 @@ _LEX = {
          "regulation", "court",
          # unambiguous political figures (Catch-All Auditor candidates)
          "trump", "biden", "harris", "putin", "zelensky", "netanyahu", "starmer",
-         "modi", "macron"],
+         "modi", "macron", "obama"],
     ),
     "business": (
         ["ipo", "merger", "acquisition", "earnings", "quarterly results",
@@ -161,7 +163,12 @@ _LEX = {
          "refugee", "hostage", "coup", "invasion", "nuclear", "sanctions",
          "iran", "israel", "gaza", "ukraine", "syria", "hamas", "hezbollah",
          "taiwan", "north korea", "geopolitical",
-         "china", "russia", "russian", "venezuela", "lebanon", "yemen", "sudan"],
+         "china", "russia", "russian", "venezuela", "lebanon", "yemen", "sudan",
+         # demonyms + the Iran/Hormuz chokepoint cluster (Catch-All Auditor candidates).
+         # NOTE: bare peaceful countries (australia/canada/france…) are deliberately NOT
+         # added — a country alone is multi-category; the SITUATION layer routes them by
+         # context (canada+hockey→sports, canada+election→politics).
+         "iranian", "israeli", "chinese", "strait of hormuz", "hormuz", "juneteenth"],
     ),
     # "news" and "general" are fallbacks — no lexicon; assigned when nothing
     # else scores. "economy"/"business" and "politics"/"current_events" overlap
