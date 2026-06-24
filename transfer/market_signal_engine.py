@@ -56,6 +56,15 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 # DEFAULT = False. Flip only after Phase 2 (Wikipedia+GDELT referee) validates.
 _MKT_QUARANTINE = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "true"
 
+# ── Dark-Positioning V2 feature flag (SEC 13F + Congress → positioning_concentration) ──
+# When True: a ticker's held-out dark-positioning signal (positioning_intel: curated-fund
+# 13F breadth + congressional net-trading), passed in via payload["dark_positioning_intel"],
+# BLENDS into positioning_concentration (40% weight). DEFAULT False — the code ships inert;
+# flip ONLY after the predictive backtest validates it improves (not just changes) the score.
+# Non-circular: inputs are external SEC/Congress filings, independent of any Now TrendIn score.
+DARK_POSITIONING_V2 = os.getenv("DARK_POSITIONING_V2", "0") == "1"
+DARK_POS_WEIGHT = float(os.getenv("DARK_POS_WEIGHT", "0.4"))
+
 MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
 # Cold-start guard (Fix #1, market diagnostic): a baseline of 3–9 cycles passes the
 # MIN_BASELINE_CYCLES gate but is too thin to trust — the 0.05 stdev floor dominates
@@ -321,6 +330,17 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
     else:
         pos_conc = _norm(min(si_chg, 30) / 30 * 0.4 + min(inst_chg, 40) / 40 * 0.4
                          + math.log1p(insider) / math.log1p(20) * 0.2)
+        # Dark-Positioning V2 (flag-gated, default OFF): blend the held-out smart-money
+        # (curated-fund 13F breadth) + political (Congress net-trading) signal for this
+        # ticker into positioning_concentration. Only fires when the flag is on AND the
+        # ticker actually has 13F/Congress activity, so the default path is unchanged.
+        if DARK_POSITIONING_V2:
+            _dpi = payload.get("dark_positioning_intel") or {}
+            _sig = _dpi.get("positioning_signal")
+            _has = (_dpi.get("smart_money", {}).get("funds_holding")
+                    or _dpi.get("congress", {}).get("members"))
+            if _sig is not None and _has:
+                pos_conc = _norm(pos_conc * (1 - DARK_POS_WEIGHT) + float(_sig) * DARK_POS_WEIGHT)
 
     # Dark Positioning — macro / cross-market (OFR funding stress + repo change)
     stress = ((macro.get("funding_stress") or {}).get("label") or "").lower()

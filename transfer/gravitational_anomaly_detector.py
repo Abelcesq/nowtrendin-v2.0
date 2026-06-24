@@ -7307,6 +7307,20 @@ def research_13f(fund: str = Query("", description="fund name or CIK; '' = Berks
     return _f.latest_13f(cik, name)
 
 
+@app.get("/research/dark-positioning", dependencies=[Depends(_require_internal)])
+def research_dark_positioning(top_congress: int = Query(25, ge=0, le=80)):
+    """HELD-OUT combined dark-positioning signal: per-ticker smart-money (curated 13F funds)
+    + political (Congress) positioning, ranked. This is the EXACT signal that augments Market
+    Signal `positioning_concentration` when DARK_POSITIONING_V2=1 — review it here first.
+    Not wired into any score while the flag is off (default)."""
+    try:
+        import positioning_intel as _pi
+        wl = risk.WATCHLIST_TICKERS if (_RISK_AVAILABLE and hasattr(risk, "WATCHLIST_TICKERS")) else {}
+        return _pi.all_signals(wl, top_congress=top_congress)
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 @app.get("/research/congress", dependencies=[Depends(_require_internal)])
 def research_congress(limit: int = Query(25, ge=1, le=100), top_n: int = Query(15, ge=1, le=50)):
     """HELD-OUT congressional-trading research (QuiverQuant) — recent trades + per-ticker

@@ -96,6 +96,11 @@ SEC_USER_AGENT  = os.getenv("SEC_USER_AGENT", "NowTrendIn Research contact@nowtr
 #  ^ SEC EDGAR REQUIRES a descriptive User-Agent with contact info.
 #    This is their published access policy. Respect it.
 
+# Dark-Positioning V2 (default OFF) — when on, attach the held-out per-ticker smart-money
+# (13F) + Congress positioning signal to the market payload so positioning_concentration can
+# blend it. Off = positioning_intel is never imported (held-out preserved, zero overhead).
+DARK_POSITIONING_V2 = os.getenv("DARK_POSITIONING_V2", "0") == "1"
+
 
 # ════════════════════════════════════════════════════════════════
 # SECTION 1: LEGITIMATE DATA SOURCE REGISTRY
@@ -2271,6 +2276,12 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
     try:
         import market_signal_engine as _mse
         sig_summary = {"stage_counts": {}, "venue_count": 0, "newest_age_hours": None}
+        if DARK_POSITIONING_V2:
+            try:
+                import positioning_intel as _pi
+                payload["dark_positioning_intel"] = _pi.signal_for(ticker, display)
+            except Exception:
+                pass
         mcomps = _mse.assemble_market_components(payload, sig_summary)
         item_key = _risk_key(display)
         _lane, _na = _market_lane(display)
@@ -2454,6 +2465,13 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                 _newest_age = None
             _sig_summary = {"stage_counts": current_by_stage,
                             "venue_count": _venues, "newest_age_hours": _newest_age}
+            if DARK_POSITIONING_V2:
+                try:
+                    import positioning_intel as _pi
+                    _tk = WATCHLIST_TICKERS.get(display) or (display if str(display).isupper() else "")
+                    positioning_payload["dark_positioning_intel"] = _pi.signal_for(_tk or display, display)
+                except Exception:
+                    pass
             _mcomps = _mse.assemble_market_components(positioning_payload, _sig_summary)
             _lane, _na = _market_lane(display)
             mkt = _mse.apply_market_signal(topic, display, _mcomps, conn=conn,
