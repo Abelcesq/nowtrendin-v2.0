@@ -59,9 +59,20 @@ _Last updated: 2026-06-23c_
   remaining duplication is SEMANTIC, which the situation layer handles).
 - The audit caught + fixed gate false-positives the unit test missed (hyphenated tech compounds
   `retrieval-augmented-generation`, geo `west bank`) — keep hyphens intact, whitelist geo/tech.
-- COMPLIANT cleanups available (no deletes): serve-filter (live) · regenerate serve_payload to
-  propagate immediately · enrich `_LEX` to drain the 75% catch-all (Catch-All Auditor candidates).
-  Engine deployed 9a84a88.
+- COMPLIANT cleanups (no deletes) — DONE:
+  - **#2 serve_payload regenerated** via new `POST /precompute` (GOTCHA G1, background, no
+    re-score). Board fresh: 2,601 topics, 0 casino/boilerplate junk. (`asi`/`shaving` generic
+    tokens still leak on /scores — a separate serve-filter coverage edge to check.)
+  - **#3 lexicon enriched** (`_LEX`): added ONLY unambiguous Catch-All Auditor candidates —
+    technology (google, bsky), politics (obama), current_events (iranian/israeli/chinese/
+    hormuz/strait of hormuz/juneteenth). Catch-all **75.3%→73.9%** (tech 992, current_events
+    400, politics 344). Bare peaceful countries (australia/canada/texas/america) deliberately
+    NOT force-routed — multi-category; the SITUATION layer (Phase B) routes them by context.
+    Honest: lexicon fixes FREQUENT unambiguous terms (~1.4%/batch); the bulk of the 74% is
+    context-dependent entities → structural fix is situation-level categorization.
+  - Auditor also flags (separate): corroboration-floor **WORSENING** (single-source catch-all
+    leak +230) and **542 tracked topics stuck in catch-all** — data-quality follow-ups.
+  Engine deployed 55ff376. NO velocity_scores deleted (90-day retention respected throughout).
 
 ---
 
