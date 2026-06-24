@@ -7278,6 +7278,35 @@ def quarantine_dates_resolve(payload: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/research/13f", dependencies=[Depends(_require_internal)])
+def research_13f(fund: str = Query("", description="fund name or CIK; '' = Berkshire, 'all' = curated list"),
+                 limit_funds: int = Query(10, ge=1, le=10)):
+    """HELD-OUT institutional-positioning research: the latest 13F-HR holdings for mega-cap
+    funds, straight from SEC EDGAR. NOT wired into any score (research-before-integrate per the
+    Source Onboarding Protocol §16). Lazy-imports the held-out module so the scoring path never
+    pulls it in."""
+    try:
+        import sec_13f_research as _f
+    except Exception as e:
+        return {"available": False, "error": f"module load: {e}"}
+    q = (fund or "").strip()
+    if q.lower() == "all":
+        return _f.research_funds(limit_funds=limit_funds)
+    if not q:
+        return _f.latest_13f(_f.FUND_CIKS["Berkshire Hathaway"], "Berkshire Hathaway")
+    # resolve by CIK or (case-insensitive) name
+    cik, name = (q, "") if q.isdigit() else (None, q)
+    if cik is None:
+        for n, c in _f.FUND_CIKS.items():
+            if n.lower() == q.lower():
+                cik, name = c, n
+                break
+    if cik is None:
+        return {"available": False, "reason": f"unknown fund '{q}'",
+                "known_funds": list(_f.FUND_CIKS.keys())}
+    return _f.latest_13f(cik, name)
+
+
 @app.get("/schema", dependencies=[Depends(_require_internal)])
 def db_schema():
     """Live DB schema introspection (information_schema + planner row estimates) — the
