@@ -45,6 +45,11 @@ CLAUDE_MODEL = os.getenv("AI_GRADE_CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
 # Default ON; the engine's monthly $20 AI budget cap still bounds spend. Set to "0" to
 # force Perplexity-only (e.g. to conserve budget once the Perplexity key is renewed).
 EXPLAINER_CLAUDE_FALLBACK = os.getenv("EXPLAINER_CLAUDE_FALLBACK", "1") == "1"
+# Skip Perplexity entirely (founder choice 2026-06-23: "I do not want to use perplexity
+# for now"). When set, the explainer / movement / research stages go STRAIGHT to Claude —
+# no wasted call to a dead/unwanted Perplexity key (also trims ~1s of latency). Flip back
+# to "0" after renewing the Perplexity key to restore the cheaper web-research primary.
+AI_SKIP_PERPLEXITY = os.getenv("AI_SKIP_PERPLEXITY", "0") == "1"
 
 
 def is_available() -> bool:
@@ -199,8 +204,8 @@ def explain_topic(topic: str, context: str = "") -> dict:
     ctx = (context or "").strip()
     prompt = (_EXPLAINER_CONTEXT_PROMPT.format(topic=topic, context=ctx[:2500])
               if ctx else _EXPLAINER_PROMPT.format(topic=topic))
-    # ── PRIMARY: Perplexity ──────────────────────────────────────────
-    if PERPLEXITY_API_KEY:
+    # ── PRIMARY: Perplexity (skipped when AI_SKIP_PERPLEXITY) ─────────
+    if PERPLEXITY_API_KEY and not AI_SKIP_PERPLEXITY:
         try:
             _api("perplexity")
             r = requests.post(
@@ -296,7 +301,7 @@ def analyze_movement(topic: str, movement: str, direction: str, context: str = "
     Caller caches + meters. Never leaks a raw provider error to the caller."""
     prompt = _MOVEMENT_PROMPT.format(topic=topic, movement=movement[:600],
                                      direction=direction, context=(context or "")[:2200])
-    if PERPLEXITY_API_KEY:
+    if PERPLEXITY_API_KEY and not AI_SKIP_PERPLEXITY:
         try:
             _api("perplexity")
             r = requests.post(
@@ -330,36 +335,45 @@ def research_topic(topic: str, web_block: str = "") -> dict:
     """Perplexity web research. Returns {available, summary, citations}.
 
     When `web_block` is provided (pre-fetched Firecrawl URLs + snippets),
-    the enriched prompt variant anchors Perplexity to real source evidence.
+    the enriched prompt variant anchors the research in real source evidence.
+    PRIMARY = Perplexity (web research); FALLBACK = Claude (grounded on web_block /
+    its own knowledge) when Perplexity is unavailable/skipped, so grading still works.
     """
-    if not PERPLEXITY_API_KEY:
-        return {"available": False, "summary": "", "citations": []}
     prompt = (
         _RESEARCH_PROMPT_WITH_WEB.format(topic=topic, web_block=web_block)
         if web_block else
         _RESEARCH_PROMPT.format(topic=topic)
     )
-    try:
-        _api("perplexity")
-        r = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-                     "Content-Type": "application/json"},
-            json={
-                "model": PPLX_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=60,
-        )
-        r.raise_for_status()
-        data = r.json()
-        summary = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-        citations = data.get("citations", []) or []
-        cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
-        return {"available": True, "summary": summary, "citations": citations, "cost": cost}
-    except Exception as e:
-        print(f"[ai_grade] perplexity error: {e}")
-        return {"available": False, "summary": "", "citations": [], "cost": 0.0, "error": str(e)}
+    if PERPLEXITY_API_KEY and not AI_SKIP_PERPLEXITY:
+        try:
+            _api("perplexity")
+            r = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                         "Content-Type": "application/json"},
+                json={
+                    "model": PPLX_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=60,
+            )
+            r.raise_for_status()
+            data = r.json()
+            summary = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            citations = data.get("citations", []) or []
+            cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
+            return {"available": True, "summary": summary, "citations": citations, "cost": cost}
+        except Exception as e:
+            print(f"[ai_grade] research (perplexity) error: {e} — trying Claude fallback")
+            # fall through to the Claude fallback below
+    # ── FALLBACK: Claude ─────────────────────────────────────────────
+    if EXPLAINER_CLAUDE_FALLBACK and ANTHROPIC_API_KEY:
+        res = _explain_via_claude(topic, prompt)
+        if res.get("available"):
+            return {"available": True,
+                    "summary": res.get("full") or res.get("short") or "",
+                    "citations": [], "cost": res.get("cost", {})}
+    return {"available": False, "summary": "", "citations": []}
 
 
 # ── Stage 2: SYNTHESIS (Claude → proposed Gradient Score) ────────────

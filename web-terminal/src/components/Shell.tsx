@@ -36,9 +36,9 @@ const NAV: { key: NavKey; icon: LucideIcon; label: string }[] = [
   { key: 'trends', icon: TrendingUp, label: 'Trends' },
   { key: 'market', icon: DollarSign, label: 'Market Signal' },
   { key: 'grade', icon: Activity, label: 'Grade' },
+  { key: 'history', icon: Clock, label: 'History' },
   { key: 'watchlists', icon: Star, label: 'Watchlists' },
   { key: 'alerts', icon: Bell, label: 'Alerts' },
-  { key: 'history', icon: Clock, label: 'History' },
   { key: 'ledger', icon: CheckCircle, label: 'Accuracy Ledger' },
   { key: 'methodology', icon: Sparkles, label: 'Methodology' },
 ]
