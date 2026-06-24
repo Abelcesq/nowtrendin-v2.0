@@ -689,8 +689,8 @@ def catchall_auditor(conn) -> dict:
 
     # corroboration per topic (distinct sources + any expert-tier signal), 72h
     agg = {}
+    cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=72)).isoformat()
     try:
-        cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=72)).isoformat()
         for r in conn.execute(
             "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
             "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
@@ -710,7 +710,7 @@ def catchall_auditor(conn) -> dict:
 
     try:
         rows = conn.execute(
-            "SELECT v.topic_key, v.topic_display FROM velocity_scores v "
+            "SELECT v.topic_key, v.topic_display, v.scored_at FROM velocity_scores v "
             "INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
             "GROUP BY topic_key) l ON v.topic_key=l.topic_key AND v.scored_at=l.m").fetchall()
     except Exception as e:
@@ -719,7 +719,7 @@ def catchall_auditor(conn) -> dict:
                 "summary": {}, "checked_at": _now().isoformat()}
 
     total = len(rows) or 1
-    catch = single_src = 0
+    catch = single_src = dormant_pile = 0
     misclassified_real, samples = [], []
     token_freq = collections.Counter()
     for r in rows:
@@ -733,8 +733,19 @@ def catchall_auditor(conn) -> dict:
             continue
         catch += 1
         nsrc, hasx = agg.get(k, (0, 0))
+        # ADMISSION leak vs DORMANT pile. The corroboration map `agg` only sees the
+        # last 72h of topic_signals, so a topic whose LATEST score predates that window
+        # has had its corroborating signals age out → a low nsrc there is a 72h-window
+        # artifact, NOT a floor failure. The floor is enforced at SCORING time
+        # (forward-only); old single-source rows are the pre-floor pile we RETAIN under
+        # the 90-day rule (it shrinks as rows age out). Only a topic scored WITHIN the
+        # 72h window that still lacks ≥min_src distinct sources is a real current leak.
+        recent = (r["scored_at"] or "") >= cut
         if nsrc < min_src and not hasx and k not in protect:
-            single_src += 1                       # floor leak (≈0 expected)
+            if recent:
+                single_src += 1                   # CURRENT admission leak (≈0 expected)
+            else:
+                dormant_pile += 1                 # aged pre-floor pile (retained, not a leak)
         if k in protect:
             misclassified_real.append(disp)       # tracked call stuck in catch-all
         for tok in disp.lower().split():          # lexicon-candidate tally
@@ -791,7 +802,9 @@ def catchall_auditor(conn) -> dict:
     summary = {
         "total_scored": total, "catchall_count": catch, "catchall_pct": catch_pct,
         "floor_min_sources": min_src,
-        "single_source_catchall_leak": single_src,
+        "single_source_catchall_leak": single_src,        # CURRENT admission leak (scored ≤72h)
+        "dormant_catchall_pile": dormant_pile,            # aged pre-floor rows, retained (not a leak)
+        "leak_window_hours": 72,
         "floor_trend": trend,
         "floor_leak_delta": leak_delta,
         "misclassified_tracked": len(misclassified_real),
@@ -805,8 +818,9 @@ def catchall_auditor(conn) -> dict:
                               f"Top lexicon candidates to reclassify: {[t for t, _ in top_terms[:10]]}"})
     if single_src > 50:
         alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"{single_src} single-source catch-all topics leaked past the "
-                              f"corroboration floor (min_sources={min_src}) — floor disabled or purge overdue"})
+                       "msg": f"{single_src} single-source catch-all topics ADMITTED in the last 72h "
+                              f"without corroboration (min_sources={min_src}) — floor may be leaking. "
+                              f"(Dormant pre-floor pile, retained, not counted: {dormant_pile}.)"})
     if trend == "WORSENING":
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"catch-all floor trend WORSENING: single-source leaks grew by "

@@ -74,7 +74,9 @@ _LEX = {
          "nvidia", "spacex", "starship", "satellite", "semiconductor", "quantum",
          "agentic", "machine learning", "artificial intelligence", "blockchain",
          "cryptocurrency", "github", "iphone", "android", "cybersecurity",
-         "malware", "data breach", "software", "algorithm", "robotics"],
+         "malware", "data breach", "software", "algorithm", "robotics",
+         # unambiguous tech terms tracked-in-catchall (Catch-All Auditor 2026-06-24)
+         "javascript", "typescript", "wwdc", "chatbot", "chatbots", "webassembly"],
         ["ai", "app", "chip", "rocket", "tesla", "ev", "robot", "crypto",
          "bitcoin", "ethereum", "coding", "programming", "developer", "startup",
          "gadget", "cloud", "server", "api", "hack", "cyber", "tech", "device",

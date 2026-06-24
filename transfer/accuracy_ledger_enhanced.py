@@ -75,6 +75,19 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
                      timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None):
     """Log a detection as PENDING the moment the engine flags it. Idempotent on
     (topic_key, detection_date)."""
+    # Sink-harden (quality): reject fragment/boilerplate non-topics at the WRITE boundary
+    # so legacy-style junk ("sunday afternoon", "york for months", "every single") can
+    # never enter the TRACKED ledger going forward — the same defense-at-the-boundary
+    # principle as the date gate below and the catch-all corroboration floor. Same shared
+    # gate every scorer uses, so a properly-scored topic always passes (no false drops).
+    # Fail OPEN: if the gate can't be imported, never drop a real detection.
+    try:
+        from gravitational_anomaly_detector import _is_quality_topic as _qt
+        if not _qt(topic_display or (topic_key or "").replace("_", " ")):
+            print(f"[ledger] record_detection skipped non-quality topic: {topic_display!r}")
+            return
+    except Exception:
+        pass
     own = conn is None
     if own:
         conn = db_compat.connect(db_path)
@@ -154,8 +167,28 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     pending = [dict(r) for r in conn.execute(q).fetchall()]
     fetch = fetch_fn or fetch_trends_curve
     now = datetime.now(timezone.utc)
-    led = lagged = same = fp = still = late = 0
+    led = lagged = same = fp = still = late = excluded = 0
+    # Shared quality gate (fail-open) — resolve LEGACY non-topics out of the pool WITHOUT
+    # scoring them as predictions. A fragment that slipped in before the gate existed is
+    # not a real detection, so timing it out as a FALSE_POSITIVE would corrupt the ledger's
+    # honest denominator. Mark it 'excluded_nonquality' (non-deleting, auditable) instead.
+    try:
+        from gravitational_anomaly_detector import _is_quality_topic as _qt
+    except Exception:
+        _qt = None
     for p in pending:
+        if _qt is not None:
+            try:
+                _disp = p.get("topic_display") or (p.get("topic_key") or "").replace("_", " ")
+                if not _qt(_disp):
+                    conn.execute(
+                        "UPDATE pending_detections SET status='excluded_nonquality' WHERE id=?",
+                        (p["id"],))
+                    conn.commit()
+                    excluded += 1
+                    continue
+            except Exception:
+                pass
         # TIMEOUT-FIRST (free): past the deadline → FALSE_POSITIVE with no Trends fetch.
         timed_out = False
         if p.get("timeout_date"):
@@ -215,7 +248,7 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     conn.close()
     out = {"resolved_led": led, "resolved_lagged": lagged, "resolved_same_day": same,
            "resolved_false_positive": fp, "resolved_late_redetection": late,
-           "still_pending": still}
+           "still_pending": still, "excluded_nonquality": excluded}
     print(f"[ledger] sweep: {out}")
     return out
 
