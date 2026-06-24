@@ -17,6 +17,7 @@ interface MRow {
   tier: string; cls: string; pct: number | null; lev: number | null
   sigs: number; ageMin: number; calibrating: boolean; dc?: string
   interp: string; comps: [string, number, string][]
+  lane: string; laneLabel: string   // coverage lane: covered / halted_microcap / macro_theme
   raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
 type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
@@ -80,8 +81,21 @@ function toRow(r: RiskRow): MRow {
     calibrating: !!mg.calibrating || r.sufficient_baseline === false,
     dc: mg.data_coverage,
     interp: mg.interpretation || r.interpretation || '',
+    lane: mg.lane || '', laneLabel: mg.lane_label || '',
     comps, raw: r,
   }
+}
+
+// Coverage-lane axis (Tier 1) — separates instruments by what data CAN exist for them,
+// so the user can isolate covered names from halt-surfaced micro-caps and macro themes.
+const LANE_FILTERS: { k: string; label: string; lane?: string }[] = [
+  { k: 'all', label: 'All lanes' },
+  { k: 'covered', label: 'Covered', lane: 'covered' },
+  { k: 'halted_microcap', label: 'Halted / micro-cap', lane: 'halted_microcap' },
+  { k: 'macro_theme', label: 'Macro themes', lane: 'macro_theme' },
+]
+const LANE_SHORT: Record<string, string> = {
+  covered: 'covered', halted_microcap: 'halt · micro-cap', macro_theme: 'macro theme',
 }
 
 function bar(label: string, val: number | null, color: string) {
@@ -127,7 +141,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.name}</div>
-            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
+            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -144,7 +158,12 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">fundamentals + price</div></div>
       </div>
       <div className="sect">
-        {mg.data_coverage === 'insufficient' && (
+        {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
+          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
+            ℹ <b>Macro theme.</b> A market-wide theme has no single ticker, so smart-money positioning (FINRA short interest · 13F) and company fundamentals are <b>not applicable</b> — the score reflects only the macro / cross-market inputs that <i>can</i> be measured ({mg.total_inputs} applicable factor{mg.total_inputs === 1 ? '' : 's'}).
+          </div>
+        )}
+        {row.lane !== 'macro_theme' && mg.data_coverage === 'insufficient' && (
           <div className="narr" style={{ marginBottom: 8, background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
             ⚠ <b>Insufficient positioning data.</b> Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this instrument yet{mg.absent_inputs != null ? ` (${mg.absent_inputs}/${mg.total_inputs} inputs absent)` : ''}, so it sits near baseline by default — <i>not</i> a confirmed quiet market.
           </div>
@@ -162,15 +181,16 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="sect">
           <h4>Market Factors</h4>
           {Object.entries(mg.components || {}).map(([label, c]: [string, any]) => {
-            const col = FEEDS_COLOR[c?.feeds] ?? MC.muted
+            const na = c?.not_applicable || c?.score == null
+            const col = na ? MC.muted : (FEEDS_COLOR[c?.feeds] ?? MC.muted)
             return (
-              <div className="comp-row" key={label} title={label}>
+              <div className="comp-row" key={label} title={na ? `${label} — not applicable to this instrument lane` : label} style={na ? { opacity: 0.5 } : undefined}>
                 <span className="cl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 3, background: col, flex: '0 0 auto' }} />
-                  {label.replace(/\s*\(.*\)$/, '')}{c?.baseline_relative ? ' ✓' : ''}
+                  {label.replace(/\s*\(.*\)$/, '')}{!na && c?.baseline_relative ? ' ✓' : ''}
                 </span>
-                <span className="comp-bar"><i style={{ width: `${Math.max(4, Math.min(100, c?.score ?? 0))}%`, background: col }} /></span>
-                <span className="cv">{Math.round(c?.score ?? 0)}</span>
+                <span className="comp-bar"><i style={{ width: na ? '0%' : `${Math.max(4, Math.min(100, c?.score ?? 0))}%`, background: col }} /></span>
+                <span className="cv">{na ? 'n/a' : Math.round(c?.score ?? 0)}</span>
               </div>
             )
           })}
@@ -361,6 +381,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState('all')
+  const [laneFilter, setLaneFilter] = useState('all')
   const [q, setQ] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('det')
   const [sortDir, setSortDir] = useState(-1)
@@ -400,8 +421,17 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
 
   const anyCalibrating = useMemo(() => rows.some((r) => r.calibrating), [rows])
 
+  // Lane counts (over the full set, before tier/search filters) for the chip labels.
+  const laneCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const r of rows) c[r.lane || 'unknown'] = (c[r.lane || 'unknown'] || 0) + 1
+    return c
+  }, [rows])
+
   const view = useMemo(() => {
     let r = rows.slice()
+    const lf = LANE_FILTERS.find((x) => x.k === laneFilter)
+    if (lf?.lane) r = r.filter((x) => x.lane === lf.lane)
     const f = FILTERS.find((x) => x.k === filter)
     if (f?.test) r = r.filter(f.test)
     if (q) { const s = q.toLowerCase(); r = r.filter((x) => x.name.toLowerCase().includes(s) || x.key.toLowerCase().includes(s)) }
@@ -411,7 +441,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
       return ((va ?? -1) - (vb ?? -1)) * sortDir
     })
     return r
-  }, [rows, filter, q, sortKey, sortDir])
+  }, [rows, filter, laneFilter, q, sortKey, sortDir])
 
   const sort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => -d)
@@ -462,6 +492,21 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
           </div>
         </div>
         <div className="chips">
+          <span className="chip-label">Lane</span>
+          {LANE_FILTERS.map((f) => {
+            const n = f.lane ? (laneCounts[f.lane] || 0) : rows.length
+            return (
+              <div key={f.k} className={'chip' + (laneFilter === f.k ? ' active' : '')} onClick={() => setLaneFilter(f.k)}
+                   title={f.lane === 'macro_theme' ? 'Macro themes have no ticker — smart-money positioning is N/A, excluded from the score and coverage'
+                        : f.lane === 'halted_microcap' ? 'Halt-surfaced micro-caps — have a ticker but typically no institutional positioning data yet'
+                        : f.lane === 'covered' ? 'Curated watchlist names with institutional positioning (FINRA short interest · 13F)'
+                        : 'All instruments across every coverage lane'}>
+                {f.label}{f.k !== 'all' ? ` ${n}` : ''}
+              </div>
+            )
+          })}
+        </div>
+        <div className="chips">
           <span className="chip-label">Tier</span>
           {FILTERS.map((f) => (
             <div key={f.k} className={'chip' + (filter === f.k ? ' active' : '')} onClick={() => setFilter(f.k)}>{f.label}</div>
@@ -506,7 +551,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                 const gw = Math.abs(r.gap) >= 20 ? 'wide' : r.gap < 0 ? 'neg' : 'tight'
                 return (
                   <tr key={r.key} className={r.key === sel ? 'sel' : ''} onClick={() => select(r.key)}>
-                    <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}</div><div className="topic-cat">{r.cls ? r.cls.toLowerCase() : 'market'}</div></td>
+                    <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}</div><div className="topic-cat">{r.lane ? (LANE_SHORT[r.lane] || 'market') : (r.cls ? r.cls.toLowerCase() : 'market')}</div></td>
                     <td className="r"><span className="score-cell det" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.det}</span></td>
                     <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>

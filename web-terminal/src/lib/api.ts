@@ -42,12 +42,17 @@ export interface TopicRow {
 // tab renders, via /risk/scores). The Market Gradient is distinct from attention:
 // detection = analyst sentiment + smart-money positioning; tier vocab is
 // ELEVATED / ACTIVE / BUILDING / ROUTINE / DORMANT (NOT BREAKOUT/STRONG). ──
-export interface MarketComponent { score: number; feeds?: string; z?: number }
+export interface MarketComponent { score: number | null; feeds?: string; z?: number; not_applicable?: boolean }
 export interface MarketGradient {
   detection?: number; confidence?: number; gap?: number
   tier?: string; gap_state?: string; interpretation?: string
   leverage_health?: number | null; calibrating?: boolean
   components?: Record<string, MarketComponent>
+  // Display-only coverage caveat (positioning inputs absent → not a confirmed quiet market)
+  data_coverage?: 'full' | 'partial' | 'insufficient'; absent_inputs?: number; total_inputs?: number
+  // Coverage LANE — covered / halted_microcap / macro_theme. na_components = inputs
+  // structurally inapplicable to this instrument (excluded from score + coverage).
+  lane?: string; lane_label?: string; na_components?: string[]
 }
 export interface RiskRow {
   risk_topic: string; risk_display: string
