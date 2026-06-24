@@ -40,12 +40,15 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
   const band = GAP_BANDS[gapBandIndex(gap)]
   const ms = result.market_signal?.market_gradient
   const scol = stageColor(result.stage)
+  // Measured topics carry their components under measured_row (with _score suffixes);
+  // AI-proposed topics carry them at the top level — read both so the bars aren't 0.
+  const _qc = result.measured_row || result
   const quality: [string, number][] = [
-    ['Niche Concentration', result.gradient_strength],
-    ['Platform Diversity', result.platform_diversity],
-    ['Momentum', result.inertia],
-    ['Dark Matter', result.dark_matter],
-    ['Persistence', result.persistence],
+    ['Niche Concentration', _qc.gradient_strength],
+    ['Platform Diversity', _qc.platform_diversity],
+    ['Momentum', _qc.inertia_score ?? _qc.inertia],
+    ['Dark Matter', _qc.dark_matter_score ?? _qc.dark_matter],
+    ['Persistence', _qc.persistence_score ?? _qc.persistence],
   ]
   const measured = result.source === 'measured'
   // N score comes straight from the Grade Agent now (live engine value).
@@ -59,8 +62,14 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
     return () => { alive = false }
   }, [topic, result.topic_key])
 
+  const gradedName = result.topic_display || result.topic || topic || (result.topic_key || '').replace(/_/g, ' ')
   return (
     <div className="grade-result">
+      {/* Graded topic name — so the user always sees WHAT was graded */}
+      <div className="g-graded-title" style={{ fontSize: 22, fontWeight: 800, color: MC.text, marginBottom: 2, textTransform: 'capitalize' }}>{gradedName}</div>
+      <div className="disc" style={{ marginTop: 0, marginBottom: 12 }}>
+        Graded topic · three independent reads below — Attention (Gradient), Market Signal, and on-platform demand (N)
+      </div>
       {/* Market read first (companies) */}
       {ms && (() => {
         const tc = marketTierColor(ms.tier)
