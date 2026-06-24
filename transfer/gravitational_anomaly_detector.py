@@ -1240,23 +1240,23 @@ def _is_quality_topic(display: str) -> bool:
     t = (display or "").strip().lower()
     if not t:
         return False
-    # Split on whitespace, underscores AND hyphens — sources emit underscored field-name
-    # fragments ("show_article_date") and hyphenated compounds ("retrieval-augmented-
-    # generation", "artificial-intelligence") that would otherwise dodge the word/bigram
-    # checks (or trip the long-token guard) as single tokens. For clean space-separated
-    # displays this is identical to .split().
-    toks = [w for w in re.split(r"[\s_\-]+", t) if w]
+    # Split on whitespace + underscores (sources emit underscored field-name fragments
+    # like "show_article_date"). HYPHENS ARE KEPT INSIDE TOKENS so a hyphenated compound
+    # ("computer-vision", "retrieval-augmented-generation") stays ONE unit — splitting it
+    # shatters it into common words and the all-common-words rule wrongly drops a real
+    # tech topic (an /audit/topics finding: junk rose 20.6%->22.2% on hyphen-split).
+    toks = [w for w in re.split(r"[\s_]+", t) if w]
     if any(w in PROFANITY for w in toks):
         return False
-    # concatenated-junk token (onlinedynamicbatching) + promotional/gambling spam —
-    # reject regardless of word count (single OR multi-word).
-    if any(len(w) > MAX_TOKEN_LEN for w in toks):
+    # concatenated-junk token (onlinedynamicbatching) — but a HYPHENATED long token is a
+    # legit compound term ("retrieval-augmented-generation"), so exempt it.
+    if any(len(w) > MAX_TOKEN_LEN and "-" not in w for w in toks):
         return False
     if any(w in SPAM_TERMS for w in toks):
         return False
     # Known real concept-phrase (recall whitelist) — passes the all-common-words rule.
-    # Use the normalized (space-joined) form so underscored inputs still match.
-    if " ".join(toks) in KNOWN_CONCEPT_PHRASES:
+    # Normalize hyphens/underscores to spaces so "artificial-intelligence" matches.
+    if re.sub(r"[\s_\-]+", " ", t) in KNOWN_CONCEPT_PHRASES:
         return True
     if len(toks) == 1:
         w = toks[0]
