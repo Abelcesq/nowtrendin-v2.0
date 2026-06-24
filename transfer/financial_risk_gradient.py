@@ -836,6 +836,28 @@ def _risk_maturity(display: str):
             "appears across more diffusion stages and additional collection cycles.")
 
 
+# Components that are STRUCTURALLY N/A for a macro theme — a theme like "recession" or
+# "inflation" has no ticker, so smart-money positioning (FINRA shorts / 13F / insider) and
+# realized company financials cannot exist for it. Excluding them (vs. scoring them 0) stops
+# a category error from masquerading as "insufficient coverage" on the Market Signal card.
+_MARKET_MACRO_NA = {"positioning_concentration", "fundamental_confirmation"}
+
+
+def _market_lane(display: str):
+    """Classify a Market Signal item into a coverage LANE so the UI can separate names
+    that genuinely have institutional data from ones that structurally cannot. Returns
+    (lane, na_components). Reuses _risk_maturity's typing (curated watchlist = ESTABLISHED;
+    macro-theme set = MACRO; everything else, incl. Nasdaq-halt micro-caps = EMERGING)."""
+    mat = _risk_maturity(display)[0]
+    if mat == "MACRO":
+        return ("macro_theme", set(_MARKET_MACRO_NA))
+    if mat == "ESTABLISHED":
+        return ("covered", set())
+    # EMERGING — typically a halt-surfaced micro-cap: it HAS a ticker, so positioning is
+    # not N/A, just usually missing (→ honest "partial/insufficient" coverage, not excluded).
+    return ("halted_microcap", set())
+
+
 # Baseline: a topic's own normal-activity level. We use the most RECENT N cycles
 # (not a long calendar window) so that when a new high-volume source is added
 # (e.g. Finnhub), the baseline re-centres within a few hours instead of staying
@@ -2247,8 +2269,10 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
         sig_summary = {"stage_counts": {}, "venue_count": 0, "newest_age_hours": None}
         mcomps = _mse.assemble_market_components(payload, sig_summary)
         item_key = _risk_key(display)
+        _lane, _na = _market_lane(display)
         mkt = _mse.apply_market_signal(item_key, display, mcomps,
-                                       record_this_cycle=False, db_path=db_path)
+                                       record_this_cycle=False, db_path=db_path,
+                                       lane=_lane, na_components=_na)
         _sus = payload.get("sustainability") or {}
         _lh = _sus.get("sector_adjusted_score") or _sus.get("score")
         if _lh is not None:
@@ -2427,7 +2451,9 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
             _sig_summary = {"stage_counts": current_by_stage,
                             "venue_count": _venues, "newest_age_hours": _newest_age}
             _mcomps = _mse.assemble_market_components(positioning_payload, _sig_summary)
-            mkt = _mse.apply_market_signal(topic, display, _mcomps, conn=conn)
+            _lane, _na = _market_lane(display)
+            mkt = _mse.apply_market_signal(topic, display, _mcomps, conn=conn,
+                                           lane=_lane, na_components=_na)
             # Leverage Health (1-100, HIGH = lower debt / healthier balance sheet)
             # from the factual sustainability read. Powers the Leverage Health
             # filter. Only present for companies with balance-sheet data.

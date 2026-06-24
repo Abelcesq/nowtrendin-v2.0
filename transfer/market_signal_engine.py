@@ -91,6 +91,19 @@ COMPONENT_LABELS = {
     "signal_freshness":          "Signal Freshness (recency / persistence)",
 }
 
+# Market-signal LANE — separates instruments by what data CAN exist for them, so an
+# "insufficient coverage" read reflects a genuine gap rather than a category error.
+# Covered names have institutional positioning (13F / short interest); halt-surfaced
+# micro-caps have a ticker but typically NO institutional coverage (honestly "partial");
+# macro themes (recession, inflation) have no single instrument at all, so positioning +
+# fundamentals are structurally N/A. The lane is supplied by the caller (risk module),
+# which knows the watchlist + macro-theme set.
+LANE_LABELS = {
+    "covered":         "Covered instrument — institutional positioning available",
+    "halted_microcap": "Halted / micro-cap — limited institutional coverage",
+    "macro_theme":     "Macro theme — no single instrument; positioning N/A",
+}
+
 # Neutral intensity tiers (NOT advice). Reused from the deployed Market section.
 MARKET_LEVELS = [(80, "ELEVATED"), (60, "ACTIVE"), (40, "BUILDING"),
                  (25, "ROUTINE"), (0, "DORMANT")]
@@ -153,41 +166,48 @@ def _feeds(component: str) -> str:
 
 def compute_market_signal(item_key: str, item_name: str,
                           components_current: dict,
-                          baselines: Optional[dict] = None) -> dict:
+                          baselines: Optional[dict] = None,
+                          lane: str = "covered",
+                          na_components: Optional[set] = None) -> dict:
     baselines = baselines or {}
-    # When _MKT_QUARANTINE=True a component may be None (structurally absent,
-    # e.g. positioning_concentration when FINRA+WhaleWisdom are both unavailable).
-    # Gate absent-set on the flag so the default-off path is byte-identical to
-    # the original: get(n, 0.0) for missing keys, no renormalization.
-    absent = ({n for n in COMPONENT_LABELS if components_current.get(n) is None}
+    # STRUCTURAL N/A (lane-driven): components that CANNOT exist for this instrument
+    # type — e.g. positioning_concentration + fundamental_confirmation for a macro theme
+    # (recession, inflation) that has no ticker. Excluded from the weighting (renormalized)
+    # AND from the coverage denominator, because they are not a data GAP — it is a category
+    # error to even ask for them. Distinct from `absent` (real input, currently missing).
+    na = {n for n in (na_components or set()) if n in COMPONENT_LABELS}
+    applicable = [n for n in COMPONENT_LABELS if n not in na]
+    # When _MKT_QUARANTINE=True an APPLICABLE component may be None (real input missing —
+    # FINRA + WhaleWisdom both unavailable). THAT is a coverage gap (counts toward the
+    # caveat). Gate on the flag so the default-off path is unchanged.
+    absent = ({n for n in applicable if components_current.get(n) is None}
               if _MKT_QUARANTINE else set())
     scored = {n: score_component(
                   (components_current.get(n, 0.0) if n not in absent
                    else 0.0),
                   baselines.get(n))
-              for n in COMPONENT_LABELS}
+              for n in applicable}
     any_calibrating = any(s.get("calibrating") for s in scored.values())
-    # Count components with current=0.0 (absent inputs treated as zero).
-    # If a majority are zero AND the baseline is also near-zero, the ROUTINE
-    # read reflects missing data coverage — not a genuinely quiet market.
+    # Count APPLICABLE components reading 0.0 (missing/absent inputs treated as zero).
+    # If a majority of APPLICABLE inputs are zero AND the baseline is also near-zero, the
+    # ROUTINE read reflects missing data coverage — not a genuinely quiet market.
     zero_inputs = sum(1 for s in scored.values() if s.get("current", -1) == 0.0)
+    n_applicable = len(scored) or 1
 
     def _weighted(weights: dict) -> float:
-        if absent:
-            # Renormalize over present components so absent ones don't drag the
-            # weighted sum down artificially. Preserves the relative emphasis of
-            # the present inputs.
-            present = {c: w for c, w in weights.items() if c not in absent}
-            total_w = sum(present.values())
-            if not total_w:
-                return 0.0
-            return sum(present[c] * scored[c]["score"] / total_w for c in present) * 100
-        return sum(weights[c] * scored[c]["score"] for c in weights) * 100
+        # Renormalize over present (applicable, non-absent) components so N/A or missing
+        # ones don't drag the weighted sum down. With no N/A and quarantine off, present
+        # == weights and total_w == 1.0, so this is identical to the plain weighted sum.
+        present = {c: w for c, w in weights.items() if c in scored and c not in absent}
+        total_w = sum(present.values())
+        if not total_w:
+            return 0.0
+        return sum(present[c] * scored[c]["score"] / total_w for c in present) * 100
 
     detection  = round(_weighted(DETECTION_WEIGHTS), 1)
     confidence = round(_weighted(CONFIDENCE_WEIGHTS), 1)
     gap = round(detection - confidence, 1)
-    interp = _interpret_gap(detection, confidence, gap, any_calibrating, zero_inputs, len(scored))
+    interp = _interpret_gap(detection, confidence, gap, any_calibrating, zero_inputs, n_applicable)
 
     return {
         "item_key": item_key, "item_name": item_name,
@@ -201,16 +221,24 @@ def compute_market_signal(item_key: str, item_name: str,
         # absent (FINRA short-interest / WhaleWisdom 13F not populated), a "30/ROUTINE" read
         # reflects MISSING DATA, not a confirmed quiet market. The UI shows an honest
         # "insufficient coverage" caveat instead of a misleading flat score.
-        "data_coverage": ("insufficient" if zero_inputs > len(scored) // 2 else
+        "data_coverage": ("insufficient" if zero_inputs > n_applicable // 2 else
                           "partial" if zero_inputs > 0 else "full"),
-        "absent_inputs": zero_inputs, "total_inputs": len(scored),
+        "absent_inputs": zero_inputs, "total_inputs": n_applicable,
+        # Lane = what data CAN exist for this instrument (covered / halted_microcap /
+        # macro_theme). na_components are the structurally-inapplicable inputs excluded
+        # from BOTH the score and the coverage denominator for this lane.
+        "lane": lane, "lane_label": LANE_LABELS.get(lane, lane),
+        "na_components": sorted(COMPONENT_LABELS[c] for c in na),
         "components": {
-            COMPONENT_LABELS[c]: {
+            COMPONENT_LABELS[c]: ({
                 "score": round(scored[c]["score"] * 100, 1),
                 "feeds": _feeds(c),
                 "baseline_relative": scored[c].get("baseline_relative", False),
                 "z": scored[c].get("z"),
-            } for c in COMPONENT_LABELS
+            } if c in scored else {
+                "score": None, "feeds": "n/a", "not_applicable": True,
+                "baseline_relative": False, "z": None,
+            }) for c in COMPONENT_LABELS
         },
         "section": "Market Signal",
         "disclaimer": "Measurement of market-signal state relative to this item's "
@@ -434,12 +462,14 @@ def get_market_baselines(item_key: str, lookback: int = 12,
 
 def apply_market_signal(item_key: str, item_name: str, components_current: dict,
                         record_this_cycle: bool = True, db_path: str = DB_PATH,
-                        conn=None) -> dict:
+                        conn=None, lane: str = "covered",
+                        na_components: Optional[set] = None) -> dict:
     """Full pipeline: record this cycle, load baselines, compute the dual score."""
     if record_this_cycle:
         record_market_cycle(item_key, components_current, db_path=db_path, conn=conn)
     baselines = get_market_baselines(item_key, db_path=db_path, conn=conn)
-    return compute_market_signal(item_key, item_name, components_current, baselines)
+    return compute_market_signal(item_key, item_name, components_current, baselines,
+                                 lane=lane, na_components=na_components)
 
 
 # ── Historical backfill (seed baselines from real history) ──────────
