@@ -39,7 +39,8 @@ COLLECTOR_EXPECTATIONS = {
     "newsapi_org":   {"max_gap_minutes": 420, "mode": "attention", "critical": False},
     "newsapi_ai":    {"max_gap_minutes": 420, "mode": "attention", "critical": False},
     "newsdata_io":   {"max_gap_minutes": 420, "mode": "attention", "critical": False},
-    "yahoo_finance": {"max_gap_minutes": 420, "mode": "attention", "critical": False},
+    # yahoo_finance REMOVED 2026-06-24 — RapidAPI 429/quota exhausted, 0 signals; collectors
+    # disabled (YAHOO_FINANCE_ENABLED=0). Re-add this row if the source is ever restored.
     # Social/open-network collectors (keyless) — niche early-chatter tier.
     "bluesky":       {"max_gap_minutes": 420, "mode": "attention", "critical": False},
     "lemmy":         {"max_gap_minutes": 420, "mode": "attention", "critical": False},

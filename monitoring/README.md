@@ -1,7 +1,8 @@
 # Now TrendIn — Engine Integrity Monitor
 
 `monitoring\integrity-check.ps1` runs nine automated checks against the live Heroku scoring engine
-(`https://nowtrendin-e62dcb9ecb69.herokuapp.com`) and prints a colour-coded PASS / FAIL / WARN / INFO
+(`https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com` — the v2 engine, the ONLY active one;
+the legacy `nowtrendin-e62dcb9ecb69` is frozen 1.0, do NOT QA it) and prints a colour-coded PASS / FAIL / WARN / INFO
 report to the console. Exit code is **1** if any check FAILs, **0** otherwise — making it safe to
 run from CI or a scheduled task.
 

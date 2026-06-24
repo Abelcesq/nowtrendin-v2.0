@@ -11,7 +11,9 @@
     Run: .\monitoring\integrity-check.ps1
 #>
 
-$BASE = "https://nowtrendin-e62dcb9ecb69.herokuapp.com"
+# v2 engine — the ONLY active engine (corrected 2026-06-24; was the frozen 1.0
+# nowtrendin-e62dcb9ecb69, which would QA the wrong/stale engine). Override with -Base.
+$BASE = "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com"
 $VALID_STAGES = @("BREAKOUT","STRONG","EMERGING","WATCHING","MONITORING","VIRAL","DECAY","WATCH")
 # Legacy anchor set the continuous formula should now exceed (at 4+ platforms):
 $LEGACY_ANCHORS = @(0,20,35,50,65,80,90,95,100)

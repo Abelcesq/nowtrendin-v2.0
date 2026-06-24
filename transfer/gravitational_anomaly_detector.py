@@ -1974,8 +1974,13 @@ def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
     print("  Collecting Hacker News...")
 
     try:
+        # Use /search_by_date, NOT /search: as of 2026-06 the /search endpoint returns 0
+        # hits for `points>50` numericFilters (verified live — `points>50` alone → 0 on
+        # /search but 5 on /search_by_date), which silently zeroed the HN collector. The
+        # by-date endpoint applies the same filters AND surfaces the newest high-signal
+        # stories — better for an early-detection feed anyway.
         resp = requests.get(
-            "https://hn.algolia.com/api/v1/search",
+            "https://hn.algolia.com/api/v1/search_by_date",
             params={
                 "tags": "story",
                 "numericFilters": f"points>50,created_at_i>{cutoff_ts}",
@@ -1984,6 +1989,7 @@ def collect_hackernews(conn: sqlite3.Connection, hours_back: int = 24) -> int:
             timeout=10,
         )
         if resp.status_code != 200:
+            print(f"  Hacker News: API HTTP {resp.status_code} — 0 signals this cycle")
             return 0
 
         for hit in resp.json().get("hits", []):
@@ -2750,6 +2756,11 @@ def collect_rss_news(conn) -> int:
 def collect_yahoo_finance_news(conn) -> int:
     """Yahoo Finance news (RapidAPI, yahoo-finance166) → mainstream-tier genuine
     contributor. Finance-focused headlines complement the general news feeds."""
+    # DISABLED 2026-06-24 — yahoo-finance166 (RapidAPI) returns HTTP 429 every cycle
+    # (quota exhausted), 0 signals. Removed from production. Flip YAHOO_FINANCE_ENABLED=1
+    # to re-enable if/when the RapidAPI quota is restored.
+    if os.getenv("YAHOO_FINANCE_ENABLED", "0") != "1":
+        return 0
     key = os.getenv("RAPIDAPI_YF_KEY", "")
     if not key:
         return 0

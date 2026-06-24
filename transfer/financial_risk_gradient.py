@@ -1944,6 +1944,10 @@ def collect_yahoo_finance_risk_signals(conn) -> int:
     """Write RISK signals (financial_news) for Yahoo Finance headlines mentioning
     a watchlist company/ticker. Same pattern as broadcast/creator risk signals —
     diffusion_stage=4 (mainstream financial press, ahead of broadcast/retail)."""
+    # DISABLED 2026-06-24 — RapidAPI 429/quota exhausted; 0 signals every cycle.
+    # Flip YAHOO_FINANCE_ENABLED=1 to re-enable if the quota is restored.
+    if os.getenv("YAHOO_FINANCE_ENABLED", "0") != "1":
+        return 0
     now = datetime.now(timezone.utc).isoformat()
     stored = 0
     pairs = [(disp, tkr) for disp, tkr in WATCHLIST_TICKERS.items()] if "WATCHLIST_TICKERS" in globals() else []
