@@ -54,6 +54,20 @@ free + durable, but transaction details are in per-filing PDFs (parsing effort, 
 project did before its bucket went private). Recommend a held-out collector against the official
 sources (or QuiverQuant's paid API) — verify + backtest before integration.
 
+**RESOLVED via QuiverQuant API (founder provided a token).** Gate-4 finding: the structured data
+the HTML page hid is at `api.quiverquant.com` — `/beta/live/congresstrading` returns clean JSON
+(works token-less), `/beta/bulk/congresstrading` (Bearer token) = **113k+ rows** current to the day,
+20 fields incl. ticker/transaction/size/party/chamber/excess_return. **All 5 §16 gates PASS.** Built
+**HELD-OUT** `transfer/quiver_research.py` (`congress_recent()` → recent trades + per-ticker
+concentration) + **`GET /research/congress`** (internal-key, the review surface). Token stored as the
+Heroku env var **QUIVER_API_KEY** (set 2026-06-24, v147; NOT committed). Verified live: 1000 recent
+trades, 401 tickers; members net-selling mega-cap tech (AAPL −7, NVDA −7), net-buying LLY +4 / AMZN +2;
+Pelosi buying UBER+INTC. ENGINE = Market Signal **Dark Positioning** (alongside SEC 13F). **NOT wired
+into positioning_concentration** — review `/research/congress`, then backtest (the `/bulk` feed is the
+historical input) before integration. NOTE: QuiverQuant also exposes insider/lobbying/gov-contracts/WSB
+datasets — each would need its own gate review. Security: token was shared in chat → rotate if the
+transcript is ever exposed.
+
 ---
 
 ## Session 2026-06-24b — Founder 10-day QA + source cleanup + new-source review
