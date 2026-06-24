@@ -3,7 +3,60 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-23c_
+_Last updated: 2026-06-23f_
+
+---
+
+## Session 2026-06-23f — Catch-all audit closeout (items #1–#3), all display/forward-only
+
+Completed the three open catch-all audit items. **Every change is display-only,
+forward-only, or monitoring-only — no `velocity_scores` deleted (90-day retention),
+no scoring input altered, no circularity.** Engine deployed v133→v138.
+
+### #1 — Situation→category routing (drains the catch-all by CONTEXT, not bare word)
+- **`situation_clustering.category_map_from_db()`** — builds a `{topic_key: category}`
+  override from the held-out clustering: each situation's SPECIFIC category (skipping
+  news/general) applied to its members, largest-situation-wins. A context-dependent
+  entity is routed by its SITUATION (hormuz in an Iran situation → current_events) —
+  what the bare-word lexicon structurally cannot do.
+- Engine: `_SITUATION_CAT` cache + `_situation_category_loop` daemon (30 min,
+  `SITUATION_CATEGORY_ENABLED`) + **`_category_for(topic_key, display)`** applied at the
+  SERVE sites only (detail, list feeds, mobile feed, category-chip counts). **NOT** at the
+  scoring method or the corroboration-floor gate `_passes_corroboration` — keeps the
+  situation layer (built FROM scored signals) out of scoring ADMISSION → no circularity.
+- `/audit/topics` now reports raw vs routed catch-all %. **Honest measured drain: ~0.6 pts
+  (≈25 topics).** Small because the catch-all is **100% "news"** (the lexicon FALLBACK) and
+  is dominated by genuinely-news topics + the long tail that forms no situation; forcing the
+  rest into specific buckets would be label inflation (integrity-forbidden). The router
+  rescues only the corroborated context-entities, and scales as more situations form.
+
+### #2 — Corroboration-floor "leak" was a MEASUREMENT ARTIFACT, not a floor failure
+- The Catch-All Auditor reported **10,488 single-source leaks / "floor disabled"**. Root
+  cause: it checked corroboration over the last 72 h of `topic_signals` but compared it to
+  the LATEST score of EVERY topic — dormant topics' signals had aged out (false nsrc=0) —
+  AND it omitted two of the floor's own exemptions (high-magnitude, window alignment).
+- Rebuilt the metric to replicate `_passes_corroboration` EXACTLY (expert-tier + tracked +
+  `MAX(engagement_raw) ≥ HIGH_MAGNITUDE_ENG`) and to align windows (corroboration widened to
+  score 72 h + recent 24 h = 96 h ⊇ every recent topic's scoring window). Split into
+  `single_source_catchall_leak` (current, scored ≤24 h) vs `dormant_catchall_pile` (aged,
+  retained). **TRUE current leak = 5 (≈ 0); dormant pile ≈ 8,500. The floor is healthy.**
+  The "WORSENING +230" in the old summary was stale — live trend is IMPROVING/STABLE.
+
+### #3 — 539 tracked detections stuck in catch-all — fixed at the source, 3 ways
+- **Lexicon:** unambiguous tech terms (javascript, typescript, wwdc, chatbot/s, webassembly)
+  added to `topic_categories` technology → reclassify out of catch-all (verified gone from the
+  tracked-in-catchall examples). Bare geographies (britain, canada) deliberately NOT added —
+  routed by the situation layer (#1).
+- **`record_detection` sink-hardened** with the shared quality gate (forward-only, fail-open):
+  fragment non-topics ("sunday afternoon", "york for months") can no longer be TRACKED.
+- **`sweep_pending`** resolves legacy non-quality pendings as `excluded_nonquality`
+  (non-deleting, auditable) instead of letting them time out as FALSE_POSITIVE — a non-topic
+  is not a failed prediction, so this protects the Accuracy Ledger's honest denominator (the
+  moat). Auditor's misclassified count now skips quarantined rows.
+
+### Next
+- Tier 1 Market Signal triage (split covered instruments vs halted/micro-cap lane; drop
+  macro themes from positioning_concentration) — researched, not yet built.
 
 ---
 
