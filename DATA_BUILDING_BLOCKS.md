@@ -140,10 +140,14 @@ date-semantic write).
 
 **INVARIANT (B3a):** every date-semantic write passes through `gate_date()`; an
 unparseable non-empty value is QUARANTINED to `format_review_queue` (human review),
-never guessed. The model governs SORT/MATCH only — it removes NO scoring input
-(Gradient components + Market-Risk leverage/positioning preserved). Forward-only:
-gates NEW writes, never deletes/rewrites existing rows (respects 90-day retention).
-**CHECK:** `format_review_queue` pending count (nightly audit surfaces it); spot-check
+never guessed. Before quarantining, `gate_date()` consults `format_rules` — a human
+decision saved via `resolve_review()` auto-applies to identical future inputs (the
+review loop, closed 2026-06-24). The model governs SORT/MATCH only — it removes NO
+scoring input (Gradient components + Market-Risk leverage/positioning preserved).
+Forward-only: gates NEW writes, never deletes/rewrites existing rows (respects 365-day
+retention). **CHECK:** `GET /quarantine/dates` lists the pending review queue (+
+candidates); `POST /quarantine/dates/resolve {id, chosen_value}` applies a human
+decision + learns a rule. Nightly audit surfaces the pending count; spot-check
 `risk_signals`/`market_signal_history` rows carry `signal_date`+`signal_time`.
 **FAILURE:** any raw `[:10]` date slice reintroduced; corrupt/guessed date in a
 date-semantic column; ledger match using a stale (non-same-surge) breakout date.

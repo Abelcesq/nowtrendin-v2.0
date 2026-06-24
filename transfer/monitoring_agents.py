@@ -763,7 +763,7 @@ def catchall_auditor(conn) -> dict:
         # has had its corroborating signals age out → a low nsrc there is a 72h-window
         # artifact, NOT a floor failure. The floor is enforced at SCORING time
         # (forward-only); old single-source rows are the pre-floor pile we RETAIN under
-        # the 90-day rule (it shrinks as rows age out). Only a topic scored WITHIN the
+        # the 365-day rule (it shrinks as rows age out). Only a topic scored WITHIN the
         # 72h window that still lacks ≥min_src distinct sources is a real current leak —
         # AND must not be one the floor legitimately exempts (expert tier, tracked call,
         # or HIGH-MAGNITUDE mass attention). Replicate _passes_corroboration exactly.

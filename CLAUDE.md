@@ -228,11 +228,13 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
 ## 13. DATA-QUALITY + MONITORING (the engine guardrails)
 
 > **DATA RETENTION RULE (hard — do not override):** All `velocity_scores` rows
-> are retained for **90 days**. Never delete scored data within this window —
-> historical scores are required for trend tracking, calibration, and accuracy-
-> ledger validation. Only rows older than 90 days are removed by
-> `_prune_velocity_scores()`. Do NOT change this to a count-based prune; count-
-> based deletes valid history for frequently-scored topics. Do NOT add any
+> are retained for **365 days** (canonical; extended from 90 on 2026-06-24, founder
+> decision — a full year of history strengthens trend tracking + the accuracy ledger).
+> Never delete scored data within this window — historical scores are required for
+> trend tracking, calibration, and accuracy-ledger validation. Only rows older than
+> 365 days are removed by `_prune_velocity_scores()` (default 365; env
+> `VELOCITY_RETENTION_DAYS`/`VELOCITY_KEEP_DAYS`). Do NOT change this to a count-based
+> prune; count-based deletes valid history for frequently-scored topics. Do NOT add any
 > function that deletes `velocity_scores` rows based on quality judgements
 > (e.g., corroboration level) — the floor is enforced at SCORING time so that
 > new bad data never enters; old data stays for the full retention window.
@@ -242,7 +244,7 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   exemptions (expert-tier signal, high magnitude, ledger/pending). De-congests the
   catch-all without losing early signals. NOT a raw post-volume floor (that would
   break the before-it-arrives thesis). Floor applied at SCORING time only (forward-
-  only); historical rows within the 90-day window are never retroactively deleted.
+  only); historical rows within the 365-day window are never retroactively deleted.
 - **Catch-all floor trend monitoring**: `catchall_auditor()` writes a row to
   `catchall_floor_log` table each run (total_scored, catchall_count, catchall_pct,
   single_source_leak, min_sources). Reads the last row to compute `floor_trend`
@@ -258,6 +260,16 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   rejected at scoring + pruned each cycle.
 - **Topic maturity** (NEW/EMERGING/ESTABLISHED) derived from the maintained
   `topic_lifecycle` table (cycles + age); ESTABLISHED topics discounted.
+- **Content category routing (display-only, no score impact, non-circular).** `'news'`
+  has NO lexicon — real news/geopolitics is `current_events`; `'news'` was ONLY the
+  classifier's no-match fallback, so the 77% "news" catch-all was 77% UNCLASSIFIED,
+  mislabeled. Fallback now → honest **`'general'`**. Serve-time category =
+  `_category_for(topic_key, display)`, layered strongest-first: **situation (event
+  co-occurrence) → context (the topic's own `raw_signals.title` headlines, 0.35 conf
+  floor) → bare lexicon → general**. Both override maps are background-refreshed,
+  held-out (built FROM scored signals, NEVER fed back into the score). Live drain:
+  catch-all 77%→56%. NEVER wire `_category_for` into scoring admission
+  (`_passes_corroboration`) or the score — that would be circular.
 - **Stage from Detection** (`stageOf`) everywhere; `Now TrendIn` view ranks by the
   proprietary **N** (`nowtrendin_score`), `All Signals` by Detection.
 - **9 monitoring agents** (`monitoring_agents.py` → `/monitor` `run_all`): Source Watchdog,
@@ -281,6 +293,11 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   `canonical_date_of`) + `ingestion_gate.py` (`gate_date()` — the CONDITION-PRECEDENT
   filter run before any date-semantic write). An unparseable, non-empty value is
   QUARANTINED to `format_review_queue` for human review — never a corrupt or guessed date.
+- **Quarantine REVIEW LOOP (closed 2026-06-24):** before quarantining, `gate_date()`
+  consults `format_rules` — a human decision saved via `resolve_review()` auto-applies to
+  identical future inputs. Review via `GET /quarantine/dates` (pending + candidate
+  normalizations); resolve via `POST /quarantine/dates/resolve {id, chosen_value}` (validated
+  canonical; learns a rule). Flag-never-force — nothing changes until a human posts.
 - Date-semantic columns: `accuracy_ledger.detection_date/breakout_date`,
   `pending_detections.detection_date`, `risk_signals.signal_date` (+ `source_time`,
   `signal_time`), `market_signal_history.signal_date` (+ `signal_time`),
@@ -296,7 +313,7 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   NO scoring input — all Gradient-Score components and Market-Risk inputs (incl.
   leverage/positioning) are preserved exactly. Operational `*_at` timestamps keep their
   full instant via `to_iso_dt`. Forward-only: it gates NEW writes; it never deletes or
-  rewrites existing rows (respects the 90-day retention + no-quality-delete rules).
+  rewrites existing rows (respects the 365-day retention + no-quality-delete rules).
 
 ## 15. SOURCE ROSTER + M/D PROVENANCE DIRECTION
 
@@ -329,4 +346,4 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
    Feeds validated (production UA). Adversarial integrity verify + backtest still required
    before deploy.
 
-*Last updated: 2026-06-23 — Canonical Date Auditor (Agent 16, `/monitor/datecanon`): audits the DATA by date-semantic column + live-schema `*_date` discovery, so §14 compliance is verified for ALL sources and new sources are auto-covered (closes the "gate_date is opt-in, bypasses invisible" gap that let two ledger `[:10]` slices survive — now refixed via `to_iso_date`). Prewarm Agent (15, read-path superset-cache + 100-at-a-time pagination on all list feeds). Accuracy-Ledger sweep backlog fixes (rotate oldest-checked-first + free timeouts + own cadence). Prior: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor); New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN.*
+*Last updated: 2026-06-24 — Retention extended to **365 days** canonical (§13; founder decision — ⚠ ~4× storage, exceeds the 10GB plan, needs a larger Postgres tier as the tail fills). **Overbroad "news" fixed** (§13): the no-match fallback was 'news' but 'news' has no lexicon — now → honest 'general'; added headline-context classification (`_category_for` layers situation→context→lexicon→general), live catch-all 77%→56%, display-only/non-circular. **Quarantine review loop closed** (§14): `gate_date` consults `format_rules` + new `GET/POST /quarantine/dates[/resolve]`. Market Signal **coverage lanes** (Tier 1) covered/halted-microcap/macro (macro themes drop positioning+fundamentals as N/A). Guardian + Reddit keys deliberately deferred (proceeding without). Fixed `/categories` 500 (missing topic_key in SELECT, regression since v133). Prior: 2026-06-23 — Canonical Date Auditor (Agent 16, `/monitor/datecanon`): audits the DATA by date-semantic column + live-schema `*_date` discovery, so §14 compliance is verified for ALL sources and new sources are auto-covered (closes the "gate_date is opt-in, bypasses invisible" gap that let two ledger `[:10]` slices survive — now refixed via `to_iso_date`). Prewarm Agent (15, read-path superset-cache + 100-at-a-time pagination on all list feeds). Accuracy-Ledger sweep backlog fixes (rotate oldest-checked-first + free timeouts + own cadence). Prior: 2026-06-22 — canonical date/time model (signal_date primary + source_time/signal_time secondary, ingestion_gate condition-precedent, same-surge floor); New Yorker + Nasdaq Trade Halts sources; M/D provenance reweighting IN DESIGN.*

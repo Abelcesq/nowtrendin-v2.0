@@ -746,14 +746,15 @@ def _prune_anomaly_log(keep_days: int = 30) -> int:
         conn.close()
 
 
-def _prune_velocity_scores(retention_days: int = 90) -> int:
-    """Delete velocity_scores rows older than retention_days (default 90).
+def _prune_velocity_scores(retention_days: int = 365) -> int:
+    """Delete velocity_scores rows older than retention_days (canonical 365).
 
-    DATA RETENTION RULE — never delete scores within the 90-day window.
-    Historical scores are required for tracking trend progression, accuracy-
-    ledger validation, and calibration. Only rows beyond the retention window
-    are removed. Do NOT change this to a count-based prune; count-based deletes
-    valid history whenever a topic is scored frequently.
+    DATA RETENTION RULE — never delete scores within the 365-day window (extended
+    from 90 on 2026-06-24, founder decision). A full year of historical scores is
+    required for tracking trend progression, accuracy-ledger validation, and
+    calibration. Only rows beyond the retention window are removed. Do NOT change
+    this to a count-based prune; count-based deletes valid history whenever a topic
+    is scored frequently.
     """
     conn = get_db(DB_PATH)
     try:
@@ -3463,9 +3464,9 @@ def run_retention() -> None:
     reset membership credits (query + AI-grade) to each tier's allowance."""
     try:
         archive_scores_snapshot(DB_PATH)
-        # 90-day per-cycle retention (matches the daily VELOCITY_KEEP_DAYS=90) —
-        # was a hardcoded 30 that would have silently overridden the 90d intent.
-        prune_velocity_scores(DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "90")))
+        # 365-day per-cycle retention (canonical, founder decision 2026-06-24; matches
+        # VELOCITY_KEEP_DAYS) — was a hardcoded 30 that would have silently overridden it.
+        prune_velocity_scores(DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "365")))
         prune_archive(DB_PATH, days=395)
         # Reset monthly membership credits via the backend (internal-key gated).
         reset_url = os.getenv("CREDITS_RESET_URL")
@@ -4941,7 +4942,7 @@ def start_scheduler():
                 except Exception as _lre:
                     print(f"[scheduler] ledger record error: {_lre}")
                 try:
-                    _prune_velocity_scores(int(os.getenv("VELOCITY_RETENTION_DAYS", "90")))
+                    _prune_velocity_scores(int(os.getenv("VELOCITY_RETENTION_DAYS", "365")))
                     _prune_anomaly_log(int(os.getenv("KEEP_ANOMALY_DAYS", "30")))
                 except Exception as _pe:
                     print(f"[scheduler] prune error: {_pe}")
@@ -5177,12 +5178,15 @@ def start_scheduler():
             try:
                 _prune_signal_tables()
                 # velocity_scores is the largest table on the 1GB plan: per-cycle
-                # rows are wide (many TEXT cols). On the 10GB Essential-1 plan we
-                # keep 90 days of per-cycle scores for backtesting/calibration
-                # (~5.4GB steady-state); weekly VACUUM FULL keeps the file true-
-                # sized. pull_history still carries the durable 12-month record.
+                # rows are wide (many TEXT cols). We now keep 365 days of per-cycle
+                # scores (canonical, founder decision 2026-06-24) for backtesting/
+                # calibration. ⚠ STORAGE: ~5.4GB at 90d → ~22GB at 365d, which EXCEEDS
+                # the 10GB Essential-1 plan — a larger Postgres plan (or a
+                # downsample-after-90d policy) is required before the tail fills in.
+                # Weekly VACUUM FULL keeps the file true-sized; pull_history carries the
+                # durable 12-month record.
                 prune_velocity_scores(
-                    DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "90")))
+                    DB_PATH, days=int(os.getenv("VELOCITY_KEEP_DAYS", "365")))
             except Exception as _sre:
                 print(f"[scheduler] signal retention error: {_sre}")
         _sched.add_job(_scheduled_signal_retention, "cron", hour=4, minute=10,
@@ -6143,7 +6147,7 @@ def situations_search(q: str, window_hours: int = 120, min_doc_freq: int = 5,
 @app.get("/audit/topics", dependencies=[Depends(_require_internal)])
 def audit_topics(days: int = 7, max_topics: int = 9000):
     """READ-ONLY audit of the current scored-topic universe (latest score per topic within
-    `days`). Writes NOTHING, deletes NOTHING (respects the 90-day retention rule). Reports:
+    `days`). Writes NOTHING, deletes NOTHING (respects the 365-day retention rule). Reports:
     quality (junk vs real via the shared gate), category distribution + catch-all %, and
     duplicate-spelling groups — so a human can decide the compliant cleanups (serve-filter is
     already live; this surfaces what to consolidate / what lexicon terms to add)."""
@@ -6190,7 +6194,7 @@ def audit_topics(days: int = 7, max_topics: int = 9000):
     pct = lambda n: (round(100 * n / total, 1) if total else 0.0)
     return {
         "status": "ok", "held_out": True, "read_only": True,
-        "note": "audit only — no rows written or deleted (90-day retention rule respected)",
+        "note": "audit only — no rows written or deleted (365-day retention rule respected)",
         "window_days": days, "total_topics_scored": total,
         "quality": {"real": real, "junk": total - real, "junk_pct": pct(total - real),
                     "junk_examples": junk},
@@ -7544,7 +7548,7 @@ def maint_prune(days: int = Query(None, ge=4), vacuum: int = Query(0),
     recent cycles only — so 14d of per-cycle detail is ample."""
     result = {"pruned": _prune_signal_tables(days)}
     try:
-        _vd = int(vel_days or os.getenv("VELOCITY_KEEP_DAYS", "90"))
+        _vd = int(vel_days or os.getenv("VELOCITY_KEEP_DAYS", "365"))
         result["velocity_scores"] = prune_velocity_scores(DB_PATH, days=_vd)
     except Exception as e:
         result["velocity_scores"] = f"error: {e}"

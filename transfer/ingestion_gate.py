@@ -13,7 +13,7 @@ gate is the single enforcement point for the canonical-date rule:
 
 The nightly audit surfaces pending reviews (pending_reviews) as an alert — the human
 escalation channel the operator answers. Forward-only: it gates NEW writes and never
-deletes or rewrites existing rows (respects the 90-day retention + no-quality-delete
+deletes or rewrites existing rows (respects the 365-day retention + no-quality-delete
 rules). It changes ONLY the date string — never a score, weight, component, or which
 data feeds a formula.
 
