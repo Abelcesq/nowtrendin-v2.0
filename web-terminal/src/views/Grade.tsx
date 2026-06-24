@@ -65,36 +65,55 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
   const gradedName = result.topic_display || result.topic || topic || (result.topic_key || '').replace(/_/g, ' ')
   return (
     <div className="grade-result">
-      {/* Graded topic name — so the user always sees WHAT was graded */}
-      <div className="g-graded-title" style={{ fontSize: 22, fontWeight: 800, color: MC.text, marginBottom: 2, textTransform: 'capitalize' }}>{gradedName}</div>
-      <div className="disc" style={{ marginTop: 0, marginBottom: 12 }}>
-        Graded topic · three independent reads below — Attention (Gradient), Market Signal, and on-platform demand (N)
+      {/* Graded topic name + how it was graded — so the user always sees WHAT was
+          graded and understands the (up to) three independent reads below. */}
+      <div className="g-graded-title" style={{ fontSize: 22, fontWeight: 800, color: MC.text, marginBottom: 4, textTransform: 'capitalize' }}>{gradedName}</div>
+      <div className="g-grade-explain" style={{ fontSize: 12.5, lineHeight: 1.5, color: MC.textSec, background: '#F7F8FA', border: '1px solid #E4E7EC', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+        <div style={{ marginBottom: 6 }}>
+          <b style={{ color: MC.text }}>How this topic is graded.</b>{' '}
+          {measured
+            ? <>This topic is already in NowTrendIn’s live data pool, so the scores below are the engine’s <b>MEASURED</b> read — no AI estimate, no grade credit charged.</>
+            : <>This topic isn’t in the pool yet, so the AI researched the open web and <b>PROPOSED</b> a score from the evidence (1 grade credit).</>}
+        </div>
+        <div style={{ marginBottom: 4 }}>You may see up to three <b>independent reads</b> — they answer different questions, so they can legitimately differ:</div>
+        <div style={{ paddingLeft: 2 }}>
+          <div>• <b style={{ color: MC.detection }}>Attention (Gradient Score)</b> — how much human attention is moving toward this, and how early. <i>The headline read.</i></div>
+          <div>• <b style={{ color: MC.amber }}>Market Signal</b> (companies only) — whether market positioning is unusual vs this stock’s <i>own</i> baseline. Not attention.</div>
+          <div>• <b style={{ color: MC.orange }}>N · Now Trending</b> — how often NowTrendIn users ask about it. A separate demand signal, never folded into the Gradient.</div>
+        </div>
       </div>
       {/* Market read first (companies) */}
       {ms && (() => {
         const tc = marketTierColor(ms.tier)
         return (
           <div className="g-card" style={{ borderColor: tc + '44' }}>
-            <div className="g-kicker" style={{ color: MC.amber }}>Market Signal · measured
-              <span className="g-tier" style={{ background: tc + '1A', color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</span></div>
-            <div className="g-rings">
+            <div className="g-kicker" style={{ color: MC.amber }}>Market Signal · market positioning
+              <span className="g-tier" style={{ background: tc + '1A', color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.data_coverage === 'insufficient' ? 'LIMITED DATA' : ms.tier}</span></div>
+            <div className="g-rings" style={ms.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
               <div className="g-ring">{ring(ms.detection, MC.detection)}<div className="g-rl">DETECTION</div><div className="g-rf">analysts + positioning</div></div>
               <div className="g-ring">{ring(ms.confidence, MC.confidence)}<div className="g-rl">CONFIDENCE</div><div className="g-rf">fundamentals + price</div></div>
             </div>
             {ms.leverage_health != null && <div className="g-lev">Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</div>}
-            {ms.interpretation && <div className="narr">{ms.interpretation}</div>}
-            <div className="disc">Measured MARKET read — same as the Market section. The AI estimate below is the separate ATTENTION read.</div>
+            {ms.data_coverage === 'insufficient' ? (
+              <div className="narr" style={{ background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
+                ⚠ <b>Insufficient positioning data.</b> Smart-money &amp; short-interest sources (FINRA short interest / 13F holdings) aren’t populated for this instrument yet{ms.absent_inputs != null ? ` (${ms.absent_inputs}/${ms.total_inputs} inputs absent)` : ''}, so this sits near baseline. Treat as limited coverage — <i>not</i> a confirmed quiet market.
+              </div>
+            ) : (ms.interpretation && <div className="narr">{ms.interpretation}</div>)}
+            <div className="disc">Measured MARKET read — is positioning unusual vs this stock’s <i>own</i> baseline? Same data as the Market section. The Attention/Gradient read below is a separate question.</div>
           </div>
         )
       })()}
 
       {/* Gradient read — MEASURED (from data pool) or AI-PROPOSED */}
       <div className="g-card">
-        <div className="g-kicker">
-          {measured ? 'Gradient Score · measured' : (ms ? 'Attention estimate · AI' : 'Proposed · AI estimate')}
+        <div className="g-kicker" style={{ color: MC.detection }}>
+          {measured ? 'Attention · Gradient Score · measured' : 'Attention · Gradient Score · AI estimate'}
           <span className="g-tier" style={{ background: (measured ? MC.confidence : GOLD) + '1A', color: measured ? MC.confidence : GOLD }}>
             {measured ? 'IN DATA POOL' : 'AI ESTIMATE'}</span>
           <span className="g-tier" style={{ background: scol + '1A', color: scol }}>{result.stage}</span>
+        </div>
+        <div className="disc" style={{ marginTop: -2, marginBottom: 8 }}>
+          How much human attention is moving toward this topic — <b style={{ color: MC.detection }}>Detection</b> = how early/strong, <b style={{ color: MC.confidence }}>Confidence</b> = how broadly confirmed.
         </div>
         {result.note && <div className="disc" style={{ marginTop: -4, marginBottom: 8 }}>{result.note}</div>}
         <div className="g-rings">

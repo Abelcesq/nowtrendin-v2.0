@@ -197,6 +197,13 @@ def compute_market_signal(item_key: str, item_name: str,
         "detection_fp": DETECTION_FP, "confidence_fp": CONFIDENCE_FP,
         "gap_state": interp["state"], "interpretation": interp["text"],
         "calibrating": any_calibrating,
+        # Display-only coverage flag (NOT a score change): when most positioning inputs are
+        # absent (FINRA short-interest / WhaleWisdom 13F not populated), a "30/ROUTINE" read
+        # reflects MISSING DATA, not a confirmed quiet market. The UI shows an honest
+        # "insufficient coverage" caveat instead of a misleading flat score.
+        "data_coverage": ("insufficient" if zero_inputs > len(scored) // 2 else
+                          "partial" if zero_inputs > 0 else "full"),
+        "absent_inputs": zero_inputs, "total_inputs": len(scored),
         "components": {
             COMPONENT_LABELS[c]: {
                 "score": round(scored[c]["score"] * 100, 1),
