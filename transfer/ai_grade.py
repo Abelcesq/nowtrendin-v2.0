@@ -40,6 +40,11 @@ ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY", "")
 FIRECRAWL_API_KEY   = os.getenv("FIRECRAWL_API_KEY", "")
 PPLX_MODEL   = os.getenv("AI_GRADE_PPLX_MODEL", "sonar")
 CLAUDE_MODEL = os.getenv("AI_GRADE_CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
+# Resilience: when Perplexity (the cheap web-research primary) is unavailable/unauthorized,
+# fall back to Claude for the topic explainer so the AI Context never goes fully dark.
+# Default ON; the engine's monthly $20 AI budget cap still bounds spend. Set to "0" to
+# force Perplexity-only (e.g. to conserve budget once the Perplexity key is renewed).
+EXPLAINER_CLAUDE_FALLBACK = os.getenv("EXPLAINER_CLAUDE_FALLBACK", "1") == "1"
 
 
 def is_available() -> bool:
@@ -186,39 +191,87 @@ def explain_topic(topic: str, context: str = "") -> dict:
     source platforms where this term is currently appearing), the explainer is
     SOURCE-AWARE: it defines the specific trend driving attention right now rather
     than a generic dictionary definition of the bare word — so "japan" surfacing
-    from World-Cup blog posts is explained as the team's run, not the country."""
-    if not PERPLEXITY_API_KEY:
-        return {"available": False}
+    from World-Cup blog posts is explained as the team's run, not the country.
+
+    PRIMARY = Perplexity (web-research grounded, cheap). FALLBACK = Claude (grounded on
+    the provided context) when Perplexity is unavailable/unauthorized — so an expired
+    Perplexity key never blacks out the AI Context entirely."""
     ctx = (context or "").strip()
     prompt = (_EXPLAINER_CONTEXT_PROMPT.format(topic=topic, context=ctx[:2500])
               if ctx else _EXPLAINER_PROMPT.format(topic=topic))
+    # ── PRIMARY: Perplexity ──────────────────────────────────────────
+    if PERPLEXITY_API_KEY:
+        try:
+            _api("perplexity")
+            r = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+                         "Content-Type": "application/json"},
+                json={"model": PPLX_MODEL,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=45,
+            )
+            r.raise_for_status()
+            data = r.json()
+            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            citations = data.get("citations", []) or []
+            # Perplexity reports per-call cost in usage.cost.total_cost — capture it so
+            # the engine can meter monthly AI-definition spend against the budget.
+            cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
+            _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
+            parsed = _extract_json(content)
+            if parsed and parsed.get("short"):
+                return {"available": True, "short": str(parsed.get("short", ""))[:400],
+                        "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
+            # Model didn't return clean JSON — use the prose directly.
+            return {"available": True, "short": content[:240], "full": content,
+                    "citations": citations, "cost": _c}
+        except Exception as e:
+            print(f"[ai_grade] explain (perplexity) error for '{topic}': {e} — trying Claude fallback")
+            # fall through to the Claude fallback below
+    # ── FALLBACK: Claude (resilience when Perplexity is down/unauthorized) ──
+    if EXPLAINER_CLAUDE_FALLBACK and ANTHROPIC_API_KEY:
+        return _explain_via_claude(topic, prompt)
+    return {"available": False, "error": "no explainer provider available"}
+
+
+def _explain_via_claude(topic: str, prompt: str) -> dict:
+    """Claude fallback for the topic explainer — grounded ONLY on the context already in
+    `prompt` (the real headlines/posts). No web access, so it must not invent specifics."""
     try:
-        _api("perplexity")
+        _api("claude")
         r = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}",
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY,
+                     "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
-            json={"model": PPLX_MODEL,
-                  "messages": [{"role": "user", "content": prompt}]},
-            timeout=45,
+            json={
+                "model": CLAUDE_MODEL, "max_tokens": 700,
+                "system": ("You write concise, plain-English explainers of what a trending topic "
+                           "is and why it is drawing attention. Ground every specific claim ONLY "
+                           "in the coverage/context provided; if the context is thin, give a brief "
+                           "careful general definition and do NOT fabricate events, dates, or "
+                           "numbers. This is measurement of attention — never financial, "
+                           "investment, or legal advice. Return ONLY the requested JSON."),
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=60,
         )
         r.raise_for_status()
         data = r.json()
-        content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-        citations = data.get("citations", []) or []
-        # Perplexity reports per-call cost in usage.cost.total_cost — capture it so
-        # the engine can meter monthly AI-definition spend against the budget.
-        cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
-        _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
-        parsed = _extract_json(content)
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        usage = data.get("usage") or {}
+        cost = (usage.get("input_tokens", 0) / 1e6) * 3.0 + (usage.get("output_tokens", 0) / 1e6) * 15.0
+        _c = {"perplexity": 0.0, "anthropic": round(cost, 6), "total": round(cost, 6)}
+        parsed = _extract_json(text)
         if parsed and parsed.get("short"):
             return {"available": True, "short": str(parsed.get("short", ""))[:400],
-                    "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
-        # Fallback: model didn't return clean JSON — use the prose directly.
-        return {"available": True, "short": content[:240], "full": content,
-                "citations": citations, "cost": _c}
+                    "full": str(parsed.get("full", "")), "citations": [], "cost": _c,
+                    "provider": "claude"}
+        return {"available": True, "short": text[:240], "full": text,
+                "citations": [], "cost": _c, "provider": "claude"}
     except Exception as e:
-        print(f"[ai_grade] explain error for '{topic}': {e}")
+        print(f"[ai_grade] explain (claude fallback) error for '{topic}': {e}")
         return {"available": False, "error": str(e)}
 
 
