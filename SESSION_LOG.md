@@ -3,7 +3,42 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24e_
+_Last updated: 2026-06-24f_
+
+---
+
+## Session 2026-06-24f — Market Signal v2.0 phases 3-4: distinct market ledger (price-validated) + platform relabel
+
+**Founder correction (key):** Google Trends does NOT validate market signals — that's the ground
+truth for the ATTENTION ledger. A money signal is validated by **realized EOD price DIRECTION**.
+So the Money Gradient gets its **OWN** ledger, distinct from the Trends ledger.
+
+- **Phase 3 — distinct Market-Signal Accuracy Ledger** (`market_accuracy_ledger.py`, NEW). Ground
+  truth = realized EOD close direction (FMP `historical_close`). `record_market_detection`
+  (flow+intensity, dedup = one open per ticker+flow, intensity floor, neutral rejected) →
+  `sweep_market_pending` resolves **CONFIRMED** (dir match) / **NOT_CONFIRMED** (opposite) /
+  **NO_MOVE** (flat by 60d) + lead time. Honest denominator; NO LOOKAHEAD (post-detection closes
+  only). Wired flag-gated: record at the market scoring site, sweep on the ledger cadence, init at
+  startup, `GET /market/accuracy` + `POST /market/accuracy/sweep`. Attention ledger byte-identical.
+  Verified: synthetic verdicts correct; live `/market/accuracy` returns the honest report (empty,
+  flag off). **`FMP_API_KEY` set on the engine.**
+- **Fixed a pre-existing latent bug:** the startup aux-table `ALTER TABLE ... ADD COLUMN` aborted the
+  PG txn (DuplicateColumn) with no rollback → every later DDL ("current transaction is aborted") was
+  skipped, including the ledger inits. Rolled back the aborted txn so the block completes.
+- **Language purge (market/risk, LIVE):** served `risk_action` ("Act now"/"Begin hedging") →
+  factual movement statements; Risk Gradient header, FP labels, interpretation strings, OFR,
+  gravitational docstring all reframed to movement+ledger language.
+- **Phase 4 — platform relabel (payload-gated, inert until flag flips):** web terminal
+  (`MarketSignal.tsx`) + mobile (`risk/[key].tsx`) show **Money Movement / Market Confirmation** +
+  the factual **flow** badge (▲ inflow / ▼ outflow) + v2 disclaimer when the engine serves a v2
+  payload; v1 (Detection/Confidence) when off. Web deployed to gh-pages; desktop inherits the web
+  build; mobile ships on Metro reload. Build clean (web vite + mobile tsc).
+- **Remaining (recommended next):** a market-accuracy-ledger **VIEW** on each platform (show
+  `/market/accuracy` distinct from the Trends Accuracy Ledger view); minor Dashboard `MKT_RANK`
+  sort label; methodology-page mention of the Money Gradient + market ledger; then validate v2
+  output end-to-end with a small recorded sample and **flip `MARKET_SIGNAL_V2=1`**.
+- Out-of-scope finding (flagged): the ATTENTION engine has a served field named `what_to_do_action`
+  (values descriptive, not buy/sell) — the field *name* reads as advice; worth a later consistency pass.
 
 ---
 
