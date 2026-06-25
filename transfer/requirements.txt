@@ -13,6 +13,9 @@ nltk>=3.8.1
 # ── Blog collectors (blog_collectors.py) ──────────────────────────
 feedparser>=6.0.10         # RSS/Atom parsing for Medium, Ghost, and fallback feeds
 
+# ── HELD-OUT research (youtube_transcript.py — quality-analyst Dark Matter, not yet scored) ──
+youtube-transcript-api>=1.0.0   # unofficial caption fetch (Data API can't download others' captions)
+
 # ── Scoring & statistics ──────────────────────────────────────────
 numpy>=1.24.0
 scipy>=1.11.0
