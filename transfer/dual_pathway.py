@@ -151,6 +151,16 @@ def attention_magnitude(signals: list) -> dict:
 
 _EXPERT_TIERS = {"expert", "niche"}
 
+import re as _re
+
+
+def _title_sig(t: str) -> str:
+    """Signature for collapsing wire-syndication: lowercased alphanumerics, first 10 significant
+    words. AP/Reuters copy republished verbatim across many outlets maps to the SAME signature, so
+    it counts as ONE independent story — defeating the 'Belgium vs Iran' syndication inflation."""
+    t = _re.sub(r"[^a-z0-9 ]+", " ", (t or "").lower())
+    return " ".join(t.split()[:10])
+
 
 def mainstream_breadth(signals: list) -> dict:
     """
@@ -178,12 +188,19 @@ def mainstream_breadth(signals: list) -> dict:
     # a news platform). This is the founder's news-corroboration count: 1 = can be
     # niche, NEWS_MAINSTREAM_MIN+ = mainstream-confirmed. Quarantined/unverified
     # rows never reach here (they are tier 'unverified', excluded from `main`).
-    news_outlets = comms([s for s in main
-                          if (s.get("platform") or "").lower() in _NEWS_PLATFORMS])
+    news_rows = [s for s in main if (s.get("platform") or "").lower() in _NEWS_PLATFORMS]
+    news_outlets = comms(news_rows)
     n_news = len(news_outlets)
+
+    # Syndication-collapse (v2): count DISTINCT STORIES (normalized headlines) among the news
+    # rows — a wire story republished across N outlets is ONE independent corroboration, not N.
+    # Falls back to the raw outlet count when titles are absent (legacy signals w/o a joined title).
+    titled = [s for s in news_rows if s.get("title")]
+    n_news_independent = len({_title_sig(s.get("title")) for s in titled}) if titled else n_news
 
     factor = max(0.0, min(1.0, (n_main - 1) / (_BREADTH_FULL - 1)))
     return {"breadth": round(factor, 3),
+            "n_news_independent": n_news_independent,
             "n_platforms": n_main,          # mainstream COMMUNITY count (name kept for compat)
             "n_expert": n_expert,
             "n_news_outlets": n_news,
@@ -240,15 +257,18 @@ def blend(expert_detection: float, expert_overall: float,
     cur_n = br["n_platforms"]
 
     n_news = br.get("n_news_outlets", 0)
+    # v2 quorum uses INDEPENDENT stories (wire-syndication collapsed by headline), so 5 means 5
+    # distinct desks, not 5 outlets republishing one AP wire. Falls back to outlet count.
+    n_news_indep = br.get("n_news_independent", n_news)
     # Mainstream-CONFIRMED is an ABSOLUTE classification ("it has arrived"),
     # independent of baseline/magnitude: corroborated across many distinct
     # reputable outlets, OR broadly across mainstream communities. This is the
     # founder's "multiple news sources + other platforms = mainstream" rule.
     if MAINSTREAM_V2:
-        # v2: a real news QUORUM (≥5 distinct outlets) OR a genuine magnitude spike — NOT a
-        # single outlet and NOT the bare community-count branch (which flipped "footballer" on
-        # 1 outlet). This is the trigger-vs-corroborator rule: corroboration, not a lone source.
-        mainstream_confirmed = (n_news >= NEWS_QUORUM_V2) or (mag >= MAG_MAINSTREAM_V2)
+        # v2: a real news QUORUM (≥5 INDEPENDENT outlets) OR a genuine magnitude spike — NOT a
+        # single outlet, NOT wire-syndication, and NOT the bare community-count branch (which
+        # flipped "footballer" on 1 outlet). Trigger-vs-corroborator: corroboration, not a lone source.
+        mainstream_confirmed = (n_news_indep >= NEWS_QUORUM_V2) or (mag >= MAG_MAINSTREAM_V2)
     else:
         mainstream_confirmed = (n_news >= NEWS_MAINSTREAM_MIN) or (cur_n >= _BREADTH_FULL)
 
@@ -288,7 +308,7 @@ def blend(expert_detection: float, expert_overall: float,
     # detection rides the early/expert pathway — the credible source acts as an early signal,
     # not a denominator vote that suppresses it — until DISTINCT outlets actually corroborate
     # (≥ NEWS_QUORUM_V2) or attention magnitude spikes. (Magnitude path keeps FIFA mainstream.)
-    if MAINSTREAM_V2 and n_news < NEWS_QUORUM_V2 and mag < MAG_TRIGGER_FLOOR_V2:
+    if MAINSTREAM_V2 and n_news_indep < NEWS_QUORUM_V2 and mag < MAG_TRIGGER_FLOOR_V2:
         breadth_factor = 0.0
         tier_migration = False
 
@@ -342,6 +362,7 @@ def blend(expert_detection: float, expert_overall: float,
         "mainstream_confirmed": bool(mainstream_confirmed),
         "mainstream_model": "v2" if MAINSTREAM_V2 else "v1",
         "news_quorum": (NEWS_QUORUM_V2 if MAINSTREAM_V2 else NEWS_MAINSTREAM_MIN),
+        "news_outlets_independent": n_news_indep,
         "tier_migration": bool(tier_migration),
         "mainstream_detection": md,
         "expert_detection": round(expert_detection, 2),

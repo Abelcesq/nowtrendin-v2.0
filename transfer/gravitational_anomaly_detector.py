@@ -3543,11 +3543,16 @@ class GravitationalAnomalyDetector:
         cutoff = (
             datetime.now(timezone.utc) - timedelta(hours=hours)
         ).isoformat()
+        # LEFT JOIN raw_signals.title so dual_pathway can collapse wire-syndication
+        # (identical headlines across outlets) when counting the mainstream news quorum (v2).
+        # LEFT JOIN keeps every signal even if the raw row is gone (title → None, no collapse).
         rows = conn.execute("""
-            SELECT * FROM topic_signals
-            WHERE topic_key = ? AND extracted_at >= ?
-              AND platform_tier != 'unverified'
-            ORDER BY extracted_at ASC
+            SELECT ts.*, rs.title AS title
+            FROM topic_signals ts
+            LEFT JOIN raw_signals rs ON rs.id = ts.signal_id
+            WHERE ts.topic_key = ? AND ts.extracted_at >= ?
+              AND ts.platform_tier != 'unverified'
+            ORDER BY ts.extracted_at ASC
         """, (topic_key, cutoff)).fetchall()
         conn.close()
         return [dict(r) for r in rows]
@@ -6401,8 +6406,10 @@ def research_mainstream_v2(topics: str = "world cup,mexico world cup,footballer"
                 tk = _topic_key(disp)
             except Exception:
                 tk = disp.lower().replace(" ", "_")
-            q = ("SELECT platform, platform_tier, source_name, engagement_raw FROM topic_signals "
-                 "WHERE topic_key = ? AND extracted_at >= ? AND platform_tier != 'unverified'")
+            q = ("SELECT ts.platform, ts.platform_tier, ts.source_name, ts.engagement_raw, "
+                 "rs.title AS title FROM topic_signals ts "
+                 "LEFT JOIN raw_signals rs ON rs.id = ts.signal_id "
+                 "WHERE ts.topic_key = ? AND ts.extracted_at >= ? AND ts.platform_tier != 'unverified'")
             sig = [dict(r) for r in conn.execute(q, (tk, cutoff)).fetchall()]
             if not sig:
                 row = conn.execute("SELECT topic_key FROM velocity_scores WHERE LOWER(topic_display)=? "
@@ -6431,7 +6438,9 @@ def research_mainstream_v2(topics: str = "world cup,mexico world cup,footballer"
                            if (s.get("platform") or "").lower() in dp._NEWS_PLATFORMS})
             out.append({
                 "topic": disp, "topic_key": tk, "available": True,
-                "n_signals": len(sig), "n_news_outlets": len(news), "magnitude": b1["magnitude"],
+                "n_signals": len(sig), "n_news_outlets": len(news),
+                "n_news_independent": b2.get("news_outlets_independent"),   # wire-syndication collapsed
+                "magnitude": b1["magnitude"],
                 "news_outlets_sample": news[:15],
                 "v1": {"detection": b1["detection"], "pathway": b1["pathway"],
                        "w": b1["mainstream_ratio"], "mainstream_confirmed": b1["mainstream_confirmed"]},
