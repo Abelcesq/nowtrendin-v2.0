@@ -2215,6 +2215,69 @@ def _market_interpretation(tier: str, gap: float, det: float, conf: float) -> st
     return base
 
 
+def _market_analysis(detection, confidence, leverage_health=None, flow=None) -> str:
+    """A factual, REPRODUCIBLE analysis of the market read, derived ENTIRELY from our
+    own score data — Money Movement, Market Confirmation, and Leverage. Appended to the
+    market description ('AI-generated overview') so it explicitly walks the three score
+    dimensions. MEASUREMENT, not advice: it states what the scores + the filing flow show,
+    never a buy/sell or price call. Deterministic (no LLM) → auditable + can't drift.
+
+    leverage_health: 1-100 where HIGH = LOWER debt / healthier balance sheet."""
+    d = int(round(detection or 0))
+    c = int(round(confidence or 0))
+    gap = d - c
+    flow = (flow or "").lower().strip()
+    # 1) MONEY MOVEMENT (the early/informed read) + the factual flow direction.
+    flow_phrase = (" — money is moving IN (net inflow across Congress / insider / 13F filings)"
+                   if flow == "inflow" else
+                   " — money is moving OUT (net outflow across Congress / insider / 13F filings)"
+                   if flow == "outflow" else
+                   " — no clear net direction in the filings" if flow == "neutral" else "")
+    strength = ("strong" if d >= 70 else "moderate" if d >= 45 else "muted")
+    parts = [f"Money Movement {d}/100 ({strength} informed-money activity){flow_phrase}."]
+    # 2) MARKET CONFIRMATION (broad / economic).
+    conf_phrase = ("broad market + economic data confirm the move" if c >= 55 else
+                   "broad confirmation is partial" if c >= 35 else
+                   "the broad market has not yet confirmed")
+    parts.append(f"Market Confirmation {c}/100 — {conf_phrase}.")
+    # 3) LEVERAGE (a balance-sheet FACT, never a rating-as-advice).
+    if leverage_health is not None:
+        lh = int(round(leverage_health))
+        lev_phrase = ("low debt / healthy balance sheet" if lh >= 60 else
+                      "moderate debt load" if lh >= 40 else "elevated debt load")
+        parts.append(f"Leverage-health {lh}/100 ({lev_phrase}) — a fact from the reported balance sheet.")
+    # The lead (gap) — described factually, judged by the ledger, never a buy-timing.
+    if gap >= 16:
+        parts.append(f"Informed money runs {gap} pts ahead of broad confirmation; whether this "
+                     f"early read led is for the Accuracy Ledger to record over time.")
+    elif gap <= -16:
+        parts.append(f"Broad data leads the informed read by {abs(gap)} pts — a later-stage read.")
+    else:
+        parts.append("Informed and broad reads are roughly aligned.")
+    parts.append("A measurement of where money is moving plus a leverage fact — not a forecast or advice.")
+    return " ".join(parts)
+
+
+def _append_market_analysis(mkt: dict) -> None:
+    """Append the factual Money-Movement / Market-Confirmation / Leverage analysis to the
+    market interpretation (the description's 'AI-generated overview'), IN PLACE. Runs for
+    both v1 and v2 (flow only enriches the text when present). Skips when calibrating or
+    coverage is insufficient — the base interpretation already explains that limited-data
+    state, and a score-walk would be misleading there. Idempotent per cycle (the base
+    interpretation is freshly rebuilt each score, so it never double-appends)."""
+    try:
+        if not isinstance(mkt, dict):
+            return
+        if mkt.get("calibrating") or mkt.get("data_coverage") == "insufficient":
+            return
+        analysis = _market_analysis(mkt.get("detection"), mkt.get("confidence"),
+                                    mkt.get("leverage_health"), mkt.get("flow"))
+        base = (mkt.get("interpretation") or "").strip()
+        mkt["interpretation"] = (base + "  " + analysis) if base else analysis
+    except Exception:
+        pass
+
+
 def resolve_ticker(topic: str):
     """Resolve a free-text topic to (ticker, display) if it's a company.
     Tries the watchlist first, then a Finnhub symbol search. Returns (None, None)
@@ -2323,6 +2386,8 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
             mkt["flow"] = _dpi.get("flow", "neutral")
             mkt["leverage_facts"] = {"company_leverage_health": mkt.get("leverage_health"),
                                      "note": "objective leverage from financial ledgers — facts only"}
+        # Enrich the description's overview with a factual money/confirmation/leverage walk.
+        _append_market_analysis(mkt)
         return {"available": True, "ticker": ticker, "display": display,
                 "market_gradient": mkt, "payload": payload}
     except Exception as e:
@@ -2536,6 +2601,8 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                             detection_score=mkt.get("detection"), db_path=db_path)
                 except Exception as _male:
                     print(f"[market_signal] ledger record {display}: {_male}")
+            # Enrich the description's overview with a factual money/confirmation/leverage walk.
+            _append_market_analysis(mkt)
             positioning_payload["market_gradient"] = mkt
         except Exception as _mge:
             print(f"[market_signal] {display}: {_mge}")

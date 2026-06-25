@@ -263,5 +263,37 @@ def _attach_market(g, topic: str, result: dict) -> None:
             ms = g.risk.market_signal_for_company(tkr, disp or topic, g.DB_PATH)
             if ms and ms.get("available"):
                 result["market_signal"] = ms
+                _attach_market_ai_analysis(g, topic, tkr, disp, ms, result)
     except Exception as e:
         print(f"[grade_agent] market attach error: {e}")
+
+
+def _attach_market_ai_analysis(g, topic, tkr, disp, ms, result) -> None:
+    """LLM market narrative for the Grade — incorporates Money Movement / Market Confirmation /
+    Leverage as a MEASUREMENT (guardrailed against advice). Budget-gated + 12h-cached per
+    instrument, so cost stays bounded under the engine's monthly AI cap. Opt-out via
+    MARKET_AI_ANALYSIS=0. The reproducible score-walk already lives in market_signal.market_gradient
+    .interpretation; this is the optional richer prose layer."""
+    import os
+    if os.getenv("MARKET_AI_ANALYSIS", "1") != "1":
+        return
+    if not getattr(g, "_AI_GRADE_AVAILABLE", False):
+        return
+    try:
+        if not g._ai_budget_ok():
+            return
+        mgd = ms.get("market_gradient") or {}
+        if not mgd or mgd.get("calibrating") or mgd.get("data_coverage") == "insufficient":
+            return
+        ma = g.ai_grade.market_analysis(
+            disp or topic, mgd.get("detection"), mgd.get("confidence"),
+            mgd.get("leverage_health"), mgd.get("flow"), ticker=tkr)
+        if ma and ma.get("available"):
+            result["market_analysis"] = {"text": ma["text"], "provider": ma.get("provider", "claude"),
+                                         "cached": ma.get("cached", False),
+                                         "note": "AI measurement of Money Movement / Market "
+                                                 "Confirmation / Leverage from our scores — not advice."}
+            if ma.get("cost"):
+                g._record_ai_cost("market_analysis", disp or topic, ma["cost"])
+    except Exception as e:
+        print(f"[grade_agent] market AI analysis error: {e}")

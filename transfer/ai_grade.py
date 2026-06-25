@@ -280,6 +280,92 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
         return {"available": False, "error": str(e)}
 
 
+# ── Market-signal AI narrative — incorporates Money Movement / Market Confirmation /
+# Leverage as a MEASUREMENT, anchored ONLY to OUR scores (no web → can't hallucinate),
+# with a hard no-advice guardrail. 12h-cached per instrument so cost stays bounded. ──
+_MARKET_AI_CACHE: dict = {}
+_MARKET_AI_TTL = float(os.getenv("MARKET_AI_ANALYSIS_TTL_SEC", "43200"))   # 12h
+
+_MARKET_ANALYSIS_SYS = (
+    "You are Now TrendIn's market-signal descriptor. You write a SHORT, factual analysis of where "
+    "MONEY is moving for one instrument, using ONLY the measured scores you are given. This is a "
+    "MEASUREMENT, never advice.\n"
+    "ABSOLUTE RULES (a violation is a critical failure):\n"
+    "- Do NOT recommend buying or selling, and do NOT predict prices or returns.\n"
+    "- Do NOT use the words: buy, sell, long, short, undervalued, overvalued, cheap, expensive, "
+    "opportunity, target, bullish, bearish, or 'should'.\n"
+    "- Do NOT invent ANY number, event, or fact beyond the scores provided. No web knowledge.\n"
+    "- Frame everything as what the THREE measured dimensions SHOW (Money Movement, Market "
+    "Confirmation, Leverage), plus the factual flow direction.\n"
+    "- Note that the Accuracy Ledger records, AFTER THE FACT, whether an early read actually led.\n"
+    "Return ONLY JSON: {\"text\": \"<2-4 sentence measurement analysis>\"}."
+)
+
+
+def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
+                    gap=None, ticker: str = "") -> dict:
+    """Guardrailed LLM narrative of OUR market scores — Money Movement, Market Confirmation,
+    Leverage + flow — as a MEASUREMENT (never advice). Anchored entirely to the passed scores
+    (no web), 12h-cached per instrument. Returns {available, text, cost, provider, cached}.
+    Cost-bounded: one Claude call per instrument per TTL; the engine's monthly cap still applies."""
+    if not ANTHROPIC_API_KEY:
+        return {"available": False, "reason": "no anthropic key"}
+    import time as _t
+    ck = (ticker or name or "").upper().strip()
+    ent = _MARKET_AI_CACHE.get(ck) if ck else None
+    if ent and (_t.time() - ent["ts"]) < _MARKET_AI_TTL:
+        return {"available": True, "text": ent["text"], "cached": True, "cost": {}, "provider": "claude"}
+    try:
+        if gap is None:
+            gap = int(round((money or 0) - (confirm or 0)))
+    except Exception:
+        gap = 0
+    lev = "n/a (no balance-sheet data)" if leverage is None else \
+        f"{int(round(leverage))}/100 (HIGH = lower debt / healthier balance sheet)"
+    user = (
+        f"Instrument: {name}\n"
+        f"- Money Movement (informed/early money — Congress · insider · 13F · quality analysts): "
+        f"{int(round(money or 0))}/100\n"
+        f"- Flow direction (a fact from filings): {flow or 'n/a'}\n"
+        f"- Market Confirmation (broad market + economic data): {int(round(confirm or 0))}/100\n"
+        f"- Leverage-health: {lev}\n"
+        f"- Lead (Money Movement minus Market Confirmation): {gap} pts\n\n"
+        "Write the 2-4 sentence MEASUREMENT analysis now, walking the three dimensions."
+    )
+    try:
+        _api("claude")
+        r = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json={"model": CLAUDE_MODEL, "max_tokens": 400,
+                  "system": _MARKET_ANALYSIS_SYS,
+                  "messages": [{"role": "user", "content": user}]},
+            timeout=45,
+        )
+        r.raise_for_status()
+        data = r.json()
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+        usage = data.get("usage") or {}
+        cost = (usage.get("input_tokens", 0) / 1e6) * 3.0 + (usage.get("output_tokens", 0) / 1e6) * 15.0
+        parsed = _extract_json(text)
+        out_text = ((parsed or {}).get("text") or text or "").strip()[:600]
+        # Guardrail backstop: if the model leaked an advice word, drop to the safe rule-based
+        # text rather than serve advice (defense in depth beyond the system prompt).
+        _banned = (" buy ", " sell ", "undervalued", "overvalued", "bullish", "bearish",
+                   " should ", "opportunity", "price target")
+        low = f" {out_text.lower()} "
+        if any(b in low for b in _banned):
+            return {"available": False, "reason": "advice-guardrail tripped"}
+        if ck:
+            _MARKET_AI_CACHE[ck] = {"text": out_text, "ts": _t.time()}
+        return {"available": True, "text": out_text, "cached": False, "provider": "claude",
+                "cost": {"perplexity": 0.0, "anthropic": round(cost, 6), "total": round(cost, 6)}}
+    except Exception as e:
+        print(f"[ai_grade] market_analysis error for '{name}': {e}")
+        return {"available": False, "error": str(e)}
+
+
 _MOVEMENT_PROMPT = (
     'You are analysing why a topic\'s ATTENTION score has been {direction} on an '
     'attention-measurement platform. Detection = how early/strong the signal is; '
