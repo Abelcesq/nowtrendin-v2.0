@@ -237,6 +237,12 @@ export interface RiskScore {
     laneLabel?: string;
     dataCoverage?: string;           // full | partial | insufficient (over APPLICABLE inputs)
     naComponents?: string[];
+    // Market Signal v2.0 (the Money Gradient) — present ONLY when MARKET_SIGNAL_V2 is on.
+    // When present: Detection→Money Movement, Confidence→Market Confirmation, and the
+    // factual flow (IN/OUT) surfaces. Absent → v1 labels (flag off).
+    modelVersion?: string;
+    flow?: 'inflow' | 'outflow' | 'neutral';
+    leverageFacts?: { company_leverage_health?: number | null; note?: string } | null;
   };
   // ── Positioning engine (baseline-relative; now a component of the above) ──
   positioningScore?: number;       // 0–100 anomaly vs the item's own baseline
@@ -417,6 +423,9 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       laneLabel: r.market_gradient.lane_label || undefined,
       dataCoverage: r.market_gradient.data_coverage || undefined,
       naComponents: Array.isArray(r.market_gradient.na_components) ? r.market_gradient.na_components : undefined,
+      modelVersion: r.market_gradient.model_version || undefined,
+      flow: r.market_gradient.flow || undefined,
+      leverageFacts: r.market_gradient.leverage_facts || undefined,
     } : undefined,
     // Positioning (baseline-relative) fields — now a component of the above.
     positioningScore: r.positioning_score != null ? Math.round(Number(r.positioning_score)) : undefined,

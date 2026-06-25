@@ -95,6 +95,12 @@ export default function RiskDetail() {
         const tier = mg?.tier ?? 'DORMANT';
         const tierCol = MARKET_TIER_COLOR[tier] ?? '#9AA3B0';
         const gap = mg ? Math.round(Math.abs(mg.gap)) : 0;
+        // Money Gradient (v2) — present only when the engine serves a v2 payload
+        // (MARKET_SIGNAL_V2 on). Drives the labels + the factual flow badge; absent → v1.
+        const v2 = !!(mg && (mg.modelVersion || mg.flow));
+        const flowMeta = mg?.flow === 'inflow' ? { t: '▲ inflow', c: '#00C896' }
+          : mg?.flow === 'outflow' ? { t: '▼ outflow', c: '#DC2626' }
+          : mg?.flow === 'neutral' ? { t: '• neutral', c: '#9AA3B0' } : null;
         return (
           <>
             <TouchableOpacity onPress={goBack} className="mt-4 mb-4 self-start flex-row items-center gap-1">
@@ -114,19 +120,26 @@ export default function RiskDetail() {
               <View className="bg-surface rounded-2xl p-5 border border-border mb-2" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
                 {/* Company / item name above the tier badge + scores */}
                 <Text className="text-textPrimary text-lg font-black text-center mb-1">{risk.display}</Text>
-                <View className="self-center px-2.5 py-1 rounded-full mb-3" style={{ backgroundColor: `${tierCol}1A` }}>
-                  <Text style={{ color: tierCol }} className="text-[9px] font-bold tracking-wide">{tier}</Text>
+                <View className="self-center flex-row items-center gap-1.5 mb-3">
+                  <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tierCol}1A` }}>
+                    <Text style={{ color: tierCol }} className="text-[9px] font-bold tracking-wide">{tier}</Text>
+                  </View>
+                  {v2 && flowMeta && (
+                    <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${flowMeta.c}1A` }}>
+                      <Text style={{ color: flowMeta.c }} className="text-[9px] font-bold tracking-wide">{flowMeta.t}</Text>
+                    </View>
+                  )}
                 </View>
                 <View className="flex-row justify-around items-start">
                   <View className="items-center">
                     <GradientScoreRing score={Math.round(mg.detection)} color={MKT_DET} size="lg" caption="/100" />
-                    <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-                    <Text className="text-textMuted text-[10px]">analysts + positioning</Text>
+                    <Text className="text-textPrimary text-xs font-bold mt-2">{v2 ? 'MONEY MOVEMENT' : 'DETECTION'}</Text>
+                    <Text className="text-textMuted text-[10px]">{v2 ? 'informed money · D' : 'analysts + positioning'}</Text>
                   </View>
                   <View className="items-center">
                     <GradientScoreRing score={Math.round(mg.confidence)} color={MKT_CONF} size="lg" caption="/100" />
-                    <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-                    <Text className="text-textMuted text-[10px]">fundamentals + price</Text>
+                    <Text className="text-textPrimary text-xs font-bold mt-2">{v2 ? 'MARKET CONFIRMATION' : 'CONFIDENCE'}</Text>
+                    <Text className="text-textMuted text-[10px]">{v2 ? 'broad market · M' : 'fundamentals + price'}</Text>
                   </View>
                 </View>
                 <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
@@ -148,9 +161,9 @@ export default function RiskDetail() {
               </View>
             )}
             <Text className="text-textMuted text-[10px] mb-4">
-              The Market Gradient splits signals by type: Detection = what analysts say + how smart money is
-              positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows
-              how early the move is. Measurement only — not financial advice.
+              {v2
+                ? 'The Money Gradient measures where money is moving: Money Movement = informed/early money (Congress · insider · 13F · quality analysts, D); Market Confirmation = broad market/economic confirmation (M). The flow (IN/OUT) is a fact from filings; whether an early read led is recorded — after the fact — by the market accuracy ledger (validated against realized price direction). Measurement only — not financial advice.'
+                : 'The Market Gradient splits signals by type: Detection = what analysts say + how smart money is positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows how early the move is. Measurement only — not financial advice.'}
             </Text>
 
             {/* Coverage-lane caveat — same lane axis as the web terminal. */}
@@ -200,7 +213,7 @@ export default function RiskDetail() {
                   );
                 })}
                 <Text className="text-textMuted text-[10px] mt-1">
-                  <Text style={{ color: '#2D7EEF' }}>Blue</Text> = leading (Detection) · <Text style={{ color: '#00C896' }}>Green</Text> = confirming · <Text style={{ color: '#8B5CF6' }}>Purple</Text> = both. ✓ base = scored vs this item's own history.
+                  <Text style={{ color: '#2D7EEF' }}>Blue</Text> = leading ({v2 ? 'Money Movement' : 'Detection'}) · <Text style={{ color: '#00C896' }}>Green</Text> = confirming · <Text style={{ color: '#8B5CF6' }}>Purple</Text> = both. ✓ base = scored vs this item's own history.
                 </Text>
               </View>
             )}
