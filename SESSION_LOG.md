@@ -3,7 +3,30 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-25b_
+_Last updated: 2026-06-25c_
+
+---
+
+## Session 2026-06-25c — market-data sources: Databento (live) + Alpha Vantage Dark-Matter (held-out)
+
+Researched two founder-provided sources via §16; both keys stored as Heroku env (rotate if transcript shared).
+
+- **Databento — LIVE (accuracy-ledger price verification).** Exchange-direct market data; §16-cleared as a
+  REFEREE (referee, never feeds a score → no backtest gate). `databento_price.historical_close()` (EQUS.SUMMARY
+  ohlcv-1d, adapter: ns ts→ISO date, 1e-9 fixed-point→float) = same `{date: close}` interface as FMP.
+  `market_accuracy_ledger._price_fetch`: **Databento PRIMARY** (no rate cap, ~free) + **FMP cross-check/fallback**
+  (`_cross_check` logs >1% divergence). Tested: databento==FMP closes agree EXACTLY (294.3=294.3). `DATABENTO_API_KEY`
+  set; deployed.
+- **Alpha Vantage Dark-Matter — HELD-OUT (`av_dark_positioning.py`, imported by NOTHING in scoring).** AV uniquely
+  provides what Databento canNOT: **insider Form-4** (INSIDER_TRANSACTIONS) + **institutional 13F by ticker**
+  (INSTITUTIONAL_HOLDINGS, with change direction). Filters ≥$250K + net direction. Live research: AAPL insider
+  −$152M/18 sells (outflow) + institutional net +1.55B shares (inflow) → combined "mixed". Reads
+  `ALPHAVANTAGE_RESEARCH_KEY` (new key; production `ALPHAVANTAGE_API_KEY`/NEWS_SENTIMENT untouched). **NOT in any
+  score yet** — research → backtest-before-ship → then integrate into `positioning_intel` (alongside congress + 13F).
+  Free tier = 5/min · 25/day · ≤1/sec → built-in 13s throttle; production at scale needs caching or premium.
+- **Cost/decision:** KEEP both — complementary. Databento = prices/microstructure only (no filings/news);
+  Alpha Vantage uniquely = insider/13F/news. Don't cancel AV. Databento ~free for the ledger. Databento microstructure
+  (block trades / dark-pool / order imbalance) is a viable **phase-2** Dark-Matter angle (own research+backtest).
 
 ---
 
