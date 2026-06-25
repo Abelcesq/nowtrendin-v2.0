@@ -74,7 +74,11 @@ def _parse(date_str: str) -> datetime:
 def record_detection(topic_key, topic_display, detection_date, detection_score,
                      timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None):
     """Log a detection as PENDING the moment the engine flags it. Idempotent on
-    (topic_key, detection_date)."""
+    (topic_key, detection_date).
+
+    This is the ATTENTION (Trends) ledger — validated by Google Trends breakout.
+    Money-movement detections use a SEPARATE ledger (market_accuracy_ledger.py),
+    validated by realized EOD price direction (FMP), NOT Google Trends."""
     # Sink-harden (quality): reject fragment/boilerplate non-topics at the WRITE boundary
     # so legacy-style junk ("sunday afternoon", "york for months", "every single") can
     # never enter the TRACKED ledger going forward — the same defense-at-the-boundary

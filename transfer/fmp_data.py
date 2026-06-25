@@ -70,6 +70,35 @@ def profile(ticker: str) -> Optional[dict]:
     return None
 
 
+def historical_close(ticker: str, frm: str = "", to: str = "") -> Optional[dict]:
+    """Daily EOD close prices as {YYYY-MM-DD: close}. The ground-truth price series
+    for the MARKET-SIGNAL accuracy ledger (did the realized close move in the detected
+    direction?). FMP /stable 'historical-price-eod/light' = date + close + volume.
+
+    Cached 6h; degrades to None when FMP_API_KEY is absent or the ticker has no data.
+    A MEASUREMENT input only — never investment advice."""
+    tkr = ticker.upper()
+    params = {"symbol": tkr}
+    if frm:
+        params["from"] = frm
+    if to:
+        params["to"] = to
+    key = f"hc:{tkr}:{frm}:{to}"
+    raw = _cached(key, lambda: _get("historical-price-eod/light", params))
+    if not isinstance(raw, list):
+        return None
+    out = {}
+    for row in raw:
+        d = (row.get("date") or "")[:10]
+        px = row.get("price", row.get("close"))
+        if d and px is not None:
+            try:
+                out[d] = float(px)
+            except (TypeError, ValueError):
+                continue
+    return out or None
+
+
 def fundamental_score(ticker: str) -> Optional[dict]:
     """
     Composite 0-100 fundamental score from FMP income statement + profile.

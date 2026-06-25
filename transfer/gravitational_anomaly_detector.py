@@ -29,9 +29,9 @@ WHAT THIS DOES (Plain English):
   emerging from private spaces into expert communities,
   and hasn't reached mainstream yet.
 
-  Each flagged topic gets a score from 0–100:
-    85–100 = BREAKOUT (act now, maximum lead time)
-    70–84  = STRONG SIGNAL (preparing to break mainstream)
+  Each flagged topic gets a score from 0–100 (a MEASUREMENT, not advice):
+    85–100 = BREAKOUT (strongest early movement measured)
+    70–84  = STRONG SIGNAL (strong movement, not yet mainstream)
     55–69  = EMERGING (confirmed movement, building)
     35–54  = EARLY WATCH (something moving, unconfirmed)
     < 35   = MONITORING (below threshold, store but don't flag)
@@ -403,6 +403,14 @@ try:
 except Exception as _lpe:
     _LEDGER_PLUS_AVAILABLE = False
     print(f"[startup] accuracy_ledger_enhanced unavailable: {_lpe}")
+
+try:
+    import market_accuracy_ledger as market_ledger
+    _MARKET_LEDGER_AVAILABLE = True
+    print("[startup] market_accuracy_ledger loaded — Money Gradient track record (EOD-price validated)")
+except Exception as _mle:
+    _MARKET_LEDGER_AVAILABLE = False
+    print(f"[startup] market_accuracy_ledger unavailable: {_mle}")
 
 
 def _record_top_detections(limit=20, min_detection=None):
@@ -5029,14 +5037,24 @@ def start_scheduler():
             COST: each still-in-window row spends one Apify Trends fetch; rows already
             past their timeout resolve FREE — no fetch (fix #2). Tune cadence/limit
             against the Apify budget (Cost Sentinel /monitor/cost, apify_trends)."""
-            if not _LEDGER_PLUS_AVAILABLE:
-                return
-            try:
-                out = ledger_plus.sweep_pending(
-                    DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
-                print(f"[scheduler] ledger sweep: {out}")
-            except Exception as _se:
-                print(f"[scheduler] ledger sweep error: {_se}")
+            if _LEDGER_PLUS_AVAILABLE:
+                try:
+                    out = ledger_plus.sweep_pending(
+                        DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
+                    print(f"[scheduler] ledger sweep: {out}")
+                except Exception as _se:
+                    print(f"[scheduler] ledger sweep error: {_se}")
+            # MARKET-SIGNAL ledger sweep (Money Gradient) — validates money-movement
+            # detections against realized EOD price direction (FMP), DISTINCT from the
+            # Google-Trends attention sweep above. Only when MARKET_SIGNAL_V2 is on. FMP
+            # calls are cheap/free-tier; past-deadline rows resolve without a fetch.
+            if _MARKET_LEDGER_AVAILABLE and os.getenv("MARKET_SIGNAL_V2", "0") == "1":
+                try:
+                    mout = market_ledger.sweep_market_pending(
+                        DB_PATH, limit=int(os.getenv("MARKET_LEDGER_SWEEP_LIMIT", "20")))
+                    print(f"[scheduler] market ledger sweep: {mout}")
+                except Exception as _mse2:
+                    print(f"[scheduler] market ledger sweep error: {_mse2}")
 
         _sched = BackgroundScheduler(timezone="UTC")
         # ── Hybrid role gating ──
@@ -5398,6 +5416,12 @@ async def startup_auto_collect():
                 print("[startup] accuracy ledger (pending + ledger) tables ensured.")
             except Exception as _le:
                 print(f"[startup] ledger init error: {_le}")
+        if _MARKET_LEDGER_AVAILABLE:
+            try:
+                market_ledger.init_market_ledger_db(DB_PATH)
+                print("[startup] market accuracy ledger (Money Gradient, EOD-price validated) tables ensured.")
+            except Exception as _mli:
+                print(f"[startup] market ledger init error: {_mli}")
     except Exception as _aux_exc:
         print(f"[startup] aux table init error (non-fatal): {_aux_exc}")
 
@@ -6278,6 +6302,45 @@ def accuracy_validate(sync: int = 0):
     import threading
     threading.Thread(target=_job, daemon=True).start()
     return {"status": "started", "provider": accuracy.TRENDS_PROVIDER}
+
+
+@app.get("/market/accuracy")
+def market_accuracy_report():
+    """The MARKET-SIGNAL Accuracy Ledger (the Money Gradient's track record) — DISTINCT
+    from /accuracy/ledger (attention/Google-Trends). Ground truth = realized EOD close
+    direction (FMP): did the market move the way the detected money flow indicated, and how
+    many days after. MEASUREMENT of our own accuracy — never a forecast or advice."""
+    if not _MARKET_LEDGER_AVAILABLE:
+        return {"status": "unavailable"}
+    try:
+        rep = market_ledger.report(DB_PATH)
+        rep["status"] = "ok" if rep.get("resolved") else "empty"
+        return rep
+    except Exception as _mare:
+        print(f"[market-accuracy] report error: {_mare}")
+        return {"status": "error", "detail": str(_mare)}
+
+
+@app.post("/market/accuracy/sweep", dependencies=[Depends(_require_internal)])
+def market_accuracy_sweep(sync: int = 0, limit: int = Query(50, ge=1, le=500)):
+    """Resolve pending money-movement detections against realized EOD price direction (FMP).
+    Gated by MARKET_SIGNAL_V2 (the Money Gradient must be live to have detections to sweep)."""
+    if not _MARKET_LEDGER_AVAILABLE:
+        return {"status": "unavailable"}
+    if os.getenv("MARKET_SIGNAL_V2", "0") != "1":
+        return {"status": "disabled", "reason": "MARKET_SIGNAL_V2 is off — no money detections recorded yet"}
+    if sync:
+        return market_ledger.sweep_market_pending(DB_PATH, limit=limit)
+
+    def _job():
+        try:
+            market_ledger.sweep_market_pending(DB_PATH, limit=limit)
+        except Exception as exc:
+            print(f"[market-accuracy] sweep error: {exc}")
+
+    import threading
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started"}
 
 
 @app.get("/signal-x/{topic}")

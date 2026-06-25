@@ -4,10 +4,13 @@ NOW TRENDIN — FINANCIAL RISK GRADIENT SCORE ENGINE
 ================================================================
 
 PURPOSE:
-  Extends the Gradient Score from attention/trend detection into
-  FINANCIAL RISK detection — scoring emerging risks before they
-  are priced in by the market. This is what makes Now TrendIn
-  attractive to hedge funds, private banks, and institutional investors.
+  Extends the Gradient pattern from attention into MONEY MOVEMENT — MEASURING where
+  money/risk is moving: early/informed positioning (Dark Matter: insiders, smart-money
+  13F, Congress, quality analysts) through to broad market confirmation (Mainstream:
+  economic + market APIs). This is a MEASUREMENT and a leverage-facts read — NOT a
+  prediction, recommendation, or investment advice. Whether an early signal actually
+  LED is for the Accuracy Ledger to record, factually, after the fact. (See
+  MARKET_SIGNAL_V2.md.)
 
 WHY THIS DATA STRATEGY (and not scraping Bloomberg/BlackRock):
   1. LEGAL: Every source below is public, government-published,
@@ -23,20 +26,20 @@ WHY THIS DATA STRATEGY (and not scraping Bloomberg/BlackRock):
      computed from a unique combination of public signals that
      nobody else has assembled into a single score.
 
-THE RISK DIFFUSION PIPELINE (risk flows differently than trends):
-  Stage 1 — DARK POSITIONING   Insider sells (Form 4), 13F changes,
-                               options skew. Smart money moves first.
-                               ← NOW TRENDIN DETECTS RISK HERE
-  Stage 2 — EXPERT WARNING     SEC 8-K material events, quant forums,
-                               specialist analyst notes
+THE MONEY-MOVEMENT DIFFUSION (money moves through stages, like attention):
+  Stage 1 — DARK MATTER        Insider Form-4, 13F changes, smart-money
+                               positioning. Informed money moves first.
+                               ← WE MEASURE MOVEMENT HERE (early/informed)
+  Stage 2 — EXPERT / ANALYST   SEC 8-K material events, quality finance
+                               analysts (Meet Kevin et al.), specialist notes
   Stage 3 — CONSUMER CONCERN   Financial subreddits, StockTwits
-  Stage 4 — MEDIA COVERAGE     Financial news, CNBC, WSJ
-  Stage 5 — RETAIL AMPLIFY     YouTube finance channels (Meet Kevin et al.)
+  Stage 4 — MAINSTREAM MEDIA   Financial news, CNBC, WSJ
+  Stage 5 — BROAD / RETAIL     Generic retail channels, broad market data
 
-  Detecting a risk at Stage 1-2, before it hits Stage 4-5, is the alpha.
-  When retail YouTubers (Stage 5) are loud about a risk, it is usually
-  already priced in — BUT that signal is still valuable as a confirmation
-  and as a "crowdedness" indicator.
+  We MEASURE money movement at every stage; Stage 1-2 (Dark Matter) is the early/informed
+  read and Stage 4-5 (Mainstream) is broad confirmation. We do NOT claim this is alpha or
+  advice — whether an early signal LED is for the Accuracy Ledger to record, factually,
+  over time. A loud broad/retail signal is a "crowdedness"/breadth FACT, not a call.
 
 LEGITIMATE DATA SOURCES (all public or official-API):
   - SEC EDGAR        Form 4 (insider), 8-K (material events), 13F (holdings)
@@ -48,10 +51,11 @@ LEGITIMATE DATA SOURCES (all public or official-API):
   - Google Trends    Risk-term search velocity
 
 HOW IT INTEGRATES:
-  Risk topics flow through the same scoring pipeline as trend topics,
-  but with risk-specific component weights and a risk-specific
-  diffusion pattern. The output is a Risk Gradient Score (0-100)
-  where HIGH means "emerging risk detected early, not yet priced in."
+  Money/risk topics flow through the same scoring pipeline as trend topics,
+  but with money-specific component weights and a money-movement diffusion
+  pattern. The output is a Money-Movement Score (0-100) where HIGH means
+  "strong early/informed money movement measured here — the Accuracy Ledger
+  will record whether it preceded broad movement." A measurement, not a forecast.
 
 ================================================================
 """
@@ -527,9 +531,10 @@ def extract_financial_topics(text: str) -> list[str]:
 # ════════════════════════════════════════════════════════════════
 
 # Risk-specific component weights
-# Risk detection values EARLY positioning signals (dark matter, gradient)
-# more heavily than trend detection, because the alpha is in detecting
-# risk BEFORE it's priced in.
+# Money-movement detection weights the EARLY/informed components (dark matter,
+# gradient) more heavily than trend detection, because that is where money
+# movement is measured earliest. Whether an early read LED is recorded by the
+# Accuracy Ledger — this is measurement, not alpha/advice.
 RISK_WEIGHTS = {
     "detection": {
         "gradient":      0.35,  # niche analyst vs mainstream concern ratio
@@ -557,9 +562,11 @@ def compute_risk_gradient(risk_signals: list[dict]) -> dict:
 
     OUTPUT: Risk Gradient Score with detection + confidence + interpretation
 
-    The score answers: "Is this risk emerging early (smart money
-    positioning, expert warning) before it's been priced in by the
-    broad market — making it actionable alpha for an institutional client?"
+    The score answers a MEASUREMENT question: "How strongly, and in which
+    direction, is informed money moving here (smart-money positioning,
+    expert/analyst activity) relative to broad market confirmation?" It is a
+    movement read + leverage facts — NOT alpha, a forecast, or investment advice.
+    Whether an early read actually led is for the Accuracy Ledger to record.
     """
     if not risk_signals:
         return _empty_risk_score()
@@ -637,21 +644,24 @@ def compute_risk_gradient(risk_signals: list[dict]) -> dict:
     # The served risk_stage column must hold the MARKET tier vocabulary the terminal
     # consumes; _RISK_TO_MARKET_TIER (module top) maps this -> that at the write site.
     avg = (detection + confidence_score) / 2
+    # risk_action is a factual MOVEMENT description (not advice). No "act now",
+    # no "hedge", no buy/sell — just what the measurement shows. The Accuracy
+    # Ledger records whether an early read led; we never tell the user to act.
     if avg >= 80:
-        risk_stage = "ACUTE"        # Act now — risk emerging, not yet priced
-        risk_action = "Smart money is positioning. Risk not yet in mainstream pricing."
+        risk_stage = "ACUTE"        # strong informed-money movement, broad market not yet confirming
+        risk_action = "Strong informed-money movement measured here; broad market has not yet confirmed."
     elif avg >= 60:
-        risk_stage = "ELEVATED"     # Building — monitor closely
-        risk_action = "Risk signals building across expert stages. Begin hedging analysis."
+        risk_stage = "ELEVATED"     # movement building across expert/informed stages
+        risk_action = "Informed-money / expert-stage movement is building; broad confirmation partial."
     elif avg >= 40:
-        risk_stage = "EMERGING"     # Early warning
-        risk_action = "Early risk signals detected. Monitor for confirmation."
+        risk_stage = "EMERGING"     # early movement, no broad confirmation yet
+        risk_action = "Early money-movement signals measured; broad confirmation not yet present."
     elif avg >= 25:
         risk_stage = "WATCH"
-        risk_action = "Low-level risk chatter. No action needed yet."
+        risk_action = "Low-level money-movement activity versus this item's baseline."
     else:
         risk_stage = "BACKGROUND"
-        risk_action = "Normal background risk level."
+        risk_action = "Movement at this item's normal baseline."
 
     return {
         "detection_score":   detection,
@@ -1373,16 +1383,17 @@ def positioning_narrative(item_name: str, sr: dict, retail_active: bool) -> dict
                    "treat the 'early' read as provisional until they are.)")
         return {"headline": "Unusual early positioning",
                 "body": (f"{item_name} is showing positioning {dstr} above its normal level, concentrated in "
-                         f"insider/institutional filings{awareness}. This is the higher-value detection window.{unknown}"),
+                         f"insider/institutional filings{awareness}. This is the early/informed read — the "
+                         f"Accuracy Ledger records, after the fact, whether it led.{unknown}"),
                 "fire_early_signal": True, "tone": "alert"}
     if late_active:
-        return {"headline": "Elevated — but already surfacing",
-                "body": (f"{item_name} positioning is elevated ({dstr} vs baseline), but activity is already "
-                         f"appearing in media/retail stages — likely already known and partly priced in."),
+        return {"headline": "Elevated — broad rather than early",
+                "body": (f"{item_name} positioning is elevated ({dstr} vs baseline), and the movement is already "
+                         f"visible in media/retail stages — a broad read rather than an early/informed one."),
                 "fire_early_signal": False, "tone": "neutral"}
     return {"headline": "Elevated activity",
             "body": (f"{item_name} is showing elevated positioning ({dstr} vs baseline), spread across stages "
-                     f"without a clear early concentration. Monitor for whether it sharpens into an early signal."),
+                     f"without a clear early concentration."),
             "fire_early_signal": False, "tone": "neutral"}
 
 
@@ -2510,6 +2521,21 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                 mkt["flow"] = _dpi2.get("flow", "neutral")
                 mkt["leverage_facts"] = {"company_leverage_health": mkt.get("leverage_health"),
                                          "note": "objective leverage from financial ledgers — facts only"}
+                # Money-movement DETECTION → MARKET accuracy ledger (distinct from the
+                # attention/Trends ledger; validated by realized EOD price direction via FMP,
+                # NOT Google Trends). Forward-only, flag-gated, measurement-not-advice. Own
+                # connection so the ledger write is decoupled from the scoring transaction.
+                try:
+                    import market_accuracy_ledger as _mal
+                    _mtk = WATCHLIST_TICKERS.get(display) or (display if str(display).isupper() else "")
+                    if _mtk:
+                        _mal.record_market_detection(
+                            _mtk, display,
+                            to_iso_date(datetime.now(timezone.utc).isoformat()),
+                            _dpi2.get("flow"), _dpi2.get("movement_intensity"),
+                            detection_score=mkt.get("detection"), db_path=db_path)
+                except Exception as _male:
+                    print(f"[market_signal] ledger record {display}: {_male}")
             positioning_payload["market_gradient"] = mkt
         except Exception as _mge:
             print(f"[market_signal] {display}: {_mge}")
@@ -2671,9 +2697,10 @@ def run_demo():
         print(f"  Interpretation: {score['interpretation']}")
 
     print("\n" + "="*68)
-    print("KEY INSIGHT: Scenario A scores HIGHER on a risk basis because")
-    print("the alpha is detecting risk BEFORE it's priced in. Scenario B")
-    print("(loud retail, no early positioning) correctly scores as 'crowded'.")
+    print("KEY INSIGHT: Scenario A scores HIGHER on money-MOVEMENT because the")
+    print("informed/early stages are where movement is measured first. Scenario B")
+    print("(loud retail, no early positioning) correctly reads as 'broad/crowded'.")
+    print("Whether an early read led is for the Accuracy Ledger to record — not alpha.")
     print("="*68)
 
     print("\n── LEGITIMATE DATA SOURCES IN USE ──")

@@ -76,17 +76,40 @@ Keep the proven primitives; change the inputs, framing, and validation:
 
 ---
 
-## 4. The Accuracy Ledger is the validator (NOT a price backtest)
+## 4. A SEPARATE Accuracy Ledger — validated by realized PRICE DIRECTION, not Google Trends
 
-Money-Dark-Matter detections are logged like attention detections. The ledger later asks the
-**factual** question: did broad money movement and/or **attention arrival** follow, and how many
-days after? Verdicts: LED / SAME_DAY / LAGGED / FALSE_POSITIVE; lead-time recorded.
+**Founder correction (2026-06-24): Google Trends does NOT validate a market signal.** Search
+velocity is the right ground truth for ATTENTION (did attention arrive?), but a *money* signal is
+validated by what the *market actually did*. So the Money Gradient gets its **own** ledger —
+`market_accuracy_ledger.py`, distinct from the attention ledger (`accuracy_ledger_enhanced.py`).
 
-- Ground truth for "money movement arrived" = subsequent Mainstream(M) confirmation (broad flow /
-  short-interest shift / volume) **and/or** the name's **attention breakout** (unifying the two
-  Gradients: money dark matter as a precursor to attention).
-- The earlier return-prediction backtest is a **footnote**, not a gate — it tested *price*, which we
-  do not claim. The ledger tests *movement*, which we do.
+| | Trends ledger (`accuracy_ledger_enhanced`) | **Market-Signal ledger (`market_accuracy_ledger`)** |
+|---|---|---|
+| Detection | attention moving toward a topic | **money moving IN/OUT of an instrument** (flow + intensity) |
+| Ground truth | Google Trends breakout | **realized EOD CLOSE price DIRECTION (FMP)** |
+| Verdicts | LED / SAME_DAY / LAGGED / FALSE_POSITIVE | **CONFIRMED / NOT_CONFIRMED / NO_MOVE** (+ lead-time) |
+
+**How it validates (the NVDA example):** detect **OUTFLOW** on NVDA → if NVDA's EOD close
+subsequently trends **down** past the move threshold (default ±5%), the detection is **CONFIRMED**
+and the **lead time** (days from our detection to the confirming close) is recorded. An **INFLOW**
+is CONFIRMED on a move **up**. A move in the *opposite* direction → **NOT_CONFIRMED** (an honest
+miss). Flat by the deadline (default 60d) → **NO_MOVE**. `hit_rate = CONFIRMED / (CONFIRMED +
+NOT_CONFIRMED + NO_MOVE)` — the misses stay in the denominator.
+
+**This does NOT contradict "no prediction / no advice."** The ledger is a **retrospective accuracy
+measurement**, not a forward claim. We never tell a user a price will move; we keep an honest,
+falsifiable record of whether *our* detected money flow corresponded to (and preceded) the realized
+move — exactly as the attention ledger records whether attention arrived. Measurement of our own
+accuracy, never a buy/sell call.
+
+**Integrity:** NO LOOKAHEAD (only closes on/after the detection date; the detection date is when WE
+flagged it, and `positioning_intel` reads PUBLIC filings). Forward-only, additive tables, degrades
+to `available:false` when `FMP_API_KEY` is absent, flag-gated so only the Money Gradient
+(`MARKET_SIGNAL_V2`) records into it. Endpoints: `GET /market/accuracy` (report),
+`POST /market/accuracy/sweep` (resolve). The earlier return-prediction backtest
+(`dark_positioning_backtest.py`) remains a **footnote**, not a gate — it tested *forward returns /
+alpha*, which we do not claim; this ledger tests *directional accuracy of our movement signal*,
+which we do.
 
 ---
 
@@ -103,8 +126,11 @@ money signal detected — the ledger will show whether it led," "leverage is ele
 
 1. **Engine** — Money Gradient scoring behind `MARKET_SIGNAL_V2` (default OFF); v1 stays live.
 2. **Sources** — reclassify YouTube/Meet Kevin → D; wire economic/market APIs → M.
-3. **Ledger** — money detections logged + validated.
-4. **Validate** — confirm the v2 output is sane (flow direction matches filings; ledger populating).
+3. **Ledger** — money detections → **`market_accuracy_ledger`** (a SEPARATE ledger, validated by
+   realized **EOD price direction** via FMP, NOT Google Trends). ✅ built + wired (record at the
+   scoring site, sweep on the ledger cadence, `GET /market/accuracy`), flag-gated.
+4. **Validate** — confirm the v2 output is sane (flow direction matches filings; the market ledger
+   populates + resolves CONFIRMED/NOT_CONFIRMED/NO_MOVE once `FMP_API_KEY` is set + the flag is on).
 5. **Flip** `MARKET_SIGNAL_V2=1`; then **propagate to all 3 platforms** (web terminal → desktop
    inherits; mobile) with the new labels (Money Movement / Confirmation / Leverage Facts / flow) and
    the language purge. Maintain 3-platform parity.

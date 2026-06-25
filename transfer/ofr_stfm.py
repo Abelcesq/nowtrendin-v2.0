@@ -4,9 +4,11 @@ OFR Short-Term Funding Monitor (STFM) — leverage & funding-stress overlay.
 The U.S. Office of Financial Research publishes the plumbing of the financial
 system: repo rates and repo transaction VOLUME. Repo is where leverage in the
 system is financed, so:
-  - rising repo VOLUME  -> leverage building in the system
-  - repo RATE spikes / spreads -> funding stress (the classic early-warning of
+  - rising repo VOLUME  -> leverage building in the system (a FACT, measured)
+  - repo RATE spikes / spreads -> funding stress (the classic marker of
     a deleveraging event, e.g. Sept-2019 repo blowup)
+These are stated as leverage/funding FACTS from the OFR ledgers — a measurement,
+not a forecast or advice.
 
 Free, public, no token. Data updates <= once/day, so we cache 12h.
 Used as a macro RISK / leverage-analysis overlay (not company-specific).

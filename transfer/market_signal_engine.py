@@ -87,8 +87,8 @@ CONFIDENCE_WEIGHTS = {
     "signal_freshness":          0.15,
 }
 
-DETECTION_FP  = "~22% false positive · early-warning"
-CONFIDENCE_FP = "<9% false positive · confirmation"
+DETECTION_FP  = "~22% false-positive rate · early / leading read (measurement, not advice)"
+CONFIDENCE_FP = "<9% false-positive rate · broad confirmation"
 
 # ── Market Signal v2.0 — the Money Gradient (see MARKET_SIGNAL_V2.md) ──────────────
 # Reorganizes the SAME baseline-relative components into MONEY MOVEMENT (Dark Matter =
@@ -317,9 +317,10 @@ def _interpret_gap(detection, confidence, gap, calibrating,
                         "leading and hard indicators are both quiet." + absent_note}
     if gap >= 36 and detection >= 45:
         return {"state": "EARLY",
-                "text": "EARLY — leading indicators (analyst, smart-money positioning, "
+                "text": "EARLY — the early/leading components (analyst, smart-money positioning, "
                         "cross-market shifts) are active while realized financials and "
-                        "price have NOT yet confirmed. The early-warning window."}
+                        "price have NOT yet confirmed. Whether this leads is for the Accuracy "
+                        "Ledger to record over time — a measurement, not a recommendation."}
     if 16 <= gap < 36:
         return {"state": "CONFIRMING",
                 "text": "Leading indicators run ahead of the hard data, which is "
