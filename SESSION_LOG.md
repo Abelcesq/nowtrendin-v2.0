@@ -3,7 +3,35 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24f_
+_Last updated: 2026-06-25a_
+
+---
+
+## Session 2026-06-25a — Market Signal v2.0 LIVE: market-ledger view, parity, validated + flag flipped ON
+
+Completed the founder's "proceed with 1-3" (validate / market-ledger view / parity), in the order
+2→3→1 so the flip exercised the whole surface.
+
+- **Item 2 — market-ledger view (the visible "two ledgers" proof):** engine `market_accuracy_ledger.detail()`
+  + `GET /market/accuracy/detail`; web terminal **Accuracy Ledger** gained an **Attention / Money** toggle
+  (Money mode = distinct-ground-truth banner, money stat strip, per-detection table); mobile
+  `profile/accuracy` got the same toggle. Added a `pending` (in-flight) count to `/market/accuracy`.
+- **Item 3 — parity:** Dashboard `MKT_RANK` label Detection→Money Movement; Methodology gained
+  "The Money Gradient" + a reworked "The Accuracy Ledgers" (two ledgers, two ground truths).
+- **Item 1 — VALIDATED + FLAG FLIPPED ON (`MARKET_SIGNAL_V2=1`, engine v155):** forced a
+  `/risk/collect` (collect + `score_all_risks`) under the flag; at t=180s, **8/8 rows scored
+  `model_version=v2`**, **7 money detections recorded** (pending). Sanity confirmed live:
+  - scores in-range (0 out-of-range); directional signals on the right names — **Nvidia MM 68 / MC 25 /
+    outflow**, **Apple 70 / 27 / outflow**, **JPMorgan 54 / 27 / outflow** (covered megacaps with
+    congress/insider/13F); macro themes + micro-caps read **neutral** (no positioning data) — correct.
+  - enriched interpretation live (Money Movement + flow + Market Confirmation + Leverage walk),
+    measurement-not-advice language intact.
+  - `/market/accuracy` pending=7, resolved=0 (expected — fresh detections resolve once price moves
+    ±5% or the 60-day window elapses; the market sweep runs on the ledger cadence).
+- **Now live for all users:** the Money Gradient (Money Movement / Market Confirmation / flow /
+  leverage facts) across web/desktop/mobile + both accuracy ledgers. Reversible: `MARKET_SIGNAL_V2=0`.
+- Observation to watch: covered megacaps currently all read **outflow** (net congress/insider/13F
+  selling — plausible for megacaps; the ledger will record whether these reads were right).
 
 ---
 
