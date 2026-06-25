@@ -30,6 +30,24 @@ export interface LedgerRow {
   validated_at?: string; provider?: string
 }
 
+// Money Gradient ledger — validated by realized EOD price direction (FMP), NOT Google Trends.
+export interface MarketLedgerSummary {
+  status: string
+  ground_truth?: string; distinct_from?: string
+  move_threshold_pct?: number; timeout_days?: number
+  resolved?: number; confirmed?: number; not_confirmed?: number; no_move?: number
+  confirm_rate_pct?: number | null; median_lead_days?: number | null
+  by_flow?: Record<string, { confirmed: number; resolved: number; confirm_rate_pct: number | null }>
+  small_sample?: boolean; note?: string
+}
+
+export interface MarketLedgerRow {
+  ticker?: string; name?: string; detection_date?: string; flow?: string
+  detection_score?: number; price_at_detection?: number; price_at_move?: number
+  price_change_pct?: number | null; move_date?: string
+  lead_time_days?: number | null; verdict?: string; validated_at?: string
+}
+
 export interface TopicRow {
   topic_key: string; topic_display: string; category?: string
   current_stage?: string; overall_score?: number
@@ -89,6 +107,10 @@ export interface HistoryRow {
 
 export const api = {
   ledger: () => get<LedgerSummary>('/accuracy/ledger'),
+  // Money Gradient ledger (distinct ground truth: realized EOD price direction, FMP).
+  marketAccuracy: () => get<MarketLedgerSummary>('/market/accuracy'),
+  marketAccuracyDetail: () =>
+    get<{ rows: MarketLedgerRow[]; count: number }>('/market/accuracy/detail?limit=500'),
   historyRecent: (window = '7d', limit = 80) =>
     get<{ window: string; count: number; results: HistoryRow[] }>(
       `/history/recent?window=${window}&limit=${limit}`),

@@ -388,6 +388,30 @@ def report(db_path=DB_PATH) -> dict:
     }
 
 
+def detail(db_path=DB_PATH, limit=300, verdict=None) -> dict:
+    """Per-detection rows of the market ledger (for the Money-ledger table). Newest-validated
+    first. Optional verdict filter (CONFIRMED / NOT_CONFIRMED / NO_MOVE)."""
+    conn = _connect(db_path)
+    try:
+        q = "SELECT * FROM market_accuracy_ledger"
+        params = ()
+        if verdict:
+            q += (" WHERE verdict=%s" if db_compat.USE_PG else " WHERE verdict=?")
+            params = (verdict,)
+        q += " ORDER BY validated_at DESC"
+        q += f" LIMIT {int(limit)}"
+        rows = [dict(r) for r in conn.execute(q, params).fetchall()]
+    except Exception as e:
+        print(f"[mkt-ledger] detail error: {e}")
+        rows = []
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return {"rows": rows, "count": len(rows)}
+
+
 if __name__ == "__main__":
     import json
     init_market_ledger_db()

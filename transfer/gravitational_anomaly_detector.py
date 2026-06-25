@@ -6336,6 +6336,23 @@ def market_accuracy_report():
             return {"status": "error", "detail": str(_mare2)}
 
 
+@app.get("/market/accuracy/detail")
+def market_accuracy_detail(limit: int = Query(300, ge=1, le=1000), verdict: str = ""):
+    """Per-detection rows of the Money-Gradient ledger (ticker, flow, scores, realized price
+    move, lead, verdict). Distinct from /accuracy/ledger/detail (the attention ledger)."""
+    if not _MARKET_LEDGER_AVAILABLE:
+        return {"rows": [], "count": 0, "status": "unavailable"}
+    try:
+        return market_ledger.detail(DB_PATH, limit=limit, verdict=(verdict or None))
+    except Exception as _mde:
+        try:
+            market_ledger.init_market_ledger_db(DB_PATH)
+            return market_ledger.detail(DB_PATH, limit=limit, verdict=(verdict or None))
+        except Exception as _mde2:
+            print(f"[market-accuracy] detail error: {_mde2}")
+            return {"rows": [], "count": 0, "status": "error"}
+
+
 @app.post("/market/accuracy/sweep", dependencies=[Depends(_require_internal)])
 def market_accuracy_sweep(sync: int = 0, limit: int = Query(50, ge=1, le=500)):
     """Resolve pending money-movement detections against realized EOD price direction (FMP).
