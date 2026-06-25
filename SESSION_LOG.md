@@ -3,7 +3,31 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-24d_
+_Last updated: 2026-06-24e_
+
+---
+
+## Session 2026-06-24e — Market Signal v2.0 (the Money Gradient) — phases 1-2 shipped flag-OFF
+
+Founder confirmed the direction: the platform MEASURES movement (attention + money) + states leverage
+FACTS — no prediction/advice — but signals MAY be precursors, and the **Accuracy Ledger** judges
+(factually, over time) whether they led. Congress = **Dark Matter** (insider-informed, early), NOT
+lagging. Spec: **MARKET_SIGNAL_V2.md**. All flag-gated behind `MARKET_SIGNAL_V2` (default OFF).
+
+- **Phase 1** — quality finance YouTube (Meet Kevin, The Compound) reclassified from Stage-5 "retail
+  amplify" (lagging) → **Dark Matter** (stage 2, early/informed). `QUALITY_ANALYST_CHANNELS`.
+- **Phase 2** — **Money Gradient scoring** (`market_signal_engine`): the SAME baseline-relative
+  components reorganized into **MONEY MOVEMENT (D** = smart-money 13F/insider/shorts + congress +
+  quality-analyst, the early/informed flow**)** vs **MARKET CONFIRMATION (M** = fundamentals +
+  momentum + diffusion, broad/economic**)**. `_interpret_movement()` replaces alpha/early-warning
+  language with movement+ledger wording ("a measurement, not a recommendation; the ledger judges
+  whether it led"). Output gains `model_version`, `money_movement`, `market_confirmation`, `flow`
+  (inflow/outflow), `leverage_facts`. MARKET_SIGNAL_V2 implies the congress/13F blend (D inputs).
+  **Verified live: flag OFF = v1 byte-identical (no v2 leak); flag ON = Money Gradient.**
+- **Remaining:** Phase 3 — money detections → Accuracy Ledger + full alpha/advice language purge
+  (incl. the Risk Gradient's "before it's priced in / is the alpha" header). Phase 4 — propagate to
+  all 3 platforms (web→desktop, mobile): relabel Detection/Confidence → Money Movement / Market
+  Confirmation, surface flow + leverage facts, purge advice language. Then validate + flip the flag.
 
 ---
 
