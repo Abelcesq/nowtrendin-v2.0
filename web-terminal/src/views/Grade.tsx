@@ -80,7 +80,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         <div style={{ paddingLeft: 2 }}>
           <div>• <b style={{ color: MC.detection }}>Attention (Gradient Score)</b> — how much human attention is moving toward this, and how early. <i>The headline read.</i></div>
           <div>• <b style={{ color: MC.amber }}>Market Signal</b> (companies only) — whether market positioning is unusual vs this stock’s <i>own</i> baseline. Not attention.</div>
-          <div>• <b style={{ color: MC.orange }}>N · Now Trending</b> — how often NowTrendIn users ask about it. A separate demand signal, never folded into the Gradient.</div>
+          <div>• <b style={{ color: MC.orange }}>N · Now Trending</b> — how often this topic is triggered + surfaced as a tracked topic across the platform. A separate signal, never folded into the Gradient.</div>
         </div>
       </div>
       {/* Legal disclaimer — top, above the Market Signal score */}
@@ -166,10 +166,10 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
           )
         })}
 
-        {/* (3) N score — Now Trending (on-platform demand) */}
+        {/* (3) N score — Now Trending (platform tracking, NOT user demand) */}
         <h4 className="g-h" style={{ color: MC.orange }}>N Score · Now Trending</h4>
-        <div className="kv"><span>N (on-platform demand)</span><b style={{ color: MC.orange }}>{nScore != null && nScore > 0 ? nScore : 'not yet registered'}</b></div>
-        <div className="disc">Demand (N) — how often Now TrendIn users ask about a topic — is a SEPARATE signal, never folded into the Gradient (no demand feedback loop). {measured ? 'Measured live from the engine.' : 'Registers once demand accrues; this grade query logs it.'}</div>
+        <div className="kv"><span>N (platform tracking)</span><b style={{ color: MC.orange }}>{nScore != null && nScore > 0 ? nScore : 'not yet registered'}</b></div>
+        <div className="disc">N — how often a topic is triggered + surfaced as a tracked topic across the Now TrendIn platform (feeds, queries, grades) — is a SEPARATE signal, never folded into the Gradient (no feedback loop). {measured ? 'Measured live from the engine.' : 'Registers once platform tracking accrues; this grade query logs it.'}</div>
 
         {Array.isArray(result.citations) && result.citations.length > 0 && (
           <>

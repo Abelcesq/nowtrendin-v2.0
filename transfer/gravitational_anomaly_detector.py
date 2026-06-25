@@ -915,10 +915,11 @@ CREATE TABLE IF NOT EXISTS velocity_scores (
     dark_matter_score     REAL,    -- D: first-timer ratio + engagement anomaly
     confidence_decay      REAL,    -- C: freshness + directional momentum
     persistence_score     REAL,    -- P: historical longevity across scoring cycles
-    nowtrendin_score      REAL,    -- N: internal query frequency (demand-side)
+    nowtrendin_score      REAL,    -- N: platform-tracking frequency (how often the topic is
+                                   --    triggered/surfaced as a tracked topic; NOT user demand)
 
     -- Final composite scores — SIX external components (G·I·M·D·C·P), renormalized
-    -- to sum to 1.0. N (internal demand) is DELIBERATELY EXCLUDED to avoid a demand
+    -- to sum to 1.0. N (platform tracking) is DELIBERATELY EXCLUDED to avoid a
     -- feedback loop (see the composite in score_topic ~line 3012 for live weights —
     -- kept in code only, trade secret). N is stored above as a separate signal.
     overall_score         REAL,    -- Balanced (external only)
@@ -1009,8 +1010,9 @@ CREATE TABLE IF NOT EXISTS topic_lifecycle (
 );
 
 -- ── TOPIC QUERIES ────────────────────────────────────────────────
--- Every time a topic appears in an API result (search demand signal).
--- Powers the N — NowTrendIn component.
+-- Logged every time a topic is SURFACED in an API result (the /scores feed, /anomalies,
+-- /trending), an on-demand /scores/{topic} query, or a grade — i.e. platform tracking
+-- (NOT a user-demand claim). Powers the N — NowTrendIn component.
 -- Written async via a bounded queue; never blocks API responses.
 CREATE TABLE IF NOT EXISTS topic_queries (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3928,25 +3930,28 @@ class GravitationalAnomalyDetector:
         """
         N — NowTrendIn Score (10% of Overall, 12% of Detection, 10% of Confidence)
 
-        Internal demand-side validation metric.
-        Measures how often this topic appears in query results within the app.
-        More appearances = more user interest = higher N.
+        PLATFORM-TRACKING metric (NOT a user-demand claim). Measures how often this topic is
+        TRIGGERED + SURFACED as a tracked topic across the platform — every time it appears in
+        an API result (the /scores feed, /anomalies, /trending), in an on-demand /scores/{topic}
+        query, or in a grade. `topic_queries` logs each such appearance (see _log_topic_query).
+        It is therefore a platform-internal tracking/appearance frequency — do NOT describe it as
+        "how often users asked about the topic"; the bulk is the engine surfacing the topic in
+        its own feeds plus on-demand lookups/grades.
 
-        Why this matters:
-          When thousands of users search for the same topic, that in itself
-          is a signal that the topic has mindshare — independent of the
-          external platform data. It validates that our detection is resonating.
+        Why it's kept SEPARATE: it is a platform-internal read with no public source, shown
+        alongside every score but DELIBERATELY EXCLUDED from the Gradient (a score can't be
+        validated by a signal produced by engagement with that score — no circular/feedback loop).
 
         Formula (0–100):
-          volume_score  (0–70): log-scale of total queries in last 30 days
+          volume_score  (0–70): log-scale of total appearances in last 30 days
           recency_score (0–30): recent 24h spike vs 7-day baseline rate
 
         Score meaning:
-          0   = never appeared in any user query result
-          1–20 = rare — a few times total
+          0   = never surfaced/tracked
+          1–20 = rare — a few appearances total
           20–50 = moderate — weekly appearances
           50–80 = frequent — daily appearances
-          80+  = viral within the app — trending in user demand
+          80+  = very frequently surfaced/tracked across the platform
         """
         conn = get_db(self.db_path)
 

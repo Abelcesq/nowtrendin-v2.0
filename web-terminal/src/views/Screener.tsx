@@ -115,9 +115,9 @@ function deriveGroups(components: any): BGroup[] {
       { label: 'Dark Matter', value: D, desc: 'Hidden early activity (first-timers, deep engagement)' },
       { label: 'Freshness (Decay)', value: C, desc: 'How fresh vs decaying the signal is' },
     ] },
-    { title: 'Community Demand', status: N >= 50 ? 'HIGH' : N >= 20 ? 'MODERATE' : 'LOW',
-      note: 'Now TrendIn user demand — separate signal, NOT part of the Gradient', items: [
-      { label: 'Now Trending (N)', value: N, desc: 'Internal query demand — shown, never fed into the score' },
+    { title: 'Platform Indicator', status: N >= 50 ? 'HIGH' : N >= 20 ? 'MODERATE' : 'LOW',
+      note: 'Now TrendIn platform tracking — separate signal, NOT part of the Gradient', items: [
+      { label: 'Now Trending (N)', value: N, desc: 'How often this topic is triggered + surfaced as a tracked topic across the platform — shown, never fed into the score' },
     ] },
   ]
 }
@@ -278,19 +278,19 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
             <span className="n-brand"><b style={{ color: MC.orange }}>Now</b><b style={{ color: MC.maroon }}>TrendIn</b> · N component</span>
             <span className="n-val">{N}</span>
           </div>
-          <div className="n-desc">The on-platform demand signal — how often Now TrendIn users have asked the engine about this topic. Real institutional curiosity no public source can see.</div>
+          <div className="n-desc">A platform-tracking signal — how often this topic is triggered and surfaced as a tracked topic across the Now TrendIn platform (feeds, queries, grades). A platform-internal read no public source has.</div>
           {N > 0 && ntgD != null && ntgC != null ? (
             <div className="ntg">
-              <div className="ntg-head"><span style={{ color: MC.orange, fontWeight: 800, fontSize: 9, letterSpacing: '.1em' }}>NOW TRENDING GRADIENT SCORE</span><span className="ntg-tag">SEPARATE · DEMAND-INCLUSIVE</span></div>
-              <div className="ntg-sub">A what-if read — where the score lands if on-platform demand (N) is folded in. The headline Detection/Confidence stay N-free (external world only).</div>
+              <div className="ntg-head"><span style={{ color: MC.orange, fontWeight: 800, fontSize: 9, letterSpacing: '.1em' }}>NOW TRENDING GRADIENT SCORE</span><span className="ntg-tag">SEPARATE · N-INCLUSIVE</span></div>
+              <div className="ntg-sub">A what-if read — where the score lands if the platform-tracking signal (N) is folded in. The headline Detection/Confidence stay N-free (external world only).</div>
               <div className="ntg-pair">
                 <div className="ntg-cell" style={{ borderColor: MC.detection + '33', background: MC.detection + '0A' }}><div className="ntg-l">DETECTION + N</div><div className="ntg-n" style={{ color: MC.detection }}>{Math.round(ntgD)}</div></div>
                 <div className="ntg-cell" style={{ borderColor: MC.confidence + '33', background: MC.confidence + '0A' }}><div className="ntg-l">CONFIDENCE + N</div><div className="ntg-n" style={{ color: MC.confidence }}>{Math.round(ntgC)}</div></div>
               </div>
-              {r.nowtrending_gradient_demand_driven && <div className="ntg-warn">⚠ Substantially demand-driven — external confirmation is limited; N's weight is reduced so demand alone can't lift the score.</div>}
+              {r.nowtrending_gradient_demand_driven && <div className="ntg-warn">⚠ Substantially N-driven — external confirmation is limited; N's weight is reduced so platform tracking alone can't lift the score.</div>}
             </div>
           ) : (
-            <div className="n-empty">No on-platform demand registered yet — N rises as users query this topic.</div>
+            <div className="n-empty">No platform tracking registered yet — N rises as this topic is surfaced and queried across the platform.</div>
           )}
           {conv?.status === 'ok' && (
             <div className="conv" style={{ borderColor: (conv.convergence === 'CONFIRMED' ? MC.confidence : conv.convergence === 'CONFLICTING' ? MC.red : MC.gold) + '55' }}>
@@ -351,7 +351,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
               {grp.items.map((it) => (
                 <div className="comp-row" key={it.label} title={it.desc}>
                   <span className="cl">{it.label}</span>
-                  <span className="comp-bar"><i style={{ width: `${Math.min(100, it.value)}%`, background: grp.title === 'Community Demand' ? MC.orange : MC.detection }} /></span>
+                  <span className="comp-bar"><i style={{ width: `${Math.min(100, it.value)}%`, background: grp.title === 'Platform Indicator' ? MC.orange : MC.detection }} /></span>
                   <span className="cv">{it.value}</span>
                 </div>
               ))}

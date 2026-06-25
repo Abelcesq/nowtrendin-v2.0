@@ -48,7 +48,8 @@ export default function Methodology() {
       </Block>
 
       <Block title="The N (Now Trending) signal" color="#EE6A2A">
-        N is the on-platform demand signal — how often Now TrendIn users ask the engine about a topic.
+        N is the platform-tracking signal — how often a topic is triggered and surfaced as a tracked
+        topic across the Now TrendIn platform (its feeds, queries, and grades).
         It is shown separately and <Text style={{ fontWeight: '600' }}>never feeds the Gradient Score</Text>,
         so the Detection/Confidence read stays an objective measurement of the external world.
       </Block>

@@ -94,13 +94,14 @@ export function Methodology() {
 
         {/* The N factor — separate from the Gradient Score */}
         <section className="mth-sec">
-          <h3>The N factor — Now Trending (community demand)</h3>
+          <h3>The N factor — Now Trending (platform indicator)</h3>
           <div className="mth-card" style={{ borderColor: '#EE6A2A55', background: '#EE6A2A0C' }}>
             <div className="mth-tag" style={{ color: '#EE6A2A' }}>● N · Now Trending</div>
             <p className="mth-p">
-              <b>N</b> is our on-platform <b>demand</b> signal — how often Now TrendIn users
-              themselves query, open, or grade a topic. It captures real institutional curiosity
-              that no public source can see, and it is shown alongside every score.
+              <b>N</b> is our <b>platform-tracking</b> signal — how often a topic is triggered and
+              surfaced as a tracked topic across the Now TrendIn platform (its feeds, queries, and
+              grades). It is a platform-internal read that no public source has, and it is shown
+              alongside every score.
             </p>
             <p className="mth-p" style={{ marginTop: 10 }}>
               <b>N is deliberately NOT part of the Gradient Score.</b> Detection and Confidence are

@@ -194,9 +194,9 @@ export default function SignalDetail() {
           </Text>
         </View>
         <Text className="text-textSecondary text-[12px] leading-4 mb-2">
-          The on-platform demand signal — how often Now TrendIn users have been asking the
-          engine about this topic. Captures real institutional curiosity that no public
-          source can see.
+          A platform-tracking signal — how often this topic is triggered and surfaced as a
+          tracked topic across the Now TrendIn platform (its feeds, queries, and grades). A
+          platform-internal read that no public source has.
         </Text>
         {/* The "Now Trending Gradient Score" — a separate, demand-inclusive read
             unique to the trend signal section. The headline Detection/Confidence
@@ -212,14 +212,14 @@ export default function SignalDetail() {
                 Now Trending Gradient Score
               </Text>
               <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EE6A2A1A' }}>
-                <Text className="text-[9px] font-bold" style={{ color: '#EE6A2A' }}>SEPARATE · DEMAND-INCLUSIVE</Text>
+                <Text className="text-[9px] font-bold" style={{ color: '#EE6A2A' }}>SEPARATE · N-INCLUSIVE</Text>
               </View>
             </View>
             <Text className="text-textMuted text-[11px] leading-4 mb-2">
-              A separate, what-if read: where the score would land if on-platform demand (N)
-              were folded in. The headline Detection/Confidence above stay N-free (external
-              world only) — this demand-inclusive view is shown only here, never sold as the
-              Gradient Score.
+              A separate, what-if read: where the score would land if the platform-tracking
+              signal (N) were folded in. The headline Detection/Confidence above stay N-free
+              (external world only) — this N-inclusive view is shown only here, never sold as
+              the Gradient Score.
             </Text>
             <View className="flex-row gap-3">
               <View className="flex-1 rounded-xl border p-2.5" style={{ borderColor: '#2D7EEF33', backgroundColor: '#2D7EEF0A' }}>
@@ -233,8 +233,8 @@ export default function SignalDetail() {
             </View>
             {signal.nowTrendingGradientDemandDriven && (
               <Text className="text-[10px] leading-4 mt-2" style={{ color: '#B5341B' }}>
-                ⚠ Substantially driven by internal demand — external confirmation is limited
-                for this topic. N's weight is reduced here so demand alone can't lift the score.
+                ⚠ Substantially driven by N (platform tracking) — external confirmation is limited
+                for this topic. N's weight is reduced here so platform tracking alone can't lift the score.
               </Text>
             )}
           </View>
@@ -243,8 +243,8 @@ export default function SignalDetail() {
         {(!signal.nowTrending || signal.nowTrending === 0) && (
           <View className="mt-2 pt-2 border-t" style={{ borderColor: '#EE6A2A33' }}>
             <Text className="text-textMuted text-[11px] italic">
-              No on-platform demand has registered for this topic yet — N will rise as
-              users query about it.
+              No platform tracking has registered for this topic yet — N will rise as it is
+              surfaced and queried across the platform.
             </Text>
           </View>
         )}
