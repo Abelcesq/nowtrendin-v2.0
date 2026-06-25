@@ -88,13 +88,17 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
       {/* Market read first (companies) */}
       {ms && (() => {
         const tc = marketTierColor(ms.tier)
+        const msV2 = !!((ms as any).model_version || (ms as any).flow || (ms as any).money_movement)
+        const flow = (ms as any).flow as string | undefined
+        const mAnalysis = result.market_analysis?.text as string | undefined
         return (
           <div className="g-card" style={{ borderColor: tc + '44' }}>
-            <div className="g-kicker" style={{ color: MC.amber }}>Market Signal · market positioning
-              <span className="g-tier" style={{ background: tc + '1A', color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.data_coverage === 'insufficient' ? 'LIMITED DATA' : ms.tier}</span></div>
+            <div className="g-kicker" style={{ color: MC.amber }}>Market Signal · {msV2 ? 'money movement' : 'market positioning'}
+              <span className="g-tier" style={{ background: tc + '1A', color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.data_coverage === 'insufficient' ? 'LIMITED DATA' : ms.tier}</span>
+              {msV2 && flow && <span className="g-tier" style={{ background: (flow === 'inflow' ? MC.confidence : flow === 'outflow' ? MC.red : MC.muted) + '1A', color: flow === 'inflow' ? MC.confidence : flow === 'outflow' ? MC.red : MC.muted }}>{flow === 'inflow' ? '▲ inflow' : flow === 'outflow' ? '▼ outflow' : '• neutral'}</span>}</div>
             <div className="g-rings" style={ms.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
-              <div className="g-ring">{ring(ms.detection, MC.detection)}<div className="g-rl">DETECTION</div><div className="g-rf">analysts + positioning</div></div>
-              <div className="g-ring">{ring(ms.confidence, MC.confidence)}<div className="g-rl">CONFIDENCE</div><div className="g-rf">fundamentals + price</div></div>
+              <div className="g-ring">{ring(ms.detection, MC.detection)}<div className="g-rl">{msV2 ? 'MONEY MOVEMENT' : 'DETECTION'}</div><div className="g-rf">{msV2 ? 'informed money · D' : 'analysts + positioning'}</div></div>
+              <div className="g-ring">{ring(ms.confidence, MC.confidence)}<div className="g-rl">{msV2 ? 'MARKET CONFIRMATION' : 'CONFIDENCE'}</div><div className="g-rf">{msV2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
             </div>
             {ms.leverage_health != null && <div className="g-lev">Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</div>}
             {ms.data_coverage === 'insufficient' ? (
@@ -102,6 +106,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
                 ⚠ <b>Insufficient positioning data.</b> Smart-money &amp; short-interest sources (FINRA short interest / 13F holdings) aren’t populated for this instrument yet{ms.absent_inputs != null ? ` (${ms.absent_inputs}/${ms.total_inputs} inputs absent)` : ''}, so this sits near baseline. Treat as limited coverage — <i>not</i> a confirmed quiet market.
               </div>
             ) : (ms.interpretation && <div className="narr">{ms.interpretation}</div>)}
+            {mAnalysis && <div className="narr" style={{ marginTop: 6 }}><b style={{ color: MC.amber }}>AI analysis</b> — {mAnalysis}<div className="disc" style={{ marginTop: 6 }}>AI measurement of money movement, market confirmation &amp; leverage from our scores — computer-generated, not financial advice.</div></div>}
             <div className="disc">Measured MARKET read — is positioning unusual vs this stock’s <i>own</i> baseline? Same data as the Market section. The Attention/Gradient read below is a separate question.</div>
           </div>
         )

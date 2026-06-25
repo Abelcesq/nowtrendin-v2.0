@@ -22,9 +22,10 @@ interface Proposed {
     market_gradient?: {
       detection: number; confidence: number; tier: string; gap: number;
       gap_state?: string; calibrating?: boolean; leverage_health?: number | null;
-      interpretation?: string;
+      interpretation?: string; model_version?: string; flow?: string;
     };
   };
+  market_analysis?: { text?: string; provider?: string; cached?: boolean };
 }
 
 const MARKET_TIER_COLOR: Record<string, string> = {
@@ -224,30 +225,49 @@ function ProposedCard({ result }: { result: Proposed }) {
         the full financial stack. Shown FIRST so a company's market read leads. */}
     {ms && (() => {
       const tc = MARKET_TIER_COLOR[ms.tier] ?? '#9AA3B0';
+      const msV2 = !!(ms.model_version || ms.flow);
+      const flow = ms.flow;
+      const flowMeta = flow === 'inflow' ? { t: '▲ inflow', c: '#00C896' }
+        : flow === 'outflow' ? { t: '▼ outflow', c: '#DC2626' }
+        : flow === 'neutral' ? { t: '• neutral', c: '#9AA3B0' } : null;
+      const mAnalysis = result.market_analysis?.text;
       return (
         <View className="bg-surface rounded-2xl border p-5 mb-4" style={{ borderColor: `${tc}44` }}>
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#E85A1E' }}>Market Signal · measured</Text>
-            <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tc}1A` }}>
-              <Text className="text-[10px] font-bold" style={{ color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</Text>
+            <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#E85A1E' }}>Market Signal · {msV2 ? 'money movement' : 'measured'}</Text>
+            <View className="flex-row items-center gap-1.5">
+              {msV2 && flowMeta && (
+                <View className="px-2 py-1 rounded-full" style={{ backgroundColor: `${flowMeta.c}1A` }}>
+                  <Text className="text-[10px] font-bold" style={{ color: flowMeta.c }}>{flowMeta.t}</Text>
+                </View>
+              )}
+              <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tc}1A` }}>
+                <Text className="text-[10px] font-bold" style={{ color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</Text>
+              </View>
             </View>
           </View>
           <View className="flex-row justify-around items-start mb-2">
             <View className="items-center">
               <GradientScoreRing score={Math.round(ms.detection)} color="#2D7EEF" size="md" caption="/100" />
-              <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-              <Text className="text-textMuted text-[9px]">analysts + positioning</Text>
+              <Text className="text-textPrimary text-xs font-bold mt-2">{msV2 ? 'MONEY MOVEMENT' : 'DETECTION'}</Text>
+              <Text className="text-textMuted text-[9px]">{msV2 ? 'informed money · D' : 'analysts + positioning'}</Text>
             </View>
             <View className="items-center">
               <GradientScoreRing score={Math.round(ms.confidence)} color="#00C896" size="md" caption="/100" />
-              <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-              <Text className="text-textMuted text-[9px]">fundamentals + price</Text>
+              <Text className="text-textPrimary text-xs font-bold mt-2">{msV2 ? 'MARKET CONFIRMATION' : 'CONFIDENCE'}</Text>
+              <Text className="text-textMuted text-[9px]">{msV2 ? 'broad market · M' : 'fundamentals + price'}</Text>
             </View>
           </View>
           {ms.leverage_health != null && (
             <Text className="text-[11px] font-bold text-center mb-1" style={{ color: '#10B981' }}>Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</Text>
           )}
           {!!ms.interpretation && <Text className="text-textSecondary text-[12px] leading-4">{ms.interpretation}</Text>}
+          {!!mAnalysis && (
+            <View className="mt-2 pt-2 border-t border-border">
+              <Text className="text-[12px] leading-4 text-textSecondary"><Text className="font-bold" style={{ color: '#E85A1E' }}>AI analysis</Text> — {mAnalysis}</Text>
+              <Text className="text-textMuted text-[9px] mt-1">AI measurement of money movement, market confirmation & leverage from our scores — computer-generated, not financial advice.</Text>
+            </View>
+          )}
           <Text className="text-textMuted text-[10px] mt-2">This is the measured MARKET read — the same as the Market section. The AI estimate below is the separate ATTENTION read.</Text>
         </View>
       );
