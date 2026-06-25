@@ -40,6 +40,22 @@ INTEGRITY:
 """
 
 import math
+import os
+
+# ── MAINSTREAM v2 (founder model: trigger-vs-corroborator) — flag-gated, DEFAULT OFF ──────────
+# Concern: a few credible news outlets prematurely flip a topic to "mainstream", which then lands
+# in the gradient's denominator and SUPPRESSES the very early read we exist to catch. v2 says: a
+# credible outlet is a DARK-MATTER TRIGGER until enough DISTINCT outlets corroborate. Mainstream
+# requires a real news QUORUM (≥ NEWS_QUORUM_V2 distinct outlets) OR a genuine magnitude spike —
+# NOT a single outlet and NOT the bare community-count branch (which leaked "footballer" on 1
+# outlet). A sub-quorum, low-magnitude topic keeps mainstream weight ~0 → stays a trigger (its
+# detection rides the expert/dark-matter pathway, preserved). Anti-circularity: distinct source_name
+# counting means one outlet (even repeated) can't self-confirm mainstream. Tune via the backtest
+# (mainstream_v2_backtest / GET /research/mainstream-v2) on the FIFA basket BEFORE flipping.
+MAINSTREAM_V2 = os.getenv("MAINSTREAM_V2", "0") == "1"
+NEWS_QUORUM_V2 = int(os.getenv("NEWS_QUORUM_V2", "5"))        # distinct reputable outlets ⇒ mainstream
+MAG_MAINSTREAM_V2 = float(os.getenv("MAG_MAINSTREAM_V2", "60"))  # magnitude that alone ⇒ mainstream (FIFA ~82)
+MAG_TRIGGER_FLOOR_V2 = float(os.getenv("MAG_TRIGGER_FLOOR_V2", "30"))  # below this + sub-quorum ⇒ stay trigger
 
 # Tiers that represent general-public / discovery attention.
 _MAINSTREAM_TIERS = {"mainstream"}
@@ -228,7 +244,13 @@ def blend(expert_detection: float, expert_overall: float,
     # independent of baseline/magnitude: corroborated across many distinct
     # reputable outlets, OR broadly across mainstream communities. This is the
     # founder's "multiple news sources + other platforms = mainstream" rule.
-    mainstream_confirmed = (n_news >= NEWS_MAINSTREAM_MIN) or (cur_n >= _BREADTH_FULL)
+    if MAINSTREAM_V2:
+        # v2: a real news QUORUM (≥5 distinct outlets) OR a genuine magnitude spike — NOT a
+        # single outlet and NOT the bare community-count branch (which flipped "footballer" on
+        # 1 outlet). This is the trigger-vs-corroborator rule: corroboration, not a lone source.
+        mainstream_confirmed = (n_news >= NEWS_QUORUM_V2) or (mag >= MAG_MAINSTREAM_V2)
+    else:
+        mainstream_confirmed = (n_news >= NEWS_MAINSTREAM_MIN) or (cur_n >= _BREADTH_FULL)
 
     calibrating = baseline_cycles < MIN_BASELINE_CYCLES or breadth_baseline is None
     if calibrating:
@@ -259,6 +281,16 @@ def blend(expert_detection: float, expert_overall: float,
     tier_migration = (not calibrating) and n_expert >= 1 and breadth_factor > 0
     if tier_migration:
         breadth_factor = min(1.0, breadth_factor + 0.3)
+
+    # ── v2 trigger-vs-corroborator clamp ──────────────────────────────────────
+    # A topic carried by FEWER than the news quorum of distinct outlets AND with no real
+    # magnitude is a TRIGGER (dark matter), not mainstream. Zero its mainstreaming weight so
+    # detection rides the early/expert pathway — the credible source acts as an early signal,
+    # not a denominator vote that suppresses it — until DISTINCT outlets actually corroborate
+    # (≥ NEWS_QUORUM_V2) or attention magnitude spikes. (Magnitude path keeps FIFA mainstream.)
+    if MAINSTREAM_V2 and n_news < NEWS_QUORUM_V2 and mag < MAG_TRIGGER_FLOOR_V2:
+        breadth_factor = 0.0
+        tier_migration = False
 
     # Mainstream when breadth OR magnitude expands past baseline (cross-community
     # corroboration velocity, a mass-attention spike, or a tier-crossing).
@@ -308,6 +340,8 @@ def blend(expert_detection: float, expert_overall: float,
         "n_expert_communities": br.get("n_expert", 0),
         "news_outlets": n_news,
         "mainstream_confirmed": bool(mainstream_confirmed),
+        "mainstream_model": "v2" if MAINSTREAM_V2 else "v1",
+        "news_quorum": (NEWS_QUORUM_V2 if MAINSTREAM_V2 else NEWS_MAINSTREAM_MIN),
         "tier_migration": bool(tier_migration),
         "mainstream_detection": md,
         "expert_detection": round(expert_detection, 2),

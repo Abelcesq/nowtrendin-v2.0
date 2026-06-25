@@ -6380,6 +6380,74 @@ def market_accuracy_sweep(sync: int = 0, limit: int = Query(50, ge=1, le=500)):
     return {"status": "started"}
 
 
+@app.get("/research/mainstream-v2")
+def research_mainstream_v2(topics: str = "world cup,mexico world cup,footballer", hours: int = 336):
+    """HELD-OUT backtest (read-only, changes NO score): compares v1 vs v2 mainstream classification
+    for each topic using its LIVE signals. v2 = the founder's trigger-vs-corroborator rule (a credible
+    outlet is a dark-matter TRIGGER until ≥NEWS_QUORUM_V2 distinct outlets corroborate, or magnitude
+    spikes). Also lists the distinct news outlets carrying each topic (eyeball real corroboration vs
+    wire-syndication). expert_detection is held at a fixed 70 reference so the PATHWAY/weight shift is
+    the meaningful output. The basis to review BEFORE flipping MAINSTREAM_V2."""
+    try:
+        import dual_pathway as dp
+    except Exception as e:
+        return {"available": False, "reason": f"dual_pathway unavailable: {e}"}
+    out = []
+    conn = get_db(DB_PATH)
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    try:
+        for disp in [t.strip() for t in (topics or "").split(",") if t.strip()]:
+            try:
+                tk = _topic_key(disp)
+            except Exception:
+                tk = disp.lower().replace(" ", "_")
+            q = ("SELECT platform, platform_tier, source_name, engagement_raw FROM topic_signals "
+                 "WHERE topic_key = ? AND extracted_at >= ? AND platform_tier != 'unverified'")
+            sig = [dict(r) for r in conn.execute(q, (tk, cutoff)).fetchall()]
+            if not sig:
+                row = conn.execute("SELECT topic_key FROM velocity_scores WHERE LOWER(topic_display)=? "
+                                   "ORDER BY scored_at DESC LIMIT 1", (disp.lower(),)).fetchone()
+                if row:
+                    tk = row["topic_key"]
+                    sig = [dict(r) for r in conn.execute(q, (tk, cutoff)).fetchall()]
+            if not sig:
+                out.append({"topic": disp, "topic_key": tk, "available": False, "reason": "no live signals"})
+                continue
+            hist = conn.execute("SELECT attention_magnitude, n_mainstream_platforms FROM velocity_scores "
+                                "WHERE topic_key=? ORDER BY scored_at DESC LIMIT 12", (tk,)).fetchall()
+            mags = sorted(float(h["attention_magnitude"] or 0) for h in hist)
+            brs = sorted(float(h["n_mainstream_platforms"] or 0) for h in hist)
+            mag_base = mags[len(mags) // 2] if mags else 0.0
+            brd_base = brs[len(brs) // 2] if brs else 0.0
+
+            def _run(v2: bool):
+                dp.MAINSTREAM_V2 = v2
+                return dp.blend(70, 65, {"M": 40, "I": 30, "P": 50}, sig,
+                                breadth_baseline=brd_base, magnitude_baseline=mag_base,
+                                baseline_cycles=len(hist), expert_confidence=60)
+            b1, b2 = _run(False), _run(True)
+            dp.MAINSTREAM_V2 = (os.getenv("MAINSTREAM_V2", "0") == "1")   # restore live state
+            news = sorted({(s.get("source_name") or s.get("platform")) for s in sig
+                           if (s.get("platform") or "").lower() in dp._NEWS_PLATFORMS})
+            out.append({
+                "topic": disp, "topic_key": tk, "available": True,
+                "n_signals": len(sig), "n_news_outlets": len(news), "magnitude": b1["magnitude"],
+                "news_outlets_sample": news[:15],
+                "v1": {"detection": b1["detection"], "pathway": b1["pathway"],
+                       "w": b1["mainstream_ratio"], "mainstream_confirmed": b1["mainstream_confirmed"]},
+                "v2": {"detection": b2["detection"], "pathway": b2["pathway"],
+                       "w": b2["mainstream_ratio"], "mainstream_confirmed": b2["mainstream_confirmed"]},
+            })
+    except Exception as e:
+        print(f"[mainstream-v2] {e}")
+    finally:
+        conn.close()
+    return {"held_out": True, "news_quorum_v2": dp.NEWS_QUORUM_V2,
+            "note": "v1 vs v2 mainstream on LIVE signals — read-only, no score change. expert_detection "
+                    "fixed at 70 so the pathway/weight shift is the signal. Review before flipping MAINSTREAM_V2.",
+            "comparison": out}
+
+
 @app.get("/signal-x/{topic}")
 def signal_x(topic: str):
     """Live X (Twitter) dual-role analysis for a topic (gated on X_BEARER_TOKEN).
