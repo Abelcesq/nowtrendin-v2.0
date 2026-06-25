@@ -3,7 +3,29 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-25a_
+_Last updated: 2026-06-25b_
+
+---
+
+## Session 2026-06-25b — N component accuracy fix (platform tracking, NOT user demand)
+
+Founder flagged the N-component copy as inaccurate ("how often Now TrendIn users asked the engine
+about this topic"). **Verified in the engine:** N (`nowtrendin_score`) is computed purely from
+`topic_queries`, and `_log_topic_query` fires **every time a topic is SURFACED in an API result**
+(the `/scores` feed, `/anomalies`, `/trending`), an on-demand `/scores/{topic}` query, or a grade.
+So N = platform-tracking / appearance frequency — NOT a user-demand claim. Founder was right.
+
+Corrected consistently across all 3 platforms + the engine source comments:
+- **"Community Demand" → "Platform Indicator"**; "Now TrendIn user demand" → "Now TrendIn platform
+  tracking" (web Screener breakdown + its bar-color key).
+- N description (Screener, mobile signal detail, Grade, both Methodology pages, GradeTool): "how often
+  users asked / institutional curiosity" → "how often this topic is triggered + surfaced as a tracked
+  topic across the platform (feeds, queries, grades) — a platform-internal read no public source has."
+- "DEMAND-INCLUSIVE" → "N-INCLUSIVE"; demand-driven warnings + empty states reworded.
+- Engine (comment/docstring only, zero runtime change — lands next engine deploy): `compute_nowtrendin_score`
+  docstring + `velocity_scores`/`topic_queries` DDL comments.
+- Unchanged: N stays a SEPARATE signal, DELIBERATELY EXCLUDED from the Gradient (no feedback loop).
+- Web → gh-pages (`00ed5c1`); mobile on Metro reload; desktop inherits. Build + tsc clean.
 
 ---
 
