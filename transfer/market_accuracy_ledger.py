@@ -356,6 +356,14 @@ def report(db_path=DB_PATH) -> dict:
     not a forecast or advice."""
     conn = _connect(db_path)
     rows = [dict(r) for r in conn.execute("SELECT * FROM market_accuracy_ledger").fetchall()]
+    # In-flight detections (recorded, awaiting a confirming move or the timeout) — proves
+    # detections are being captured even before any verdict resolves.
+    try:
+        pending = conn.execute(
+            "SELECT COUNT(*) FROM market_pending_detections WHERE status='pending'").fetchone()
+        pending = (pending[0] if not isinstance(pending, dict) else list(pending.values())[0]) or 0
+    except Exception:
+        pending = 0
     conn.close()
     confirmed = [r for r in rows if r.get("verdict") == "CONFIRMED"]
     not_conf = [r for r in rows if r.get("verdict") == "NOT_CONFIRMED"]
@@ -375,6 +383,7 @@ def report(db_path=DB_PATH) -> dict:
         "move_threshold_pct": MOVE_THRESHOLD_PCT,
         "timeout_days": MARKET_TIMEOUT_DAYS,
         "resolved": resolved,
+        "pending": pending,
         "confirmed": len(confirmed),
         "not_confirmed": len(not_conf),
         "no_move": len(no_move),

@@ -91,8 +91,9 @@ export default function AccuracyLedger() {
             <Target size={40} color="#C7CDD6" />
             <Text className="text-textPrimary font-bold text-base mt-3 text-center">No resolved money-movement detections yet</Text>
             <Text className="text-textMuted text-sm mt-2 text-center leading-5">
-              The Money ledger fills in as detected money flows are checked against the realized EOD price
-              direction (or the {mrep?.timeoutDays ?? 60}-day window elapses). Populates once the Money Gradient is live.
+              {(mrep?.pending ?? 0) > 0
+                ? `${mrep!.pending} detection${mrep!.pending === 1 ? '' : 's'} in flight — they resolve as the realized EOD price direction confirms (or the ${mrep?.timeoutDays ?? 60}-day window elapses).`
+                : `The Money ledger fills in as detected money flows are checked against the realized EOD price direction (or the ${mrep?.timeoutDays ?? 60}-day window elapses). Populates once the Money Gradient is live.`}
             </Text>
           </View>
         )

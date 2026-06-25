@@ -546,7 +546,7 @@ export async function fetchAccuracy(): Promise<AccuracyReport> {
 // Money Gradient ledger — validated by realized EOD price DIRECTION (FMP), NOT Google Trends.
 export interface MarketAccuracyReport {
   status: string;
-  resolved?: number; confirmed?: number; notConfirmed?: number; noMove?: number;
+  resolved?: number; pending?: number; confirmed?: number; notConfirmed?: number; noMove?: number;
   confirmRate?: number | null; medianLead?: number | null;
   moveThresholdPct?: number; timeoutDays?: number;
   inflowConfirm?: number | null; outflowConfirm?: number | null;
@@ -558,7 +558,7 @@ export async function fetchMarketAccuracy(): Promise<MarketAccuracyReport> {
   const d = await res.json();
   return {
     status: d.status,
-    resolved: d.resolved, confirmed: d.confirmed, notConfirmed: d.not_confirmed, noMove: d.no_move,
+    resolved: d.resolved, pending: d.pending, confirmed: d.confirmed, notConfirmed: d.not_confirmed, noMove: d.no_move,
     confirmRate: d.confirm_rate_pct, medianLead: d.median_lead_days,
     moveThresholdPct: d.move_threshold_pct, timeoutDays: d.timeout_days,
     inflowConfirm: d.by_flow?.inflow?.confirm_rate_pct ?? null,

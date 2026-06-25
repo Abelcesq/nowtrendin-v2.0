@@ -104,7 +104,7 @@ export function Ledger() {
           <div className="main-sub">
             {money ? (
               <>Money-movement detections validated against realized <b>EOD price direction</b> (FMP) ·{' '}
-                <b>{msum?.resolved ?? 0}</b> resolved</>
+                <b>{msum?.resolved ?? 0}</b> resolved · <b>{msum?.pending ?? 0}</b> in flight</>
             ) : (
               <>Timestamped detections validated against observed breakouts ·{' '}
                 <b>{resolved}</b> resolved · <b>{summary?.pending ?? 0}</b> pending</>
@@ -138,7 +138,7 @@ export function Ledger() {
             <div className="statcard"><div className="sl">Median lead</div><div className="sv early">{msum?.median_lead_days != null ? msum.median_lead_days + 'd' : '—'}</div><div className="sf">days from detection to the confirming move</div></div>
             <div className="statcard"><div className="sl">Confirmed / Not / No-move</div><div className="sv">{msum?.confirmed ?? 0}/{msum?.not_confirmed ?? 0}/{msum?.no_move ?? 0}</div><div className="sf">directional outcome breakdown</div></div>
             <div className="statcard"><div className="sl">Inflow · outflow confirm</div><div className="sv">{msum?.by_flow?.inflow?.confirm_rate_pct != null ? msum.by_flow.inflow.confirm_rate_pct + '%' : '—'} · {msum?.by_flow?.outflow?.confirm_rate_pct != null ? msum.by_flow.outflow.confirm_rate_pct + '%' : '—'}</div><div className="sf">by detected flow direction</div></div>
-            <div className="statcard"><div className="sl">Resolved</div><div className="sv">{msum?.resolved ?? 0}</div><div className="sf">{msum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
+            <div className="statcard"><div className="sl">Resolved · in flight</div><div className="sv">{msum?.resolved ?? 0}·{msum?.pending ?? 0}</div><div className="sf">{msum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
           </div>
         </>
       ) : (
@@ -160,7 +160,7 @@ export function Ledger() {
           mview.length === 0 ? (
             <div className="center-state">
               No resolved money-movement detections yet{filter ? ` for "${MVLABEL[filter]}"` : ''}.
-              <div className="muted">Detections resolve as the realized price confirms (or the {msum?.timeout_days ?? 60}-day window elapses). Populates once the Money Gradient is live.</div>
+              <div className="muted">{(msum?.pending ?? 0) > 0 ? `${msum!.pending} detection${msum!.pending === 1 ? '' : 's'} in flight — they resolve` : 'Detections resolve'} as the realized price confirms (or the {msum?.timeout_days ?? 60}-day window elapses).{(msum?.pending ?? 0) === 0 ? ' Populates once the Money Gradient is live.' : ''}</div>
             </div>
           ) : (
             <table>

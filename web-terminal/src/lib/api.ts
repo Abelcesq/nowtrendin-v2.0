@@ -35,7 +35,7 @@ export interface MarketLedgerSummary {
   status: string
   ground_truth?: string; distinct_from?: string
   move_threshold_pct?: number; timeout_days?: number
-  resolved?: number; confirmed?: number; not_confirmed?: number; no_move?: number
+  resolved?: number; pending?: number; confirmed?: number; not_confirmed?: number; no_move?: number
   confirm_rate_pct?: number | null; median_lead_days?: number | null
   by_flow?: Record<string, { confirmed: number; resolved: number; confirm_rate_pct: number | null }>
   small_sample?: boolean; note?: string
