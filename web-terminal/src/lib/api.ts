@@ -53,6 +53,13 @@ export interface MarketGradient {
   // Coverage LANE — covered / halted_microcap / macro_theme. na_components = inputs
   // structurally inapplicable to this instrument (excluded from score + coverage).
   lane?: string; lane_label?: string; na_components?: string[]
+  // Market Signal v2.0 (the Money Gradient) — present ONLY when MARKET_SIGNAL_V2 is on.
+  // When present, Detection→Money Movement, Confidence→Market Confirmation, and flow
+  // (the factual IN/OUT direction) + leverage facts surface. Absent → v1 labels (flag off).
+  model_version?: string
+  money_movement?: number; market_confirmation?: number
+  flow?: 'inflow' | 'outflow' | 'neutral'
+  leverage_facts?: { company_leverage_health?: number | null; note?: string }
 }
 export interface RiskRow {
   risk_topic: string; risk_display: string

@@ -18,6 +18,7 @@ interface MRow {
   sigs: number; ageMin: number; calibrating: boolean; dc?: string
   interp: string; comps: [string, number, string][]
   lane: string; laneLabel: string   // coverage lane: covered / halted_microcap / macro_theme
+  v2: boolean; flow: 'inflow' | 'outflow' | 'neutral' | null  // Money Gradient (v2): direction
   raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
 type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
@@ -82,8 +83,23 @@ function toRow(r: RiskRow): MRow {
     dc: mg.data_coverage,
     interp: mg.interpretation || r.interpretation || '',
     lane: mg.lane || '', laneLabel: mg.lane_label || '',
+    v2: !!(mg.model_version || mg.money_movement != null || mg.flow),
+    flow: (mg.flow as MRow['flow']) || null,
     comps, raw: r,
   }
+}
+
+// Money Gradient (v2) labels — used only when the engine serves a v2 payload.
+const MM_LABEL = 'Money Movement'      // was "Detection" (informed/early money flow, D)
+const MC_LABEL = 'Market Confirmation' // was "Confidence" (broad market/economic confirmation, M)
+
+// Factual flow direction chip (a FACT from filings — not a buy/sell call).
+function flowChip(flow: MRow['flow']) {
+  if (!flow) return null
+  const meta = flow === 'inflow' ? { t: '▲ inflow', c: MC.confidence }
+    : flow === 'outflow' ? { t: '▼ outflow', c: MC.red }
+    : { t: '• neutral', c: MC.muted }
+  return <span className="cal-chip" title="Net money-flow DIRECTION from filings (Congress · insider · 13F) — a fact, not advice" style={{ background: meta.c + '1A', color: meta.c, fontWeight: 700 }}>{meta.t}</span>
 }
 
 // Coverage-lane axis (Tier 1) — separates instruments by what data CAN exist for them,
@@ -141,7 +157,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.name}</div>
-            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
+            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.v2 && flowChip(row.flow)}{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -154,8 +170,8 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       <Disclaimer style={{ marginBottom: 10 }} />
       {/* Market Gradient — dual score, mobile colors */}
       <div className="gauges" style={mg.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
-        <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">analysts + positioning</div></div>
-        <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">fundamentals + price</div></div>
+        <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MM_LABEL : 'Detection'}</div><div className="gf">{row.v2 ? 'informed money · D' : 'analysts + positioning'}</div></div>
+        <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MC_LABEL : 'Confidence'}</div><div className="gf">{row.v2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
       </div>
       <div className="sect">
         {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
@@ -173,7 +189,9 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
           {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
           {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</div>}
         </div>
-        <div className="disc"><b>What Market Signal measures:</b> is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</div>
+        <div className="disc"><b>What Market Signal measures:</b> {row.v2
+          ? <>where <i>money</i> is moving versus this instrument’s <b>own</b> baseline — a different question from a Trend/Attention score. {MM_LABEL} = informed/early money (Congress · insider · 13F · quality analysts, D); {MC_LABEL} = broad market/economic confirmation (M). The <b>flow</b> (IN/OUT) is a fact from filings; whether an early read LED is recorded — factually, after the fact — by the market accuracy ledger (validated against realized price direction). Measurement only — not financial advice.</>
+          : <>is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</>}</div>
       </div>
 
       {/* Market factors — colored by which score they feed */}
@@ -420,6 +438,9 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   }, [preset?.n])
 
   const anyCalibrating = useMemo(() => rows.some((r) => r.calibrating), [rows])
+  // Money Gradient (v2) is global on the engine (MARKET_SIGNAL_V2): either every row
+  // carries the v2 fields or none do. One flag drives the column labels + framing.
+  const isV2 = useMemo(() => rows.some((r) => r.v2), [rows])
 
   // Lane counts (over the full set, before tier/search filters) for the chip labels.
   const laneCounts = useMemo(() => {
@@ -483,7 +504,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
       <div className="main-head">
         <div className="main-title-row">
           <div className="main-title">Market Signal</div>
-          <div className="main-sub"><b>{view.length}</b> instruments · finance-native dual score · baseline-relative{pullMsg ? ` · ${pullMsg}` : ''}</div>
+          <div className="main-sub"><b>{view.length}</b> instruments · {isV2 ? 'the Money Gradient — where money is moving (D→M)' : 'finance-native dual score'} · baseline-relative{pullMsg ? ` · ${pullMsg}` : ''}</div>
           <div className="main-actions">
             <button className="btn primary" onClick={doPull} disabled={pulling} title="Enterprise — fresh FINRA/OFR/WhaleWisdom/creator/news pull, costs 1 token">
               {pulling ? '⟳ Pulling…' : '⚡ Pull Market · 1 token'}
@@ -536,9 +557,9 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
             <thead>
               <tr>
                 <th onClick={() => sort('name')} className={sortKey === 'name' ? 'sorted' : ''}>Instrument <span className="sort">{arrow('name')}</span></th>
-                <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')}>Detection <span className="sort">{arrow('det')}</span></th>
-                <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')}>Confidence <span className="sort">{arrow('conf')}</span></th>
-                <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')}>Gap (lead) <span className="sort">{arrow('gap')}</span></th>
+                <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')}>{isV2 ? MM_LABEL : 'Detection'} <span className="sort">{arrow('det')}</span></th>
+                <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')}>{isV2 ? MC_LABEL : 'Confidence'} <span className="sort">{arrow('conf')}</span></th>
+                <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')}>{isV2 ? 'Lead' : 'Gap (lead)'} <span className="sort">{arrow('gap')}</span></th>
                 <th onClick={() => sort('tier')} className={sortKey === 'tier' ? 'sorted' : ''}>Tier <span className="sort">{arrow('tier')}</span></th>
                 <th onClick={() => sort('pct')} className={'r ' + (sortKey === 'pct' ? 'sorted' : '')}>%Δ baseline <span className="sort">{arrow('pct')}</span></th>
                 <th onClick={() => sort('lev')} className={'r ' + (sortKey === 'lev' ? 'sorted' : '')}>Leverage <span className="sort">{arrow('lev')}</span></th>
@@ -551,7 +572,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                 const gw = Math.abs(r.gap) >= 20 ? 'wide' : r.gap < 0 ? 'neg' : 'tight'
                 return (
                   <tr key={r.key} className={r.key === sel ? 'sel' : ''} onClick={() => select(r.key)}>
-                    <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}</div><div className="topic-cat">{r.lane ? (LANE_SHORT[r.lane] || 'market') : (r.cls ? r.cls.toLowerCase() : 'market')}</div></td>
+                    <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}{r.v2 && flowChip(r.flow)}</div><div className="topic-cat">{r.lane ? (LANE_SHORT[r.lane] || 'market') : (r.cls ? r.cls.toLowerCase() : 'market')}</div></td>
                     <td className="r"><span className="score-cell det" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.det}</span></td>
                     <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
