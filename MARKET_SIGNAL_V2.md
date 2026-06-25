@@ -135,6 +135,12 @@ money signal detected — the ledger will show whether it led," "leverage is ele
    inherits; mobile) with the new labels (Money Movement / Confirmation / Leverage Facts / flow) and
    the language purge. Maintain 3-platform parity.
 
+> **STATUS: LIVE.** Flag flipped ON (engine v155) and validated 2026-06-25 — 8/8 rows scored
+> `model_version=v2`, directional signals correct (NVDA/AAPL/JPM outflow, MM≫MC; macro/micro-caps
+> neutral), detections recording, enriched interpretation live. All 3 platforms propagated; both
+> accuracy ledgers exposed (Attention/Money toggle). Reversible with `MARKET_SIGNAL_V2=0`. Market
+> ledger verdicts resolve forward as price confirms (±5%) or the 60-day window elapses.
+
 ---
 
 ## 7. Naming map (v1 → v2)
