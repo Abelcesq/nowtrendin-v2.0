@@ -377,7 +377,37 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
    source ADDITIONALLY requires **backtest-before-ship**: build it held-out, research the output,
    review, and only then integrate into any score.
 
-*Last updated: 2026-06-24 — **§16 SOURCE ONBOARDING PROTOCOL** added (hard 5-gate rule before
+## 17. SOURCE-DISPLAY RULE (detail sections — trend + market, ALL platforms)
+
+> **Hard rule:** a topic's detail view shows ONLY the sources, coverage, and components that
+> actually CONTRIBUTE to that topic's score or research. A data source that returns no data for
+> the topic — isn't covering it, has 0 items, or is N/A for it — is **OMITTED**, never rendered as
+> empty, "not in recent uploads", "0 articles", "no coverage across N channels", or **NaN**.
+
+- Applies to BOTH the **trend signal detail** and the **market signal detail**, on **all three
+  platforms** (web terminal · desktop · mobile). Parity enforced by the **Frontend Consistency**
+  agent (`/frontend-consistency`).
+- **Why:** showing a non-contributing source implies it informed the read when it did not — noise
+  that misrepresents what supports the score. Integrity: only reference what contributes
+  ([[feedback-integrity-standard]]).
+- **Mechanics:** gate each source/coverage sub-block on real content for the topic (covered creators
+  only; news only when `article_count > 0`; broadcast only when `channels > 0`; positioning/
+  fundamentals only when present). A section with no contributing sub-blocks is not rendered.
+  Component breakdowns render a real value or an explicit **"n/a"** — NEVER `NaN` (read the
+  component's `.score`, never `Number()` the component object).
+- **Canonical example of what this forbids:** the web "Score Components" panel (removed 2026-06-25)
+  duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
+  YouTubers as "not in recent uploads" for a topic they weren't covering.
+
+*Last updated: 2026-06-25 — **§17 SOURCE-DISPLAY RULE** added (detail views show ONLY contributing
+sources/components; omit no-data sources, never show empty/"not in uploads"/NaN — trend + market,
+all platforms). Removed the web "Score Components" NaN panel (duplicated Market Factors) + the
+non-covering creator rows. **Market Signal v2.0 (Money Gradient) is LIVE** (`MARKET_SIGNAL_V2=1`,
+validated): Money Movement / Market Confirmation + factual flow + leverage facts across all
+platforms; a SEPARATE **market accuracy ledger** validated by realized EOD price direction (FMP),
+distinct from the Trends ledger (Google Trends); see `MARKET_SIGNAL_V2.md`. **N component** copy
+corrected — N is **platform tracking** (how often a topic is triggered/surfaced as a tracked topic),
+NOT "user demand"; "Community Demand" → "Platform Indicator". Prior: 2026-06-24 — **§16 SOURCE ONBOARDING PROTOCOL** added (hard 5-gate rule before
 linking ANY source: TYPE → ENGINE → FORMAT → CURRENCY+ACCESS → TEST→LINK→DEPLOY; enforced by the
 `.githooks/commit-msg` gotcha). Source cleanup: HackerNews fixed (algolia `/search`→`/search_by_date`),
 yahoo_finance removed (429/dead), QA runbook (`monitoring/integrity-check.ps1`) repointed 1.0→v2.

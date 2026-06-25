@@ -299,53 +299,59 @@ export default function RiskDetail() {
 
       {/* Retail Coverage — attributed data points, not advice. No external
           links (titles/URLs are shown as plain copyable text). */}
-      {(!!risk.creatorCoverage || !!risk.alphaVantage || !!risk.broadcastCoverage) && (
+      {(() => {
+        // Source-display rule (CLAUDE.md §17): show ONLY sources that contribute for THIS
+        // topic. A source returning no data / not covering it is omitted — never shown as
+        // "not in recent uploads", "0 articles", or "no coverage across N channels".
+        const hasNews = !!risk.alphaVantage && (risk.alphaVantage.articleCount ?? 0) > 0;
+        const coveredCreators = (risk.creatorCoverage?.creators ?? []).filter((c) => c.covered);
+        const hasBroadcast = !!risk.broadcastCoverage && risk.broadcastCoverage.channels.length > 0;
+        if (!hasNews && coveredCreators.length === 0 && !hasBroadcast) return null;
+        const note = risk.alphaVantage?.note || risk.creatorCoverage?.note || risk.meetKevin?.note;
+        return (
         <>
           <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Retail Coverage</Text>
-          <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
-            {/* Alpha Vantage — news volume + tone */}
-            {!!risk.alphaVantage && (
-              <View className="mb-3">
-                <Text className="text-textPrimary text-sm font-bold mb-1">
-                  {risk.alphaVantage.articleCount} recent news article{risk.alphaVantage.articleCount === 1 ? '' : 's'}
-                  {risk.alphaVantage.sentimentLabel ? ` · ${risk.alphaVantage.sentimentLabel}` : ''}
-                </Text>
-                {(risk.alphaVantage.recent ?? []).slice(0, 3).map((a, i) => (
-                  <View key={i} className="mb-1">
-                    <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {a.title}</Text>
-                    <Text className="text-textMuted text-[10px]">{a.source} · {(a.published || '').slice(0, 8)}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            {/* Creator coverage (Meet Kevin + Andrei Jikh) — attributed, no links */}
-            {(risk.creatorCoverage?.creators ?? []).map((cr, ci) => (
-              <View key={cr.handle} className={(ci > 0 || risk.alphaVantage) ? 'pt-3 border-t border-border' : ''}>
-                <View className="flex-row items-center gap-2 mb-1">
-                  <Play size={16} color="#CF2A1B" />
-                  <Text className="text-textPrimary text-sm font-bold flex-1">
-                    {cr.name}: {cr.covered
-                      ? `${cr.count} recent video${cr.count === 1 ? '' : 's'} on this name`
-                      : 'not in recent uploads'}
+          {(hasNews || coveredCreators.length > 0) && (
+            <View className="bg-surface rounded-2xl border border-border p-4 mb-2">
+              {hasNews && (
+                <View className="mb-3">
+                  <Text className="text-textPrimary text-sm font-bold mb-1">
+                    {risk.alphaVantage!.articleCount} recent news article{risk.alphaVantage!.articleCount === 1 ? '' : 's'}
+                    {risk.alphaVantage!.sentimentLabel ? ` · ${risk.alphaVantage!.sentimentLabel}` : ''}
                   </Text>
+                  {(risk.alphaVantage!.recent ?? []).slice(0, 3).map((a, i) => (
+                    <View key={i} className="mb-1">
+                      <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {a.title}</Text>
+                      <Text className="text-textMuted text-[10px]">{a.source} · {(a.published || '').slice(0, 8)}</Text>
+                    </View>
+                  ))}
                 </View>
-                {cr.covered && (cr.recent ?? []).map((v, i) => (
-                  <View key={i} className="mb-1.5">
-                    <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
-                    <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+              )}
+              {coveredCreators.map((cr, ci) => (
+                <View key={cr.handle} className={(ci > 0 || hasNews) ? 'pt-3 border-t border-border' : ''}>
+                  <View className="flex-row items-center gap-2 mb-1">
+                    <Play size={16} color="#CF2A1B" />
+                    <Text className="text-textPrimary text-sm font-bold flex-1">
+                      {cr.name}: {cr.count} recent video{cr.count === 1 ? '' : 's'} on this name
+                    </Text>
                   </View>
-                ))}
-                <Text className="text-textMuted text-[10px] mt-1">Source: {cr.name} (youtube.com/@{cr.handle})</Text>
-              </View>
-            ))}
-          </View>
-          {/* Broadcast / institutional media coverage */}
-          {!!risk.broadcastCoverage && risk.broadcastCoverage.channels.length > 0 && (
-            <View className={(risk.creatorCoverage || risk.alphaVantage) ? 'pt-3 border-t border-border mt-1' : ''}>
+                  {(cr.recent ?? []).map((v, i) => (
+                    <View key={i} className="mb-1.5">
+                      <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
+                      <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+                    </View>
+                  ))}
+                  <Text className="text-textMuted text-[10px] mt-1">Source: {cr.name} (youtube.com/@{cr.handle})</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {hasBroadcast && (
+            <View className={(coveredCreators.length > 0 || hasNews) ? 'pt-3 border-t border-border mt-1' : ''}>
               <Text className="text-textSecondary text-xs font-semibold uppercase tracking-wider mb-2">
-                Broadcast Media ({risk.broadcastCoverage.channels.length}/{risk.broadcastCoverage.totalChannels} channels)
+                Broadcast Media ({risk.broadcastCoverage!.channels.length}/{risk.broadcastCoverage!.totalChannels} channels)
               </Text>
-              {risk.broadcastCoverage.channels.map((ch, ci) => (
+              {risk.broadcastCoverage!.channels.map((ch, ci) => (
                 <View key={ch.handle} className={ci > 0 ? 'pt-2 border-t border-border mt-1' : ''}>
                   <View className="flex-row items-center gap-2 mb-0.5">
                     <Play size={14} color="#5B6472" />
@@ -363,16 +369,12 @@ export default function RiskDetail() {
               ))}
             </View>
           )}
-          {!!risk.broadcastCoverage && risk.broadcastCoverage.channels.length === 0 && (
-            <View className={(risk.creatorCoverage || risk.alphaVantage) ? 'pt-3 border-t border-border mt-1' : ''}>
-              <Text className="text-textMuted text-[12px]">No recent broadcast media coverage across {risk.broadcastCoverage.totalChannels} monitored channels.</Text>
-            </View>
+          {!!note && (
+            <Text className="text-textMuted text-[10px] mb-5">{note}</Text>
           )}
-          <Text className="text-textMuted text-[10px] mb-5">
-            {risk.alphaVantage?.note || risk.creatorCoverage?.note || risk.meetKevin?.note}
-          </Text>
         </>
-      )}
+        );
+      })()}
 
       {/* Leverage — FINRA short interest (company) + OFR macro funding context */}
       {(!!risk.shortInterest || !!risk.macroLeverage || !!risk.institutionalHoldings) && (

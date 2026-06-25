@@ -262,30 +262,38 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         )
       })()}
 
-      {/* Retail & media coverage */}
-      {(av || cc || bc) && (
-        <div className="sect">
-          <h4>Retail &amp; Media Coverage</h4>
-          {av && (
-            <div className="cov-block">
-              <div className="cov-h">{av.article_count} news article{av.article_count === 1 ? '' : 's'}{av.sentiment_label ? ` · ${av.sentiment_label}` : ''}</div>
-              {(av.recent || []).slice(0, 3).map((a: any, i: number) => <div className="cov-i" key={i}>▸ {a.title}<span className="cov-m"> {a.source}</span></div>)}
-            </div>
-          )}
-          {(cc?.creators || []).map((cr: any) => (
-            <div className="cov-block" key={cr.handle}>
-              <div className="cov-h" style={{ color: MC.red }}>{cr.name}: {cr.covered ? `${cr.count} recent video${cr.count === 1 ? '' : 's'}` : 'not in recent uploads'}</div>
-              {cr.covered && (cr.recent || []).slice(0, 2).map((vd: any, i: number) => <div className="cov-i" key={i}>▸ {vd.title}</div>)}
-            </div>
-          ))}
-          {bc && bc.channels?.length > 0 && (
-            <div className="cov-block">
-              <div className="cov-h">Broadcast media ({bc.channels.length}/{bc.total_channels} channels)</div>
-              {bc.channels.slice(0, 4).map((ch: any) => <div className="cov-i" key={ch.handle}>▸ {ch.name}{ch.region ? ` · ${ch.region}` : ''}: {ch.count} video{ch.count === 1 ? '' : 's'}</div>)}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Retail & media coverage — ONLY sources that actually contribute for this topic.
+          Source-display rule: a source that returns no data / isn't covering this topic is
+          omitted, never shown as empty or "not in recent uploads" (see CLAUDE.md §17). */}
+      {(() => {
+        const hasNews = av && (av.article_count ?? 0) > 0
+        const coveredCreators = (cc?.creators || []).filter((cr: any) => cr.covered)
+        const hasBroadcast = bc && bc.channels?.length > 0
+        if (!hasNews && coveredCreators.length === 0 && !hasBroadcast) return null
+        return (
+          <div className="sect">
+            <h4>Retail &amp; Media Coverage</h4>
+            {hasNews && (
+              <div className="cov-block">
+                <div className="cov-h">{av.article_count} news article{av.article_count === 1 ? '' : 's'}{av.sentiment_label ? ` · ${av.sentiment_label}` : ''}</div>
+                {(av.recent || []).slice(0, 3).map((a: any, i: number) => <div className="cov-i" key={i}>▸ {a.title}<span className="cov-m"> {a.source}</span></div>)}
+              </div>
+            )}
+            {coveredCreators.map((cr: any) => (
+              <div className="cov-block" key={cr.handle}>
+                <div className="cov-h" style={{ color: MC.red }}>{cr.name}: {cr.count} recent video{cr.count === 1 ? '' : 's'}</div>
+                {(cr.recent || []).slice(0, 2).map((vd: any, i: number) => <div className="cov-i" key={i}>▸ {vd.title}</div>)}
+              </div>
+            ))}
+            {hasBroadcast && (
+              <div className="cov-block">
+                <div className="cov-h">Broadcast media ({bc.channels.length}/{bc.total_channels} channels)</div>
+                {bc.channels.slice(0, 4).map((ch: any) => <div className="cov-i" key={ch.handle}>▸ {ch.name}{ch.region ? ` · ${ch.region}` : ''}: {ch.count} video{ch.count === 1 ? '' : 's'}</div>)}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Leverage & funding */}
       {(si || macro || inst) && (
@@ -365,12 +373,9 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         </div>
       )}
 
-      {/* Score components */}
-      {raw.components && Object.keys(raw.components).length > 0 && (
-        <div className="sect"><h4>Score Components</h4>
-          {Object.entries(raw.components).map(([k, val]) => bar(k.replace(/_/g, ' '), Number(val), tcol))}
-        </div>
-      )}
+      {/* (Removed) "Score Components" — duplicated the Market Factors section above and
+          rendered NaN (it did Number() on the component OBJECT, not its .score). Market
+          Factors is the single, correct component breakdown. */}
 
       {/* Sources */}
       {sources.length > 0 && (
