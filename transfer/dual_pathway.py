@@ -192,11 +192,16 @@ def mainstream_breadth(signals: list) -> dict:
     news_outlets = comms(news_rows)
     n_news = len(news_outlets)
 
-    # Syndication-collapse (v2): count DISTINCT STORIES (normalized headlines) among the news
-    # rows — a wire story republished across N outlets is ONE independent corroboration, not N.
-    # Falls back to the raw outlet count when titles are absent (legacy signals w/o a joined title).
+    # Independent corroboration (v2) = min(distinct OUTLETS, distinct STORIES). This defeats BOTH
+    # failure modes: wire-syndication (5 outlets carrying 1 AP headline → 1 story → 1) AND single-
+    # outlet spam (1 outlet, 5 articles → 1 outlet → 1). "5 independent sources" therefore needs
+    # ≥5 distinct outlets AND ≥5 distinct headlines. Falls back to outlet count when titles absent.
     titled = [s for s in news_rows if s.get("title")]
-    n_news_independent = len({_title_sig(s.get("title")) for s in titled}) if titled else n_news
+    if titled:
+        n_stories = len({_title_sig(s.get("title")) for s in titled})
+        n_news_independent = min(n_news, n_stories)
+    else:
+        n_news_independent = n_news
 
     factor = max(0.0, min(1.0, (n_main - 1) / (_BREADTH_FULL - 1)))
     return {"breadth": round(factor, 3),
