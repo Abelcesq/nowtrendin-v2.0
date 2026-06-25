@@ -3,7 +3,9 @@
 > Living doc. Update weekly. Measured figures are from live API responses;
 > estimates are labelled (est). Live AI tally: `GET /grade/costs`.
 
-_Last updated: 2026-06-05_
+_Last updated: 2026-06-25 — added QuiverQuant ($30/mo, congress), Databento (~free, metered),
+Alpha Vantage (free tier), FMP (free tier); X migrated Basic→Pay-Per-Use; worker dyno live.
+Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** posts (`/x/budget`)._
 
 ---
 
@@ -18,6 +20,10 @@ _Last updated: 2026-06-05_
 | **Pull Trends / live query** | HN, GitHub, YouTube, Reddit + scoring | **~$0.00** | All free APIs (YouTube within free quota). |
 | **X signal** (`/signal-x`) | X search+counts | **~$0.50** (est, PPU) | 100 posts/pull. Basic: free within 15k cap. PPU (Jun 21+): ~$0.005/read. **12h cached** → ~zero on repeat. |
 | **Google Trends validation** | Apify actor | **~$0.02–0.05/run** (est) | Daily batch (8 topics), NOT per search. Draws from $150 Apify plan. |
+| **Market-ledger price verify** | Databento (+FMP cross-check) | **~$0.0003/ticker** | EQUS.SUMMARY ohlcv-1d; per sweep, cached 6h. Effectively free. |
+| **Microstructure read** (held-out) | Databento trades | **~$0.001/window** | block/dark-pool/imbalance prototype. Not in any score yet. |
+| **Dark-Matter insider/13F** (held-out) | Alpha Vantage | **$0** | free tier, throttled (13s/call). Not in any score yet. |
+| **Market AI analysis** | Claude (guardrailed) | **~$0.003** | folds into the $20 AI cap; 12h-cached per instrument. |
 
 **Key:** the only meaningful marginal cost per *new* search is the **AI Grade (~1.2¢)**. Reading existing scores is **free**.
 
@@ -27,18 +33,23 @@ _Last updated: 2026-06-05_
 
 | Item | Cost/mo | Notes |
 |---|---|---|
-| Heroku — engine dyno (Basic) | ~$7 | 512MB. Scale to Standard/Perf at load (est $25–250). |
-| Heroku — engine Postgres (essential-0) | $5 | |
+| Heroku — engine web dyno (Basic) | ~$7 | 512MB. Scale to Standard/Perf at load (est $25–250). |
+| Heroku — engine **worker** dyno (Basic) | ~$7 | scheduler moved off web (P1, §6) — removed /scores timeouts. |
+| Heroku — engine Postgres (essential-0) | $5 | ⚠ 365-day retention (§13) grows storage → standard-0 upsize coming (~$50). |
 | Heroku — backend dyno (Basic) | ~$7 | |
 | Heroku — backend Postgres (essential-0) | $5 | |
 | Heroku Scheduler | $0 | free |
 | **Apify** (Google Trends) | **$150** | current plan; capped. |
-| **X API** (Basic) | **$200** | 15,000 posts/mo cap. → Pay-Per-Use Jun 21. |
-| FRED | $0 | free |
+| **X API** (Pay-Per-Use) | **~$100 (est)** | was $200 Basic; migrated PPU Jun 21. June usage **9,160 / 14,880** posts. Confirm $/post on X dashboard. |
+| **QuiverQuant** (congress trades / Dark Matter) | **$30** | **confirmed 06/25** (card charge). |
+| **AI** (Perplexity + Claude — Grade/explainer/market) | **≤$20 (hard cap)** | **June live: $15.32** (Perplexity $13.76 + Claude $1.56; explainer/definition is the bulk). |
+| **Databento** (accuracy-ledger price verify + microstructure) | **~$0** | metered (~$0.0003/ticker), new-acct free credit; ~cents/mo after. No request cap. |
+| **Alpha Vantage** (NEWS_SENTIMENT + held-out insider/13F) | **$0** | free tier (25/day · 5/min). Premium (~$50) only if Dark-Matter pulls go to scale. |
+| **FMP** (prices/fundamentals) | **$0** | free tier (250/day) assumed — confirm if a paid tier is active. |
+| FRED · SEC EDGAR · OFR · FINRA · GDELT | $0 | free / public. |
 | YouTube Data API | $0 | free ≤10,000 units/day (~100 searches/day). |
-| Twilio (SMS verify) | ~$0.008/msg | signup only, negligible. |
-| SendGrid (email) | $0 | free tier. |
-| **Total fixed (today)** | **~$374/mo** | before scaling dynos. |
+| Twilio (SMS verify) · SendGrid (email) | ~$0 | signup only / free tier, negligible. |
+| **Total fixed (today)** | **~$340/mo (est)** | Heroku ~$31 + Apify $150 + X ~$100 + Quiver $30 + AI ~$20; new data sources add ~$30 net (Quiver), Databento/AV/FMP ~$0. |
 
 ---
 
