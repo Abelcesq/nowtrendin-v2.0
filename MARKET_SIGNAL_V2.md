@@ -39,6 +39,13 @@ Routing uses the engine's existing `platform_tier` M/D mechanism (same as attent
   Routed D (insider-tier), **net flow direction** (inflow/outflow) + breadth (# members).
 - **Insider Form-4** (SEC EDGAR) — corporate insiders buying/selling their own stock.
 - **Smart-money 13F** (SEC EDGAR, curated funds — `sec_13f_research`) — fund accumulation/trimming.
+- **Alpha Vantage insider + 13F-by-ticker** (`av_dark_positioning.py`) — Form-4 insider trades (≥$250K,
+  A/D direction) + institutional 13F net flow by ticker. Blended into `positioning_intel` behind
+  **`AV_DARKPOS_ENABLED` (default OFF)** — provisional weights, **backtest-before-ship** before flipping.
+- **Databento tape microstructure** (`databento_microstructure.py`, HELD-OUT prototype) — block prints
+  (≥$250K) + tick-test direction = institutional footprints in the tape (a *different* Dark-Matter angle).
+  NVDA cross-validated outflow across all three (filings + AV insider + microstructure). Phase-2: harden
+  to full-day (DBN client) + dark-pool venue map, then backtest + flag-gate.
 - **Quality finance YouTube** — Meet Kevin et al. **RECLASSIFIED from Stage-5 "Retail Amplify" to
   Dark Matter.** Original macro/market *analysis* by informed independents is an early read, not
   lagging retail noise. (Generic hype channels stay low-tier; the curated quality set is D.)
