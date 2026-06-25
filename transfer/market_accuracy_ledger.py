@@ -68,14 +68,45 @@ def _connect(db_path: str = DB_PATH):
     return conn
 
 
+def _cross_check(ticker: str, db: dict, fmp: dict, tol_pct: float = 1.0) -> None:
+    """Log a WARNING when Databento + FMP EOD closes diverge >tol_pct on a shared date — an
+    independent-source discrepancy worth a human look. The ledger keeps using the exchange-direct
+    Databento value; this only surfaces disagreement (never silently trusts a mismatch)."""
+    try:
+        shared = set(db) & set(fmp)
+        diffs = []
+        for d in sorted(shared):
+            a, b = db.get(d), fmp.get(d)
+            if a and b and b != 0 and abs(a - b) / b * 100.0 > tol_pct:
+                diffs.append((d, round(a, 2), round(b, 2)))
+        if diffs:
+            print(f"[mkt-ledger] price cross-check {ticker}: {len(diffs)}/{len(shared)} shared "
+                  f"date(s) diverge >{tol_pct}% (databento vs fmp): {diffs[:3]}")
+    except Exception:
+        pass
+
+
 def _price_fetch(ticker: str, frm: str, to: str):
-    """Default ground-truth price source: FMP daily EOD closes {YYYY-MM-DD: close}."""
+    """Ground-truth EOD closes {YYYY-MM-DD: close} for the ledger. **Databento** (exchange-direct,
+    no rate cap) is the PRIMARY verification source; **FMP** is the fallback. When BOTH are
+    available the overlapping dates are cross-checked and any material divergence is logged — two
+    independent sources agreeing makes a CONFIRMED/NOT_CONFIRMED verdict robust. Referee only;
+    never feeds a score."""
+    db = fmp = None
+    try:
+        import databento_price
+        db = databento_price.historical_close(ticker, frm, to)
+    except Exception as e:
+        print(f"[mkt-ledger] databento {ticker}: {e}")
     try:
         import fmp_data
-        return fmp_data.historical_close(ticker, frm=frm, to=to)
+        fmp = fmp_data.historical_close(ticker, frm=frm, to=to)
     except Exception as e:
-        print(f"[mkt-ledger] price fetch {ticker}: {e}")
-        return None
+        print(f"[mkt-ledger] fmp {ticker}: {e}")
+    if db and fmp:
+        _cross_check(ticker, db, fmp)
+        return db   # exchange-direct primary (already cross-checked against FMP)
+    return db or fmp
 
 
 def init_market_ledger_db(db_path: str = DB_PATH):

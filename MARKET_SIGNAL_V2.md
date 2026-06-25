@@ -86,7 +86,7 @@ validated by what the *market actually did*. So the Money Gradient gets its **ow
 | | Trends ledger (`accuracy_ledger_enhanced`) | **Market-Signal ledger (`market_accuracy_ledger`)** |
 |---|---|---|
 | Detection | attention moving toward a topic | **money moving IN/OUT of an instrument** (flow + intensity) |
-| Ground truth | Google Trends breakout | **realized EOD CLOSE price DIRECTION (FMP)** |
+| Ground truth | Google Trends breakout | **realized EOD CLOSE price DIRECTION** — Databento (exchange-direct, primary) cross-checked against FMP (fallback) |
 | Verdicts | LED / SAME_DAY / LAGGED / FALSE_POSITIVE | **CONFIRMED / NOT_CONFIRMED / NO_MOVE** (+ lead-time) |
 
 **How it validates (the NVDA example):** detect **OUTFLOW** on NVDA → if NVDA's EOD close
