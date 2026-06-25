@@ -90,6 +90,27 @@ CONFIDENCE_WEIGHTS = {
 DETECTION_FP  = "~22% false positive · early-warning"
 CONFIDENCE_FP = "<9% false positive · confirmation"
 
+# ── Market Signal v2.0 — the Money Gradient (see MARKET_SIGNAL_V2.md) ──────────────
+# Reorganizes the SAME baseline-relative components into MONEY MOVEMENT (Dark Matter =
+# early/informed money) vs MARKET CONFIRMATION (Mainstream = broad market/economic). Macro
+# funding (dark_positioning) routes to Leverage Facts, not the movement axis. Active only
+# when MARKET_SIGNAL_V2=1 (default off; v1 weights above untouched). MARKET_SIGNAL_V2 also
+# implies the congress/13F dark-positioning blend (they are D inputs to Money Movement).
+MARKET_SIGNAL_V2 = os.getenv("MARKET_SIGNAL_V2", "0") == "1"
+MONEY_MOVEMENT_WEIGHTS = {          # D — where early / informed money is moving
+    "positioning_concentration": 0.55,   # smart-money 13F/insider/shorts (+ congress blend)
+    "analyst_signal":            0.30,    # early analyst/coverage incl. quality finance YouTube
+    "signal_freshness":          0.15,
+}
+MARKET_CONFIRMATION_WEIGHTS = {     # M — broad market / economic confirmation
+    "fundamental_confirmation":  0.35,
+    "market_momentum":           0.35,
+    "cross_market_diffusion":    0.20,
+    "signal_freshness":          0.10,
+}
+MONEY_MOVEMENT_FP    = "early money-movement signal · the Accuracy Ledger judges whether it led"
+MARKET_CONFIRM_FP    = "broad market / economic confirmation"
+
 COMPONENT_LABELS = {
     "dark_positioning":          "Dark Positioning (macro & cross-market shifts)",
     "positioning_concentration": "Positioning Concentration (smart-money: shorts/13F/insider)",
@@ -218,14 +239,34 @@ def compute_market_signal(item_key: str, item_name: str,
     gap = round(detection - confidence, 1)
     interp = _interpret_gap(detection, confidence, gap, any_calibrating, zero_inputs, n_applicable)
 
+    # ── Market Signal v2.0 — the Money Gradient (flag-gated; v1 path above unchanged) ──
+    # Reorganize the SAME scored components into MONEY MOVEMENT (Dark Matter = early/informed)
+    # vs MARKET CONFIRMATION (Mainstream = broad). The dual-ring then shows the Money Gradient
+    # (detection/confidence become aliases of money_movement/market_confirmation). Movement +
+    # ledger language — no prediction/advice.
+    money_movement = market_confirmation = None
+    if MARKET_SIGNAL_V2:
+        money_movement = round(_weighted(MONEY_MOVEMENT_WEIGHTS), 1)
+        market_confirmation = round(_weighted(MARKET_CONFIRMATION_WEIGHTS), 1)
+        detection, confidence = money_movement, market_confirmation
+        gap = round(detection - confidence, 1)
+        interp = _interpret_movement(money_movement, market_confirmation, gap,
+                                     any_calibrating, zero_inputs, n_applicable)
+
     return {
         "item_key": item_key, "item_name": item_name,
         "detection": detection, "confidence": confidence, "gap": gap,
         "tier": _level((detection + confidence) / 2),
         "detection_level": _level(detection), "confidence_level": _level(confidence),
-        "detection_fp": DETECTION_FP, "confidence_fp": CONFIDENCE_FP,
+        "detection_fp": (MONEY_MOVEMENT_FP if MARKET_SIGNAL_V2 else DETECTION_FP),
+        "confidence_fp": (MARKET_CONFIRM_FP if MARKET_SIGNAL_V2 else CONFIDENCE_FP),
         "gap_state": interp["state"], "interpretation": interp["text"],
         "calibrating": any_calibrating,
+        # Market Signal v2.0 (Money Gradient) — present only when MARKET_SIGNAL_V2=1. The
+        # dual-ring detection/confidence above ARE these values (aliases) when v2 is on.
+        "model_version": ("v2" if MARKET_SIGNAL_V2 else "v1"),
+        "money_movement": money_movement,            # D — early/informed money (None in v1)
+        "market_confirmation": market_confirmation,  # M — broad market confirmation (None in v1)
         # Display-only coverage flag (NOT a score change): when most positioning inputs are
         # absent (FINRA short-interest / WhaleWisdom 13F not populated), a "30/ROUTINE" read
         # reflects MISSING DATA, not a confirmed quiet market. The UI shows an honest
@@ -296,6 +337,36 @@ def _interpret_gap(detection, confidence, gap, calibrating,
                     "direction is forming but not yet clear-cut."}
 
 
+def _interpret_movement(money, confirm, gap, calibrating, zero_inputs=0, total_inputs=7) -> dict:
+    """Market Signal v2.0 interpretation — MOVEMENT + FACTS language ONLY. Describes WHERE money
+    is moving and whether the broad market has confirmed. NO prediction, NO advice, NO buy/sell —
+    whether an early signal actually led is for the Accuracy Ledger to judge, after the fact."""
+    if calibrating:
+        return {"state": "CALIBRATING",
+                "text": "Baseline forming — not yet enough history to read money movement against "
+                        "this item's own norm."}
+    if zero_inputs > total_inputs // 2:
+        return {"state": "LIMITED_DATA",
+                "text": "Most money-movement inputs are absent for this instrument — limited "
+                        "coverage, not a confirmed quiet read."}
+    if money >= 45 and gap >= 16:
+        return {"state": "EARLY_MOVEMENT",
+                "text": "Informed money (smart-money 13F / insider / Congress / quality analysts) "
+                        "is moving here AHEAD of broad market confirmation. Whether it leads is for "
+                        "the Accuracy Ledger to record over time — this is a measurement, not a "
+                        "recommendation."}
+    if abs(gap) < 16 and confirm >= 45:
+        return {"state": "CONFIRMED_MOVEMENT",
+                "text": "Early money movement and broad market signals agree — the movement is "
+                        "corroborated across informed and mainstream sources."}
+    if gap <= -16:
+        return {"state": "BROAD_ONLY",
+                "text": "Broad market activity without a distinct early/informed money signal — a "
+                        "mainstream-driven read."}
+    return {"state": "MIXED",
+            "text": "Money-movement signals are partially aligned; direction is still forming."}
+
+
 # ── Component assembly from our real market sources ─────────────────
 def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
     """Build the 7 normalized (0-1) component values from the positioning payload
@@ -334,7 +405,7 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
         # (curated-fund 13F breadth) + political (Congress net-trading) signal for this
         # ticker into positioning_concentration. Only fires when the flag is on AND the
         # ticker actually has 13F/Congress activity, so the default path is unchanged.
-        if DARK_POSITIONING_V2:
+        if DARK_POSITIONING_V2 or MARKET_SIGNAL_V2:
             _dpi = payload.get("dark_positioning_intel") or {}
             _sig = _dpi.get("positioning_signal")
             _has = (_dpi.get("smart_money", {}).get("funds_holding")

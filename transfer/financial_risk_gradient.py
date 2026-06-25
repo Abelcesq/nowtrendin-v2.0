@@ -2291,7 +2291,7 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
     try:
         import market_signal_engine as _mse
         sig_summary = {"stage_counts": {}, "venue_count": 0, "newest_age_hours": None}
-        if DARK_POSITIONING_V2:
+        if DARK_POSITIONING_V2 or MARKET_SIGNAL_V2:
             try:
                 import positioning_intel as _pi
                 payload["dark_positioning_intel"] = _pi.signal_for(ticker, display)
@@ -2307,6 +2307,11 @@ def market_signal_for_company(ticker: str, display: str, db_path: str = DB_PATH)
         _lh = _sus.get("sector_adjusted_score") or _sus.get("score")
         if _lh is not None:
             mkt["leverage_health"] = round(float(_lh), 0)
+        if MARKET_SIGNAL_V2:                      # v2 money-movement surface (facts, not advice)
+            _dpi = payload.get("dark_positioning_intel") or {}
+            mkt["flow"] = _dpi.get("flow", "neutral")
+            mkt["leverage_facts"] = {"company_leverage_health": mkt.get("leverage_health"),
+                                     "note": "objective leverage from financial ledgers — facts only"}
         return {"available": True, "ticker": ticker, "display": display,
                 "market_gradient": mkt, "payload": payload}
     except Exception as e:
@@ -2480,7 +2485,7 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                 _newest_age = None
             _sig_summary = {"stage_counts": current_by_stage,
                             "venue_count": _venues, "newest_age_hours": _newest_age}
-            if DARK_POSITIONING_V2:
+            if DARK_POSITIONING_V2 or MARKET_SIGNAL_V2:
                 try:
                     import positioning_intel as _pi
                     _tk = WATCHLIST_TICKERS.get(display) or (display if str(display).isupper() else "")
@@ -2500,6 +2505,11 @@ def score_all_risks(db_path: str = DB_PATH) -> int:
                 _lh = _sus.get("score")
             if _lh is not None:
                 mkt["leverage_health"] = round(float(_lh), 0)
+            if MARKET_SIGNAL_V2:                  # v2 money-movement surface (facts, not advice)
+                _dpi2 = positioning_payload.get("dark_positioning_intel") or {}
+                mkt["flow"] = _dpi2.get("flow", "neutral")
+                mkt["leverage_facts"] = {"company_leverage_health": mkt.get("leverage_health"),
+                                         "note": "objective leverage from financial ledgers — facts only"}
             positioning_payload["market_gradient"] = mkt
         except Exception as _mge:
             print(f"[market_signal] {display}: {_mge}")
