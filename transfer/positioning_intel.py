@@ -116,15 +116,56 @@ def signal_for(ticker: str, name: str = "") -> dict:
     positioning_signal = round(min(1.0, 0.6 * sm_norm + 0.4 * cg_norm), 3)
     # DIRECTION of flow (a fact about what the filings show): money moving IN vs OUT.
     flow = ("inflow" if net > 1 else "outflow" if net < -1 else "neutral")
-    return {
+    out = {
         "ticker": tkr, "name": name,
         "movement_intensity": positioning_signal,       # 0-1: how much money is moving here
         "positioning_signal": positioning_signal,       # (alias, kept for the flag-gated blend)
         "flow": flow,                                    # inflow | outflow | neutral (factual)
+        "dark_matter_inputs": "congress + curated_13F",
         "smart_money": {"funds_holding": len(sm_funds), "funds": sorted(sm_funds),
                         "total_value_usd": round(sm_value, 0)},
         "congress": {"members": n_members, "buys": cg["buys"], "sells": cg["sells"], "net": net},
     }
+
+    # ── AV Dark-Matter blend — flag-gated, DEFAULT OFF (AV_DARKPOS_ENABLED). Adds Alpha Vantage
+    #    insider Form-4 + 13F-by-ticker on top of curated-13F + congress. INERT when off →
+    #    byte-identical to the current signal. Weights are PROVISIONAL — tune in the backtest
+    #    BEFORE flipping the flag (this is score-affecting). Operational note: AV free tier is
+    #    25/day·5/min, so flipping this on requires a prewarm that rotates the watchlist (~12
+    #    tickers/day) or a premium AV key; av_dark_positioning caches 24h per ticker.
+    if os.getenv("AV_DARKPOS_ENABLED", "0") == "1":
+        try:
+            import av_dark_positioning as _av
+
+            def _f(x):
+                try:
+                    return float(x)
+                except (TypeError, ValueError):
+                    return 0.0
+
+            av = _av.signal_for(tkr, name)
+            ins = av.get("insider") or {}
+            inst = av.get("institutional") or {}
+            insider_norm = min(1.0, abs(_f(ins.get("net_usd"))) / 250_000_000.0)   # $250M net = saturated
+            tot = _f(inst.get("total_holders"))
+            inst_skew = (abs(_f(inst.get("holders_increased")) - _f(inst.get("holders_decreased"))) / tot) if tot else 0.0
+            inst_norm = min(1.0, inst_skew * 4.0)                                  # 25% net-holder skew = saturated
+            blended = 0.30 * sm_norm + 0.25 * cg_norm + 0.30 * insider_norm + 0.15 * inst_norm
+            out["movement_intensity"] = out["positioning_signal"] = round(min(1.0, blended), 3)
+            # Flow CONSENSUS across the directional inputs (congress + insider + institutional).
+            votes = [f for f in (flow, ins.get("flow"), inst.get("flow")) if f in ("inflow", "outflow")]
+            inflow_n, outflow_n = votes.count("inflow"), votes.count("outflow")
+            out["flow"] = ("inflow" if inflow_n > outflow_n else "outflow" if outflow_n > inflow_n
+                           else (flow if flow in ("inflow", "outflow") else ("mixed" if votes else "neutral")))
+            out["av_insider"] = {"net_usd": ins.get("net_usd"), "flow": ins.get("flow"),
+                                 "buys": ins.get("buys"), "sells": ins.get("sells")}
+            out["av_institutional"] = {"net_shares": inst.get("net_shares"), "flow": inst.get("flow"),
+                                       "holders_increased": inst.get("holders_increased"),
+                                       "holders_decreased": inst.get("holders_decreased")}
+            out["dark_matter_inputs"] = "congress + curated_13F + av_insider + av_institutional"
+        except Exception as _ave:
+            print(f"[positioning_intel] AV blend {tkr}: {_ave}")
+    return out
 
 
 def all_signals(watchlist: dict, top_congress: int = 25) -> dict:
