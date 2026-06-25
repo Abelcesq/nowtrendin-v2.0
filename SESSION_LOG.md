@@ -39,6 +39,17 @@ So the Money Gradient gets its **OWN** ledger, distinct from the Trends ledger.
   output end-to-end with a small recorded sample and **flip `MARKET_SIGNAL_V2=1`**.
 - Out-of-scope finding (flagged): the ATTENTION engine has a served field named `what_to_do_action`
   (values descriptive, not buy/sell) — the field *name* reads as advice; worth a later consistency pass.
+- **Market AI descriptor (founder request, BOTH descriptors):** the market description now analyzes
+  **Money Movement + Market Confirmation + Leverage** from our score data. (1) Reproducible:
+  `_market_analysis` / `_append_market_analysis` append a deterministic three-dimension walk
+  (money score + filing flow, confirmation score, leverage-health fact) to the market interpretation
+  at both call sites — runs v1+v2, skips calibrating/insufficient. (2) LLM: `ai_grade.market_analysis`
+  — a guardrailed Claude narrative anchored ONLY to our scores (no web), 12h-cached per instrument,
+  budget-gated ($20/mo cap), opt-out `MARKET_AI_ANALYSIS=0`, with a banned-word backstop
+  (buy/sell/undervalued/should/… → reject) so it can't drift into advice; attached via
+  `grade_agent._attach_market` as `result.market_analysis`. Grade views (web + mobile) surface it +
+  v2 labels. Engine deployed; web→gh-pages; mobile on Metro reload. Forward-only: enriched overviews
+  populate as market rows re-score (persisted serve path).
 
 ---
 
