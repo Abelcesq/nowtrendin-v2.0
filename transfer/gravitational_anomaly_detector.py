@@ -5381,7 +5381,14 @@ async def startup_auto_collect():
             _c.execute("ALTER TABLE topic_explainers ADD COLUMN full_text TEXT")
             _c.commit()
         except Exception:
-            pass
+            # PG raises DuplicateColumn when the column already exists, which ABORTS the
+            # transaction — every later statement then fails with "current transaction is
+            # aborted" and the whole aux block (incl. the ledger inits) is skipped. Roll
+            # back to clear the aborted txn so the rest of the block runs. (SQLite no-op.)
+            try:
+                _c.rollback()
+            except Exception:
+                pass
         _c.execute("CREATE TABLE IF NOT EXISTS x_post_usage (month TEXT PRIMARY KEY, posts INTEGER)")
         _c.execute("""CREATE TABLE IF NOT EXISTS ai_grade_costs (
             id TEXT PRIMARY KEY, topic TEXT,
@@ -6317,8 +6324,16 @@ def market_accuracy_report():
         rep["status"] = "ok" if rep.get("resolved") else "empty"
         return rep
     except Exception as _mare:
-        print(f"[market-accuracy] report error: {_mare}")
-        return {"status": "error", "detail": str(_mare)}
+        # Self-heal if the table is missing (brand-new ledger, first deploy): init once
+        # and retry. Avoids per-request DDL on the happy path — only the error path inits.
+        try:
+            market_ledger.init_market_ledger_db(DB_PATH)
+            rep = market_ledger.report(DB_PATH)
+            rep["status"] = "ok" if rep.get("resolved") else "empty"
+            return rep
+        except Exception as _mare2:
+            print(f"[market-accuracy] report error: {_mare2}")
+            return {"status": "error", "detail": str(_mare2)}
 
 
 @app.post("/market/accuracy/sweep", dependencies=[Depends(_require_internal)])
