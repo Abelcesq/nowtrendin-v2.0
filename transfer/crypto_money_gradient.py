@@ -50,15 +50,15 @@ def assemble_crypto_components(coin: str, sig: Optional[dict] = None) -> dict:
     dm = sig.get("_dark_matter") or {}
     pm = sig.get("_price") or {}
     proxy_pos = (dm.get("intensity") or 0.0) / 100.0          # Dark-Matter intensity → 0-1
-    price_mom = (pm.get("confirmation") or 0.0) / 100.0        # price confirmation strength → 0-1
     covered, total = dm.get("proxies_covered") or 0, dm.get("proxies_total") or 1
     venue = covered / total if total else 0.0
-    fresh = 0.8 if pm.get("available") else 0.3               # crypto price is daily; available ⇒ fresh
+    price_avail = bool(pm.get("available"))
     return {
         "proxy_positioning": round(mse._norm(proxy_pos), 3),
-        "price_momentum":    round(mse._norm(price_mom), 3),
+        # §17: Price Momentum is n/a (None) when the price leg is unavailable — NEVER a misleading 0.
+        "price_momentum":    (round(mse._norm((pm.get("confirmation") or 0.0) / 100.0), 3) if price_avail else None),
         "venue_diffusion":   round(mse._norm(venue), 3),
-        "signal_freshness":  round(fresh, 3),
+        "signal_freshness":  round(0.8 if price_avail else 0.3, 3),
     }
 
 
@@ -67,7 +67,11 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
                           price: Optional[dict] = None, dm: Optional[dict] = None) -> dict:
     """Baseline-relative dual score → the Money Gradient payload (parity with compute_market_signal)."""
     baselines = baselines or {}
-    scored = {n: mse.score_component(components_current.get(n, 0.0), baselines.get(n)) for n in CRYPTO_LABELS}
+    # §17: a None component = n/a (data leg unavailable, e.g. price throttled) → excluded from the
+    # weighted score (renormalized over present components) AND rendered "n/a", never a misleading 0.
+    na = {n for n in CRYPTO_LABELS if components_current.get(n) is None}
+    scored = {n: mse.score_component(components_current.get(n, 0.0), baselines.get(n))
+              for n in CRYPTO_LABELS if n not in na}
     any_calibrating = any(s.get("calibrating") for s in scored.values())
     covered = (dm or {}).get("proxies_covered") or 0
 
@@ -95,12 +99,15 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "flow": flow,
         # §17 source-display: only render components that contributed; show real value or n/a (never NaN).
         "components": {
-            CRYPTO_LABELS[c]: {
+            CRYPTO_LABELS[c]: ({
                 "score": round(scored[c]["score"] * 100, 1),
                 "feeds": ("money_movement" if c in CRYPTO_MM_WEIGHTS else "market_confirmation"),
                 "baseline_relative": scored[c].get("baseline_relative", False),
                 "z": scored[c].get("z"),
-            } for c in CRYPTO_LABELS
+            } if c in scored else {
+                "score": None, "feeds": "n/a", "not_applicable": True,
+                "baseline_relative": False, "z": None,
+            }) for c in CRYPTO_LABELS
         },
         "price": ({k: price.get(k) for k in ("last_close", "change_7d_pct", "change_30d_pct", "trend", "as_of")}
                   if price and price.get("available") else None),

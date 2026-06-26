@@ -101,18 +101,61 @@ def _closest_on_or_before(series: dict, target: str) -> Optional[float]:
     return series[keys[-1]] if keys else None
 
 
+_AV_PRICE_CACHE: dict = {}
+
+
+def _av_crypto_series(coin: str) -> Optional[dict]:
+    """AV DIGITAL_CURRENCY_DAILY → {date: close_usd}. Fallback when FMP is throttled (free-tier 429).
+    AV has headroom now that Finviz owns the insider pulls. Cached per process (daily series)."""
+    import time as _t
+    key = os.getenv("ALPHAVANTAGE_RESEARCH_KEY") or os.getenv("ALPHAVANTAGE_API_KEY", "")
+    if not key:
+        return None
+    sym = (COIN_UNIVERSE.get(coin.upper()) or {}).get("av") or coin.upper()
+    ent = _AV_PRICE_CACHE.get(sym)
+    if ent and (_t.time() - ent["ts"] < 21600):       # 6h cache
+        return ent["data"]
+    import json as _json, urllib.request as _ur, urllib.parse as _up
+    url = "https://www.alphavantage.co/query?" + _up.urlencode(
+        {"function": "DIGITAL_CURRENCY_DAILY", "symbol": sym, "market": "USD", "apikey": key})
+    out = None
+    try:
+        with _ur.urlopen(url, timeout=20) as r:
+            d = _json.loads(r.read().decode("utf-8"))
+        ts = d.get("Time Series (Digital Currency Daily)") or {}
+        parsed = {}
+        for date, row in ts.items():
+            v = row.get("4. close") or row.get("4a. close (USD)")
+            try:
+                parsed[date] = float(v)
+            except (TypeError, ValueError):
+                continue
+        out = parsed or None
+    except Exception as e:
+        print(f"[crypto av-price] {sym}: {e}")
+    _AV_PRICE_CACHE[sym] = {"data": out, "ts": _t.time()}
+    return out
+
+
 def price_momentum(coin: str) -> dict:
-    """The coin's price trend = the broad crypto market CONFIRMING (or not) the move. A measurement."""
+    """The coin's price trend = the broad crypto market CONFIRMING (or not) the move. A measurement.
+    FMP primary; AV DIGITAL_CURRENCY_DAILY fallback when FMP is throttled (free-tier 429)."""
     c = COIN_UNIVERSE.get(coin.upper())
     if not c:
         return {"available": False, "reason": "unknown coin"}
-    if not (fmp_data and getattr(fmp_data, "FMP_API_KEY", "")):
-        return {"available": False, "reason": "FMP not configured"}
     today = datetime.now(timezone.utc).date()
     frm = (today - timedelta(days=PRICE_LOOKBACK_DAYS)).isoformat()
-    series = fmp_data.historical_close(c["fmp"], frm=frm, to=today.isoformat())
+    series, src = None, ""
+    if fmp_data and getattr(fmp_data, "FMP_API_KEY", ""):
+        series = fmp_data.historical_close(c["fmp"], frm=frm, to=today.isoformat())
+        if series:
+            src = "fmp"
+    if not series:                                     # FMP empty/throttled → AV crypto fallback
+        series = _av_crypto_series(coin)
+        if series:
+            src = "alphavantage"
     if not series:
-        return {"available": False, "reason": "no FMP price series", "symbol": c["fmp"]}
+        return {"available": False, "reason": "no price series (FMP+AV)", "symbol": c["fmp"]}
     dates = sorted(series)
     last_d = dates[-1]
     last = series[last_d]
@@ -130,7 +173,7 @@ def price_momentum(coin: str) -> dict:
     aligned = m7 is not None and m30 is not None and (m7 > 0) == (m30 > 0)
     confirmation = round(min(100.0, base * (1.15 if aligned else 0.85)), 1)
     return {
-        "available": True, "symbol": c["fmp"], "as_of": last_d, "last_close": round(last, 4),
+        "available": True, "symbol": c["fmp"], "source": src, "as_of": last_d, "last_close": round(last, 4),
         "change_7d_pct": None if m7 is None else round(m7, 2),
         "change_30d_pct": None if m30 is None else round(m30, 2),
         "trend": trend, "aligned_7d_30d": aligned, "confirmation": confirmation,
