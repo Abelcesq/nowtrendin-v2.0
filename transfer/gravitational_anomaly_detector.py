@@ -429,6 +429,33 @@ except Exception as _cle:
     print(f"[startup] crypto_accuracy_ledger unavailable: {_cle}")
 
 
+def _apify_sweep_budget_ok(reserve_usd: float = None) -> dict:
+    """Budget guard for the held-out accuracy-ledger sweep. The sweep shares the Apify
+    account with the MAIN collection pipeline, so it must never spend the last dollars
+    collection needs. Reads live Apify monthly usage vs the account cap and returns
+    {ok, used, cap, reserve}: the sweep may spend paid Trends fetches only while
+    used < cap - reserve. Fail-OPEN (ok=True) when usage can't be read — a sweep fetch is
+    cheap ($0.001/result) and a monitoring hiccup must not silently stall the moat's
+    measurement. Reserve = LEDGER_APIFY_RESERVE_USD (default 20)."""
+    import os as _os
+    reserve = reserve_usd if reserve_usd is not None else float(_os.getenv("LEDGER_APIFY_RESERVE_USD", "20"))
+    tok = _os.getenv("APIFY_TOKEN")
+    if not tok:
+        return {"ok": True, "used": None, "cap": None, "reserve": reserve, "note": "no APIFY_TOKEN"}
+    try:
+        import requests as _rq
+        r = _rq.get(f"https://api.apify.com/v2/users/me/limits?token={tok}", timeout=12)
+        d = (r.json() or {}).get("data", {})
+        used = d.get("current", {}).get("monthlyUsageUsd")
+        cap = d.get("limits", {}).get("maxMonthlyUsageUsd")
+        if used is None or cap is None:
+            return {"ok": True, "used": used, "cap": cap, "reserve": reserve, "note": "usage unreadable"}
+        return {"ok": float(used) < (float(cap) - reserve), "used": float(used),
+                "cap": float(cap), "reserve": reserve}
+    except Exception as e:
+        return {"ok": True, "used": None, "cap": None, "reserve": reserve, "note": f"read error: {e}"}
+
+
 def _record_top_detections(limit=20, min_detection=None):
     """Log the engine's strongest current detections as PENDING ledger entries
     (starts the clock for every call, not just the winners). Uses each topic's
@@ -5078,9 +5105,22 @@ def start_scheduler():
             against the Apify budget (Cost Sentinel /monitor/cost, apify_trends)."""
             if _LEDGER_PLUS_AVAILABLE:
                 try:
-                    out = ledger_plus.sweep_pending(
-                        DB_PATH, limit=int(os.getenv("LEDGER_SWEEP_LIMIT", "8")))
-                    print(f"[scheduler] ledger sweep: {out}")
+                    # Uncapped by default (LEDGER_SWEEP_LIMIT=0 → drain the whole pool); a positive
+                    # value bounds each run for operational latency. Raised from the old 8 now that the
+                    # per-result Trends fetch is known-cheap ($0.001) — that cap throttled the held-out
+                    # MEASUREMENT only (never a score). Budget-guarded so it can't starve collection.
+                    _lim_env = int(os.getenv("LEDGER_SWEEP_LIMIT", "300"))
+                    _lim = None if _lim_env <= 0 else _lim_env
+                    _g = _apify_sweep_budget_ok()
+                    if _g["ok"]:
+                        out = ledger_plus.sweep_pending(DB_PATH, limit=_lim)
+                        print(f"[scheduler] ledger sweep (apify {_g.get('used')}/{_g.get('cap')}): {out}")
+                    else:
+                        # Near the Apify cap → resolve FREE timeouts only (fetch_fn→None, no paid Trends
+                        # fetch), so the sweep never starves the main collection pipeline.
+                        out = ledger_plus.sweep_pending(DB_PATH, limit=_lim, fetch_fn=lambda *_a, **_k: None)
+                        print(f"[scheduler] ledger sweep BUDGET-GUARDED (apify {_g.get('used')}/{_g.get('cap')}, "
+                              f"reserve ${_g.get('reserve')}): timeouts-only {out}")
                 except Exception as _se:
                     print(f"[scheduler] ledger sweep error: {_se}")
             # MARKET-SIGNAL ledger sweep (Money Gradient) — validates money-movement
@@ -6546,6 +6586,33 @@ def market_accuracy_sweep(sync: int = 0, limit: int = Query(50, ge=1, le=500)):
     import threading
     threading.Thread(target=_job, daemon=True).start()
     return {"status": "started"}
+
+
+@app.post("/accuracy/ledger/sweep", dependencies=[Depends(_require_internal)])
+def accuracy_ledger_sweep(sync: int = 0, limit: int = Query(300, ge=1, le=5000)):
+    """Resolve pending ATTENTION (Google-Trends) detections — hits / counted misses against the
+    realized Google-Trends breakout. BUDGET-GUARDED against the shared Apify cap so this held-out
+    measurement never starves the main collection pipeline (near the cap → free timeouts only).
+    Internal-only; background by default. Each in-window row spends one $0.001 Trends fetch;
+    timed-out rows resolve free. This is the on-demand drain for the pending backlog."""
+    if not _LEDGER_PLUS_AVAILABLE:
+        return {"status": "unavailable"}
+    g = _apify_sweep_budget_ok()
+    fetch_fn = None if g["ok"] else (lambda *_a, **_k: None)  # near cap → free timeouts only
+    if sync:
+        out = ledger_plus.sweep_pending(DB_PATH, limit=limit, fetch_fn=fetch_fn)
+        return {"status": "done", "budget": g, "result": out}
+
+    def _job():
+        try:
+            r = ledger_plus.sweep_pending(DB_PATH, limit=limit, fetch_fn=fetch_fn)
+            print(f"[accuracy-ledger] manual sweep (apify {g.get('used')}/{g.get('cap')}): {r}")
+        except Exception as exc:
+            print(f"[accuracy-ledger] sweep error: {exc}")
+
+    import threading
+    threading.Thread(target=_job, daemon=True).start()
+    return {"status": "started", "limit": limit, "budget": g}
 
 
 @app.get("/research/mainstream-v2")
