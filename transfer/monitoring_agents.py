@@ -414,10 +414,15 @@ def cost_sentinel() -> dict:
             alerts.append({"level": "warn", "block": "B7",
                            "msg": f"Firecrawl credit check failed: {_fce}"})
 
-    grand_cap = float(os.getenv("COST_TOTAL_MONTHLY_CAP", "0") or 0)
+    # TOTAL monthly spend vs the cap (COST_TOTAL_MONTHLY_CAP, default $700). CRITICAL once it EXCEEDS
+    # the cap; WARN at ≥80% so there's a heads-up before it does (matches the per-line 80/100% pattern).
+    grand_cap = float(os.getenv("COST_TOTAL_MONTHLY_CAP", "700") or 0)
     if grand_cap and total >= grand_cap:
         alerts.append({"level": "critical", "block": "B7",
-                       "msg": f"TOTAL monthly cost ${total:.2f} ≥ cap ${grand_cap:.0f}"})
+                       "msg": f"TOTAL monthly cost ${total:.2f} EXCEEDS cap ${grand_cap:.0f}/mo"})
+    elif grand_cap and total / grand_cap >= 0.8:
+        alerts.append({"level": "warn", "block": "B7",
+                       "msg": f"TOTAL monthly cost ${total:.2f} at {total / grand_cap * 100:.0f}% of the ${grand_cap:.0f}/mo cap"})
 
     summary = {
         "total_monthly_usd": round(total, 2),
