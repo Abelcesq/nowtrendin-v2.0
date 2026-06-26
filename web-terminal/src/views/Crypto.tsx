@@ -1,97 +1,118 @@
-import { useEffect, useState } from 'react'
-import { Bitcoin, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { MC, marketTierColor } from '../lib/mobileTheme'
+import { Disclaimer } from '../components/Disclaimer'
 import { api, type CryptoFeed, type CryptoCoin } from '../lib/api'
 
-// Per-coin flow chip styling (factual IN/OUT direction — never advice).
-const FLOW_META: Record<string, { label: string; color: string; Icon: typeof Minus }> = {
-  inflow:    { label: 'Inflow',    color: 'var(--up)',    Icon: ArrowUpRight },
-  outflow:   { label: 'Outflow',   color: 'var(--down)',  Icon: ArrowDownRight },
-  neutral:   { label: 'Neutral',   color: 'var(--text-3)', Icon: Minus },
-  no_data:   { label: 'No data',   color: 'var(--text-3)', Icon: Minus },
-  mixed:     { label: 'Mixed',     color: 'var(--warn, #D4A017)', Icon: Minus },
-  divergent: { label: 'Divergent', color: 'var(--warn, #D4A017)', Icon: Minus },
-}
+// Crypto Money Gradient — master/detail, mirroring the Market Signal stock detail page.
+// Coin list (master) + a side panel (CryptoRail) with the SAME dual-ring layout, interpretation,
+// factors, and CSS as MarketRail. Measurement, not advice.
+const MM_LABEL = 'Money Movement'
+const MC_LABEL = 'Market Confirmation'
 
-function Bar({ label, value, color, level }: { label: string; value?: number; color: string; level?: string }) {
-  const v = Math.max(0, Math.min(100, value ?? 0))
+function ring(val: number, color: string) {
+  const r = 26, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, val)) / 100)
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-2)', marginBottom: 5 }}>
-        <span>{label}</span>
-        <span style={{ fontWeight: 700, color }}>{value ?? '—'}{level ? ` · ${level}` : ''}</span>
-      </div>
-      <div style={{ height: 8, background: 'var(--line-2)', borderRadius: 6, overflow: 'hidden' }}>
-        <div style={{ width: `${v}%`, height: '100%', background: color, borderRadius: 6 }} />
-      </div>
-    </div>
+    <svg width="72" height="72" viewBox="0 0 72 72">
+      <circle cx="36" cy="36" r={r} fill="none" stroke="var(--line)" strokeWidth="6" />
+      <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={off} transform="rotate(-90 36 36)" />
+    </svg>
   )
 }
 
-function CoinCard({ c }: { c: CryptoCoin }) {
-  const flow = FLOW_META[c.flow || 'neutral'] || FLOW_META.neutral
-  const Icon = flow.Icon
-  const comps = Object.entries(c.components || {})
+// Factual flow direction chip (proxy Dark Matter vs price) — a measurement, not a buy/sell call.
+function flowChip(flow?: string) {
+  if (!flow || flow === 'no_data') return null
+  const meta = flow === 'inflow' ? { t: '▲ inflow', c: MC.confidence }
+    : flow === 'outflow' ? { t: '▼ outflow', c: MC.red }
+    : flow === 'divergent' ? { t: '◆ divergent', c: MC.gold }
+    : { t: '• ' + flow, c: MC.muted }
+  return <span className="cal-chip" title="Net money-flow direction (informed proxies vs the coin's price) — a measurement, not advice" style={{ background: meta.c + '1A', color: meta.c, fontWeight: 700 }}>{meta.t}</span>
+}
+
+function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
+  const tcol = marketTierColor(c.tier)
   const p = c.price
+  const dm = c.dark_matter
+  const comps = Object.entries(c.components || {})
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 11, padding: 16, display: 'flex', flexDirection: 'column', gap: 13 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Bitcoin size={22} color="#f7931a" strokeWidth={2} />
-        <div style={{ fontWeight: 700, fontSize: 16 }}>{c.item_name}<span style={{ color: 'var(--text-3)', fontWeight: 500 }}> · {c.coin}</span></div>
-        <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', padding: '3px 9px', borderRadius: 999, background: 'var(--canvas)', color: 'var(--text-2)' }}>{c.tier}</span>
+    <aside className="rail">
+      <div className="detail-head">
+        <div className="detail-top">
+          <div>
+            <div className="detail-name">{c.item_name} <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>· {c.coin}</span></div>
+            <div className="detail-cat">Crypto · <span style={{ color: tcol, fontWeight: 700 }}>{c.tier}</span>{flowChip(c.flow)}{c.calibrating && <span className="cal-chip">calibrating</span>}</div>
+          </div>
+          <div className="x" onClick={onClose}>✕</div>
+        </div>
+        <div className="detail-asof">
+          {p?.last_close != null ? `$${p.last_close.toLocaleString()}` : ''}{p?.as_of ? ` · price as of ${p.as_of}` : ''}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 16 }}>
-        <Bar label="Money Movement" value={c.money_movement} color="var(--det)" level={c.detection_level} />
-        <Bar label="Market Confirmation" value={c.market_confirmation} color="var(--conf)" level={c.confidence_level} />
+      <Disclaimer style={{ marginBottom: 10 }} />
+
+      {/* Dual rings — Money Movement (D) / Market Confirmation (M), same layout as the stock page */}
+      <div className="gauges">
+        <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed money · D</div></div>
+        <div className="gauge conf">{ring(c.market_confirmation ?? 0, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{c.market_confirmation ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MC_LABEL}</div><div className="gf">coin price · M</div></div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: flow.color }}>
-          <Icon size={14} /> {flow.label}
-        </span>
-        {p && p.change_7d_pct != null && (
-          <span className="muted" style={{ fontSize: 11.5 }}>
-            {p.last_close != null ? `$${p.last_close.toLocaleString()} · ` : ''}7d {p.change_7d_pct}% · 30d {p.change_30d_pct ?? '—'}%
-          </span>
-        )}
-        {c.calibrating && <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', color: 'var(--warn, #D4A017)' }}>CALIBRATING</span>}
-      </div>
-
-      {c.gap_state && (
-        <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
-          <b style={{ color: 'var(--text)' }}>{c.gap_state.replace(/_/g, ' ')}</b>{c.interpretation ? ` — ${c.interpretation}` : ''}
+      {(c.gap_state || c.interpretation) && (
+        <div className="sect">
+          <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : (c.gap_state || '').replace(/_/g, ' ')}{c.gap != null && !c.calibrating ? ` · ${Math.abs(c.gap)}-pt gap` : ''}</b>
+          {c.interpretation && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{c.interpretation}</div>}
         </div>
       )}
 
-      {/* §17 source-display: only components that contributed; real value or explicit n/a (never NaN). */}
+      {/* Market Factors — §17: real value or n/a, never NaN */}
       {comps.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--line-2)', paddingTop: 10, display: 'grid', gap: 6 }}>
-          {comps.map(([label, comp]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
-              <span style={{ color: 'var(--text-3)' }}>{label}</span>
-              <span style={{ fontWeight: 600, fontFamily: 'var(--mono)' }}>
-                {comp.score == null ? 'n/a' : comp.score}
-                {comp.baseline_relative && comp.z != null ? <span style={{ color: 'var(--text-3)', fontWeight: 400 }}> (z {comp.z})</span> : null}
-              </span>
-            </div>
-          ))}
+        <div className="sect">
+          <h4>Market Factors</h4>
+          {comps.map(([label, comp]: [string, any]) => {
+            const na = comp?.not_applicable || comp?.score == null
+            const col = na ? MC.muted : (comp?.feeds === 'money_movement' ? MC.detection : MC.confidence)
+            return (
+              <div className="comp-row" key={label} style={na ? { opacity: 0.5 } : undefined}>
+                <span className="cl"><span style={{ width: 6, height: 6, borderRadius: 3, background: col, display: 'inline-block', marginRight: 5 }} />{label.replace(/\s*\(.*\)$/, '')}{!na && comp?.baseline_relative ? ' ✓' : ''}</span>
+                <span className="comp-bar"><i style={{ width: na ? '0%' : `${Math.max(4, Math.min(100, comp?.score ?? 0))}%`, background: col }} /></span>
+                <span className="cv">{na ? 'n/a' : Math.round(comp?.score ?? 0)}</span>
+              </div>
+            )
+          })}
+          <div className="div-legend"><span style={{ color: MC.detection }}>●</span> money movement · <span style={{ color: MC.confidence }}>●</span> market confirmation · ✓ = scored vs own history</div>
         </div>
       )}
 
-      {c.dark_matter && (
-        <div className="muted" style={{ fontSize: 11 }}>
-          Dark Matter: {c.dark_matter.flow} · intensity {c.dark_matter.intensity} · {c.dark_matter.coverage} coverage ({c.dark_matter.proxies_covered} proxies)
+      {/* Price & Dark Matter facts — only what contributed (§17) */}
+      {(p?.change_7d_pct != null || dm) && (
+        <div className="sect">
+          <h4>Price &amp; Dark Matter</h4>
+          {p?.change_7d_pct != null && <div className="comp-row"><span className="cl">Price trend</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>7d {p.change_7d_pct}% · 30d {p.change_30d_pct ?? '—'}%</span></div>}
+          {dm && <div className="comp-row"><span className="cl">Dark Matter (proxies)</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>{dm.flow} · {dm.intensity} · {dm.coverage}</span></div>}
+          <div className="disc">Price via FMP (coin) · Dark Matter via crypto-exposure proxy 13F / insider. Measurement only.</div>
         </div>
       )}
-    </div>
+
+      <div className="disc"><b>What the Crypto signal measures:</b> The Crypto section tracks whether money is moving into or out of a coin. {MM_LABEL} “D” = informed / early money via crypto-exposure proxies (spot-ETF 13F + MSTR / COIN insider). {MC_LABEL} “M” = the coin's own price / volume confirmation. The flow (IN/OUT) is a measurement; whether an early read led realized price is recorded, after the fact, in the crypto accuracy ledger. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</div>
+    </aside>
   )
 }
 
-export function Crypto() {
+export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void }) {
   const [feed, setFeed] = useState<CryptoFeed | null>(null)
   const [err, setErr] = useState('')
+  const [sel, setSel] = useState<string | null>(null)
   useEffect(() => { api.crypto().then(setFeed).catch((e) => setErr(String(e))) }, [])
 
+  const select = (c: CryptoCoin) => {
+    if (c.coin === sel) { setSel(null); onRail(null); return }
+    setSel(c.coin)
+    onRail(<CryptoRail c={c} onClose={() => { setSel(null); onRail(null) }} />)
+  }
+
+  const coins = feed?.coins || []
+  const anyCalibrating = coins.some((c) => c.calibrating)
   return (
     <>
       <div className="main-head">
@@ -104,23 +125,55 @@ export function Crypto() {
         </div>
       </div>
 
-      {!feed && !err && <div className="center-state"><div className="spinner" /></div>}
-      {err && <div className="center-state">Couldn't load the crypto feed.<div className="muted">{err}</div></div>}
-      {feed && !feed.available && (
-        <div className="center-state">
-          Crypto Money Gradient is in held-out research.
-          <div className="muted">{feed.note || 'Enable CRYPTO_SIGNAL to activate the live feed.'}</div>
+      {anyCalibrating && feed?.available && (
+        <div className="cal-banner">
+          ◷ Crypto Money Gradient is <b>baseline-relative</b>. Coins with limited history read “calibrating” —
+          tiers settle as each coin's baseline accumulates over the coming cycles. Measurement only — not advice.
         </div>
       )}
-      {feed && feed.available && (
-        <div style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 16 }}>
-            {(feed.coins || []).map((c) => <CoinCard key={c.coin} c={c} />)}
-          </div>
-          {(feed.coins || []).length === 0 && <div className="center-state">No coins in the feed yet.</div>}
-          {feed.disclaimer && <div className="muted" style={{ marginTop: 18, fontSize: 11, lineHeight: 1.5, maxWidth: 760 }}>{feed.disclaimer}</div>}
-        </div>
-      )}
+
+      <div className="grid-wrap">
+        {!feed && !err ? (
+          <div className="center-state"><div className="spinner" />Loading the crypto money gradient…</div>
+        ) : err ? (
+          <div className="center-state">Couldn't load the crypto feed.<div className="muted">{err}</div></div>
+        ) : feed && !feed.available ? (
+          <div className="center-state">Crypto Money Gradient is in held-out research.<div className="muted">{feed.note || ''}</div></div>
+        ) : coins.length === 0 ? (
+          <div className="center-state">No coins in the feed yet.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Coin</th>
+                <th className="r">{MM_LABEL}</th>
+                <th className="r">{MC_LABEL}</th>
+                <th className="r">Lead</th>
+                <th>Tier</th>
+                <th className="r">Price 7d</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coins.map((c) => {
+                const ch7 = c.price?.change_7d_pct
+                return (
+                  <tr key={c.coin} className={c.coin === sel ? 'sel' : ''} onClick={() => select(c)}>
+                    <td>
+                      <div className="topic-name">{c.item_name} <span style={{ color: 'var(--text-3)' }}>· {c.coin}</span>{c.calibrating && <span className="cal-chip">cal</span>}{flowChip(c.flow)}</div>
+                      <div className="topic-cat">crypto</div>
+                    </td>
+                    <td className="r"><span className="score-cell det">{c.money_movement}</span></td>
+                    <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>
+                    <td className="r"><span className="muted">{c.gap != null ? `${c.gap > 0 ? '+' : ''}${c.gap}` : '—'}</span></td>
+                    <td><span className="tier" style={{ color: marketTierColor(c.tier), background: marketTierColor(c.tier) + '18', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{c.tier}</span></td>
+                    <td className="r"><span className={'pct ' + (ch7 == null ? 'na' : ch7 > 0 ? 'up' : ch7 < 0 ? 'down' : 'flat')}>{ch7 == null ? '—' : `${ch7 > 0 ? '+' : ''}${ch7}%`}</span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </>
   )
 }

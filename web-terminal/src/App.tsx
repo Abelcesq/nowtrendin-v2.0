@@ -109,7 +109,7 @@ export function App() {
   else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} />
   else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
-  else if (nav === 'crypto') body = <Crypto />
+  else if (nav === 'crypto') body = <Crypto onRail={setRail} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
   else if (nav === 'history') body = <History key={historyNavKey} initialQ={historyInitQ} />
@@ -117,7 +117,7 @@ export function App() {
   else body = <Placeholder title={titleFor(nav)} />
 
   return (
-    <Shell nav={nav} onNav={go} rail={!account && (nav === 'trends' || nav === 'market') ? rail : null}
+    <Shell nav={nav} onNav={go} rail={!account && (nav === 'trends' || nav === 'market' || nav === 'crypto') ? rail : null}
       user={user} onSignOut={signOut} onAccount={() => { setRail(null); setAccount(true) }}
       search={q} onSearch={setQ} alertCount={0} favorites={favorites} onFav={onFav} onFavChange={onFavChange}>
       {body}
