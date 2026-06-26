@@ -5326,6 +5326,16 @@ def _prewarm_caches() -> dict:
         warmed.append({"feed": "risk", "rows": len(rf.get("results") or [])})
     except Exception as e:
         warmed.append({"feed": "risk", "error": str(e)})
+    # Crypto Money Gradient (/crypto): warm the coin roster so the page paints instantly. The live
+    # compute does FMP price + Finviz/AV-throttled proxy Dark Matter across the roster — far too slow
+    # per-request, so it MUST be served from this prewarmed cache (parity with scores/topics/risk).
+    if _CRYPTO_AVAILABLE and crypto_engine.CRYPTO_SIGNAL:
+        try:
+            cf = crypto_engine.serve_crypto(record=False, db_path=DB_PATH)
+            _cache.set("crypto_full", cf, CACHE_TTL_SCORES_FULL)
+            warmed.append({"feed": "crypto", "rows": len(cf.get("coins") or [])})
+        except Exception as e:
+            warmed.append({"feed": "crypto", "error": str(e)})
     dt = round(_t.time() - t0, 2)
     _PREWARM_STATUS.update({"last_run": datetime.now(timezone.utc).isoformat(),
                             "warmed": warmed, "elapsed_s": dt})
@@ -6389,11 +6399,25 @@ def crypto_feed():
     if not crypto_engine.CRYPTO_SIGNAL:
         return {"available": False, "status": "disabled", "coins": [],
                 "note": "Crypto Money Gradient is in held-out research (CRYPTO_SIGNAL=0)."}
+    # Served from the PREWARMED cache (parity with scores/topics/risk) — the live compute (FMP price +
+    # Finviz/AV-throttled proxy Dark Matter across the roster) is too slow per-request and would time out.
+    cached = _cache.get("crypto_full")
+    if cached is not None:
+        return cached
+    # Cold cache (fresh boot, before the first prewarm completes): kick a background warm and return a
+    # FAST "warming" response so the page never hangs. The client polls until the roster is ready.
+    def _crypto_warm():
+        try:
+            _cache.set("crypto_full", crypto_engine.serve_crypto(db_path=DB_PATH), CACHE_TTL_SCORES_FULL)
+        except Exception as _cwe:
+            print(f"[crypto] warm error: {_cwe}")
     try:
-        return crypto_engine.serve_crypto(db_path=DB_PATH)
-    except Exception as _ce:
-        print(f"[crypto] feed error: {_ce}")
-        return {"available": False, "status": "error", "detail": str(_ce), "coins": []}
+        threading.Thread(target=_crypto_warm, daemon=True, name="crypto-warm").start()
+    except Exception as _cte:
+        print(f"[crypto] warm thread error: {_cte}")
+    return {"available": True, "status": "warming", "model": "crypto-money-gradient-v1",
+            "section": "Crypto", "coins": [], "count": 0,
+            "note": "Warming the crypto money gradient — refresh in a moment."}
 
 
 @app.get("/crypto/{coin}")

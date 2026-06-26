@@ -103,7 +103,20 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
   const [feed, setFeed] = useState<CryptoFeed | null>(null)
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<string | null>(null)
-  useEffect(() => { api.crypto().then(setFeed).catch((e) => setErr(String(e))) }, [])
+  // The engine serves /crypto from a prewarmed cache. On a cold boot it returns status:'warming'
+  // (coins:[]) while the prewarm fills the roster — poll until the coins arrive.
+  useEffect(() => {
+    let stop = false; let tries = 0
+    const load = () => {
+      api.crypto().then((f) => {
+        if (stop) return
+        setFeed(f)
+        if (f.status === 'warming' && tries++ < 15) setTimeout(load, 4000)
+      }).catch((e) => { if (!stop) setErr(String(e)) })
+    }
+    load()
+    return () => { stop = true }
+  }, [])
 
   const select = (c: CryptoCoin) => {
     if (c.coin === sel) { setSel(null); onRail(null); return }
@@ -139,6 +152,8 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
           <div className="center-state">Couldn't load the crypto feed.<div className="muted">{err}</div></div>
         ) : feed && !feed.available ? (
           <div className="center-state">Crypto Money Gradient is in held-out research.<div className="muted">{feed.note || ''}</div></div>
+        ) : feed?.status === 'warming' ? (
+          <div className="center-state"><div className="spinner" />Warming the crypto money gradient…<div className="muted">Loading the roster — one moment.</div></div>
         ) : coins.length === 0 ? (
           <div className="center-state">No coins in the feed yet.</div>
         ) : (
