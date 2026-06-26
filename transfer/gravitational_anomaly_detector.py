@@ -412,6 +412,14 @@ except Exception as _mle:
     _MARKET_LEDGER_AVAILABLE = False
     print(f"[startup] market_accuracy_ledger unavailable: {_mle}")
 
+try:
+    import crypto_money_gradient as crypto_engine
+    _CRYPTO_AVAILABLE = True
+    print(f"[startup] crypto_money_gradient loaded — Crypto Money Gradient (CRYPTO_SIGNAL={crypto_engine.CRYPTO_SIGNAL})")
+except Exception as _cme:
+    _CRYPTO_AVAILABLE = False
+    print(f"[startup] crypto_money_gradient unavailable: {_cme}")
+
 
 def _record_top_detections(limit=20, min_detection=None):
     """Log the engine's strongest current detections as PENDING ledger entries
@@ -6361,6 +6369,55 @@ def market_accuracy_detail(limit: int = Query(300, ge=1, le=1000), verdict: str 
         except Exception as _mde2:
             print(f"[market-accuracy] detail error: {_mde2}")
             return {"rows": [], "count": 0, "status": "error"}
+
+
+@app.get("/crypto")
+def crypto_feed():
+    """Crypto Money Gradient feed (BTC/ETH…): Money Movement (D — crypto-exposure proxies: spot-ETF
+    13F + MSTR/COIN insider[Finviz]+13F) + Market Confirmation (M — coin price/volume), per-coin flow.
+    Flag-gated CRYPTO_SIGNAL. MEASUREMENT only — not advice, not a buy/sell signal, not a price forecast."""
+    if not _CRYPTO_AVAILABLE:
+        return {"available": False, "status": "unavailable", "coins": []}
+    if not crypto_engine.CRYPTO_SIGNAL:
+        return {"available": False, "status": "disabled", "coins": [],
+                "note": "Crypto Money Gradient is in held-out research (CRYPTO_SIGNAL=0)."}
+    try:
+        return crypto_engine.serve_crypto(db_path=DB_PATH)
+    except Exception as _ce:
+        print(f"[crypto] feed error: {_ce}")
+        return {"available": False, "status": "error", "detail": str(_ce), "coins": []}
+
+
+@app.get("/crypto/{coin}")
+def crypto_detail(coin: str):
+    """Per-coin Crypto Money Gradient detail (dual-ring + components + flow + price/Dark-Matter facts)."""
+    if not _CRYPTO_AVAILABLE:
+        return {"available": False, "status": "unavailable"}
+    if not crypto_engine.CRYPTO_SIGNAL:
+        return {"available": False, "status": "disabled"}
+    try:
+        c = (coin or "").upper()
+        if c not in crypto_engine.cs.COIN_UNIVERSE:
+            return {"available": False, "status": "unknown_coin", "coin": c}
+        return crypto_engine.apply_crypto_signal(c, record_this_cycle=False, db_path=DB_PATH)
+    except Exception as _cde:
+        print(f"[crypto] detail error: {_cde}")
+        return {"available": False, "status": "error", "detail": str(_cde)}
+
+
+@app.post("/crypto/collect", dependencies=[Depends(_require_internal)])
+def crypto_collect():
+    """Record one crypto cycle per coin so the baseline-relative z-scores build over time (the coin
+    reads CALIBRATING until ~3 cycles, like the market signal). Cron/scheduler calls this; internal-only."""
+    if not (_CRYPTO_AVAILABLE and crypto_engine.CRYPTO_SIGNAL):
+        return {"status": "disabled"}
+    try:
+        r = crypto_engine.serve_crypto(record=True, db_path=DB_PATH)
+        return {"status": "ok", "recorded": r.get("count", 0),
+                "coins": [c.get("coin") for c in r.get("coins", [])]}
+    except Exception as _cce:
+        print(f"[crypto] collect error: {_cce}")
+        return {"status": "error", "detail": str(_cce)}
 
 
 @app.post("/market/accuracy/sweep", dependencies=[Depends(_require_internal)])
