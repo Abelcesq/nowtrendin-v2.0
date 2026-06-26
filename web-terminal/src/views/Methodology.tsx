@@ -167,7 +167,7 @@ export function Methodology() {
         <section className="mth-sec">
           <h3>The Money Gradient — where money is moving</h3>
           <div className="mth-card">
-            <p className="mth-p">Alongside the Attention Gradient, Now TrendIn runs a parallel <b>Money Gradient</b> on the same Dark-Matter→Mainstream pattern. <b>Money Movement</b> measures early/informed money — congressional trades, insider Form-4, smart-money 13F, and quality finance analysts (the Dark-Matter layer). <b>Market Confirmation</b> measures the broad market + economic data (the Mainstream layer). The <b>flow</b> (IN/OUT) is a fact read straight from the filings, and an objective <b>leverage</b> read states balance-sheet facts. It is a measurement of movement and a leverage-facts read — never a buy/sell recommendation, a price prediction, or investment advice.</p>
+            <p className="mth-p">Alongside the Attention Gradient, Now TrendIn runs a parallel <b>Money Gradient</b> on the same Dark-Matter→Mainstream pattern. <b>Money Movement</b> measures early/informed money — insider Form-4, smart-money 13F filings, and quality finance analysts (the Dark-Matter layer). <b>Market Confirmation</b> measures the broad market + economic data (the Mainstream layer). The <b>flow</b> (IN/OUT) is a fact read straight from the filings, and an objective <b>leverage</b> read states balance-sheet facts. It is a measurement of movement and a leverage-facts read — never a buy/sell recommendation, a price prediction, or investment advice.</p>
           </div>
         </section>
 

@@ -388,10 +388,19 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       retail: r.diffusion?.stage_5_retail_amplify ?? 0,
     },
     totalSignals: r.total_signals ?? 0,
-    sources: String(r.source_provenance || '')
-      .split('·')
-      .map((s: string) => s.trim())
-      .filter(Boolean),
+    // SOURCES — accurate per §17: source_provenance is built from tagged SIGNALS, so it omits the
+    // structured market sources that DRIVE the score (FINRA/OFR/FMP/13F). Add them when present + clean names.
+    sources: Array.from(new Set([
+      ...(r.short_interest ? ['FINRA'] : []),
+      ...(r.macro_leverage ? ['OFR'] : []),
+      ...(r.institutional_holdings ? ['WhaleWisdom'] : []),
+      ...(r.sustainability ? ['Financial Modeling Prep'] : []),
+      ...String(r.source_provenance || '')
+        .split('·')
+        .map((s: string) => s.trim())
+        .filter(Boolean)
+        .map((s: string) => (({ finnhub: 'Finnhub', sec_edgar: 'SEC EDGAR', whalewisdom: 'WhaleWisdom' } as Record<string, string>)[s.toLowerCase()] || s)),
+    ])) as string[],
     firstSeenAt: Date.parse(r.first_scored_at) || Date.parse(r.scored_at) || Date.now(),
     maturity: r.maturity || '',
     maturityNote: r.maturity_note || '',

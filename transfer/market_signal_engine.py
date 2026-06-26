@@ -112,8 +112,8 @@ MONEY_MOVEMENT_FP    = "early money-movement signal · the Accuracy Ledger judge
 MARKET_CONFIRM_FP    = "broad market / economic confirmation"
 
 COMPONENT_LABELS = {
-    "dark_positioning":          "Dark Positioning (macro & cross-market shifts)",
-    "positioning_concentration": "Positioning Concentration (smart-money: shorts/13F/insider)",
+    "dark_positioning":          "Macro Positioning (funding & cross-market shifts)",
+    "positioning_concentration": "Insider Tracking (insider + 13F filings)",
     "analyst_signal":            "Analyst Signal (news, ratings, attributed coverage)",
     "fundamental_confirmation":  "Fundamental Confirmation (realized financials)",
     "market_momentum":           "Market Momentum (price / valuation trend)",
@@ -352,7 +352,7 @@ def _interpret_movement(money, confirm, gap, calibrating, zero_inputs=0, total_i
                         "coverage, not a confirmed quiet read."}
     if money >= 45 and gap >= 16:
         return {"state": "EARLY_MOVEMENT",
-                "text": "Informed money (smart-money 13F / insider / Congress / quality analysts) "
+                "text": "Informed money (insider + 13F filings + quality analysts) "
                         "is moving here AHEAD of broad market confirmation. Whether it leads is for "
                         "the Accuracy Ledger to record over time — this is a measurement, not a "
                         "recommendation."}

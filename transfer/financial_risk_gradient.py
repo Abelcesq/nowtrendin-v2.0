@@ -2227,34 +2227,37 @@ def _market_analysis(detection, confidence, leverage_health=None, flow=None) -> 
     c = int(round(confidence or 0))
     gap = d - c
     flow = (flow or "").lower().strip()
-    # 1) MONEY MOVEMENT (the early/informed read) + the factual flow direction.
-    flow_phrase = (" — money is moving IN (net inflow across Congress / insider / 13F filings)"
-                   if flow == "inflow" else
-                   " — money is moving OUT (net outflow across Congress / insider / 13F filings)"
-                   if flow == "outflow" else
-                   " — no clear net direction in the filings" if flow == "neutral" else "")
+    # 1) MONEY MOVEMENT (the early/informed read) + factual flow direction. Insider tracking — NO Congress.
+    flow_dir = ("IN" if flow == "inflow" else "OUT" if flow == "outflow" else "")
     strength = ("strong" if d >= 70 else "moderate" if d >= 45 else "muted")
-    parts = [f"Money Movement {d}/100 ({strength} informed-money activity){flow_phrase}."]
+    if flow_dir:
+        parts = [f"Money Movement {d}/100 - this signals {strength} informed-money activity and that "
+                 f"money may be moving {flow_dir} (based on insider tracking data)."]
+    else:
+        parts = [f"Money Movement {d}/100 - this signals {strength} informed-money activity "
+                 f"(no clear net direction in the insider tracking data)."]
     # 2) MARKET CONFIRMATION (broad / economic).
-    conf_phrase = ("broad market + economic data confirm the move" if c >= 55 else
+    conf_phrase = ("the broad market + economic data confirm the move" if c >= 55 else
                    "broad confirmation is partial" if c >= 35 else
                    "the broad market has not yet confirmed")
-    parts.append(f"Market Confirmation {c}/100 — {conf_phrase}.")
+    parts.append(f"Market Confirmation {c}/100 — this signals {conf_phrase}.")
     # 3) LEVERAGE (a balance-sheet FACT, never a rating-as-advice).
     if leverage_health is not None:
         lh = int(round(leverage_health))
         lev_phrase = ("low debt / healthy balance sheet" if lh >= 60 else
                       "moderate debt load" if lh >= 40 else "elevated debt load")
-        parts.append(f"Leverage-health {lh}/100 ({lev_phrase}) — a fact from the reported balance sheet.")
-    # The lead (gap) — described factually, judged by the ledger, never a buy-timing.
+        parts.append(f"The Leverage-health of this topic is {lh}/100 ({lev_phrase}) — a fact from the reported balance sheet.")
+    # 4) The lead (gap) — described factually.
     if gap >= 16:
-        parts.append(f"Informed money runs {gap} pts ahead of broad confirmation; whether this "
-                     f"early read led is for the Accuracy Ledger to record over time.")
+        parts.append(f"Informed money runs {gap} pts ahead of broad confirmation.")
     elif gap <= -16:
         parts.append(f"Broad data leads the informed read by {abs(gap)} pts — a later-stage read.")
     else:
         parts.append("Informed and broad reads are roughly aligned.")
-    parts.append("A measurement of where money is moving plus a leverage fact — not a forecast or advice.")
+    # 5) Standing disclaimer + measurement framing.
+    parts.append("Be advised that this summary may be inaccurate and is not intended to be financial, "
+                 "legal or investment advice.")
+    parts.append("A measurement of where money is moving plus a leverage detail is not a forecast or advice.")
     return " ".join(parts)
 
 

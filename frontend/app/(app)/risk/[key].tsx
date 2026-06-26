@@ -22,7 +22,7 @@ const BASELINE_META: Record<string, { color: string; label: string }> = {
 };
 
 const PIPELINE = [
-  { key: 'Dark Positioning', label: 'Dark Positioning', desc: 'Insider Form 4 / 13F — smart money', detect: true },
+  { key: 'Dark Positioning', label: 'Insider Tracking', desc: 'Insider Form 4 / 13F — smart money', detect: true },
   { key: 'Expert Warning', label: 'Expert Warning', desc: '8-K material events, macro stress', detect: false },
   { key: 'Consumer Concern', label: 'Consumer Concern', desc: 'Financial communities', detect: false },
   { key: 'Media Coverage', label: 'Media Coverage', desc: 'News flow', detect: false },
@@ -162,7 +162,7 @@ export default function RiskDetail() {
             )}
             <Text className="text-textMuted text-[10px] mb-4">
               {v2
-                ? 'The Money Gradient measures where money is moving: Money Movement = informed/early money (Congress · insider · 13F · quality analysts, D); Market Confirmation = broad market/economic confirmation (M). The flow (IN/OUT) is a fact from filings; whether an early read led is recorded — after the fact — by the market accuracy ledger (validated against realized price direction). Measurement only — not financial advice.'
+                ? 'The Market Signal section tracks whether money is moving into or out of a particular instrument. Money Movement "D" = the tracking of informed / early money movement. Market Confirmation "M" signals the broad market / economic confirmation of the overall market. The flow (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.'
                 : 'The Market Gradient splits signals by type: Detection = what analysts say + how smart money is positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows how early the move is. Measurement only — not financial advice.'}
             </Text>
 

@@ -324,7 +324,7 @@ def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
         f"{int(round(leverage))}/100 (HIGH = lower debt / healthier balance sheet)"
     user = (
         f"Instrument: {name}\n"
-        f"- Money Movement (informed/early money — Congress · insider · 13F · quality analysts): "
+        f"- Money Movement (informed/early money — insider + 13F filings + quality analysts): "
         f"{int(round(money or 0))}/100\n"
         f"- Flow direction (a fact from filings): {flow or 'n/a'}\n"
         f"- Market Confirmation (broad market + economic data): {int(round(confirm or 0))}/100\n"

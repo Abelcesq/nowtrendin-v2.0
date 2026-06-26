@@ -77,7 +77,7 @@ export const MARKET_TIERS = [
 
 // Diffusion pipeline stages (risk/[key].tsx PIPELINE).
 export const RISK_PIPELINE = [
-  { key: 'Dark Positioning', label: 'Dark Positioning', desc: 'Insider Form 4 / 13F — smart money', detect: true },
+  { key: 'Dark Positioning', label: 'Insider Tracking', desc: 'Insider Form 4 / 13F — smart money', detect: true },
   { key: 'Expert Warning', label: 'Expert Warning', desc: '8-K material events, macro stress', detect: false },
   { key: 'Consumer Concern', label: 'Consumer Concern', desc: 'Financial communities', detect: false },
   { key: 'Media Coverage', label: 'Media Coverage', desc: 'News flow', detect: false },

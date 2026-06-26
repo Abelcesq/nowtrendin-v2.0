@@ -143,7 +143,16 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   const macro = raw.macro_leverage
   const inst = raw.institutional_holdings
   const sustTone = (v: number) => v >= 75 ? MC.confidence : v >= 50 ? MC.detection : v >= 30 ? MC.gold : MC.red
-  const sources = String(raw.source_provenance || '').split('·').map((s) => s.trim()).filter(Boolean)
+  // SOURCES — only sources that actually contribute to THIS topic's read (§17). source_provenance is
+  // built from tagged SIGNALS (news/broadcast/creators), so it OMITS the structured market sources that
+  // drive the score (FINRA short-interest, OFR funding, FMP fundamentals, 13F) — add them when present,
+  // and clean raw collector names so the list accurately reflects what informed the read.
+  const _cleanSrc = (s: string) => (({ finnhub: 'Finnhub', sec_edgar: 'SEC EDGAR', whalewisdom: 'WhaleWisdom' } as Record<string, string>)[s.toLowerCase()] || s)
+  const _structuredSrc = [si ? 'FINRA' : '', macro ? 'OFR' : '', inst ? 'WhaleWisdom' : '', raw.sustainability ? 'Financial Modeling Prep' : ''].filter(Boolean)
+  const sources = Array.from(new Set([
+    ..._structuredSrc,
+    ...String(raw.source_provenance || '').split('·').map((s) => _cleanSrc(s.trim())).filter(Boolean),
+  ]))
   const diffusion: any = raw.diffusion || {}
   const stageCount = (k: string) => {
     const x = diffusion[k]; return typeof x === 'number' ? x : (x?.count ?? null)
@@ -190,7 +199,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
           {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</div>}
         </div>
         <div className="disc"><b>What Market Signal measures:</b> {row.v2
-          ? <>where <i>money</i> is moving versus this instrument’s <b>own</b> baseline — a different question from a Trend/Attention score. {MM_LABEL} = informed/early money (Congress · insider · 13F · quality analysts, D); {MC_LABEL} = broad market/economic confirmation (M). The <b>flow</b> (IN/OUT) is a fact from filings; whether an early read LED is recorded — factually, after the fact — by the market accuracy ledger (validated against realized price direction). Measurement only — not financial advice.</>
+          ? <>The Market Signal section tracks whether money is moving into or out of a particular instrument. {MM_LABEL} “D” = the tracking of informed / early money movement. {MC_LABEL} “M” signals the broad market / economic confirmation of the overall market. The <b>flow</b> (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</>
           : <>is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</>}</div>
       </div>
 
