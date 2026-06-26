@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, Flame, DollarSign, Scale, LineChart, GripVertical, X, Plus, Pencil, Check } from 'lucide-react'
-import { api, type TopicRow, type RiskRow } from '../lib/api'
+import { TrendingUp, Flame, DollarSign, Bitcoin, Scale, LineChart, GripVertical, X, Plus, Pencil, Check } from 'lucide-react'
+import { api, type TopicRow, type RiskRow, type CryptoCoin } from '../lib/api'
 import { getDashboard, saveDashboard, type DashTile } from '../lib/auth'
 import type { NavKey } from '../components/Shell'
 
@@ -16,13 +16,28 @@ const DEFAULT_TILES: DashTile[] = [
   { id: 'd1', type: 'top-trends-mingap' },
   { id: 'd2', type: 'top-n' },
   { id: 'd3', type: 'top-market' },
+  { id: 'd_crypto', type: 'top-crypto' },
   { id: 'd4', type: 'leverage-spread' },
 ]
+
+// One-time injection: existing users (who already have a saved layout) get the new Crypto tile
+// inserted right after the market-signals tile. A localStorage marker means a later REMOVAL is
+// respected (we don't re-inject). New users get it from DEFAULT_TILES above.
+function ensureCryptoTile(saved: DashTile[]): DashTile[] {
+  if (saved.some((t) => t.type === 'top-crypto')) return saved
+  try { if (localStorage.getItem('nt_crypto_tile_v1') === 'done') return saved } catch { /* ignore */ }
+  const i = saved.findIndex((t) => t.type === 'top-market')
+  const next = saved.slice()
+  next.splice(i >= 0 ? i + 1 : next.length, 0, { id: newId(), type: 'top-crypto' })
+  try { localStorage.setItem('nt_crypto_tile_v1', 'done') } catch { /* ignore */ }
+  return next
+}
 
 const BUILTIN_META: Record<string, { title: string; icon: any; color: string }> = {
   'top-trends-mingap': { title: 'Top trends · minimal gap', icon: TrendingUp, color: 'var(--det)' },
   'top-n': { title: 'Top N · demand leaders', icon: Flame, color: 'var(--early)' },
   'top-market': { title: 'Top market signals', icon: DollarSign, color: 'var(--conf)' },
+  'top-crypto': { title: 'Top crypto · money movement', icon: Bitcoin, color: 'var(--det)' },
   'leverage-spread': { title: 'Leverage spread', icon: Scale, color: 'var(--text-2)' },
 }
 
@@ -38,6 +53,7 @@ const pill = (t: string, col: string, bg: string) => <span className="dash-pill"
 export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void; onNavHistory?: (q: string) => void }) {
   const [topics, setTopics] = useState<TopicRow[]>([])
   const [risks, setRisks] = useState<RiskRow[]>([])
+  const [coins, setCoins] = useState<CryptoCoin[]>([])
   const [tiles, setTiles] = useState<DashTile[]>(DEFAULT_TILES)
   const [loading, setLoading] = useState(true)
   const [edit, setEdit] = useState(false)
@@ -50,11 +66,17 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
       api.topics(200).catch(() => ({ topics: [] as TopicRow[] })),
       api.risk(200).catch(() => ({ results: [] as RiskRow[] })),
       getDashboard().catch(() => ({ tiles: [] as DashTile[] })),
-    ]).then(([t, r, d]) => {
+      api.crypto().catch(() => ({ coins: [] as CryptoCoin[] })),
+    ]).then(([t, r, d, cy]) => {
       if (!alive) return
       setTopics(t.topics || [])
       setRisks((r as any).results || [])
-      setTiles(d.tiles && d.tiles.length ? d.tiles : DEFAULT_TILES)
+      setCoins((cy as any).coins || [])
+      const saved = d.tiles && d.tiles.length ? d.tiles : DEFAULT_TILES
+      const withCrypto = ensureCryptoTile(saved)
+      setTiles(withCrypto)
+      // Persist the one-time Crypto-tile injection into the user's saved layout (so it sticks cross-device).
+      if (withCrypto !== saved && d.tiles && d.tiles.length) saveDashboard(withCrypto).catch(() => {})
     }).finally(() => alive && setLoading(false))
     return () => { alive = false }
   }, [])
@@ -79,6 +101,10 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
     return { key: r.risk_topic, name: r.risk_display || r.risk_topic, det: r0(mg.detection ?? r.detection_score),
       tier: (mg.tier || r.risk_stage || '—'), lev: mg.leverage_health == null ? null : r0(mg.leverage_health) }
   }), [risks])
+
+  const C = useMemo(() => coins.map((c) => ({
+    key: c.coin, name: c.item_name || c.coin, mm: r0(c.money_movement), tier: (c.tier || '—'),
+  })), [coins])
 
   function rowsForTrends(cfg: any) {
     let r = T.slice()
@@ -111,6 +137,10 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
       case 'top-market': {
         const rows = [...M].sort((a, b) => b.det - a.det).slice(0, 5)
         return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('market')}><span className="dash-nm">{x.name}</span>{num(x.det, 'var(--det)')}{pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>) : <div className="dash-empty">Market unavailable.</div>
+      }
+      case 'top-crypto': {
+        const rows = [...C].sort((a, b) => b.mm - a.mm).slice(0, 5)
+        return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('crypto')}><span className="dash-nm">{x.name}</span>{num(x.mm, 'var(--det)')}{pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>) : <div className="dash-empty">Crypto unavailable.</div>
       }
       case 'leverage-spread': {
         const lev = M.filter((m) => m.lev != null) as any[]
@@ -146,7 +176,7 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
     if (t.type === 'track-topic') return <><LineChart size={17} color="var(--early)" /> {t.title || `Track: ${t.config?.topic_display || ''}`}</>
     return <>{t.title}</>
   }
-  const tileNav = (t: DashTile): NavKey => (t.type.includes('market') ? 'market' : t.type === 'track-topic' ? 'history' : 'trends')
+  const tileNav = (t: DashTile): NavKey => (t.type.includes('crypto') ? 'crypto' : t.type.includes('market') ? 'market' : t.type === 'track-topic' ? 'history' : 'trends')
 
   if (loading) return <div className="center-state"><div className="spinner" />Loading dashboard…</div>
 
