@@ -6433,6 +6433,28 @@ def crypto_feed():
             "note": "Warming the crypto money gradient — refresh in a moment."}
 
 
+@app.get("/crypto/accuracy")
+def crypto_accuracy_report():
+    """Crypto Money Gradient ACCURACY LEDGER — DISTINCT from /accuracy/ledger (attention / Google
+    Trends) and /market/accuracy (equity EOD price). Ground truth = realized COIN price direction
+    (FMP crypto + AV). MUST precede /crypto/{coin} so it isn't captured as coin='accuracy'."""
+    if not _CRYPTO_LEDGER_AVAILABLE:
+        return {"status": "unavailable"}
+    try:
+        rep = crypto_ledger.report(DB_PATH)
+        rep["status"] = "ok" if rep.get("resolved") else "empty"
+        return rep
+    except Exception as _car:
+        try:
+            crypto_ledger.init_crypto_ledger_db(DB_PATH)
+            rep = crypto_ledger.report(DB_PATH)
+            rep["status"] = "ok" if rep.get("resolved") else "empty"
+            return rep
+        except Exception as _car2:
+            print(f"[crypto-ledger] report error: {_car2}")
+            return {"status": "error", "detail": str(_car2)}
+
+
 @app.get("/crypto/{coin}")
 def crypto_detail(coin: str):
     """Per-coin Crypto Money Gradient detail (dual-ring + components + flow + price/Dark-Matter facts)."""
@@ -6471,28 +6493,6 @@ def crypto_collect():
     except Exception as _cce:
         print(f"[crypto] collect error: {_cce}")
         return {"status": "error", "detail": str(_cce)}
-
-
-@app.get("/crypto/accuracy")
-def crypto_accuracy_report():
-    """Crypto Money Gradient ACCURACY LEDGER — DISTINCT from /accuracy/ledger (attention / Google
-    Trends) and /market/accuracy (equity EOD price). Ground truth = realized COIN price direction
-    (FMP crypto + AV): did the coin move the way the detected informed-money flow indicated. MEASUREMENT."""
-    if not _CRYPTO_LEDGER_AVAILABLE:
-        return {"status": "unavailable"}
-    try:
-        rep = crypto_ledger.report(DB_PATH)
-        rep["status"] = "ok" if rep.get("resolved") else "empty"
-        return rep
-    except Exception as _car:
-        try:
-            crypto_ledger.init_crypto_ledger_db(DB_PATH)
-            rep = crypto_ledger.report(DB_PATH)
-            rep["status"] = "ok" if rep.get("resolved") else "empty"
-            return rep
-        except Exception as _car2:
-            print(f"[crypto-ledger] report error: {_car2}")
-            return {"status": "error", "detail": str(_car2)}
 
 
 @app.get("/crypto/accuracy/detail")

@@ -122,19 +122,21 @@ def _close_on_or_after(px: dict, date_str: str, max_skip: int = _MAX_SKIP):
 
 
 def record_crypto_detection(coin, name, detection_date, flow, money_movement,
-                            db_path=DB_PATH, conn=None):
+                            db_path=DB_PATH, conn=None, gate=True):
     """Log a crypto MONEY-MOVEMENT (D) detection as PENDING. Idempotent on (coin, detection_date, flow);
     at most ONE open detection per (coin, flow) — a persistent read is the same ongoing signal, not many.
-    flow MUST be directional ('inflow'/'outflow') and money_movement ≥ CRYPTO_MIN_MM to be falsifiable."""
+    flow MUST be directional ('inflow'/'outflow'). When gate=True the money_movement floor applies;
+    record_from_serve passes gate=False (it already gated on the baseline-independent proxy intensity)."""
     flow = (flow or "").lower().strip()
     cn = (coin or "").upper().strip()
     if flow not in ("inflow", "outflow") or not cn:
         return
-    try:
-        if money_movement is not None and float(money_movement) < CRYPTO_MIN_MM:
-            return
-    except (TypeError, ValueError):
-        pass
+    if gate:
+        try:
+            if money_movement is not None and float(money_movement) < CRYPTO_MIN_MM:
+                return
+        except (TypeError, ValueError):
+            pass
     try:
         from date_utils import to_iso_date
         detection_date = to_iso_date(detection_date) or detection_date
@@ -177,26 +179,33 @@ def record_crypto_detection(coin, name, detection_date, flow, money_movement,
 
 def record_from_serve(payload: dict, db_path=DB_PATH) -> dict:
     """Record ledger detections from a serve_crypto() payload — the coin's MONEY MOVEMENT (D)
-    direction = its Dark-Matter flow (the informed-money read). Only directional, ≥CRYPTO_MIN_MM,
-    non-calibrating reads are logged. Held-out: gated on CRYPTO_SIGNAL by the caller."""
+    direction = its Dark-Matter flow. The flow + proxy intensity are baseline-INDEPENDENT (the
+    informed-money read), so a detection is a valid falsifiable claim even while the displayed
+    baseline-relative TIER is still calibrating. Gated on directional flow + proxy intensity ≥
+    CRYPTO_MIN_MM. Held-out: the caller gates on CRYPTO_SIGNAL."""
     init_crypto_ledger_db(db_path)
     n = 0
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     conn = db_compat.connect(db_path)
     try:
         for c in (payload or {}).get("coins", []):
-            if c.get("calibrating"):
-                continue                                  # no claim while the baseline is forming
             dm = c.get("dark_matter") or {}
-            flow = (dm.get("flow") or "").lower()         # the informed-money (D) direction
+            flow = (dm.get("flow") or "").lower()             # informed-money (D) direction
+            intensity = dm.get("intensity")                   # proxy DM strength (0-100), baseline-independent
             if flow not in ("inflow", "outflow"):
                 continue
+            try:
+                if intensity is None or float(intensity) < CRYPTO_MIN_MM:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            # Store the dual-ring Money Movement score as context; the gate above is on proxy intensity.
             record_crypto_detection(c.get("coin"), c.get("item_name"), today, flow,
-                                    c.get("money_movement"), conn=conn)
+                                    c.get("money_movement"), conn=conn, gate=False)
             n += 1
     finally:
         conn.close()
-    return {"recorded_or_seen": n}
+    return {"recorded": n}
 
 
 def _upsert_ledger(conn, rec_id, p, price0, price1, change_pct, move_date, lead_days, verdict):
