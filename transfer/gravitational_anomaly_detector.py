@@ -420,6 +420,14 @@ except Exception as _cme:
     _CRYPTO_AVAILABLE = False
     print(f"[startup] crypto_money_gradient unavailable: {_cme}")
 
+try:
+    import crypto_accuracy_ledger as crypto_ledger
+    _CRYPTO_LEDGER_AVAILABLE = True
+    print("[startup] crypto_accuracy_ledger loaded — Crypto Money Gradient track record (coin-price validated)")
+except Exception as _cle:
+    _CRYPTO_LEDGER_AVAILABLE = False
+    print(f"[startup] crypto_accuracy_ledger unavailable: {_cle}")
+
 
 def _record_top_detections(limit=20, min_detection=None):
     """Log the engine's strongest current detections as PENDING ledger entries
@@ -4968,6 +4976,11 @@ def start_scheduler():
                     try:
                         _cr = crypto_engine.serve_crypto(record=True, db_path=DB_PATH)
                         print(f"[scheduler] crypto cycle: recorded {_cr.get('count', 0)} coins")
+                        # Held-out accuracy ledger: log falsifiable detections + resolve pending vs
+                        # realized coin price (no-lookahead). Never feeds the score.
+                        if _CRYPTO_LEDGER_AVAILABLE:
+                            crypto_ledger.record_from_serve(_cr, db_path=DB_PATH)
+                            crypto_ledger.sweep_crypto_pending(DB_PATH, limit=60)
                     except Exception as _cce:
                         print(f"[scheduler] crypto error: {_cce}")
                 print("[scheduler] collect phase complete.")
@@ -6445,11 +6458,72 @@ def crypto_collect():
         return {"status": "disabled"}
     try:
         r = crypto_engine.serve_crypto(record=True, db_path=DB_PATH)
-        return {"status": "ok", "recorded": r.get("count", 0),
+        # Record falsifiable crypto money-movement detections into the held-out accuracy ledger
+        # (validated later vs realized coin price direction). Held-out — never feeds the score.
+        led = {}
+        if _CRYPTO_LEDGER_AVAILABLE:
+            try:
+                led = crypto_ledger.record_from_serve(r, db_path=DB_PATH)
+            except Exception as _cle2:
+                print(f"[crypto] ledger record error: {_cle2}")
+        return {"status": "ok", "recorded": r.get("count", 0), "ledger": led,
                 "coins": [c.get("coin") for c in r.get("coins", [])]}
     except Exception as _cce:
         print(f"[crypto] collect error: {_cce}")
         return {"status": "error", "detail": str(_cce)}
+
+
+@app.get("/crypto/accuracy")
+def crypto_accuracy_report():
+    """Crypto Money Gradient ACCURACY LEDGER — DISTINCT from /accuracy/ledger (attention / Google
+    Trends) and /market/accuracy (equity EOD price). Ground truth = realized COIN price direction
+    (FMP crypto + AV): did the coin move the way the detected informed-money flow indicated. MEASUREMENT."""
+    if not _CRYPTO_LEDGER_AVAILABLE:
+        return {"status": "unavailable"}
+    try:
+        rep = crypto_ledger.report(DB_PATH)
+        rep["status"] = "ok" if rep.get("resolved") else "empty"
+        return rep
+    except Exception as _car:
+        try:
+            crypto_ledger.init_crypto_ledger_db(DB_PATH)
+            rep = crypto_ledger.report(DB_PATH)
+            rep["status"] = "ok" if rep.get("resolved") else "empty"
+            return rep
+        except Exception as _car2:
+            print(f"[crypto-ledger] report error: {_car2}")
+            return {"status": "error", "detail": str(_car2)}
+
+
+@app.get("/crypto/accuracy/detail")
+def crypto_accuracy_detail(limit: int = Query(300, ge=1, le=1000), verdict: str = ""):
+    """Per-detection rows of the crypto ledger (coin, flow, money_movement, realized price move, lead,
+    verdict). Distinct from the attention + market ledgers."""
+    if not _CRYPTO_LEDGER_AVAILABLE:
+        return {"rows": [], "count": 0, "status": "unavailable"}
+    try:
+        return crypto_ledger.detail(DB_PATH, limit=limit, verdict=(verdict or None))
+    except Exception:
+        try:
+            crypto_ledger.init_crypto_ledger_db(DB_PATH)
+            return crypto_ledger.detail(DB_PATH, limit=limit, verdict=(verdict or None))
+        except Exception as _cde:
+            print(f"[crypto-ledger] detail error: {_cde}")
+            return {"rows": [], "count": 0, "status": "error"}
+
+
+@app.post("/crypto/accuracy/sweep", dependencies=[Depends(_require_internal)])
+def crypto_accuracy_sweep(limit: int = Query(60, ge=1, le=500)):
+    """Resolve pending crypto detections against realized coin price direction (FMP crypto + AV).
+    Internal-only; cron/scheduler calls it. No-lookahead, honest denominator."""
+    if not _CRYPTO_LEDGER_AVAILABLE:
+        return {"status": "unavailable"}
+    try:
+        crypto_ledger.init_crypto_ledger_db(DB_PATH)
+        return crypto_ledger.sweep_crypto_pending(DB_PATH, limit=limit)
+    except Exception as _cse:
+        print(f"[crypto-ledger] sweep error: {_cse}")
+        return {"status": "error", "detail": str(_cse)}
 
 
 @app.post("/market/accuracy/sweep", dependencies=[Depends(_require_internal)])
