@@ -325,6 +325,29 @@ exchange RSS; stage-2 market-microstructure; `signal_date`=HaltDate,
 `source_time`=HaltTime). Google: Blogger API (live), YouTube Data API v3
 (coverage/broadcast/creators), Custom Search reviewed; Apify retained for Google Trends.
 
+**Market/risk + insider sources (this week):** **Finviz Elite** ($30/mo, `finviz_data.py`) = **PRIMARY
+insider Form-4** (uncapped market-wide feed) + equity screener; **FMP** ($20 Starter, prices/fundamentals +
+**crypto coin prices**); **QuiverQuant** ($30, congress → Dark Matter); **Databento** (metered ~$0, ledger
+price-verify + microstructure). Finviz crypto is display-only → FMP serves crypto prices.
+
+**✅ SHIPPED 2026-06-26 — Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2.**
+- **Finviz = PRIMARY insider** (`FINVIZ_INSIDER=1`, `av_dark_positioning._best_insider` → Finviz, AV fallback).
+  INTEGRITY FIX: insider NET is degenerate (≈always sell-dominated) → the signal is insider **BUYING**
+  (`signal=='accumulation'`, ≥$250K); routine selling is neutral, NOT bearish (applied across finviz_data /
+  av_dark_positioning / crypto_signals / positioning_intel).
+- **Market Signal de-Congress → "insider."** All user-facing "Congress" generalized to **insider tracking**
+  (interpretation `_market_analysis`, `ai_grade` prompt, explainer, Methodology, `_interpret_movement`). Labels:
+  "Positioning Concentration" → **Insider Tracking**; "Dark Positioning" (macro funding/OFR) → **Macro
+  Positioning** (accurate — NOT insider); Diffusion "Dark Positioning" stage label → Insider Tracking. Tier
+  **BUILDING → MODERATE** (engine + web + mobile). SOURCES accuracy: now ADDS the score-driving FINRA/OFR/FMP/13F
+  that `source_provenance` (signals-only) omitted (§17). De-Congress means the DISPLAY only — congress trade
+  DATA (Quiver) is still a Dark-Matter input, just not named to the user.
+- **Mainstream v2 (`MAINSTREAM_V2=1`, LIVE)** — credible media is a Dark-Matter **TRIGGER** until **≥5 INDEPENDENT
+  outlets** corroborate (syndication-collapsed `min(distinct outlets, distinct titles)`) OR magnitude spikes →
+  `mainstream_confirmed`. FIFA validated: "world cup" stays mainstream (134 outlets), thin-credible "mexico world
+  cup" (5→4 stories) demotes to a dark-matter trigger (det 38.5→70). The ½/full weight reweighting below is the
+  related, still-in-design refinement.
+
 **M / D provenance reweighting — ⏳ IN DESIGN (next phase, NOT yet shipped; gated by
 backtest-before-ship).** Two coupled changes to the `_news_write` provenance decision:
 1. **Reputable ≠ automatic mainstream full weight.** 1 reputable source = **½ weight**;
@@ -399,7 +422,21 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-06-25 — **§17 SOURCE-DISPLAY RULE** added (detail views show ONLY contributing
+*Last updated: 2026-06-26 — **Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2 +
+the Crypto Money Gradient** (see §15). (1) **Finviz Elite** = PRIMARY insider Form-4 (uncapped; `FINVIZ_INSIDER=1`),
+AV→fallback; integrity fix = insider **BUYING** is the signal (net is sell-dominated/degenerate). (2) **Market
+Signal de-Congress**: user-facing "Congress" → "insider tracking" everywhere (text/AI prompt/explainer/Methodology);
+"Positioning Concentration"→**Insider Tracking**, "Dark Positioning"→**Macro Positioning**; tier **BUILDING→MODERATE**
+(all platforms); SOURCES now add the score-driving FINRA/OFR/FMP/13F (§17). (3) **Mainstream v2** (`MAINSTREAM_V2=1`,
+LIVE): credible media is a Dark-Matter TRIGGER until ≥5 INDEPENDENT outlets corroborate (syndication-collapsed) or
+magnitude spikes — FIFA-validated. (4) **Crypto Money Gradient LIVE** (`CRYPTO_SIGNAL=1`): 12 coins (BTC/ETH/SOL/XRP/
+BNB/DOGE/ADA/AVAX/LINK/DOT/LTC/BCH), proxy-based Dark Matter (D, crypto-exposure 13F/insider via Finviz) + FMP coin
+price (M); master/detail `/crypto` page + nav (under Market Signal, above Grade) + Dashboard tile; **served from the
+prewarm cache** (live compute uses FAST Finviz-only DM — AV 13F too slow; `CRYPTO_FULL_DM=1` for research); its OWN
+**crypto accuracy ledger** (realized COIN price direction) — the 3rd distinct ledger. (5) New paid sources tracked:
+Finviz $30 + QuiverQuant $30 + FMP $20 Starter + Databento (metered); the Data Subscriptions + Cost Sentinel agents
+now register them. Health check clean: services up, 0 quarantine, ledgers forward-only, catch-all STABLE.
+Prior: 2026-06-25 — **§17 SOURCE-DISPLAY RULE** added (detail views show ONLY contributing
 sources/components; omit no-data sources, never show empty/"not in uploads"/NaN — trend + market,
 all platforms). Removed the web "Score Components" NaN panel (duplicated Market Factors) + the
 non-covering creator rows. **Market Signal v2.0 (Money Gradient) is LIVE** (`MARKET_SIGNAL_V2=1`,

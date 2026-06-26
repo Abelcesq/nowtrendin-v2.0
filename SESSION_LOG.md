@@ -3,7 +3,45 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-25c_
+_Last updated: 2026-06-26_
+
+---
+
+## Session 2026-06-26 — Finviz primary insider · Market-Signal "insider" reframe · Mainstream v2 · Crypto Money Gradient
+
+Large multi-thread session; all shipped, health check clean at close.
+
+- **Mainstream v2 (`MAINSTREAM_V2=1`, LIVE).** A few credible outlets were prematurely flipping a topic to
+  "mainstream" and suppressing the early read. `dual_pathway.py`: credible media is a Dark-Matter TRIGGER until
+  **≥5 INDEPENDENT outlets** corroborate or magnitude spikes. Syndication-collapse:
+  `n_news_independent = min(distinct outlets, distinct normalized titles)` — defeats BOTH wire-syndication AND
+  single-outlet spam. FIFA-validated (held-out `/research/mainstream-v2`): "world cup" stays mainstream (134
+  outlets); thin "mexico world cup" (5→4 stories) demotes to a dark-matter trigger (det 38.5→70).
+- **Finviz Elite — PRIMARY insider ($30/mo).** `finviz_data.py`: uncapped market-wide SEC Form-4 feed +
+  per-ticker insider + screener. Primary via `av_dark_positioning._best_insider` (`FINVIZ_INSIDER=1`, AV→fallback).
+  **INTEGRITY FIX (backtest-caught):** raw insider NET is degenerate (15/15 basket "outflow" — insiders structurally
+  sell). The signal is insider **BUYING** (`signal=='accumulation'`, ≥$250K); routine selling = neutral, not bearish.
+  Source hierarchy: Finviz #1 insider+equity-market · Databento #1 price-truth+microstructure · AV fallback/13F ·
+  FMP crypto+deep-fundamentals. Finviz crypto is display-only.
+- **Market Signal de-Congress → "insider" (all platforms).** Reworded `_market_analysis` + `ai_grade` prompt +
+  `_interpret_movement` + explainer + Methodology. Labels: "Positioning Concentration" → **Insider Tracking**;
+  "Dark Positioning" (macro OFR funding) → **Macro Positioning** (kept accurate — NOT insider); Diffusion stage →
+  Insider Tracking. Tier **"BUILDING" → "MODERATE"** (engine + every frontend color/filter/legend). SOURCES (§17):
+  added the score-driving FINRA/OFR/FMP/13F that `source_provenance` (signals-only) omitted. Congress DATA (Quiver)
+  is still a D input — only the DISPLAY drops the name.
+- **Crypto Money Gradient — LIVE (`CRYPTO_SIGNAL=1`).** Coin-native Money Gradient: D = informed money via
+  crypto-EXPOSURE proxies (spot-ETF 13F + MSTR/COIN insider via Finviz; no on-chain — proxy v1); M = FMP coin price.
+  12 coins. `crypto_signals.py` + `crypto_money_gradient.py` (baseline-relative dual score, reuses
+  market_signal_engine store under `crypto:BTC`) + `/crypto[/{coin}]`. Web: master/detail `/crypto` page +
+  CryptoRail (mirrors the stock detail) + nav (under Market Signal, above Grade) + **Dashboard tile**. **P3 —
+  `crypto_accuracy_ledger.py`**: realized COIN price direction, 8%/45d, no-lookahead — the 3rd distinct ledger +
+  "Crypto · Coin" toggle. **Perf gotchas:** /crypto MUST serve from the PREWARM cache (`crypto_full`); live roster
+  uses FAST Finviz-only DM (`CRYPTO_FULL_DM=0`) — AV 13F's 13s/call throttle hung the page; roster now ~10s.
+- **FMP upgrade** to $20 Starter (300/min, crypto+forex) → crypto prices reliable (free-tier 429s gone).
+- **Health check + docs (this entry).** Services up; the only warns were Data Subscriptions + Cost Sentinel not
+  accounting for the new sources — FIXED (registered Finviz/Quiver/FMP/Databento/AV-research; set
+  `COST_FINVIZ_USD=30`/`COST_QUIVER_USD=30`/`COST_FMP_USD=20`). Quarantine 0; ledgers forward-only (no lost data);
+  catch-all STABLE (no leak). Updated CLAUDE.md §15+footer, DATA_BUILDING_BLOCKS §1/§5, this log, `/nowtrendin2.0`.
 
 ---
 

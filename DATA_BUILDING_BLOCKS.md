@@ -1,5 +1,8 @@
 # Now TrendIn — Data & Scoring Building Blocks
-**The foundation for monitoring agents.** *Last updated 2026-06-22.*
+**The foundation for monitoring agents.** *Last updated 2026-06-26 — added Finviz Elite (primary insider) /
+FMP ($20 Starter) / QuiverQuant / Databento to §1; Mainstream v2 (trigger-vs-corroborator) + the 3 distinct
+accuracy ledgers + BUILDING→MODERATE to §5; the Crypto Money Gradient (12 coins, prewarmed, own ledger).
+Data Subscriptions agent now registers Finviz/Quiver/FMP/Databento (COST_*_USD wired).*
 
 > Why this exists: we keep hitting the same two failure classes — **(a) data not
 > pulling** and **(b) scores wrong/absent**. This document is the single, durable
@@ -57,9 +60,20 @@ criticality) and the collectors in `gravitational_anomaly_detector.start_schedul
 | FINRA | file API | UA | short interest |
 | OFR | open | none | macro funding-stress / leverage |
 | WhaleWisdom | REST | key | 13F institutional positioning |
-| Alpha Vantage | REST | key (free 25/day) | news/retail coverage, sentiment |
+| **Finviz Elite** | screener CSV + HTML | key ($30/mo) | **PRIMARY insider Form-4** (uncapped market-wide feed) + equity screener. NOT crypto (display-only) |
+| **FMP** | REST | key ($20/mo Starter) | prices/fundamentals + **crypto coin prices** (300/min, crypto+forex) |
+| **QuiverQuant** | REST | key ($30/mo) | congressional trades — Dark Matter (D input) |
+| **Databento** | REST | key (metered ~$0) | accuracy-ledger price verify + microstructure (held-out) |
+| Alpha Vantage | REST | key (free 25/day) | news sentiment; insider/13F **FALLBACK** behind Finviz; crypto-price fallback |
 | Yahoo Finance | scrape/API | none | market news |
 | Nasdaq Trade Halts | exchange RSS | none | official trading halts (stage-2 microstructure); `signal_date`=HaltDate, `source_time`=HaltTime |
+
+> **Crypto Money Gradient (LIVE, flag `CRYPTO_SIGNAL`).** A coin-native Money Gradient: Money Movement (D) =
+> informed money via crypto-EXPOSURE proxy securities (spot-ETF 13F + MSTR/COIN insider via Finviz) — there is
+> NO direct on-chain feed (proxy-based v1); Market Confirmation (M) = the coin's own FMP price/volume. 12 coins
+> (BTC, ETH, SOL, XRP, BNB, DOGE, ADA, AVAX, LINK, DOT, LTC, BCH). Served from the prewarm cache (the live
+> compute uses the FAST uncapped Finviz insider; AV 13F is too slow per-request — `CRYPTO_FULL_DM=1` for
+> background only). Its OWN accuracy ledger validates by realized COIN price direction (§5).
 
 ### AI services (definitions + grades)
 | Service | Use | Cost control |
@@ -198,17 +212,22 @@ organically), **not** force-injecting it (would violate B6 objectivity).
 ## 5. CALIBRATION ACCURACY — are the numbers honest?
 
 Code: `dual_pathway.py` (expert vs mainstream; baseline-relative fame-vs-diffusion;
-news-outlet corroboration → `mainstream_confirmed`; tier-migration),
-`community_tiers.py`, `signal_calibration_integration`, `market_signal_engine.py`
-(z-score baseline-relative tiers), `google_trends_validation` + `accuracy_ledger_
-enhanced` (the **Accuracy Ledger** — the moat).
+**Mainstream v2 = trigger-vs-corroborator** — credible media is a Dark-Matter TRIGGER until ≥5
+INDEPENDENT outlets corroborate (syndication-collapsed: `min(distinct outlets, distinct titles)`)
+OR magnitude spikes → `mainstream_confirmed`; tier-migration), `community_tiers.py`,
+`signal_calibration_integration`, `market_signal_engine.py` (z-score baseline-relative tiers).
+**Three DISTINCT accuracy ledgers** (the moat), each a different ground truth — all count misses
+(honest denominator): `accuracy_ledger_enhanced` (attention → Google Trends breakout),
+`market_accuracy_ledger` (equity money → realized EOD price direction, FMP/Databento),
+`crypto_accuracy_ledger` (crypto money → realized COIN price direction, FMP crypto + AV).
 
 **INVARIANTS (B5):**
 - `backtest_dual_pathway.py` **all cases pass before any calibration ship**
   (backtest-before-ship, hard rule).
 - Scores are **baseline-relative** (deviation from a topic's own norm), so fame
-  ≠ movement. Market tiers (ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT) are z-score
-  calibrated — at-baseline reads ROUTINE *honestly* (don't fudge thresholds).
+  ≠ movement. Market tiers (ELEVATED/ACTIVE/**MODERATE**/ROUTINE/DORMANT — "BUILDING" renamed to
+  "MODERATE" 2026-06-26, all platforms) are z-score calibrated — at-baseline reads ROUTINE
+  *honestly* (don't fudge thresholds).
 - Accuracy is reported **with its denominator** (`/accuracy/ledger`), never
   inflated. Small-sample is stated as small-sample.
 **CHECK:** run `backtest_dual_pathway.py`; `/accuracy/ledger` hit-rate + pending;
