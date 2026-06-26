@@ -97,6 +97,27 @@ export interface RiskRow {
   macro_leverage?: any
 }
 
+// ── Crypto Money Gradient (the crypto sibling of Market Signal) — Money Movement (D, crypto-
+// exposure proxy Dark Matter) vs Market Confirmation (M, coin price/volume), per-coin flow.
+// Same dual-ring shape as MarketGradient so it renders consistently. Flag-gated (CRYPTO_SIGNAL). ──
+export interface CryptoComponent { score: number | null; feeds?: string; z?: number | null; baseline_relative?: boolean }
+export interface CryptoCoin {
+  coin: string; item_name: string; item_key?: string; section?: string; model_version?: string
+  money_movement?: number; market_confirmation?: number
+  detection?: number; confidence?: number; gap?: number
+  tier?: string; detection_level?: string; confidence_level?: string
+  gap_state?: string; interpretation?: string; calibrating?: boolean
+  flow?: 'inflow' | 'outflow' | 'neutral' | 'no_data' | 'mixed' | 'divergent'
+  components?: Record<string, CryptoComponent>
+  price?: { last_close?: number; change_7d_pct?: number | null; change_30d_pct?: number | null; trend?: string; as_of?: string } | null
+  dark_matter?: { coverage?: string; flow?: string; intensity?: number; proxies_covered?: number } | null
+  detection_fp?: string; confidence_fp?: string; disclaimer?: string
+}
+export interface CryptoFeed {
+  available: boolean; held_out?: boolean; status?: string; note?: string
+  model?: string; section?: string; coins: CryptoCoin[]; count?: number; disclaimer?: string
+}
+
 export interface HistoryPoint { t: string; overall: number; det: number; conf: number }
 export interface HistoryRow {
   topic_key: string; topic_display: string; category?: string
@@ -132,6 +153,9 @@ export const api = {
   historyAnalysis: (key: string, topic = '') =>
     get<{ available: boolean; direction?: string; short?: string; full?: string; citations?: string[]; reason?: string }>(
       `/history/${encodeURIComponent(key)}/analysis${topic ? `?topic=${encodeURIComponent(topic)}` : ''}`),
+  // Crypto Money Gradient (flag-gated CRYPTO_SIGNAL; held-out research until live).
+  crypto: () => get<CryptoFeed>('/crypto'),
+  cryptoDetail: (coin: string) => get<CryptoCoin>(`/crypto/${encodeURIComponent(coin)}`),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   // The WHOLE Market universe, fetched 100 at a time (engine serves O(1) slices from
   // its prewarmed superset). onBatch fires after each page so the table paints

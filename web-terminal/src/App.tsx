@@ -7,6 +7,7 @@ import { Watchlists } from './views/Watchlists'
 import { Methodology } from './views/Methodology'
 import { Account } from './views/Account'
 import { Grade } from './views/Grade'
+import { Crypto } from './views/Crypto'
 import { Dashboard } from './views/Dashboard'
 import { Alerts } from './views/Alerts'
 import { History } from './views/History'
@@ -108,6 +109,7 @@ export function App() {
   else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} />
   else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
+  else if (nav === 'crypto') body = <Crypto />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
   else if (nav === 'history') body = <History key={historyNavKey} initialQ={historyInitQ} />
@@ -126,7 +128,7 @@ export function App() {
 function titleFor(k: NavKey): string {
   return ({
     dashboard: 'Dashboard', trends: 'Signal Screener', market: 'Market Signal',
-    grade: 'Grade', watchlists: 'Watchlists', alerts: 'Alerts', history: 'History',
+    crypto: 'Crypto', grade: 'Grade', watchlists: 'Watchlists', alerts: 'Alerts', history: 'History',
     ledger: 'Accuracy Ledger', methodology: 'Methodology',
   } as Record<NavKey, string>)[k]
 }

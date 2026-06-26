@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  LayoutGrid, TrendingUp, DollarSign, Activity, Star, Bell, CheckCircle, Sparkles,
+  LayoutGrid, TrendingUp, DollarSign, Bitcoin, Activity, Star, Bell, CheckCircle, Sparkles,
   Search, Clock, Pencil, Plus, X, type LucideIcon,
 } from 'lucide-react'
 import { TIER_LABEL, type User, type Favorite } from '../lib/auth'
@@ -25,7 +25,7 @@ const FAV_COLORS = ['var(--bk-t)', '#8B5CF6', 'var(--down)', 'var(--det)', 'var(
 let _favc = 0
 
 export type NavKey =
-  | 'dashboard' | 'trends' | 'market' | 'grade'
+  | 'dashboard' | 'trends' | 'market' | 'crypto' | 'grade'
   | 'watchlists' | 'alerts' | 'history' | 'ledger' | 'methodology'
 
 // Phase 2 of the 3-platform UI migration (Charter §0.6): nav icons now come from
@@ -35,6 +35,7 @@ const NAV: { key: NavKey; icon: LucideIcon; label: string }[] = [
   { key: 'dashboard', icon: LayoutGrid, label: 'Dashboard' },
   { key: 'trends', icon: TrendingUp, label: 'Trends' },
   { key: 'market', icon: DollarSign, label: 'Market Signal' },
+  { key: 'crypto', icon: Bitcoin, label: 'Crypto' },
   { key: 'grade', icon: Activity, label: 'Grade' },
   { key: 'history', icon: Clock, label: 'History' },
   { key: 'watchlists', icon: Star, label: 'Watchlists' },
