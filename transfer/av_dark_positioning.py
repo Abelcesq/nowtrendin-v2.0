@@ -159,15 +159,18 @@ def _best_insider(ticker: str, name: str = "") -> dict:
     return insider_signal(ticker)
 
 
-def signal_for(ticker: str, name: str = "") -> dict:
+def signal_for(ticker: str, name: str = "", with_institutional: bool = True) -> dict:
     """Combined per-ticker Dark-Matter read = insider (Form-4) + institutional (13F). HELD-OUT.
-    Insider leg uses the best available source (Finviz primary when FINVIZ_INSIDER=1, else AV)."""
+    Insider leg uses the best available source (Finviz primary when FINVIZ_INSIDER=1, else AV).
+    with_institutional=False skips the AV 13F leg (which self-throttles 13s/call) — used by the LIVE
+    crypto roster so the page doesn't hang on the throttle; insider (Finviz, fast) is the primary read."""
     tkr = ticker.upper().strip()
-    ent = _CACHE.get(tkr)
+    ckey = tkr if with_institutional else (tkr + ":ins")   # don't serve a fast read as a full one
+    ent = _CACHE.get(ckey)
     if ent and (time.time() - ent["ts"] < _TTL):
         return ent["data"]
     ins = _best_insider(tkr, name)
-    inst = institutional_signal(tkr)
+    inst = institutional_signal(tkr) if with_institutional else {"available": False}
     flows = [s.get("flow") for s in (ins, inst) if s.get("available") and s.get("flow") in ("inflow", "outflow")]
     if flows and all(f == "inflow" for f in flows):
         combined = "inflow"
@@ -183,7 +186,7 @@ def signal_for(ticker: str, name: str = "") -> dict:
            "note": f"HELD-OUT Dark-Matter research ({ins.get('source','alphavantage')} insider Form-4 + "
                    "AV 13F institutional, ≥$250K). A FACT from filings — not advice. NOT in any score yet "
                    "(backtest-before-ship)."}
-    _CACHE[tkr] = {"data": out, "ts": time.time()}
+    _CACHE[ckey] = {"data": out, "ts": time.time()}
     return out
 
 

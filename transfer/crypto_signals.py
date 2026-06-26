@@ -97,6 +97,10 @@ COIN_UNIVERSE: dict = {
 }
 
 PRICE_LOOKBACK_DAYS = int(os.getenv("CRYPTO_PRICE_LOOKBACK_DAYS", "45"))
+# AV 13F institutional self-throttles 13s/call → too slow for the LIVE roster (the page would hang).
+# Default to the FAST Finviz-insider-only Dark Matter; set CRYPTO_FULL_DM=1 to add AV 13F (slow, for
+# background research only). Finviz insider (uncapped) is the primary D read either way.
+CRYPTO_FULL_DM = os.getenv("CRYPTO_FULL_DM", "0") == "1"
 
 
 def available() -> dict:
@@ -235,7 +239,7 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
     num = 0.0          # weighted signed direction
     den = 0.0          # sum of weights that produced a usable vote
     for p in proxies:
-        sig = avdp.signal_for(p["ticker"], name=p["ticker"])
+        sig = avdp.signal_for(p["ticker"], name=p["ticker"], with_institutional=CRYPTO_FULL_DM)
         vote = _proxy_vote(sig)
         ins = (sig or {}).get("insider") or {}
         inst = (sig or {}).get("institutional") or {}
