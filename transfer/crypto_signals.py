@@ -140,17 +140,15 @@ def price_momentum(coin: str) -> dict:
 # ── MONEY MOVEMENT (D): informed money via proxy securities ─────────────────────────────────
 def _proxy_vote(sig: dict) -> Optional[float]:
     """Signed [-1,1] directional vote for ONE proxy from av_dark_positioning.signal_for output.
-    +1 = accumulation (inflow), -1 = distribution (outflow), None = no usable data."""
+    Insider: BUYING (signal=='accumulation') → +1; routine net selling is low-information → no insider
+    vote (insider net is structurally sell-dominated, so it's not treated as bearish). Institutional
+    13F is genuinely two-sided → +1/-1 on net share flow. None = no usable signal."""
     if not sig:
         return None
     votes = []
     ins = sig.get("insider") or {}
-    if ins.get("available"):
-        nf = ins.get("net_usd") or 0
-        if nf > 0:
-            votes.append(1.0)
-        elif nf < 0:
-            votes.append(-1.0)
+    if ins.get("available") and ins.get("signal") == "accumulation":
+        votes.append(1.0)                       # rare, high-conviction insider BUY
     inst = sig.get("institutional") or {}
     if inst.get("available"):
         ns = inst.get("net_shares") or 0
@@ -170,8 +168,8 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
     c = COIN_UNIVERSE.get(coin.upper())
     if not c:
         return {"available": False, "reason": "unknown coin"}
-    if not (avdp and avdp.available()):
-        return {"available": False, "reason": "AV dark-positioning not configured"}
+    if not (avdp and avdp.source_available()):
+        return {"available": False, "reason": "no dark-positioning source configured (AV or Finviz)"}
     proxies = c["proxies"][: max_proxies] if max_proxies else c["proxies"]
     detail = []
     num = 0.0          # weighted signed direction

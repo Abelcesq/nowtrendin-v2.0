@@ -171,9 +171,14 @@ def insider_signal(ticker: str, name: str = "") -> dict:
             sell_usd += val; sell_n += 1
     net = buy_usd - sell_usd
     flow = "inflow" if net > MIN_USD else "outflow" if net < -MIN_USD else "neutral"
+    # Interpreted Dark-Matter read: insider BUYING is the rare, high-conviction signal. Routine net
+    # selling is structurally dominant (stock comp / diversification / 10b5-1) and low-information, so
+    # it is NOT treated as bearish — only material BUYING flags accumulation. (Unusual-selling-vs-
+    # baseline detection is a future enhancement.) `flow`/`net_usd` are kept as factual context.
+    signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
     return {"available": bool(rows), "source": "finviz", "window_days": INSIDER_WINDOW_DAYS,
             "buy_usd": round(buy_usd), "sell_usd": round(sell_usd), "net_usd": round(net),
-            "buys": buy_n, "sells": sell_n, "flow": flow, "rows_seen": len(rows)}
+            "buys": buy_n, "sells": sell_n, "flow": flow, "signal": signal, "rows_seen": len(rows)}
 
 
 if __name__ == "__main__":

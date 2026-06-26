@@ -34,6 +34,21 @@ def available() -> bool:
     return bool(AV_KEY)
 
 
+def source_available() -> bool:
+    """True if ANY Dark-Matter insider source is usable: Alpha Vantage (AV_KEY) OR Finviz Elite
+    (FINVIZ_INSIDER=1 + FINVIZ_API_KEY). Lets the insider signal run on Finviz alone — AV no longer
+    required now that Finviz is the uncapped primary. (Institutional 13F still needs AV.)"""
+    if AV_KEY:
+        return True
+    if os.getenv("FINVIZ_INSIDER", "0") == "1":
+        try:
+            import finviz_data
+            return finviz_data.available()
+        except Exception:
+            return False
+    return False
+
+
 _last_call = [0.0]
 # Free tier = 5 req/min → ≥12s/call. Default safe; lower it (e.g. 1) on a premium key.
 _MIN_INTERVAL = float(os.getenv("AV_MIN_INTERVAL_SEC", "13"))
@@ -94,9 +109,12 @@ def insider_signal(ticker: str) -> dict:
             sell_usd += val; sell_n += 1
     net = buy_usd - sell_usd
     flow = "inflow" if net > MIN_USD else "outflow" if net < -MIN_USD else "neutral"
-    return {"available": bool(rows), "window_days": INSIDER_WINDOW_DAYS,
+    # Insider BUYING is the rare high-conviction signal; routine net selling is low-information →
+    # neutral, not bearish (matches finviz_data.insider_signal). flow/net_usd kept as factual context.
+    signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
+    return {"available": bool(rows), "source": "alphavantage", "window_days": INSIDER_WINDOW_DAYS,
             "buy_usd": round(buy_usd), "sell_usd": round(sell_usd), "net_usd": round(net),
-            "buys": buy_n, "sells": sell_n, "flow": flow}
+            "buys": buy_n, "sells": sell_n, "flow": flow, "signal": signal}
 
 
 def institutional_signal(ticker: str) -> dict:
@@ -125,13 +143,30 @@ def institutional_signal(ticker: str) -> dict:
             "net_shares": net_shares, "flow": flow}
 
 
+def _best_insider(ticker: str, name: str = "") -> dict:
+    """Insider Form-4 from the PRIMARY source, AV as fallback. Finviz Elite (uncapped, market-wide
+    Form-4) is primary when FINVIZ_INSIDER=1 and configured; otherwise Alpha Vantage (25/day). Both
+    return the same shape, so this is a transparent swap. Flag default OFF → byte-identical to AV."""
+    if os.getenv("FINVIZ_INSIDER", "0") == "1":
+        try:
+            import finviz_data
+            if finviz_data.available():
+                s = finviz_data.insider_signal(ticker, name)
+                if s.get("available"):
+                    return s
+        except Exception as e:
+            print(f"[av-darkpos] finviz insider unavailable, falling back to AV: {e}")
+    return insider_signal(ticker)
+
+
 def signal_for(ticker: str, name: str = "") -> dict:
-    """Combined per-ticker Dark-Matter read = insider (Form-4) + institutional (13F). HELD-OUT."""
+    """Combined per-ticker Dark-Matter read = insider (Form-4) + institutional (13F). HELD-OUT.
+    Insider leg uses the best available source (Finviz primary when FINVIZ_INSIDER=1, else AV)."""
     tkr = ticker.upper().strip()
     ent = _CACHE.get(tkr)
     if ent and (time.time() - ent["ts"] < _TTL):
         return ent["data"]
-    ins = insider_signal(tkr)
+    ins = _best_insider(tkr, name)
     inst = institutional_signal(tkr)
     flows = [s.get("flow") for s in (ins, inst) if s.get("available") and s.get("flow") in ("inflow", "outflow")]
     if flows and all(f == "inflow" for f in flows):
@@ -144,8 +179,10 @@ def signal_for(ticker: str, name: str = "") -> dict:
         combined = "neutral"
     out = {"ticker": tkr, "name": name or tkr, "insider": ins, "institutional": inst,
            "combined_flow": combined, "min_usd": MIN_USD,
-           "note": "HELD-OUT Dark-Matter research (AV insider Form-4 + 13F institutional, ≥$250K). "
-                   "A FACT from filings — not advice. NOT in any score yet (backtest-before-ship)."}
+           "insider_source": ins.get("source", "alphavantage"),
+           "note": f"HELD-OUT Dark-Matter research ({ins.get('source','alphavantage')} insider Form-4 + "
+                   "AV 13F institutional, ≥$250K). A FACT from filings — not advice. NOT in any score yet "
+                   "(backtest-before-ship)."}
     _CACHE[tkr] = {"data": out, "ts": time.time()}
     return out
 

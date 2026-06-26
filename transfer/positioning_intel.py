@@ -146,19 +146,24 @@ def signal_for(ticker: str, name: str = "") -> dict:
             av = _av.signal_for(tkr, name)
             ins = av.get("insider") or {}
             inst = av.get("institutional") or {}
-            insider_norm = min(1.0, abs(_f(ins.get("net_usd"))) / 250_000_000.0)   # $250M net = saturated
+            # Insider intensity from BUYING (the conviction signal) — NOT |net|, which is sell-dominated
+            # and ≈always large (routine comp/diversification), so it would degenerate to ~always-on.
+            insider_norm = min(1.0, _f(ins.get("buy_usd")) / 10_000_000.0)         # $10M insider BUYING = saturated
             tot = _f(inst.get("total_holders"))
             inst_skew = (abs(_f(inst.get("holders_increased")) - _f(inst.get("holders_decreased"))) / tot) if tot else 0.0
             inst_norm = min(1.0, inst_skew * 4.0)                                  # 25% net-holder skew = saturated
             blended = 0.30 * sm_norm + 0.25 * cg_norm + 0.30 * insider_norm + 0.15 * inst_norm
             out["movement_intensity"] = out["positioning_signal"] = round(min(1.0, blended), 3)
             # Flow CONSENSUS across the directional inputs (congress + insider + institutional).
-            votes = [f for f in (flow, ins.get("flow"), inst.get("flow")) if f in ("inflow", "outflow")]
+            # Insider votes INFLOW only on accumulation (buying); routine selling is low-information →
+            # no vote (its degenerate net `flow` would otherwise bias everything to outflow).
+            ins_dir = "inflow" if ins.get("signal") == "accumulation" else None
+            votes = [f for f in (flow, ins_dir, inst.get("flow")) if f in ("inflow", "outflow")]
             inflow_n, outflow_n = votes.count("inflow"), votes.count("outflow")
             out["flow"] = ("inflow" if inflow_n > outflow_n else "outflow" if outflow_n > inflow_n
                            else (flow if flow in ("inflow", "outflow") else ("mixed" if votes else "neutral")))
             out["av_insider"] = {"net_usd": ins.get("net_usd"), "flow": ins.get("flow"),
-                                 "buys": ins.get("buys"), "sells": ins.get("sells")}
+                                 "signal": ins.get("signal"), "buys": ins.get("buys"), "sells": ins.get("sells")}
             out["av_institutional"] = {"net_shares": inst.get("net_shares"), "flow": inst.get("flow"),
                                        "holders_increased": inst.get("holders_increased"),
                                        "holders_decreased": inst.get("holders_decreased")}
