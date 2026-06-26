@@ -40,13 +40,13 @@ const COMPONENT_LABELS: Record<string, string> = {
 // Market Gradient — neutral intensity tiers + colors (describe how unusual the
 // positioning is, never what to do). Mirrors the Trends gradient's tier legend.
 const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017',
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017',
   ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
 };
 const MARKET_TIERS = [
   { key: 'ELEVATED', range: '80–100', desc: 'Strongly elevated positioning' },
   { key: 'ACTIVE',   range: '60–79',  desc: 'Clearly above routine' },
-  { key: 'BUILDING', range: '40–59',  desc: 'Building, not yet elevated' },
+  { key: 'MODERATE', range: '40–59',  desc: 'Moderate, not yet elevated' },
   { key: 'ROUTINE',  range: '25–39',  desc: 'In line with own baseline' },
   { key: 'DORMANT',  range: '0–24',   desc: 'Quiet vs baseline' },
 ];

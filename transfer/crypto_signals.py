@@ -77,6 +77,23 @@ COIN_UNIVERSE: dict = {
             {"ticker": "COIN", "kind": "exchange", "weight": 0.3},
         ],
     },
+    # Additional majors (FMP price verified). Proxy = COIN only (broad crypto-exposure) → Dark Matter
+    # is THIN / shared for alts: Money Movement reads institutional crypto sentiment via Coinbase, while
+    # Market Confirmation (price/volume) is coin-specific. Per-coin proxies improve as spot ETFs list.
+    "BNB":  {"name": "BNB",          "fmp": "BNBUSD",  "av": "BNB",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.3}]},
+    "ADA":  {"name": "Cardano",      "fmp": "ADAUSD",  "av": "ADA",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
+    "AVAX": {"name": "Avalanche",    "fmp": "AVAXUSD", "av": "AVAX",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
+    "LINK": {"name": "Chainlink",    "fmp": "LINKUSD", "av": "LINK",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
+    "DOT":  {"name": "Polkadot",     "fmp": "DOTUSD",  "av": "DOT",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
+    "LTC":  {"name": "Litecoin",     "fmp": "LTCUSD",  "av": "LTC",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
+    "BCH":  {"name": "Bitcoin Cash", "fmp": "BCHUSD",  "av": "BCH",
+             "proxies": [{"ticker": "COIN", "kind": "exchange", "weight": 0.4}]},
 }
 
 PRICE_LOOKBACK_DAYS = int(os.getenv("CRYPTO_PRICE_LOOKBACK_DAYS", "45"))

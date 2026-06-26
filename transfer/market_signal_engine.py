@@ -135,7 +135,7 @@ LANE_LABELS = {
 }
 
 # Neutral intensity tiers (NOT advice). Reused from the deployed Market section.
-MARKET_LEVELS = [(80, "ELEVATED"), (60, "ACTIVE"), (40, "BUILDING"),
+MARKET_LEVELS = [(80, "ELEVATED"), (60, "ACTIVE"), (40, "MODERATE"),
                  (25, "ROUTINE"), (0, "DORMANT")]
 
 

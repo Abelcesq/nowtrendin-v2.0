@@ -24,12 +24,12 @@ interface MRow {
 type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
 
 // mobile MARKET_CATEGORY_DEFS parity — the tier axis.
-const TIERS = ['ELEVATED', 'ACTIVE', 'BUILDING', 'ROUTINE', 'DORMANT']
+const TIERS = ['ELEVATED', 'ACTIVE', 'MODERATE', 'ROUTINE', 'DORMANT']
 const FILTERS: { k: string; label: string; test?: (r: MRow) => boolean }[] = [
   { k: 'all', label: 'All' },
   { k: 'elevated', label: 'Elevated', test: (r) => r.tier === 'ELEVATED' },
   { k: 'active', label: 'Active', test: (r) => r.tier === 'ACTIVE' },
-  { k: 'building', label: 'Building', test: (r) => r.tier === 'BUILDING' },
+  { k: 'building', label: 'Moderate', test: (r) => r.tier === 'MODERATE' || r.tier === 'BUILDING' },
   { k: 'routine', label: 'Routine', test: (r) => r.tier === 'ROUTINE' },
   { k: 'dormant', label: 'Dormant', test: (r) => r.tier === 'DORMANT' },
   { k: 'watch', label: 'Watch / Unusual', test: (r) => ['WATCH', 'ELEVATED', 'UNUSUAL'].includes(r.cls) },

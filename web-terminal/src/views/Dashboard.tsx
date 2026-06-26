@@ -229,7 +229,7 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
   const TREND_RANK = [['n', 'N'], ['det', 'Detection'], ['conf', 'Confidence'], ['mingap', 'Min gap']]
   const MKT_RANK = [['det', 'Money Movement'], ['leverage', 'Leverage']]
   const STAGES = ['', 'BREAKOUT', 'STRONG', 'EMERGING', 'WATCHING', 'MONITORING']
-  const TIERS = ['', 'ELEVATED', 'ACTIVE', 'BUILDING', 'ROUTINE', 'DORMANT']
+  const TIERS = ['', 'ELEVATED', 'ACTIVE', 'MODERATE', 'ROUTINE', 'DORMANT']
   // Verified typeahead (same as the watchlist): filter the live topic universe as
   // the user types; a tile can only track a topic that exists in our database.
   const tq = topic.trim().toLowerCase()

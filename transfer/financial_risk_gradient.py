@@ -89,7 +89,7 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 # the market vocabulary so one column never carries two disjoint enums (the format-
 # mismatch disease). Ordered by intensity: ACUTE->ELEVATED ... BACKGROUND->DORMANT.
 _RISK_TO_MARKET_TIER = {
-    "ACUTE": "ELEVATED", "ELEVATED": "ACTIVE", "EMERGING": "BUILDING",
+    "ACUTE": "ELEVATED", "ELEVATED": "ACTIVE", "EMERGING": "MODERATE",
     "WATCH": "ROUTINE", "BACKGROUND": "DORMANT",
 }
 
@@ -2076,7 +2076,7 @@ def alpha_vantage_coverage(ticker: str) -> Optional[dict]:
 # themes that lack ticker-level fundamentals/price.
 # ════════════════════════════════════════════════════════════════
 
-MARKET_TIERS = [(80, "ELEVATED"), (60, "ACTIVE"), (40, "BUILDING"),
+MARKET_TIERS = [(80, "ELEVATED"), (60, "ACTIVE"), (40, "MODERATE"),
                 (25, "ROUTINE"), (0, "DORMANT")]
 
 
@@ -2193,7 +2193,7 @@ def compute_market_gradient(payload: dict, diffusion_score: dict,
 _MARKET_TIER_DESC = {
     "ELEVATED": "Positioning is strongly elevated across leading and confirming signals.",
     "ACTIVE":   "Active positioning — signals are clearly above routine levels.",
-    "BUILDING": "Positioning is building but not yet broadly elevated.",
+    "MODERATE": "Positioning is moderate — building but not yet broadly elevated.",
     "ROUTINE":  "Activity is in line with this item's normal level.",
     "DORMANT":  "Quiet — little positioning activity relative to baseline.",
 }

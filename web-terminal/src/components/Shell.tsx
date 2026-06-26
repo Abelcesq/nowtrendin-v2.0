@@ -16,7 +16,7 @@ const FAV_OPTIONS: Record<string, { k: string; label: string }[]> = {
   ],
   market: [
     { k: 'all', label: 'All' }, { k: 'elevated', label: 'Elevated' }, { k: 'active', label: 'Active' },
-    { k: 'building', label: 'Building' }, { k: 'routine', label: 'Routine' },
+    { k: 'building', label: 'Moderate' }, { k: 'routine', label: 'Routine' },
     { k: 'dormant', label: 'Dormant' }, { k: 'leverage', label: 'Leverage ≥60' },
   ],
   watchlist: [{ k: '', label: 'My watchlists' }],

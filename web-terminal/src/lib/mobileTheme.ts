@@ -38,7 +38,7 @@ export const maturityColor = (c?: string) => MATURITY_COLOR[(c || '').toUpperCas
 
 // Market tier → color (risk/[key].tsx MARKET_TIER_COLOR).
 export const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017',
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017',
   ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
 }
 export const marketTierColor = (t?: string) => MARKET_TIER_COLOR[(t || '').toUpperCase()] ?? '#9AA3B0'
@@ -70,7 +70,7 @@ export const SCORE_ROLES = {
 export const MARKET_TIERS = [
   { key: 'ELEVATED', range: '80–100', desc: 'Strongly elevated positioning' },
   { key: 'ACTIVE', range: '60–79', desc: 'Clearly above routine' },
-  { key: 'BUILDING', range: '40–59', desc: 'Building, not yet elevated' },
+  { key: 'MODERATE', range: '40–59', desc: 'Moderate, not yet elevated' },
   { key: 'ROUTINE', range: '25–39', desc: 'In line with own baseline' },
   { key: 'DORMANT', range: '0–24', desc: 'Quiet vs baseline' },
 ]

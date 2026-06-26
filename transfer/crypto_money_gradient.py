@@ -21,7 +21,8 @@ import crypto_signals as cs
 import market_signal_engine as mse
 
 CRYPTO_SIGNAL = os.getenv("CRYPTO_SIGNAL", "0") == "1"
-DEFAULT_COINS = [c.strip().upper() for c in os.getenv("CRYPTO_COINS", "BTC,ETH").split(",") if c.strip()]
+DEFAULT_COINS = [c.strip().upper() for c in os.getenv(
+    "CRYPTO_COINS", "BTC,ETH,SOL,XRP,BNB,DOGE,ADA,AVAX,LINK,DOT,LTC,BCH").split(",") if c.strip()]
 
 # Crypto Money Gradient components (0-1), z-scored vs the coin's own baseline.
 CRYPTO_MM_WEIGHTS = {            # D — informed money via crypto-exposure proxies
@@ -39,9 +40,10 @@ CRYPTO_LABELS = {
     "signal_freshness":  "Signal Freshness (recency)",
 }
 
-_DISCLAIMER = ("Measurement of crypto money movement relative to this coin's own baseline. Analysis only — "
-               "not financial advice, not a buy/sell signal, and not a price prediction. Whether an early "
-               "movement led realized price is recorded, after the fact, by the crypto Accuracy Ledger.")
+_DISCLAIMER = ("The Crypto Measurement section tracks significant money movement relative to this coin's own "
+               "baseline. Whether an early movement led realized price is recorded, after the fact, in the "
+               "crypto Accuracy Ledger. Be advised that this summary may be inaccurate and is not intended to "
+               "be financial, legal or investment advice.")
 
 
 def assemble_crypto_components(coin: str, sig: Optional[dict] = None) -> dict:

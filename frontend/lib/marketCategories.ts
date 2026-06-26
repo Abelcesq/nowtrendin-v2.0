@@ -80,11 +80,11 @@ export const MARKET_CATEGORY_DEFS: Array<{
     showTile: true, filter: (r) => tierOf(r) === 'ACTIVE',
   },
   {
-    key: 'building', label: 'Building', short: 'BUILDING', range: 'Score 40–59',
+    key: 'building', label: 'Moderate', short: 'MODERATE', range: 'Score 40–59',
     color: '#D4A017',
-    definition: 'Positioning is building but not yet broadly elevated — worth watching for promotion.',
+    definition: 'Positioning is moderate — building but not yet broadly elevated, worth watching for promotion.',
     howReached: 'The average of Detection and Confidence lands in 40–59.',
-    showTile: true, filter: (r) => tierOf(r) === 'BUILDING',
+    showTile: true, filter: (r) => tierOf(r) === 'MODERATE' || tierOf(r) === 'BUILDING',
   },
   {
     key: 'routine', label: 'Routine', short: 'ROUTINE', range: 'Score 25–39',
@@ -124,6 +124,6 @@ export function getMarketCategory(key: string) {
 }
 
 export const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017',
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017',
   ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
 };

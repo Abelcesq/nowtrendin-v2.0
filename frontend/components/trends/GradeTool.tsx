@@ -29,7 +29,7 @@ interface Proposed {
 }
 
 const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', BUILDING: '#D4A017', ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017', ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
 };
 interface GradeRow {
   id: number; topic: string; detection: number; confidence: number;
