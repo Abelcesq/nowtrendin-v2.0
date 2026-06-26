@@ -3,10 +3,12 @@
 > Living doc. Update weekly. Measured figures are from live API responses;
 > estimates are labelled (est). Live AI tally: `GET /grade/costs`.
 
-_Last updated: 2026-06-25 — added **Finviz Elite ($30/mo)** as PRIMARY insider + equity-market source
-(uncapped market-wide SEC Form-4; AV demoted to fallback); QuiverQuant ($30/mo, congress), Databento
-(~free, metered), Alpha Vantage (free tier), FMP (free tier); X migrated Basic→Pay-Per-Use; worker dyno
-live. Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** posts (`/x/budget`)._
+_Last updated: 2026-06-26 — **FMP upgraded free → $20 Starter** (300/min, crypto+forex) for the Crypto
+Money Gradient + reliable crypto prices; the Cost Sentinel + Data Subscriptions agents now register Finviz/
+Quiver/FMP/Databento (`COST_FINVIZ_USD`/`COST_QUIVER_USD`/`COST_FMP_USD` set). Total fixed ~$390/mo. Prior:
+2026-06-25 — added **Finviz Elite ($30/mo)** as PRIMARY insider + equity-market source (uncapped market-wide
+SEC Form-4; AV demoted to fallback); QuiverQuant ($30/mo, congress), Databento (~free, metered); X migrated
+Basic→Pay-Per-Use; worker dyno live. Live AI spend June: **$15.32 / $20** (`/ai/costs`)._
 
 ---
 
@@ -47,11 +49,11 @@ live. Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** p
 | **AI** (Perplexity + Claude — Grade/explainer/market) | **≤$20 (hard cap)** | **June live: $15.32** (Perplexity $13.76 + Claude $1.56; explainer/definition is the bulk). |
 | **Databento** (accuracy-ledger price verify + microstructure) | **~$0** | metered (~$0.0003/ticker), new-acct free credit; ~cents/mo after. No request cap. |
 | **Alpha Vantage** (NEWS_SENTIMENT + 13F + insider FALLBACK) | **$0** | free tier (25/day · 5/min). Insider role now FALLBACK behind Finviz; AV kept for 13F institutional + NEWS_SENTIMENT. |
-| **FMP** (prices/fundamentals) | **$0** | free tier (250/day) assumed — confirm if a paid tier is active. |
+| **FMP** (prices/fundamentals + crypto coin prices) | **$20** | **Starter, confirmed 06/26** (300/min, crypto+forex). Upgraded from free — fixes free-tier 429s; now serves the **Crypto Money Gradient** coin prices + the market-ledger cross-check. `COST_FMP_USD`. |
 | FRED · SEC EDGAR · OFR · FINRA · GDELT | $0 | free / public. |
 | YouTube Data API | $0 | free ≤10,000 units/day (~100 searches/day). |
 | Twilio (SMS verify) · SendGrid (email) | ~$0 | signup only / free tier, negligible. |
-| **Total fixed (today)** | **~$370/mo (est)** | Heroku ~$31 + Apify $150 + X ~$100 + Quiver $30 + Finviz $30 + AI ~$20; Databento/AV/FMP ~$0. Finviz is the only net add since last update (+$30). |
+| **Total fixed (today)** | **~$390/mo (est)** | Heroku ~$31 + Apify $150 + X ~$100 + Quiver $30 + Finviz $30 + FMP $20 + AI ~$20; Databento/AV ~$0. Net adds this week: Finviz $30 + FMP $20 (the Crypto Money Gradient + reliable crypto prices). All wired into the Cost Sentinel via `COST_FINVIZ_USD`/`COST_QUIVER_USD`/`COST_FMP_USD`. |
 
 ---
 
