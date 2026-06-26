@@ -567,6 +567,12 @@ DATA_SUBSCRIPTIONS = [
      "Yahoo Finance via RapidAPI"),
     ("WhaleWisdom",          "WHALEWISDOM_SHARED_KEY", "COST_WHALEWISDOM_USD", "paid",
      "13F institutional holdings"),
+    ("Finviz Elite",         "FINVIZ_API_KEY",       "COST_FINVIZ_USD",       "paid",
+     "PRIMARY insider Form-4 + equity-market screener (uncapped market-wide feed); ~$30/mo"),
+    ("QuiverQuant",          "QUIVER_API_KEY",       "COST_QUIVER_USD",       "paid",
+     "congressional trades — Dark Matter; ~$30/mo"),
+    ("FMP",                  "FMP_API_KEY",          "COST_FMP_USD",          "paid",
+     "prices/fundamentals + crypto coin prices; ~$20/mo Starter (300/min, crypto+forex)"),
     # free / free-tier data APIs (configured, $0 expected)
     ("FRED",                 "FRED_API_KEY",         None, "free", "Federal Reserve econ data (free)"),
     ("FINRA",                "FINRA_API_KEY",        None, "free", "FINRA short/market data (free)"),
@@ -579,11 +585,15 @@ DATA_SUBSCRIPTIONS = [
     ("Currents",             "CURRENTS_API_KEY",     None, "free",
      "multi-source news aggregator (free tier 1000 req/day; hard-capped via "
      "CURRENTS_DAILY_CAP, ~4 calls/day in practice)"),
+    ("Alpha Vantage (research)", "ALPHAVANTAGE_RESEARCH_KEY", None, "free",
+     "dedicated AV research key — insider/13F dark-matter FALLBACK behind Finviz (free, 25/day)"),
     # usage-metered — tracked on their own cost lines (do NOT add to subs total)
     ("Perplexity",           "PERPLEXITY_API_KEY",   None, "metered", "AI research — on AI ledger line"),
     ("Anthropic",            "ANTHROPIC_API_KEY",    None, "metered", "AI synthesis — on AI ledger line"),
     ("Apify",                "APIFY_TOKEN",          None, "metered", "Google-Trends actor — live Apify line"),
     ("X (Twitter) API",      "X_BEARER_TOKEN",       None, "metered", "social — on X Developer API line"),
+    ("Databento",            "DATABENTO_API_KEY",    None, "metered",
+     "accuracy-ledger price verify + microstructure — metered (~$0/mo), no request cap"),
 ]
 
 
