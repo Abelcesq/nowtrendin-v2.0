@@ -3,9 +3,10 @@
 > Living doc. Update weekly. Measured figures are from live API responses;
 > estimates are labelled (est). Live AI tally: `GET /grade/costs`.
 
-_Last updated: 2026-06-25 — added QuiverQuant ($30/mo, congress), Databento (~free, metered),
-Alpha Vantage (free tier), FMP (free tier); X migrated Basic→Pay-Per-Use; worker dyno live.
-Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** posts (`/x/budget`)._
+_Last updated: 2026-06-25 — added **Finviz Elite ($30/mo)** as PRIMARY insider + equity-market source
+(uncapped market-wide SEC Form-4; AV demoted to fallback); QuiverQuant ($30/mo, congress), Databento
+(~free, metered), Alpha Vantage (free tier), FMP (free tier); X migrated Basic→Pay-Per-Use; worker dyno
+live. Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** posts (`/x/budget`)._
 
 ---
 
@@ -42,14 +43,15 @@ Live AI spend June: **$15.32 / $20** (`/ai/costs`); X **9,160 / 14,880** posts (
 | **Apify** (Google Trends) | **$150** | current plan; capped. |
 | **X API** (Pay-Per-Use) | **~$100 (est)** | was $200 Basic; migrated PPU Jun 21. June usage **9,160 / 14,880** posts. Confirm $/post on X dashboard. |
 | **QuiverQuant** (congress trades / Dark Matter) | **$30** | **confirmed 06/25** (card charge). |
+| **Finviz Elite** (PRIMARY insider Form-4 + equity market) | **$30** | **confirmed 06/25** (card charge). Uncapped market-wide insider feed (`insidertrading.ashx`) + screener export. Flag `FINVIZ_INSIDER`. NOT crypto (display-only → FMP). |
 | **AI** (Perplexity + Claude — Grade/explainer/market) | **≤$20 (hard cap)** | **June live: $15.32** (Perplexity $13.76 + Claude $1.56; explainer/definition is the bulk). |
 | **Databento** (accuracy-ledger price verify + microstructure) | **~$0** | metered (~$0.0003/ticker), new-acct free credit; ~cents/mo after. No request cap. |
-| **Alpha Vantage** (NEWS_SENTIMENT + held-out insider/13F) | **$0** | free tier (25/day · 5/min). Premium (~$50) only if Dark-Matter pulls go to scale. |
+| **Alpha Vantage** (NEWS_SENTIMENT + 13F + insider FALLBACK) | **$0** | free tier (25/day · 5/min). Insider role now FALLBACK behind Finviz; AV kept for 13F institutional + NEWS_SENTIMENT. |
 | **FMP** (prices/fundamentals) | **$0** | free tier (250/day) assumed — confirm if a paid tier is active. |
 | FRED · SEC EDGAR · OFR · FINRA · GDELT | $0 | free / public. |
 | YouTube Data API | $0 | free ≤10,000 units/day (~100 searches/day). |
 | Twilio (SMS verify) · SendGrid (email) | ~$0 | signup only / free tier, negligible. |
-| **Total fixed (today)** | **~$340/mo (est)** | Heroku ~$31 + Apify $150 + X ~$100 + Quiver $30 + AI ~$20; new data sources add ~$30 net (Quiver), Databento/AV/FMP ~$0. |
+| **Total fixed (today)** | **~$370/mo (est)** | Heroku ~$31 + Apify $150 + X ~$100 + Quiver $30 + Finviz $30 + AI ~$20; Databento/AV/FMP ~$0. Finviz is the only net add since last update (+$30). |
 
 ---
 
