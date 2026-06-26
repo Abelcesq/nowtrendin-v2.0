@@ -23,12 +23,15 @@ function fmtDate(s?: string) {
 }
 
 export function Ledger() {
-  const [mode, setMode] = useState<'attention' | 'money'>('attention')
+  const [mode, setMode] = useState<'attention' | 'money' | 'crypto'>('attention')
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
   const [rows, setRows] = useState<LedgerRow[]>([])
   const [msum, setMsum] = useState<MarketLedgerSummary | null>(null)
   const [mrows, setMrows] = useState<MarketLedgerRow[]>([])
   const [moneyLoaded, setMoneyLoaded] = useState(false)
+  const [csum, setCsum] = useState<MarketLedgerSummary | null>(null)
+  const [crows, setCrows] = useState<MarketLedgerRow[]>([])
+  const [cryptoLoaded, setCryptoLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('')
@@ -57,6 +60,18 @@ export function Ledger() {
     return () => { alive = false }
   }, [mode, moneyLoaded])
 
+  // Lazy-load the Crypto ledger the first time it's selected (coin-price-validated, distinct endpoints).
+  useEffect(() => {
+    if (mode !== 'crypto' || cryptoLoaded) return
+    let alive = true
+    setLoading(true); setErr(null); setFilter('')
+    Promise.all([api.cryptoAccuracy(), api.cryptoAccuracyDetail()])
+      .then(([s, d]) => { if (!alive) return; setCsum(s); setCrows(d.rows || []); setCryptoLoaded(true) })
+      .catch((e) => alive && setErr(String(e.message || e)))
+      .finally(() => alive && setLoading(false))
+    return () => { alive = false }
+  }, [mode, cryptoLoaded])
+
   const view = useMemo(() => {
     let r = rows.slice()
     if (filter) r = r.filter((x) => (x.verdict || '').toUpperCase() === filter)
@@ -75,6 +90,12 @@ export function Ledger() {
     return r.sort((a, b) => String(b.validated_at ?? '').localeCompare(String(a.validated_at ?? '')))
   }, [mrows, filter])
 
+  const cview = useMemo(() => {
+    let r = crows.slice()
+    if (filter) r = r.filter((x) => (x.verdict || '').toUpperCase() === filter)
+    return r.sort((a, b) => String(b.validated_at ?? '').localeCompare(String(a.validated_at ?? '')))
+  }, [crows, filter])
+
   const sort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => -d)
     else { setSortKey(k); setSortDir(k === 'topic_display' ? 1 : -1) }
@@ -85,14 +106,21 @@ export function Ledger() {
   const med = summary?.medianLead ?? 0
   const resolved = summary?.total ?? 0
   const money = mode === 'money'
+  const crypto = mode === 'crypto'
+  // Money + Crypto are BOTH realized-price-validated ledgers with the SAME shape — render one path.
+  const priceMode = money || crypto
+  const psum = crypto ? csum : msum
+  const pview = crypto ? cview : mview
 
   const ModeToggle = (
     <div className="chips" style={{ marginBottom: 6 }}>
       <span className="chip-label">Ledger</span>
-      <div className={'chip' + (!money ? ' active' : '')} onClick={() => { setMode('attention'); setFilter('') }}
+      <div className={'chip' + (mode === 'attention' ? ' active' : '')} onClick={() => { setMode('attention'); setFilter('') }}
            title="Attention Gradient — validated against Google Trends breakout">Attention · Trends</div>
       <div className={'chip' + (money ? ' active' : '')} onClick={() => { setMode('money'); setFilter('') }}
            title="Money Gradient — validated against realized EOD price direction (FMP)">Money · Market</div>
+      <div className={'chip' + (crypto ? ' active' : '')} onClick={() => { setMode('crypto'); setFilter('') }}
+           title="Crypto Money Gradient — validated against realized COIN price direction (FMP crypto + AV)">Crypto · Coin</div>
     </div>
   )
 
@@ -102,9 +130,10 @@ export function Ledger() {
         <div className="main-title-row">
           <div className="main-title">Accuracy Ledger</div>
           <div className="main-sub">
-            {money ? (
-              <>Money-movement detections validated against realized <b>EOD price direction</b> (FMP) ·{' '}
-                <b>{msum?.resolved ?? 0}</b> resolved · <b>{msum?.pending ?? 0}</b> in flight</>
+            {priceMode ? (
+              <>{crypto ? 'Crypto money-movement detections validated against realized ' : 'Money-movement detections validated against realized '}
+                <b>{crypto ? 'coin price direction' : 'EOD price direction'}</b> ({crypto ? 'FMP crypto + AV' : 'FMP'}) ·{' '}
+                <b>{psum?.resolved ?? 0}</b> resolved · <b>{psum?.pending ?? 0}</b> in flight</>
             ) : (
               <>Timestamped detections validated against observed breakouts ·{' '}
                 <b>{resolved}</b> resolved · <b>{summary?.pending ?? 0}</b> pending</>
@@ -117,28 +146,28 @@ export function Ledger() {
         </div>
         {ModeToggle}
         <div className="chips">
-          {(money ? MVERDICTS : VERDICTS).map((v) => (
+          {(priceMode ? MVERDICTS : VERDICTS).map((v) => (
             <div key={v || 'all'} className={'chip' + (filter === v ? ' active' : '')} onClick={() => setFilter(v)}>
-              {money ? MVLABEL[v] : VLABEL[v]}
+              {priceMode ? MVLABEL[v] : VLABEL[v]}
             </div>
           ))}
         </div>
       </div>
 
-      {money ? (
+      {priceMode ? (
         <>
           <div className="cal-banner">
-            ◷ A <b>separate</b> ledger from the Attention one. Ground truth = the realized EOD close
-            <b> direction</b> (inflow→up / outflow→down, past ±{msum?.move_threshold_pct ?? 5}%), not Google Trends.
-            A <b>retrospective measurement</b> of whether our money-movement read matched the market — not a
+            ◷ A <b>separate</b> ledger from the Attention one. Ground truth = the realized {crypto ? 'coin' : 'EOD'} close
+            <b> direction</b> (inflow→up / outflow→down, past ±{psum?.move_threshold_pct ?? (crypto ? 8 : 5)}%), {crypto ? 'via FMP crypto + AV' : 'via FMP'} — not Google Trends.
+            A <b>retrospective measurement</b> of whether our {crypto ? 'crypto ' : ''}money-movement read matched the {crypto ? 'coin' : 'market'} — not a
             forecast or advice.
           </div>
           <div className="statstrip">
-            <div className="statcard"><div className="sl">Confirm rate</div><div className="sv good">{msum?.confirm_rate_pct != null ? msum.confirm_rate_pct.toFixed(1) + '%' : '—'}</div><div className="sf">CONFIRMED ÷ all resolved (misses counted)</div></div>
-            <div className="statcard"><div className="sl">Median lead</div><div className="sv early">{msum?.median_lead_days != null ? msum.median_lead_days + 'd' : '—'}</div><div className="sf">days from detection to the confirming move</div></div>
-            <div className="statcard"><div className="sl">Confirmed / Not / No-move</div><div className="sv">{msum?.confirmed ?? 0}/{msum?.not_confirmed ?? 0}/{msum?.no_move ?? 0}</div><div className="sf">directional outcome breakdown</div></div>
-            <div className="statcard"><div className="sl">Inflow · outflow confirm</div><div className="sv">{msum?.by_flow?.inflow?.confirm_rate_pct != null ? msum.by_flow.inflow.confirm_rate_pct + '%' : '—'} · {msum?.by_flow?.outflow?.confirm_rate_pct != null ? msum.by_flow.outflow.confirm_rate_pct + '%' : '—'}</div><div className="sf">by detected flow direction</div></div>
-            <div className="statcard"><div className="sl">Resolved · in flight</div><div className="sv">{msum?.resolved ?? 0}·{msum?.pending ?? 0}</div><div className="sf">{msum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
+            <div className="statcard"><div className="sl">Confirm rate</div><div className="sv good">{psum?.confirm_rate_pct != null ? psum.confirm_rate_pct.toFixed(1) + '%' : '—'}</div><div className="sf">CONFIRMED ÷ all resolved (misses counted)</div></div>
+            <div className="statcard"><div className="sl">Median lead</div><div className="sv early">{psum?.median_lead_days != null ? psum.median_lead_days + 'd' : '—'}</div><div className="sf">days from detection to the confirming move</div></div>
+            <div className="statcard"><div className="sl">Confirmed / Not / No-move</div><div className="sv">{psum?.confirmed ?? 0}/{psum?.not_confirmed ?? 0}/{psum?.no_move ?? 0}</div><div className="sf">directional outcome breakdown</div></div>
+            <div className="statcard"><div className="sl">Inflow · outflow confirm</div><div className="sv">{psum?.by_flow?.inflow?.confirm_rate_pct != null ? psum.by_flow.inflow.confirm_rate_pct + '%' : '—'} · {psum?.by_flow?.outflow?.confirm_rate_pct != null ? psum.by_flow.outflow.confirm_rate_pct + '%' : '—'}</div><div className="sf">by detected flow direction</div></div>
+            <div className="statcard"><div className="sl">Resolved · in flight</div><div className="sv">{psum?.resolved ?? 0}·{psum?.pending ?? 0}</div><div className="sf">{psum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
           </div>
         </>
       ) : (
@@ -156,17 +185,17 @@ export function Ledger() {
           <div className="center-state"><div className="spinner" />Loading the ledger…</div>
         ) : err ? (
           <div className="center-state">Could not load the ledger.<div className="muted">{err}</div></div>
-        ) : money ? (
-          mview.length === 0 ? (
+        ) : priceMode ? (
+          pview.length === 0 ? (
             <div className="center-state">
-              No resolved money-movement detections yet{filter ? ` for "${MVLABEL[filter]}"` : ''}.
-              <div className="muted">{(msum?.pending ?? 0) > 0 ? `${msum!.pending} detection${msum!.pending === 1 ? '' : 's'} in flight — they resolve` : 'Detections resolve'} as the realized price confirms (or the {msum?.timeout_days ?? 60}-day window elapses).{(msum?.pending ?? 0) === 0 ? ' Populates once the Money Gradient is live.' : ''}</div>
+              No resolved {crypto ? 'crypto ' : ''}money-movement detections yet{filter ? ` for "${MVLABEL[filter]}"` : ''}.
+              <div className="muted">{(psum?.pending ?? 0) > 0 ? `${psum!.pending} detection${psum!.pending === 1 ? '' : 's'} in flight — they resolve` : 'Detections resolve'} as the realized {crypto ? 'coin' : ''} price confirms (or the {psum?.timeout_days ?? (crypto ? 45 : 60)}-day window elapses).{(psum?.pending ?? 0) === 0 ? ` Populates once the ${crypto ? 'Crypto ' : ''}Money Gradient is live.` : ''}</div>
             </div>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Instrument</th>
+                  <th>{crypto ? 'Coin' : 'Instrument'}</th>
                   <th>Flow</th>
                   <th className="r">Money @ call</th>
                   <th className="r">Detected</th>
@@ -177,11 +206,11 @@ export function Ledger() {
                 </tr>
               </thead>
               <tbody>
-                {mview.map((r, i) => (
-                  <tr key={(r.ticker || '') + i}>
-                    <td><div className="topic-name">{r.name || r.ticker}</div><div className="topic-cat">{r.ticker}</div></td>
+                {pview.map((r, i) => (
+                  <tr key={(r.ticker || r.coin || '') + i}>
+                    <td><div className="topic-name">{r.name || r.ticker || r.coin}</div><div className="topic-cat">{r.ticker || r.coin}</div></td>
                     <td><span style={{ color: flowCol(r.flow), fontWeight: 700, fontSize: 12 }}>{flowLabel(r.flow)}</span></td>
-                    <td className="r"><span className="score-cell det">{r.detection_score != null ? Math.round(r.detection_score) : '—'}</span></td>
+                    <td className="r"><span className="score-cell det">{(r.detection_score ?? r.money_movement) != null ? Math.round((r.detection_score ?? r.money_movement)!) : '—'}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.detection_date)}</span></td>
                     <td className="r"><span className={'gapnum ' + ((r.price_change_pct ?? 0) >= 0 ? 'wide' : 'neg')}>{r.price_change_pct != null ? `${r.price_change_pct > 0 ? '+' : ''}${r.price_change_pct}%` : '—'}</span></td>
                     <td className="r"><span className="muted">{r.lead_time_days != null ? `${r.lead_time_days}d` : '—'}</span></td>

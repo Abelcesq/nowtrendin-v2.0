@@ -42,8 +42,8 @@ export interface MarketLedgerSummary {
 }
 
 export interface MarketLedgerRow {
-  ticker?: string; name?: string; detection_date?: string; flow?: string
-  detection_score?: number; price_at_detection?: number; price_at_move?: number
+  ticker?: string; coin?: string; name?: string; detection_date?: string; flow?: string
+  detection_score?: number; money_movement?: number; price_at_detection?: number; price_at_move?: number
   price_change_pct?: number | null; move_date?: string
   lead_time_days?: number | null; verdict?: string; validated_at?: string
 }
@@ -132,6 +132,10 @@ export const api = {
   marketAccuracy: () => get<MarketLedgerSummary>('/market/accuracy'),
   marketAccuracyDetail: () =>
     get<{ rows: MarketLedgerRow[]; count: number }>('/market/accuracy/detail?limit=500'),
+  // Crypto accuracy ledger — validated by realized COIN price direction (FMP crypto + AV).
+  cryptoAccuracy: () => get<MarketLedgerSummary>('/crypto/accuracy'),
+  cryptoAccuracyDetail: () =>
+    get<{ rows: MarketLedgerRow[]; count: number }>('/crypto/accuracy/detail?limit=500'),
   historyRecent: (window = '7d', limit = 80) =>
     get<{ window: string; count: number; results: HistoryRow[] }>(
       `/history/recent?window=${window}&limit=${limit}`),
