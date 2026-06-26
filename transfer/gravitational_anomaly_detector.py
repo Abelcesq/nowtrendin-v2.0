@@ -4962,6 +4962,14 @@ def start_scheduler():
                     except Exception as _rce:
                         _log_health("risk", 0, "failure")
                         print(f"[scheduler] risk error: {_rce}")
+                # Crypto Money Gradient — record a cycle per coin so baseline-relative z-scores
+                # build over time (reads CALIBRATING until ~3 cycles). Gated on CRYPTO_SIGNAL.
+                if _CRYPTO_AVAILABLE and crypto_engine.CRYPTO_SIGNAL:
+                    try:
+                        _cr = crypto_engine.serve_crypto(record=True, db_path=DB_PATH)
+                        print(f"[scheduler] crypto cycle: recorded {_cr.get('count', 0)} coins")
+                    except Exception as _cce:
+                        print(f"[scheduler] crypto error: {_cce}")
                 print("[scheduler] collect phase complete.")
             except Exception as _ce:
                 print(f"[scheduler] collect phase error: {_ce}")
