@@ -3,7 +3,47 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-26_
+_Last updated: 2026-06-26 (evening)_
+
+---
+
+## Session 2026-06-26 (evening) — Signal Analysis · accuracy-ledger backlog + maturity · Apify audit + token rotation
+
+- **Signal Analysis (per-item, enterprise-grade) — LIVE on web, shipped on mobile.** New held-out
+  `signal_analysis.py` (imported by NOTHING in scoring): a REPRODUCIBLE, formula-confidential,
+  measurement-only narrative per item — explains each metric conceptually + analyzes the finding from real
+  scores + the accuracy-ledger track record (honest denominators), for trend / market / crypto. Engine:
+  `POST /analysis/{kind}`. Web terminal: a "Signal Analysis" section in the trend/market/crypto rails
+  (live, gh-pages). Mobile: trend (`signal/[id]`) + market (`risk/[key]`) screens (crypto N/A — no mobile
+  crypto screen). Desktop inherits via the shared web build. Founder standard saved
+  (`feedback-enterprise-analysis-standard`): explain metrics, hide the formula, every claim data-supported +
+  defensible to hedge-fund counsel.
+- **Accuracy-ledger backlog root-caused + the moat made honest.** The 909-pending / 2.1% *blended* rate is an
+  ARTIFACT, not the product: (1) throughput starvation, (2) resolution survivorship bias (LAGGED resolves
+  instantly; LED waits for a future breakout → stuck pending), (3) denominator pollution by ESTABLISHED topics
+  (world cup etc. can only LAG). VERIFIED the ledger is **held-out** — `calibration_engine` /
+  `signal_calibration_integration` have ZERO ledger refs; `calibration_agent` is read-only → the sweep cap
+  **never touched a score**.
+- **Maturity segmentation (held-out, display-only).** `generate_honest_report` segments resolved rows by
+  `topic_maturity.maturity_class`, with a well-covered fallback to `velocity_scores` SUSTAINED-DAYS (distinct
+  days scored ≥ `LEDGER_ESTABLISHED_MIN_DAYS`=14 → established). Headline = the EMERGING early-detection cohort;
+  established/unknown reported too (nothing hidden). Exposed via `/accuracy/ledger` (`byMaturity`,
+  `earlyDetectionHitRate`). Live: emerging 37 resolved · 1 led · 2.7% · 11d median lead (still early/maturing —
+  the "don't publish a rate yet" guardrail stands).
+- **Sweep runaway (caught + fixed).** Uncapping the sweep (8→300) + a one-off drain stampeded Apify — the
+  Google-Trends-Scraper actor is SLOW + compute-heavy per topic (1–11 min/run, some fail); the earlier
+  "$0.001/result cheap" read was WRONG (cost is per-run COMPUTE). Throttled to **`LEDGER_SWEEP_LIMIT=8`**
+  (code default reverted 300→8 — footgun removed), added `_apify_sweep_budget_ok` guard (skips paid fetches
+  within `LEDGER_APIFY_RESERVE_USD`=40 of the Apify cap so the sweep can't starve collection) + a manual
+  `POST /accuracy/ledger/sweep`.
+- **Apify usage audit.** CONFIRMED Apify pulls ONLY trend/attention — Google Trends realtime discovery
+  (`easyapi/...`) + Google Trends curves (ledger sweep) + Reddit. Crypto + financial have ZERO Apify refs
+  (FMP / Finviz / AV / FINRA / OFR / Databento). Found a realtime 2× overrun (the actor fires :00 AND :30 =
+  8×/day vs the engine's single :30 cron) — likely a 2nd process on the old token; expected to resolve now the
+  old key is deleted (confirm at the next 6h slot).
+- **Apify token rotated** (old leaked in a tool output → rotated → old deleted; new set on engine v187,
+  authenticating). ⚠ Confirm the new token is **non-expiring** or trend discovery + the ledger sweep go dark.
+- **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
 
 ---
 

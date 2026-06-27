@@ -422,7 +422,25 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-06-26 — **Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2 +
+*Last updated: 2026-06-26 (evening) — **Per-item Signal Analysis + accuracy-ledger maturity segmentation + Apify
+usage audit + token rotation.** (1) **Signal Analysis** — held-out `signal_analysis.py` + `POST /analysis/{kind}`:
+a reproducible, formula-CONFIDENTIAL, measurement-only narrative per item (explains each metric + analyzes the
+finding vs the accuracy-ledger track record, honest denominators). LIVE on web (trend/market/crypto rails) + mobile
+(trend `signal/[id]` + market `risk/[key]`; crypto N/A — no mobile crypto screen); desktop inherits via the web build.
+Founder enterprise standard: explain the metric, HIDE the formula, every claim data-supported + defensible to hedge-fund
+counsel. (2) **The accuracy ledger is HELD-OUT** — `calibration_engine`/`signal_calibration_integration` have ZERO
+ledger refs, `calibration_agent` is read-only → the sweep cap NEVER affects a score. The 909-pending / 2.1% *blended*
+rate is an ARTIFACT (throughput starvation + survivorship bias + ESTABLISHED-topic pollution). `generate_honest_report`
+is now MATURITY-SEGMENTED (`topic_maturity.maturity_class` + a `velocity_scores` sustained-days fallback) → headline =
+the EMERGING early-detection cohort (`/accuracy/ledger` `byMaturity`/`earlyDetectionHitRate`); all cohorts reported.
+(3) **Sweep runaway fixed** — the `google-trends-scraper` actor is COMPUTE-expensive per run (1–11 min, some fail; the
+"$0.001/result" read was wrong). Keep `LEDGER_SWEEP_LIMIT=8` (code default reverted 300→8; `0`=uncapped footgun),
+`_apify_sweep_budget_ok` guard (skips paid fetches within `LEDGER_APIFY_RESERVE_USD`=40 of the Apify cap), manual
+`POST /accuracy/ledger/sweep`. (4) **Apify = TREND/ATTENTION-ONLY** (Google Trends realtime+sweep + Reddit; crypto +
+financial have ZERO Apify refs — FMP/Finviz/AV/FINRA/OFR/Databento). Realtime 2× overrun (actor fires :00 AND :30 vs
+the single :30 cron — a 2nd process on the old token). `APIFY_TOKEN` rotated (was leaked in a tool output) → set on
+engine; ⚠ must be NON-EXPIRING. (5) **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
+Prior: 2026-06-26 — **Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2 +
 the Crypto Money Gradient** (see §15). (1) **Finviz Elite** = PRIMARY insider Form-4 (uncapped; `FINVIZ_INSIDER=1`),
 AV→fallback; integrity fix = insider **BUYING** is the signal (net is sell-dominated/degenerate). (2) **Market
 Signal de-Congress**: user-facing "Congress" → "insider tracking" everywhere (text/AI prompt/explainer/Methodology);
