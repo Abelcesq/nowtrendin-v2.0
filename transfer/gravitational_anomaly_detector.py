@@ -428,6 +428,14 @@ except Exception as _cle:
     _CRYPTO_LEDGER_AVAILABLE = False
     print(f"[startup] crypto_accuracy_ledger unavailable: {_cle}")
 
+try:
+    import signal_analysis
+    _SIGNAL_ANALYSIS_AVAILABLE = True
+    print("[startup] signal_analysis loaded — per-item Signal Analysis (held-out, reproducible)")
+except Exception as _sae:
+    _SIGNAL_ANALYSIS_AVAILABLE = False
+    print(f"[startup] signal_analysis unavailable: {_sae}")
+
 
 def _apify_sweep_budget_ok(reserve_usd: float = None) -> dict:
     """Budget guard for the held-out accuracy-ledger sweep. The sweep shares the Apify
@@ -6199,6 +6207,36 @@ def accuracy_ledger_report():
     if _ACCURACY_AVAILABLE:
         return accuracy.generate_accuracy_report(DB_PATH)
     return {"status": "unavailable"}
+
+
+@app.post("/analysis/{kind}")
+def signal_analysis_endpoint(kind: str, payload: dict = Body(default={})):
+    """Per-item SIGNAL ANALYSIS — an enterprise-grade, REPRODUCIBLE narrative composed from the item
+    the client is already showing + the matching accuracy-ledger track record. Held-out (imported by
+    nothing in scoring), deterministic, formula-confidential, measurement-not-advice. kind = trend |
+    market | crypto. The client passes the item it rendered (body {"item": {...}} or the item directly),
+    so no re-load is needed; the server attaches the right ledger report and builds the narrative."""
+    if not _SIGNAL_ANALYSIS_AVAILABLE:
+        return {"available": False, "reason": "signal_analysis module not loaded"}
+    item = payload.get("item") if isinstance(payload, dict) and "item" in payload else payload
+    item = item or {}
+    k = (kind or "").lower().strip()
+    ledger = {}
+    try:
+        if k == "crypto" and _CRYPTO_LEDGER_AVAILABLE:
+            ledger = crypto_ledger.report(DB_PATH)
+        elif k == "market" and _MARKET_LEDGER_AVAILABLE:
+            ledger = market_ledger.report(DB_PATH)
+        elif k == "trend" and _LEDGER_PLUS_AVAILABLE:
+            ledger = ledger_plus.generate_honest_report(DB_PATH)
+    except Exception as _le:
+        print(f"[analysis] ledger load error ({k}): {_le}")
+        ledger = {}
+    try:
+        return signal_analysis.build(k, item, ledger)
+    except Exception as _be:
+        print(f"[analysis] build error ({k}): {_be}")
+        return {"available": False, "reason": "build error"}
 
 
 # Phase A — situation model preview. HELD-OUT + READ-ONLY: assembles co-occurring topic

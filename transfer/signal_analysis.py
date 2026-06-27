@@ -266,19 +266,26 @@ def _trend(item: dict, ledger: dict) -> dict:
 
 def _track_trend(ledger: dict) -> str:
     ledger = ledger or {}
-    resolved = _i(_first(ledger.get("sample_size"), ledger.get("resolved")))
     pending = _i(_first(ledger.get("still_pending"), ledger.get("pending")))
-    led = _i(ledger.get("hits_led"))
-    lead = _first(ledger.get("median_lead_days"), ledger.get("medianLead"))
+    # Prefer the EMERGING cohort — the product's actual claim. Established/already-mainstream
+    # topics are reported separately (they can only lag) and excluded from the headline.
+    em = (ledger.get("by_maturity") or ledger.get("byMaturity") or {}).get("emerging") or {}
+    e_res = _i(em.get("resolved"))
+    using_cohort = e_res is not None
+    resolved = _i(_first(em.get("resolved"), ledger.get("sample_size"), ledger.get("resolved")))
+    led = _i(_first(em.get("led"), ledger.get("hits_led")))
+    lead = _first(em.get("median_lead_days"), ledger.get("median_lead_days"), ledger.get("medianLead"))
     if not resolved:
         return ("Each early detection is written into a falsifiable accuracy ledger and later tested against "
                 "an external benchmark — the date the topic broke out on Google Trends — counting every miss. "
                 f"The resolved sample is still accruing ({pending or 0} detections in flight); we publish the "
                 "ledger in full, with its denominator, rather than a selected statistic.")
+    scope = ("emerging-topic detections — the early-signal claim; already-mainstream topics are reported "
+             "separately, since they can only lag" if using_cohort else "resolved detections")
     body = ("Each early detection is written into a falsifiable accuracy ledger and tested against an external "
-            "benchmark — the date the topic broke out on Google Trends — counting every miss. The strict bar "
-            "we hold ourselves to is whether our detection PRECEDED that external breakout. Across "
-            f"{resolved} resolved detections to date ({pending or 0} still in flight), ")
+            "benchmark — the date the topic broke out on Google Trends — counting every miss. The strict bar is "
+            "whether our detection PRECEDED that external breakout. Across "
+            f"{resolved} resolved {scope} ({pending or 0} still in flight), ")
     if led is not None:
         body += (f"{led} preceded the breakout outright; on that conservative bar the methodology is in active "
                  "calibration")
@@ -286,25 +293,34 @@ def _track_trend(ledger: dict) -> str:
         body += "the methodology is in active calibration on that conservative bar"
     if lead is not None:
         body += f", and when a detection does lead, the median lead is {lead} days"
-    body += ". We publish the ledger in full, with its denominator, rather than a selected statistic."
+    body += ". We publish the ledger in full, with its denominator and every cohort, rather than a selected statistic."
     return body
 
 
 def _ledger_facts_trend(ledger: dict):
     ledger = ledger or {}
-    resolved = _i(_first(ledger.get("sample_size"), ledger.get("resolved")))
     pending = _i(_first(ledger.get("still_pending"), ledger.get("pending")))
-    led = _i(ledger.get("hits_led"))
-    lead = _first(ledger.get("median_lead_days"), ledger.get("medianLead"))
+    em = (ledger.get("by_maturity") or ledger.get("byMaturity") or {}).get("emerging") or {}
+    e_res = _i(em.get("resolved"))
     out = []
-    if resolved is not None or pending is not None:
-        v = f"{resolved or 0} resolved"
-        if led is not None:
-            v += f" · {led} led"
-        v += f" · {pending or 0} in flight"
-        out.append({"label": "Ledger", "value": v})
-    if lead is not None:
-        out.append({"label": "Median lead (when it leads)", "value": f"{lead} days"})
+    if e_res is not None:  # emerging cohort = the early-detection claim
+        e_led = _i(em.get("led")) or 0
+        out.append({"label": "Early-detection ledger (emerging)",
+                    "value": f"{e_res} resolved · {e_led} led · {pending or 0} in flight"})
+        if em.get("median_lead_days") is not None:
+            out.append({"label": "Median lead (when it leads)", "value": f"{em.get('median_lead_days')} days"})
+    else:  # fallback to the blended set
+        resolved = _i(_first(ledger.get("sample_size"), ledger.get("resolved")))
+        led = _i(ledger.get("hits_led"))
+        lead = _first(ledger.get("median_lead_days"), ledger.get("medianLead"))
+        if resolved is not None or pending is not None:
+            v = f"{resolved or 0} resolved"
+            if led is not None:
+                v += f" · {led} led"
+            v += f" · {pending or 0} in flight"
+            out.append({"label": "Ledger", "value": v})
+        if lead is not None:
+            out.append({"label": "Median lead (when it leads)", "value": f"{lead} days"})
     return out
 
 
