@@ -6511,7 +6511,7 @@ def crypto_feed():
         except Exception as _cwe:
             print(f"[crypto] warm error: {_cwe}")
     try:
-        threading.Thread(target=_crypto_warm, daemon=True, name="crypto-warm").start()
+        _threading.Thread(target=_crypto_warm, daemon=True, name="crypto-warm").start()
     except Exception as _cte:
         print(f"[crypto] warm thread error: {_cte}")
     return {"available": True, "status": "warming", "model": "crypto-money-gradient-v1",

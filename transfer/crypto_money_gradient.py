@@ -64,6 +64,38 @@ def assemble_crypto_components(coin: str, sig: Optional[dict] = None) -> dict:
     }
 
 
+def _crypto_analysis(d, c, gap, flow) -> str:
+    """A factual, REPRODUCIBLE walk of the crypto Money-Gradient read — Money Movement, Market
+    Confirmation, and the flow — parallel to the equity `_market_analysis` (image-1 style), but
+    crypto-worded (proxies, coin price). MEASUREMENT, not advice; deterministic (no LLM)."""
+    d = int(round(d or 0)); c = int(round(c or 0)); gap = int(round(gap or 0))
+    f = (flow or "").lower().strip()
+    fdir = "IN" if f == "inflow" else "OUT" if f == "outflow" else ""
+    strength = "strong" if d >= 70 else "moderate" if d >= 45 else "muted"
+    parts = []
+    if fdir:
+        parts.append(f"Money Movement {d}/100 — this signals {strength} informed-money activity, and that "
+                     f"money may be moving {fdir} via the crypto-exposure proxies (spot-ETF 13F + listed "
+                     f"crypto-treasury/exchange insider).")
+    else:
+        parts.append(f"Money Movement {d}/100 — this signals {strength} informed-money activity in the "
+                     f"crypto-exposure proxies, with no clear net direction yet.")
+    conf = ("the coin's own price has confirmed the move" if c >= 55 else
+            "price confirmation is partial" if c >= 35 else "the coin's price has not yet confirmed")
+    parts.append(f"Market Confirmation {c}/100 — this signals {conf}.")
+    if gap >= 16:
+        parts.append(f"Informed money runs {gap} pts ahead of price confirmation — an early read.")
+    elif gap <= -16:
+        parts.append(f"Price leads the informed read by {abs(gap)} pts — a later-stage read.")
+    else:
+        parts.append("Informed and price reads are roughly aligned.")
+    parts.append("Whether an early read leads realized coin price is recorded, after the fact, in the "
+                 "crypto accuracy ledger over time — this is a measurement, not a recommendation.")
+    parts.append("Be advised that this summary may be inaccurate and is not intended to be financial, "
+                 "legal or investment advice.")
+    return " ".join(parts)
+
+
 def compute_crypto_signal(coin: str, name: str, components_current: dict,
                           baselines: Optional[dict] = None, flow: str = "neutral",
                           price: Optional[dict] = None, dm: Optional[dict] = None) -> dict:
@@ -85,8 +117,14 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
     money_movement = round(_weighted(CRYPTO_MM_WEIGHTS), 1)
     market_confirmation = round(_weighted(CRYPTO_MC_WEIGHTS), 1)
     gap = round(money_movement - market_confirmation, 1)
-    # Reuse the equity Money-Gradient interpretation (movement + facts language, no advice).
+    # Reuse the equity Money-Gradient interpretation (movement + facts language, no advice), then append
+    # the rich crypto analysis walk (parity with the Market Signal's _market_analysis) — EXCEPT while
+    # calibrating, where the base line already explains the limited-data state.
     interp = mse._interpret_movement(money_movement, market_confirmation, gap, any_calibrating)
+    _interp_text = interp["text"]
+    if not any_calibrating:
+        _interp_text = (_interp_text + "  "
+                        + _crypto_analysis(money_movement, market_confirmation, gap, flow)).strip()
 
     return {
         "item_key": f"crypto:{coin}", "coin": coin, "item_name": name, "section": "Crypto",
@@ -97,7 +135,7 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "tier": mse._level((money_movement + market_confirmation) / 2),
         "detection_level": mse._level(money_movement), "confidence_level": mse._level(market_confirmation),
         "detection_fp": mse.MONEY_MOVEMENT_FP, "confidence_fp": mse.MARKET_CONFIRM_FP,
-        "gap_state": interp["state"], "interpretation": interp["text"], "calibrating": any_calibrating,
+        "gap_state": interp["state"], "interpretation": _interp_text, "calibrating": any_calibrating,
         "flow": flow,
         # §17 source-display: only render components that contributed; show real value or n/a (never NaN).
         "components": {
