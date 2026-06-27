@@ -103,10 +103,20 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
   )
 }
 
+// DIRECTION (flow) axis — net money-flow via crypto-exposure proxies (a measurement, not advice).
+// Neutral covers anything without a clear in/out read (neutral, divergent, or unknown).
+const CRYPTO_DIR_FILTERS: { k: string; label: string; test: (c: CryptoCoin) => boolean }[] = [
+  { k: 'all', label: 'All', test: () => true },
+  { k: 'inflow', label: 'Inflow', test: (c) => c.flow === 'inflow' },
+  { k: 'outflow', label: 'Outflow', test: (c) => c.flow === 'outflow' },
+  { k: 'neutral', label: 'Neutral', test: (c) => c.flow !== 'inflow' && c.flow !== 'outflow' },
+]
+
 export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void }) {
   const [feed, setFeed] = useState<CryptoFeed | null>(null)
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<string | null>(null)
+  const [dirFilter, setDirFilter] = useState('all')
   // The engine serves /crypto from a prewarmed cache. On a cold boot it returns status:'warming'
   // (coins:[]) while the prewarm fills the roster — poll until the coins arrive.
   useEffect(() => {
@@ -130,6 +140,8 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
 
   const coins = feed?.coins || []
   const anyCalibrating = coins.some((c) => c.calibrating)
+  const dfl = CRYPTO_DIR_FILTERS.find((x) => x.k === dirFilter)
+  const shown = dfl?.test ? coins.filter(dfl.test) : coins
   return (
     <>
       <div className="main-head">
@@ -139,6 +151,13 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
             Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
             vs Market Confirmation (the coin's own price). Measurement, not advice.
           </div>
+        </div>
+        <div className="chips">
+          <span className="chip-label">Direction</span>
+          {CRYPTO_DIR_FILTERS.map((f) => (
+            <div key={f.k} className={'chip' + (dirFilter === f.k ? ' active' : '')} onClick={() => setDirFilter(f.k)}
+                 title="Net money-flow via crypto-exposure proxies: Inflow = informed buying · Outflow = selling · Neutral = no clear net direction">{f.label}</div>
+          ))}
         </div>
       </div>
 
@@ -173,7 +192,7 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
               </tr>
             </thead>
             <tbody>
-              {coins.map((c) => {
+              {shown.map((c) => {
                 const ch7 = c.price?.change_7d_pct
                 return (
                   <tr key={c.coin} className={c.coin === sel ? 'sel' : ''} onClick={() => select(c)}>

@@ -111,6 +111,14 @@ const LANE_FILTERS: { k: string; label: string; lane?: string }[] = [
   { k: 'halted_microcap', label: 'Halted / micro-cap', lane: 'halted_microcap' },
   { k: 'macro_theme', label: 'Macro themes', lane: 'macro_theme' },
 ]
+// DIRECTION (flow) axis — net money-flow direction from filings (a FACT, not advice). Neutral covers
+// anything without a clear in/out read (neutral, divergent, or unknown).
+const DIRECTION_FILTERS: { k: string; label: string; test: (r: MRow) => boolean }[] = [
+  { k: 'all', label: 'All', test: () => true },
+  { k: 'inflow', label: 'Inflow', test: (r) => r.flow === 'inflow' },
+  { k: 'outflow', label: 'Outflow', test: (r) => r.flow === 'outflow' },
+  { k: 'neutral', label: 'Neutral', test: (r) => r.flow !== 'inflow' && r.flow !== 'outflow' },
+]
 const LANE_SHORT: Record<string, string> = {
   covered: 'covered', halted_microcap: 'halt · micro-cap', macro_theme: 'macro theme',
 }
@@ -418,6 +426,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState('all')
   const [laneFilter, setLaneFilter] = useState('all')
+  const [dirFilter, setDirFilter] = useState('all')
   const [q, setQ] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('det')
   const [sortDir, setSortDir] = useState(-1)
@@ -473,6 +482,8 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
     if (lf?.lane) r = r.filter((x) => x.lane === lf.lane)
     const f = FILTERS.find((x) => x.k === filter)
     if (f?.test) r = r.filter(f.test)
+    const dfl = DIRECTION_FILTERS.find((x) => x.k === dirFilter)
+    if (dfl?.test) r = r.filter(dfl.test)
     if (q) { const s = q.toLowerCase(); r = r.filter((x) => x.name.toLowerCase().includes(s) || x.key.toLowerCase().includes(s)) }
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
@@ -480,7 +491,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
       return ((va ?? -1) - (vb ?? -1)) * sortDir
     })
     return r
-  }, [rows, filter, laneFilter, q, sortKey, sortDir])
+  }, [rows, filter, laneFilter, dirFilter, q, sortKey, sortDir])
 
   const sort = (k: SortKey) => {
     if (k === sortKey) setSortDir((d) => -d)
@@ -554,6 +565,13 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
             <input className="chip-search" placeholder="Filter instruments…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingRight: q ? 22 : undefined }} />
             {q && <button onClick={() => setQ('')} title="Clear" style={{ position: 'absolute', right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={12} /></button>}
           </div>
+        </div>
+        <div className="chips">
+          <span className="chip-label">Direction</span>
+          {DIRECTION_FILTERS.map((f) => (
+            <div key={f.k} className={'chip' + (dirFilter === f.k ? ' active' : '')} onClick={() => setDirFilter(f.k)}
+                 title="Net money-flow direction (a fact from filings): Inflow = informed buying · Outflow = selling · Neutral = no clear net direction">{f.label}</div>
+          ))}
         </div>
       </div>
 
