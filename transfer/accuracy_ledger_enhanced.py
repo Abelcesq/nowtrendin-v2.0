@@ -279,20 +279,21 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         except Exception:
             mat = {}
         # FALLBACK coverage from velocity_scores (365-day retention → covers EVERY ledger topic,
-        # unlike topic_maturity which is sparse): a topic ever confirmed MAINSTREAM is one Google
-        # Trends already knows, so it can only resolve LAGGED → established; an unconfirmed niche
-        # topic → emerging. Used only where topic_maturity has no class. Threshold-free + held-out.
-        vs_ms = {}
+        # unlike topic_maturity which is sparse): use SUSTAINED PRESENCE — the count of DISTINCT
+        # DAYS the topic was scored. Present across many days = an ESTABLISHED, sustained trend
+        # Google Trends already knows (can only resolve LAGGED); few days = still EMERGING/early.
+        # Frequency-independent, uses the real scored_at column. Used where topic_maturity is blank.
+        vs_days = {}
         try:
             tks = list({r.get("topic_key") for r in rows if r.get("topic_key")})
             if tks:
                 ph = ",".join((["%s"] if db_compat.USE_PG else ["?"]) * len(tks))
-                vq = ("SELECT topic_key, MAX(CASE WHEN mainstream_confirmed THEN 1 ELSE 0 END) AS ms "
+                vq = ("SELECT topic_key, COUNT(DISTINCT substr(scored_at,1,10)) AS d "
                       f"FROM velocity_scores WHERE topic_key IN ({ph}) GROUP BY topic_key")
                 for _v in conn.execute(vq, tuple(tks)).fetchall():
-                    _vd = dict(_v); vs_ms[_vd.get("topic_key")] = int(_vd.get("ms") or 0)
+                    _vd = dict(_v); vs_days[_vd.get("topic_key")] = int(_vd.get("d") or 0)
         except Exception:
-            vs_ms = {}
+            vs_days = {}
     except Exception:
         conn.close()
         return {"status": "empty", "message": "Ledger not initialised yet.", "pending": 0}
@@ -315,18 +316,17 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     # ESTABLISHED ones can only resolve LAGGED. All cohorts reported (transparency).
     _RES = ("LED", "SAME_DAY", "LAGGED", "FALSE_POSITIVE")
     _EMERGING, _ESTABLISHED = {"NEW", "EMERGING", "RESURGENT"}, {"ESTABLISHED", "MONITORING"}
+    _EST_MIN_DAYS = int(os.getenv("LEDGER_ESTABLISHED_MIN_DAYS", "14"))
     def _cohort(tk):
         c = mat.get(tk, "")
         if c in _EMERGING:
             return "emerging"
         if c in _ESTABLISHED:
             return "established"
-        # Fallback: a mainstream-confirmed topic is one Trends already knows → established.
-        ms = vs_ms.get(tk)
-        if ms == 1:
-            return "established"
-        if ms == 0:
-            return "emerging"
+        # Fallback: sustained presence across many distinct days → established (Trends knows it).
+        d = vs_days.get(tk)
+        if d is not None:
+            return "established" if d >= _EST_MIN_DAYS else "emerging"
         return "unknown"
     def _seg(name):
         sub = [r for r in rows if r["verdict"] in _RES and _cohort(r.get("topic_key")) == name]
@@ -353,9 +353,10 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "small_sample_warning": resolved < 20,
         # Maturity-segmented — headline going forward = the EMERGING cohort (the product's claim).
         "by_maturity": by_mat,
-        "maturity_source": "topic_maturity.maturity_class, else velocity_scores.mainstream_confirmed",
+        "maturity_source": ("topic_maturity.maturity_class, else velocity_scores sustained-days "
+                            "(>=%dd distinct = established)" % _EST_MIN_DAYS),
         "maturity_coverage": {"by_topic_maturity": sum(1 for r in rows if mat.get(r.get("topic_key"))),
-                              "by_mainstream_fallback": sum(1 for r in rows if r.get("topic_key") in vs_ms),
+                              "by_sustained_days_fallback": sum(1 for r in rows if r.get("topic_key") in vs_days),
                               "total_resolved_rows": len(rows)},
         "early_detection_hit_rate_pct": by_mat["emerging"]["hit_rate_pct"],
         "early_detection_sample": by_mat["emerging"]["resolved"],
