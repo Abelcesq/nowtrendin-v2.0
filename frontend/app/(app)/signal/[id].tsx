@@ -13,6 +13,7 @@ import { TopicResearch } from '../../../components/trends/TopicResearch';
 import { TopicVariationMap } from '../../../components/trends/TopicVariationMap';
 import { DarkMatterPanel } from '../../../components/trends/DarkMatterPanel';
 import { MethodologyExplainer } from '../../../components/trends/MethodologyExplainer';
+import { SignalAnalysisPanel } from '../../../components/trends/SignalAnalysisPanel';
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
 import { useSignal } from '../../../hooks/useSignals';
@@ -159,6 +160,9 @@ export default function SignalDetail() {
           )}
         </View>
       </View>
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
+      <SignalAnalysisPanel kind="trend" item={{ topic_display: signal.topic, det: signal.detection, conf: signal.confidence, stage: signal.stage, category: (signal as any).category, n: (signal as any).n }} />
 
       {/* AI score explanation — why this taxonomy topic scores where it does */}
       {!!signal.scoreExplanation && (

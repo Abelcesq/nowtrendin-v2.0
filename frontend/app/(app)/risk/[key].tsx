@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
+import { SignalAnalysisPanel } from '../../../components/trends/SignalAnalysisPanel';
 import { useRisk } from '../../../hooks/useSignals';
 
 const CLASS_COLOR: Record<string, string> = {
@@ -165,6 +166,9 @@ export default function RiskDetail() {
                 ? 'The Market Signal section tracks whether money is moving into or out of a particular instrument. Money Movement "D" = the tracking of informed / early money movement. Market Confirmation "M" signals the broad market / economic confirmation of the overall market. The flow (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.'
                 : 'The Market Gradient splits signals by type: Detection = what analysts say + how smart money is positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows how early the move is. Measurement only — not financial advice.'}
             </Text>
+
+            {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
+            <SignalAnalysisPanel kind="market" item={{ item_name: risk.display, detection: mg?.detection, confidence: mg?.confidence, flow: mg?.flow, tier: tier, leverage_health: (mg as any)?.leverageHealth }} />
 
             {/* Coverage-lane caveat — same lane axis as the web terminal. */}
             {mg?.lane === 'macro_theme' ? (

@@ -715,3 +715,29 @@ export async function fetchResearch(topicKey: string): Promise<ResearchHistory> 
     milestones: Array.isArray(d.milestones) ? d.milestones : [],
   };
 }
+
+// Per-item Signal Analysis — POST the item the screen already has; the engine attaches the
+// matching accuracy-ledger report and returns the held-out, reproducible narrative (formula
+// confidential, measurement-only). Returns null when there's nothing to show (§17-safe).
+export interface SignalAnalysisData {
+  title?: string; kind?: string; item?: string; headline?: string;
+  facts?: { label: string; value: string }[];
+  sections?: { heading: string; body: string }[];
+  disclaimer?: string;
+}
+export async function fetchSignalAnalysis(
+  kind: 'trend' | 'market' | 'crypto', item: any,
+): Promise<SignalAnalysisData | null> {
+  try {
+    const res = await fetch(`${GRADIENT_API}/analysis/${kind}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ item }),
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d && Array.isArray(d.sections) && d.sections.length ? d : null;
+  } catch {
+    return null;
+  }
+}
