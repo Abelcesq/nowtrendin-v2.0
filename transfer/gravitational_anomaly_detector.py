@@ -6184,6 +6184,12 @@ def accuracy_ledger_report():
                     "smallSample": h["small_sample_warning"],
                     "best": [{"topic": b["topic"], "leadDays": b["lead_days"]}
                              for b in h.get("best", [])],
+                    # Maturity-segmented — early detection of EMERGING topics is the claim;
+                    # established topics can only resolve LAGGED (coverage latency, not the thesis).
+                    "byMaturity": h.get("by_maturity"),
+                    "earlyDetectionHitRate": h.get("early_detection_hit_rate_pct"),
+                    "earlyDetectionSample": h.get("early_detection_sample"),
+                    "maturityCoverage": h.get("maturity_coverage"),
                 }
             # No resolved rows yet — surface the pending count so the empty
             # state can honestly say "N calls in flight".

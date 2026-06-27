@@ -258,12 +258,26 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
 
 
 def generate_honest_report(db_path=DB_PATH) -> dict:
-    """Accuracy report with the misses counted in the denominator."""
+    """Accuracy report with the misses counted in the denominator.
+
+    SEGMENTED by topic MATURITY CLASS (topic_maturity.maturity_class): the product's claim
+    is EARLY detection of EMERGING topics, so `early_detection_*` / by_maturity['emerging']
+    is the meaningful headline. ESTABLISHED/MONITORING topics (e.g. 'world cup') broke out on
+    Google Trends long before any first-sighting and can ONLY resolve LAGGED — they measure
+    coverage latency, not the early-signal thesis, and drag the blended rate down. NOTHING is
+    hidden: every cohort is reported. Maturity is the CURRENT class; held-out, score-neutral."""
     conn = db_compat.connect(db_path)
     try:
         rows = [dict(r) for r in conn.execute("SELECT * FROM accuracy_ledger").fetchall()]
         pending = conn.execute(
             "SELECT COUNT(*) AS c FROM pending_detections WHERE status='pending'").fetchone()["c"]
+        # Current maturity class per topic (held-out, display-only segmentation source).
+        mat = {}
+        try:
+            for _m in conn.execute("SELECT topic_key, maturity_class FROM topic_maturity").fetchall():
+                _md = dict(_m); mat[_md.get("topic_key")] = (_md.get("maturity_class") or "").upper()
+        except Exception:
+            mat = {}
     except Exception:
         conn.close()
         return {"status": "empty", "message": "Ledger not initialised yet.", "pending": 0}
@@ -280,6 +294,24 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                 "late_redetection_excluded": len(late), "param_version": LEDGER_PARAM_VERSION}
     lead_times = [r["lead_time_days"] for r in led if r["lead_time_days"] is not None]
     naive_denom = len(led) + len(same) + len(lag)
+
+    # ── Maturity segmentation (held-out, display-only) ──────────────────────────────────
+    # EARLY-DETECTION cohort = topics that were genuinely EMERGING (the product's claim);
+    # ESTABLISHED ones can only resolve LAGGED. All cohorts reported (transparency).
+    _RES = ("LED", "SAME_DAY", "LAGGED", "FALSE_POSITIVE")
+    _EMERGING, _ESTABLISHED = {"NEW", "EMERGING", "RESURGENT"}, {"ESTABLISHED", "MONITORING"}
+    def _cohort(tk):
+        c = mat.get(tk, "")
+        return "emerging" if c in _EMERGING else "established" if c in _ESTABLISHED else "unknown"
+    def _seg(name):
+        sub = [r for r in rows if r["verdict"] in _RES and _cohort(r.get("topic_key")) == name]
+        s_led = [r for r in sub if r["verdict"] == "LED"]
+        s_leads = [r["lead_time_days"] for r in s_led if r["lead_time_days"] is not None]
+        return {"resolved": len(sub), "led": len(s_led),
+                "hit_rate_pct": round(len(s_led) / len(sub) * 100, 1) if sub else None,
+                "median_lead_days": round(statistics.median(s_leads), 1) if s_leads else None}
+    by_mat = {k: _seg(k) for k in ("emerging", "established", "unknown")}
+
     return {
         "status": "ok",
         "param_version": LEDGER_PARAM_VERSION,
@@ -294,6 +326,13 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "mean_lead_days": round(statistics.mean(lead_times), 1) if lead_times else 0,
         "max_lead_days": max(lead_times) if lead_times else 0,
         "small_sample_warning": resolved < 20,
+        # Maturity-segmented — headline going forward = the EMERGING cohort (the product's claim).
+        "by_maturity": by_mat,
+        "maturity_source": "topic_maturity.maturity_class (current)",
+        "maturity_coverage": {"rows_with_class": sum(1 for r in rows if mat.get(r.get("topic_key"))),
+                              "total_resolved_rows": len(rows)},
+        "early_detection_hit_rate_pct": by_mat["emerging"]["hit_rate_pct"],
+        "early_detection_sample": by_mat["emerging"]["resolved"],
         "best": sorted([{"topic": r["topic_display"], "lead_days": r["lead_time_days"]}
                         for r in led], key=lambda x: x["lead_days"] or 0, reverse=True)[:5],
     }
