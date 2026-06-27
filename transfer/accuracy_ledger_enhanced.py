@@ -25,9 +25,23 @@ from typing import Optional
 import db_compat
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
-DEFAULT_TIMEOUT_DAYS = int(os.getenv("LEDGER_TIMEOUT_DAYS", "90"))
+# PATIENCE WINDOW (365d, 2026-06-27). The product tracks human attention BEFORE it reaches Google —
+# and human attention can arrive MONTHS after our agents detect the dark matter. So we give every
+# early detection a FULL YEAR to be confirmed by a later Google breakout before judging it a miss:
+# "the big money is not in the buying and selling, but in the WAITING" (Munger). Integrity to our
+# own system means never marking a detection FALSE_POSITIVE before human attention has had a real
+# chance to arrive — we must not conclude the agents failed because we removed the data too early.
+# Aligns with the 365-day velocity_scores retention (§13). HELD-OUT — affects measurement only,
+# never a score. Shorten only with founder sign-off + a backtest of the denominator impact.
+DEFAULT_TIMEOUT_DAYS = int(os.getenv("LEDGER_TIMEOUT_DAYS", "365"))
+# BACKWARD stale-match floor stays TIGHT: a breakout more than this many days BEFORE detection is a
+# different, older surge (the −92d cross-surge artifact), never a "lead". Asymmetric vs LEAD_MAX_DAYS.
 MATCH_WINDOW_DAYS    = int(os.getenv("LEDGER_MATCH_WINDOW_DAYS", "30"))
-LEDGER_PARAM_VERSION = "calib-params-v1"
+# FORWARD lead window: a Google breakout up to this many days AFTER detection still counts as a
+# genuine LED win (early detection of dark matter that took time to reach Google). Defaults to the
+# full patience window so the wait horizon and the lead-credit horizon move together.
+LEAD_MAX_DAYS        = int(os.getenv("LEDGER_LEAD_MAX_DAYS", str(DEFAULT_TIMEOUT_DAYS)))
+LEDGER_PARAM_VERSION = "calib-params-v2-patience365"
 
 try:
     from google_trends_validation import (
@@ -193,11 +207,15 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                     continue
             except Exception:
                 pass
-        # TIMEOUT-FIRST (free): past the deadline → FALSE_POSITIVE with no Trends fetch.
+        # TIMEOUT-FIRST (free): past the deadline → FALSE_POSITIVE with no Trends fetch. Compute the
+        # deadline LIVE from detection + DEFAULT_TIMEOUT_DAYS so the patience-window policy applies to
+        # ALL pending rows — including the ~881 recorded under the old 90d default — not just new ones.
         timed_out = False
-        if p.get("timeout_date"):
+        try:
+            timed_out = now > (_parse(p["detection_date"]) + timedelta(days=DEFAULT_TIMEOUT_DAYS))
+        except Exception:
             try:
-                timed_out = now > _parse(p["timeout_date"])
+                timed_out = bool(p.get("timeout_date")) and now > _parse(p["timeout_date"])
             except Exception:
                 timed_out = False
         if timed_out:
@@ -207,9 +225,19 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
             conn.commit()
             fp += 1
             continue
-        # Still within the window → spend a Trends fetch to see if it has broken out.
+        # Still within the window → spend a Trends fetch to see if it has broken out. Fetch a curve
+        # long enough to span detection→now (+buffer) so a breakout arriving MONTHS after our
+        # detection is still visible to match. Recent rows keep the 90d (daily-granularity) default;
+        # older rows widen toward the patience window (coarser/weekly granularity — fine for long leads).
         try:
-            curve = fetch(p["topic_display"])
+            _cdays = max(90, min(DEFAULT_TIMEOUT_DAYS + 35,
+                                 (now - _parse(p["detection_date"])).days + 35))
+        except Exception:
+            _cdays = 90
+        try:
+            curve = fetch(p["topic_display"], days=_cdays)
+        except TypeError:
+            curve = fetch(p["topic_display"])   # an injected fetch_fn may not accept days=
         except Exception:
             curve = None
         # SAME-SURGE FLOOR: match only a breakout on/after (detection − MATCH_WINDOW).
@@ -224,9 +252,13 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
         if breakout:
             lead = compute_lead_time(p["detection_date"], breakout)
             if lead:
-                # C1: reject cross-surge matches where the breakout date is outside
-                # the detection window — e.g. nukes detected in June matching a Feb spike.
-                if abs(lead["lead_time_days"]) > MATCH_WINDOW_DAYS:
+                # C1 (ASYMMETRIC): reject a STALE BACK-match (a breakout long BEFORE detection is a
+                # different, older surge — the −92d artifact), but ACCEPT a long FORWARD lead: an
+                # early detection confirmed by a Google breakout up to LEAD_MAX_DAYS later is a
+                # genuine LED win, not a re-detection. This is the patience principle in code — we do
+                # NOT disqualify our own early read just because human attention took months to arrive.
+                _lt = lead["lead_time_days"]
+                if _lt < -MATCH_WINDOW_DAYS or _lt > LEAD_MAX_DAYS:
                     rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                     _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
                                    lead["lead_time_days"], "LATE_REDETECTION", "sweep")
