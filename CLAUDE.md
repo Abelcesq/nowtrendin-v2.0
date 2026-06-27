@@ -438,8 +438,8 @@ the EMERGING early-detection cohort (`/accuracy/ledger` `byMaturity`/`earlyDetec
 `_apify_sweep_budget_ok` guard (skips paid fetches within `LEDGER_APIFY_RESERVE_USD`=40 of the Apify cap), manual
 `POST /accuracy/ledger/sweep`. (4) **Apify = TREND/ATTENTION-ONLY** (Google Trends realtime+sweep + Reddit; crypto +
 financial have ZERO Apify refs — FMP/Finviz/AV/FINRA/OFR/Databento). Realtime 2× overrun (actor fires :00 AND :30 vs
-the single :30 cron — a 2nd process on the old token). `APIFY_TOKEN` rotated (was leaked in a tool output) → set on
-engine; ⚠ must be NON-EXPIRING. (5) **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
+the single :30 cron — a 2nd process on the old token). `APIFY_TOKEN` rotated (was leaked in a tool output → old
+deleted) → new set on engine; confirmed **NON-EXPIRING** (2026-06-26) — trend pipeline safe. (5) **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
 Prior: 2026-06-26 — **Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2 +
 the Crypto Money Gradient** (see §15). (1) **Finviz Elite** = PRIMARY insider Form-4 (uncapped; `FINVIZ_INSIDER=1`),
 AV→fallback; integrity fix = insider **BUYING** is the signal (net is sell-dominated/degenerate). (2) **Market

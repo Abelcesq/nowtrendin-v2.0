@@ -42,7 +42,7 @@ _Last updated: 2026-06-26 (evening)_
   8×/day vs the engine's single :30 cron) — likely a 2nd process on the old token; expected to resolve now the
   old key is deleted (confirm at the next 6h slot).
 - **Apify token rotated** (old leaked in a tool output → rotated → old deleted; new set on engine v187,
-  authenticating). ⚠ Confirm the new token is **non-expiring** or trend discovery + the ledger sweep go dark.
+  authenticating). Confirmed **NON-EXPIRING** (2026-06-26) — trend discovery + the ledger sweep are safe.
 - **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
 
 ---
