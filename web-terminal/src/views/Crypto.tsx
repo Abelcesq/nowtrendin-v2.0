@@ -63,6 +63,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
         <div className="sect">
           <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : (c.gap_state || '').replace(/_/g, ' ')}{c.gap != null && !c.calibrating ? ` · ${Math.abs(c.gap)}-pt gap` : ''}</b>
           {c.interpretation && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{c.interpretation}</div>}
+          {c.interpretation && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</div>}
         </div>
       )}
 
