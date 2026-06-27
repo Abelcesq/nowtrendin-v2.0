@@ -44,6 +44,16 @@ _Last updated: 2026-06-26 (evening)_
 - **Apify token rotated** (old leaked in a tool output → rotated → old deleted; new set on engine v187,
   authenticating). Confirmed **NON-EXPIRING** (2026-06-26) — trend discovery + the ledger sweep are safe.
 - **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
+- **Accuracy-ledger PATIENCE WINDOW (365d) — founder decision.** The product detects dark matter BEFORE
+  it reaches Google, and human attention can arrive MONTHS later — so judging a detection a miss at 90
+  days unfairly condemns our own system before confirmation can arrive ("the big money is in the
+  waiting" — Munger; refs reviewed). `accuracy_ledger_enhanced`: (1) timeout 90→365, computed LIVE from
+  detection so it applies to the existing ~881 pending; (2) ASYMMETRIC lead window — backward stale-floor
+  stays tight (30d, the −92d artifact), FORWARD lead up to 365d now counts as a genuine LED win (was
+  wrongly excluded as LATE_REDETECTION); (3) dynamic curve length spans detection→now so a months-later
+  breakout is visible. Held-out (no score impact); `param_version=calib-params-v2-patience365`. Documented
+  in CLAUDE.md §14. Backlog insight: the 881 pending is a ROLLING working set — rows resolve at a Google
+  breakout (trickle) or the (now 365-day) timeout; it self-resolves, it is NOT a throughput problem.
 
 ---
 

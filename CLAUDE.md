@@ -309,6 +309,19 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   viability of the **Accuracy Ledger** (the moat). Same-surge matching now floors
   `detect_breakout_date(curve, since=detection−30d)` — fixed stale ledger matches (a
   −62d stale match became a correct −2d).
+- **PATIENCE WINDOW (365d, hard rule — 2026-06-27).** A pending detection gets a FULL YEAR for human
+  attention to reach Google before it is judged a miss: `LEDGER_TIMEOUT_DAYS=365` (computed LIVE from
+  `detection_date`, so it applies to the existing pending pool too, not just new rows). The lead
+  window is **ASYMMETRIC**: the backward stale-match floor stays tight (`MATCH_WINDOW_DAYS=30` — a
+  breakout >30d BEFORE detection is a different, older surge, the −92d artifact), but a FORWARD lead
+  up to `LEAD_MAX_DAYS=365` now counts as a genuine **LED** win (early dark-matter detection confirmed
+  by a LATER Google breakout — no longer wrongly excluded as LATE_REDETECTION). The sweep fetches a
+  Trends curve spanning detection→now so a months-later breakout is visible. **Rationale:** the
+  product detects attention BEFORE Google, so we must be FAIR to our own system — never conclude the
+  agents failed by removing data before human attention had a real chance to arrive ("the big money
+  is in the waiting" — Munger). Held-out — measurement only, NO score impact. NEVER shorten without
+  founder sign-off + a denominator backtest. Aligns with the 365-day retention (§13). `param_version`
+  → `calib-params-v2-patience365`.
 - **Guardrail (do NOT violate):** this model governs SORTING/MATCHING only. It removes
   NO scoring input — all Gradient-Score components and Market-Risk inputs (incl.
   leverage/positioning) are preserved exactly. Operational `*_at` timestamps keep their
@@ -439,7 +452,15 @@ the EMERGING early-detection cohort (`/accuracy/ledger` `byMaturity`/`earlyDetec
 `POST /accuracy/ledger/sweep`. (4) **Apify = TREND/ATTENTION-ONLY** (Google Trends realtime+sweep + Reddit; crypto +
 financial have ZERO Apify refs — FMP/Finviz/AV/FINRA/OFR/Databento). Realtime 2× overrun (actor fires :00 AND :30 vs
 the single :30 cron — a 2nd process on the old token). `APIFY_TOKEN` rotated (was leaked in a tool output → old
-deleted) → new set on engine; confirmed **NON-EXPIRING** (2026-06-26) — trend pipeline safe. (5) **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%).
+deleted) → new set on engine; confirmed **NON-EXPIRING** (2026-06-26) — trend pipeline safe. (5) **Cost Sentinel $700/mo total cap** (critical if exceeded, warn at 80%). (6) **Accuracy-ledger
+PATIENCE WINDOW (365d)** — `LEDGER_TIMEOUT_DAYS` 90→365 (computed LIVE from detection → applies to the
+existing ~881 pending) + ASYMMETRIC lead window (backward stale-floor stays 30d; FORWARD lead up to
+`LEAD_MAX_DAYS`=365 now a genuine LED win, was excluded as LATE_REDETECTION) + dynamic curve span
+detection→now. The product detects attention BEFORE Google, so be FAIR to our own system — never judge a
+detection a miss before human attention can arrive ("the big money is in the waiting" — Munger). Held-out
+(no score impact); `param_version=calib-params-v2-patience365`; aligns with the §13 365-day retention. The
+881 pending is a ROLLING working set (resolves at a Google breakout or the 365-day timeout), NOT a
+throughput problem. Full rule in §14.
 Prior: 2026-06-26 — **Finviz primary insider + Market-Signal "insider" reframe + Mainstream v2 +
 the Crypto Money Gradient** (see §15). (1) **Finviz Elite** = PRIMARY insider Form-4 (uncapped; `FINVIZ_INSIDER=1`),
 AV→fallback; integrity fix = insider **BUYING** is the signal (net is sell-dominated/degenerate). (2) **Market

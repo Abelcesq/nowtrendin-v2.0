@@ -230,6 +230,16 @@ OR magnitude spikes → `mainstream_confirmed`; tier-migration), `community_tier
   *honestly* (don't fudge thresholds).
 - Accuracy is reported **with its denominator** (`/accuracy/ledger`), never
   inflated. Small-sample is stated as small-sample.
+- **PATIENCE WINDOW (365d, hard — 2026-06-27).** A pending detection gets a FULL YEAR for human
+  attention to reach Google before being judged a miss (`LEDGER_TIMEOUT_DAYS`=365, computed LIVE from
+  detection so it covers existing pending). The lead window is ASYMMETRIC — the backward stale-match
+  floor stays tight (`MATCH_WINDOW_DAYS`=30, the −92d artifact) but a FORWARD lead up to `LEAD_MAX_DAYS`
+  =365 now counts as a genuine LED win (early dark-matter detection confirmed by a *later* Google
+  breakout — no longer excluded as LATE_REDETECTION). Be FAIR to our own system: never conclude the
+  agents failed by removing data before attention arrived ("the big money is in the waiting" — Munger).
+  Held-out (measurement only); shorten only with founder sign-off + a denominator backtest. The pending
+  pool is a ROLLING working set (resolves at a breakout or the 365-day timeout), not a throughput
+  problem — never "drain" it by uncapping the compute-expensive sweep. See CLAUDE.md §14.
 **CHECK:** run `backtest_dual_pathway.py`; `/accuracy/ledger` hit-rate + pending;
 spot-check `detection_pathway` / `mainstream_confirmed` on news topics.
 **FAILURE:** a backtest case fails, or a published number lacks a real denominator.
