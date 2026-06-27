@@ -48,6 +48,10 @@ _DISCLAIMER = ("This is a measurement of where money and attention are positione
                "disclosures and validated against an external, auditable ground truth. It is not a "
                "forecast, a price target, a recommendation, or investment, legal or financial advice.")
 
+# Crypto carries an explicit additional caveat (founder request) — appended to the shared disclaimer.
+_DISCLAIMER_CRYPTO = (_DISCLAIMER + " Be advised that this summary may be inaccurate and is not intended "
+                      "to be financial, legal or investment advice.")
+
 
 # ── MONEY GRADIENT (market + crypto share the field shape) ───────────────────────────────────────
 def _money(item: dict, ledger: dict, asset: str) -> dict:
@@ -145,7 +149,8 @@ def _money(item: dict, ledger: dict, asset: str) -> dict:
                     "later-stage" if (gap is not None and gap <= -16) else "balanced")
     headline = f"{tier + ' — ' if tier else ''}{strength_lbl} money read".strip()
     return {"title": "Signal Analysis", "kind": asset, "item": name, "headline": headline,
-            "facts": facts, "sections": sections, "disclaimer": _DISCLAIMER,
+            "facts": facts, "sections": sections,
+            "disclaimer": (_DISCLAIMER_CRYPTO if crypto else _DISCLAIMER),
             "generated": "Reproducible — composed from this item's scores and the accuracy ledger; no model inference."}
 
 
