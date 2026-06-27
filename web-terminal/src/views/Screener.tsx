@@ -6,6 +6,7 @@ import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, stageColor, stageLabel, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
 import { ScoreChart } from '../components/ScoreChart'
 import { Disclaimer } from '../components/Disclaimer'
+import { SignalAnalysisPanel } from '../components/SignalAnalysis'
 
 // Signal filters — EXACT parity with the mobile app's CATEGORY_DEFS (lib/signals.ts)
 // so the two surfaces match. `gap` here is abs(detection − confidence), matching
@@ -301,6 +302,9 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
+      <SignalAnalysisPanel kind="trend" item={{ topic_display: row.topic_display, det, conf, stage: row.stage, category: row.category, n: row.n }} />
 
       {/* Detection–Confidence Gap */}
       <div className="sect">

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { MC, marketTierColor } from '../lib/mobileTheme'
 import { Disclaimer } from '../components/Disclaimer'
+import { SignalAnalysisPanel } from '../components/SignalAnalysis'
 import { api, type CryptoFeed, type CryptoCoin } from '../lib/api'
 
 // Crypto Money Gradient — master/detail, mirroring the Market Signal stock detail page.
@@ -64,6 +65,9 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
           {c.interpretation && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{c.interpretation}</div>}
         </div>
       )}
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
+      <SignalAnalysisPanel kind="crypto" item={{ item_name: c.item_name, detection: c.money_movement, confidence: c.market_confirmation, flow: c.flow, tier: c.tier, dark_matter: (c as any).dark_matter }} />
 
       {/* Market Factors — §17: real value or n/a, never NaN */}
       {comps.length > 0 && (

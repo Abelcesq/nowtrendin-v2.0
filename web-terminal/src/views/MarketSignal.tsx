@@ -5,6 +5,7 @@ import { pullMarket } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, marketTierColor, FEEDS_COLOR, MARKET_TIERS, RISK_PIPELINE, BASELINE_META } from '../lib/mobileTheme'
 import { Disclaimer } from '../components/Disclaimer'
+import { SignalAnalysisPanel } from '../components/SignalAnalysis'
 
 // Market Signal — the finance-native dual score, wired to the live /risk/scores
 // (the SAME data the mobile Market tab renders). Detection = analyst sentiment +
@@ -202,6 +203,9 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
           ? <>The Market Signal section tracks whether money is moving into or out of a particular instrument. {MM_LABEL} “D” = the tracking of informed / early money movement. {MC_LABEL} “M” signals the broad market / economic confirmation of the overall market. The <b>flow</b> (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</>
           : <>is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</>}</div>
       </div>
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
+      <SignalAnalysisPanel kind="market" item={{ item_name: row.name, detection: mg.detection ?? row.det, confidence: mg.confidence ?? row.conf, flow: mg.flow ?? row.flow, tier: mg.tier ?? row.tier, leverage_health: mg.leverage_health ?? row.lev, gap: mg.gap }} />
 
       {/* Market factors — colored by which score they feed */}
       {row.comps.length > 0 && (

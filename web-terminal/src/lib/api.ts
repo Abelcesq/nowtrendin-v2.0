@@ -13,6 +13,24 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>
 }
 
+async function post<T>(path: string, body: any): Promise<T> {
+  const r = await fetch(`${ENGINE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`)
+  return r.json() as Promise<T>
+}
+
+// Per-item Signal Analysis (held-out, reproducible narrative; formula-confidential, measurement-only).
+export interface SignalAnalysis {
+  title?: string; kind?: string; item?: string; headline?: string
+  facts?: { label: string; value: string }[]
+  sections?: { heading: string; body: string }[]
+  disclaimer?: string; generated?: string; available?: boolean
+}
+
 export interface LedgerSummary {
   status: string
   hitRate?: number; naiveHitRate?: number
@@ -160,6 +178,10 @@ export const api = {
   // Crypto Money Gradient (flag-gated CRYPTO_SIGNAL; held-out research until live).
   crypto: () => get<CryptoFeed>('/crypto'),
   cryptoDetail: (coin: string) => get<CryptoCoin>(`/crypto/${encodeURIComponent(coin)}`),
+  // Per-item Signal Analysis — POST the item the rail already has; engine attaches the matching
+  // accuracy-ledger report and returns the held-out, reproducible narrative.
+  analysis: (kind: 'trend' | 'market' | 'crypto', item: any) =>
+    post<SignalAnalysis>(`/analysis/${kind}`, { item }),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   // The WHOLE Market universe, fetched 100 at a time (engine serves O(1) slices from
   // its prewarmed superset). onBatch fires after each page so the table paints
