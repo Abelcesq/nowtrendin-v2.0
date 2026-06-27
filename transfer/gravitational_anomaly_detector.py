@@ -5113,11 +5113,13 @@ def start_scheduler():
             against the Apify budget (Cost Sentinel /monitor/cost, apify_trends)."""
             if _LEDGER_PLUS_AVAILABLE:
                 try:
-                    # Uncapped by default (LEDGER_SWEEP_LIMIT=0 → drain the whole pool); a positive
-                    # value bounds each run for operational latency. Raised from the old 8 now that the
-                    # per-result Trends fetch is known-cheap ($0.001) — that cap throttled the held-out
-                    # MEASUREMENT only (never a score). Budget-guarded so it can't starve collection.
-                    _lim_env = int(os.getenv("LEDGER_SWEEP_LIMIT", "300"))
+                    # Per-run cap (default 8). The Google-Trends-Scraper actor is SLOW + compute-heavy
+                    # per topic (1–11 min/run, some fail), so a high cap stampedes the Apify COMPUTE
+                    # budget — the 2026-06-27 runaway (an earlier "$0.001/result" read was wrong; cost is
+                    # per-run compute). Keep this LOW: the ledger is a held-out MEASUREMENT (never a
+                    # score), so a slow forward drain is fine, and the budget guard below also protects
+                    # collection. LEDGER_SWEEP_LIMIT=0 = uncapped — do NOT set that in production.
+                    _lim_env = int(os.getenv("LEDGER_SWEEP_LIMIT", "8"))
                     _lim = None if _lim_env <= 0 else _lim_env
                     _g = _apify_sweep_budget_ok()
                     if _g["ok"]:
