@@ -22,7 +22,10 @@ from __future__ import annotations
 
 SCALAR = {"type": "scalar", "min": 0.0, "max": 100.0}
 STAGE_ENUM = ["BREAKOUT", "STRONG", "EMERGING", "MARGINAL", "WATCHING", "MONITORING"]
-MARKET_TIER_ENUM = ["ELEVATED", "ACTIVE", "BUILDING", "ROUTINE", "DORMANT"]
+# MODERATE is the user-facing relabel of BUILDING (Market-Signal de-Congress reframe, 2026-06-26).
+# BUILDING is retained for historical rows (365-day retention) + the financial_risk_gradient module
+# which still emits it; both are valid stages.
+MARKET_TIER_ENUM = ["ELEVATED", "ACTIVE", "MODERATE", "BUILDING", "ROUTINE", "DORMANT"]
 
 # table -> column -> spec.  The declared, single-source-of-truth format for scoring fields.
 SCORING_CONTRACT = {

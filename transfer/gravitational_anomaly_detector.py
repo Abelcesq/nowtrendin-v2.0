@@ -8129,6 +8129,39 @@ def maint_prune(days: int = Query(None, ge=4), vacuum: int = Query(0),
     return result
 
 
+@app.post("/maint/fix-heisenberg", dependencies=[Depends(_require_internal)])
+def maint_fix_heisenberg():
+    """INTERNAL: re-derive the heisenberg_gap column so it satisfies the Scoring-Contract
+    invariant (gap == round(detection_score - confidence_score, 1), the contract's own
+    0.2 tolerance). Both live write sinks already harden this; this one-shot HEALS the
+    stale legacy rows (pre-sink-fix snapshots still inside the 365-day window) the auditor
+    keeps flagging. ZERO score impact — heisenberg_gap is a derived DISPLAY field;
+    detection_score / confidence_score / overall_score are never touched, nothing is
+    deleted (respects §13 retention). Reusable remediation for the weekly improve-system audit."""
+    conn = get_db(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT id, detection_score, confidence_score, heisenberg_gap FROM velocity_scores").fetchall()
+        bad = []
+        for r in rows:
+            d = r["detection_score"] or 0
+            c = r["confidence_score"] or 0
+            g = r["heisenberg_gap"]
+            exp = round(float(d) - float(c), 1)
+            if g is None or abs(float(g) - exp) > 0.2:
+                bad.append((r["id"], exp))
+        for _id, exp in bad:
+            conn.execute("UPDATE velocity_scores SET heisenberg_gap = ? WHERE id = ?", (exp, _id))
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        return {"checked": len(rows), "fixed": len(bad),
+                "note": "heisenberg_gap re-derived = round(detection - confidence, 1); derived display field only"}
+    finally:
+        conn.close()
+
+
 @app.get("/scores/{topic_key}")
 def get_topic_detail(topic_key: str):
     """
