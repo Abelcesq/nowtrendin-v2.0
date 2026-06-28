@@ -548,7 +548,8 @@ def fragment_category_auditor(conn, sample: int = 400) -> dict:
 # Investigates + monitors every external DATA API the engine integrates with.
 # Each entry: (display, key_env, cost_env, billing_class, note). billing_class:
 #   "paid"    — a paid subscription; contributes to the data-subscription total.
-#             A cost_env of $0 while the key IS configured = UNTRACKED spend → warn.
+#             A configured key whose cost_env was NEVER declared = UNTRACKED spend → warn.
+#             An explicitly-set cost_env (even $0 = founder-confirmed free tier) = tracked.
 #   "free"    — free / free-tier API (key present, $0 expected). Listed, not billed.
 #   "metered" — usage-billed and tracked on its OWN cost line elsewhere
 #             (AI ledger / Apify live / X line). Listed here for the full map,
@@ -624,15 +625,18 @@ def data_subscriptions() -> dict:
     alerts, items = [], []
     paid_total = 0.0
     paid_n = free_n = metered_n = 0
-    untracked = []  # paid + configured + $0
+    untracked = []  # paid + configured + COST_*_USD never declared (explicit $0 = tracked/free)
     orphan_cost = []  # cost set but key missing
 
     for name, kenv, cenv, klass, note in DATA_SUBSCRIPTIONS:
         configured = bool(os.getenv(kenv))
         cost = None
+        cost_set = False
         if cenv:
+            raw = os.getenv(cenv)
+            cost_set = raw is not None and raw != ""   # explicitly set (even "0") vs never declared
             try:
-                cost = float(os.getenv(cenv, "0") or 0)
+                cost = float(raw) if cost_set else 0.0
             except (TypeError, ValueError):
                 cost = 0.0
         row = {"name": name, "key_env": kenv, "configured": configured,
@@ -645,7 +649,9 @@ def data_subscriptions() -> dict:
         if klass == "paid":
             paid_n += 1
             paid_total += (cost or 0)
-            if configured and (cost or 0) == 0:
+            # Explicitly-set cost (even $0 = founder-confirmed free tier) counts as TRACKED.
+            # Only a configured paid API whose COST_*_USD was NEVER declared is untracked spend.
+            if configured and not cost_set:
                 untracked.append(f"{name} (set {cenv})")
             if (cost or 0) > 0 and not configured:
                 orphan_cost.append(f"{name} (${cost:.2f} on {cenv}, no key)")
