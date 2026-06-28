@@ -8138,25 +8138,37 @@ def maint_fix_heisenberg():
     keeps flagging. ZERO score impact — heisenberg_gap is a derived DISPLAY field;
     detection_score / confidence_score / overall_score are never touched, nothing is
     deleted (respects §13 retention). Reusable remediation for the weekly improve-system audit."""
+    # Set-based UPDATE run inside the DB (never fetch the ~600MB table into app memory).
+    # Predicate mirrors the Scoring-Contract rule: stale if NULL or |gap - (det-conf)| > 0.2 tol.
+    pred = ("heisenberg_gap IS NULL OR "
+            "ABS(heisenberg_gap - (detection_score - confidence_score)) > 0.2")
+    if os.getenv("DATABASE_URL"):
+        import psycopg2
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        conn.autocommit = True
+        try:
+            cur = conn.cursor()
+            cur.execute(f"SELECT COUNT(*) FROM velocity_scores WHERE {pred}")
+            stale = cur.fetchone()[0]
+            cur.execute("UPDATE velocity_scores "
+                        "SET heisenberg_gap = ROUND((detection_score - confidence_score)::numeric, 1) "
+                        f"WHERE {pred}")
+            return {"engine": "postgres", "stale_before": stale, "fixed": cur.rowcount,
+                    "note": "heisenberg_gap re-derived = round(detection - confidence, 1); derived display field only"}
+        finally:
+            conn.close()
+    # sqlite fallback (local dev)
     conn = get_db(DB_PATH)
     try:
-        rows = conn.execute(
-            "SELECT id, detection_score, confidence_score, heisenberg_gap FROM velocity_scores").fetchall()
-        bad = []
-        for r in rows:
-            d = r["detection_score"] or 0
-            c = r["confidence_score"] or 0
-            g = r["heisenberg_gap"]
-            exp = round(float(d) - float(c), 1)
-            if g is None or abs(float(g) - exp) > 0.2:
-                bad.append((r["id"], exp))
-        for _id, exp in bad:
-            conn.execute("UPDATE velocity_scores SET heisenberg_gap = ? WHERE id = ?", (exp, _id))
+        n = conn.execute(f"SELECT COUNT(*) AS n FROM velocity_scores WHERE {pred}").fetchone()["n"]
+        conn.execute("UPDATE velocity_scores "
+                     "SET heisenberg_gap = ROUND(detection_score - confidence_score, 1) "
+                     f"WHERE {pred}")
         try:
             conn.commit()
         except Exception:
             pass
-        return {"checked": len(rows), "fixed": len(bad),
+        return {"engine": "sqlite", "stale_before": n, "fixed": n,
                 "note": "heisenberg_gap re-derived = round(detection - confidence, 1); derived display field only"}
     finally:
         conn.close()
