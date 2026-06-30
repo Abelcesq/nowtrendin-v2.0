@@ -18,18 +18,18 @@ export function ResearchHistory({ topicKey }: { topicKey: string }) {
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
           Research history — how long has this been discussed?
         </Text>
-        {open ? <ChevronUp size={16} color="#9AA3B0" /> : <ChevronDown size={16} color="#9AA3B0" />}
+        {open ? <ChevronUp size={16} color="#9A9AA2" /> : <ChevronDown size={16} color="#9A9AA2" />}
       </TouchableOpacity>
 
       {open && (
-        <View className="bg-surface rounded-2xl border border-border p-4 mt-2">
-          {isLoading && <ActivityIndicator color="#00C896" />}
+        <View className="bg-card rounded-2xl p-4 mt-2">
+          {isLoading && <ActivityIndicator color="#2E7D5B" />}
           {isError && <Text className="text-textMuted text-sm">Research data unavailable.</Text>}
           {research && (
             <>
               {!!research.trajectoryLabel && (
-                <View className="self-start px-3 py-1 rounded-full mb-2" style={{ backgroundColor: '#2D7EEF1A' }}>
-                  <Text className="text-[11px] font-bold" style={{ color: '#2D7EEF' }}>{research.trajectoryLabel}</Text>
+                <View className="self-start px-3 py-1 rounded-full mb-2" style={{ backgroundColor: '#2A5B9E1A' }}>
+                  <Text className="text-[11px] font-bold" style={{ color: '#2A5B9E' }}>{research.trajectoryLabel}</Text>
                 </View>
               )}
               {!!research.summaryShort && (

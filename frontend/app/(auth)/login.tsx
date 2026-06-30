@@ -43,7 +43,7 @@ export default function Login() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-6 self-start">
-        <ChevronLeft size={24} color="#94A3B8" />
+        <ChevronLeft size={24} color="#8A8F9C" />
       </TouchableOpacity>
 
       <View className="mb-6">
@@ -62,7 +62,7 @@ export default function Login() {
             value={value}
             onChangeText={onChange}
             error={errors.email?.message}
-            icon={<Mail size={18} color="#94A3B8" />}
+            icon={<Mail size={18} color="#8A8F9C" />}
             keyboardType="email-address"
           />
         )}
@@ -76,7 +76,7 @@ export default function Login() {
             value={value}
             onChangeText={onChange}
             error={errors.password?.message}
-            icon={<KeyRound size={18} color="#94A3B8" />}
+            icon={<KeyRound size={18} color="#8A8F9C" />}
             secureText
           />
         )}

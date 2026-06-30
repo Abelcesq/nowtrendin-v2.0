@@ -8,12 +8,12 @@ import { updateNotifyPrefs, sendPhoneCode, verifyPhoneCode } from '../../../lib/
 
 function PrefRow({ label, desc, value, onChange, disabled }: { label: string; desc: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <View className="flex-row items-center justify-between bg-surface rounded-xl border border-border p-4 mb-3" style={disabled ? { opacity: 0.55 } : undefined}>
+    <View className="flex-row items-center justify-between bg-card rounded-xl p-4 mb-3" style={disabled ? { opacity: 0.55 } : undefined}>
       <View className="flex-1 pr-3">
         <Text className="text-textPrimary text-base font-semibold">{label}</Text>
         <Text className="text-textMuted text-xs mt-0.5">{desc}</Text>
       </View>
-      <Switch value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+      <Switch value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
     </View>
   );
 }
@@ -61,7 +61,7 @@ export default function Notifications() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
+        <ChevronLeft size={22} color="#3C4663" />
         <Text className="text-textSecondary text-sm">Profile</Text>
       </TouchableOpacity>
       <Text className="text-textPrimary text-3xl font-bold mb-6">Notifications</Text>
@@ -73,24 +73,24 @@ export default function Notifications() {
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2 mt-4">Cell phone for text alerts</Text>
       {verified ? (
-        <View className="flex-row items-center bg-surface rounded-xl border border-border p-4 mb-2">
+        <View className="flex-row items-center bg-card rounded-xl p-4 mb-2">
           <Text className="text-textPrimary text-base font-semibold flex-1">{phone}</Text>
-          <View className="flex-row items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: '#00C89620' }}>
-            <CheckCircle size={13} color="#00C896" /><Text className="text-xs font-bold" style={{ color: '#009970' }}>VERIFIED</Text>
+          <View className="flex-row items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: '#2E7D5B20' }}>
+            <CheckCircle size={13} color="#2E7D5B" /><Text className="text-xs font-bold" style={{ color: '#246B4A' }}>VERIFIED</Text>
           </View>
           <TouchableOpacity onPress={() => { setVerified(false); setCodeSent(false); }} className="ml-3"><Text className="text-primary text-sm font-semibold">Change</Text></TouchableOpacity>
         </View>
       ) : (
-        <View className="bg-surface rounded-xl border border-border p-4 mb-2">
-          <TextInput value={phone} onChangeText={setPhone} placeholder="+1 555 123 4567" placeholderTextColor="#9AA3B0" keyboardType="phone-pad" className="bg-bg rounded-lg px-3 py-2.5 border border-border mb-3" style={{ color: '#1A1A2E' }} />
+        <View className="bg-card rounded-xl p-4 mb-2">
+          <TextInput value={phone} onChangeText={setPhone} placeholder="+1 555 123 4567" placeholderTextColor="#9A9AA2" keyboardType="phone-pad" className="bg-bg rounded-lg px-3 py-2.5 mb-3" style={{ color: '#16264A' }} />
           {!codeSent ? (
-            <TouchableOpacity onPress={sendCode} className="rounded-lg py-3 items-center" style={{ backgroundColor: '#00C896' }}>
+            <TouchableOpacity onPress={sendCode} className="rounded-lg py-3 items-center" style={{ backgroundColor: '#2E7D5B' }}>
               <Text className="text-white font-semibold">Send verification code</Text>
             </TouchableOpacity>
           ) : (
             <View className="flex-row gap-2">
-              <TextInput value={code} onChangeText={setCode} placeholder="6-digit code" placeholderTextColor="#9AA3B0" keyboardType="number-pad" className="flex-1 bg-bg rounded-lg px-3 py-2.5 border border-border" style={{ color: '#1A1A2E' }} />
-              <TouchableOpacity onPress={confirmCode} className="rounded-lg py-3 px-5 items-center justify-center" style={{ backgroundColor: '#00C896' }}><Text className="text-white font-semibold">Verify</Text></TouchableOpacity>
+              <TextInput value={code} onChangeText={setCode} placeholder="6-digit code" placeholderTextColor="#9A9AA2" keyboardType="number-pad" className="flex-1 bg-bg rounded-lg px-3 py-2.5" style={{ color: '#16264A' }} />
+              <TouchableOpacity onPress={confirmCode} className="rounded-lg py-3 px-5 items-center justify-center" style={{ backgroundColor: '#2E7D5B' }}><Text className="text-white font-semibold">Verify</Text></TouchableOpacity>
             </View>
           )}
         </View>
@@ -98,13 +98,13 @@ export default function Notifications() {
 
       {msg && (
         <View className="flex-row items-center gap-2 mt-1">
-          <Text className="text-sm" style={{ color: msg.ok ? '#009970' : '#DC2626' }}>{msg.ok ? '✓ ' : '• '}{msg.text}</Text>
+          <Text className="text-sm" style={{ color: msg.ok ? '#246B4A' : '#B11226' }}>{msg.ok ? '✓ ' : '• '}{msg.text}</Text>
         </View>
       )}
       {saved && !msg && (
         <View className="flex-row items-center gap-2 mt-1">
-          <CheckCircle size={14} color="#00C896" />
-          <Text className="text-sm" style={{ color: '#009970' }}>Preferences saved.</Text>
+          <CheckCircle size={14} color="#2E7D5B" />
+          <Text className="text-sm" style={{ color: '#246B4A' }}>Preferences saved.</Text>
         </View>
       )}
 

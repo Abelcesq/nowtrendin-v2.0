@@ -35,7 +35,7 @@ export default function ProfileLegal() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
+        <ChevronLeft size={22} color="#3C4663" />
         <Text className="text-textSecondary text-sm">Profile</Text>
       </TouchableOpacity>
 
@@ -49,16 +49,16 @@ export default function ProfileLegal() {
           key={key}
           onPress={() => Linking.openURL(url)}
           activeOpacity={0.7}
-          className="bg-surface rounded-2xl border border-border p-4 mb-3 flex-row items-center"
+          className="bg-card rounded-2xl p-4 mb-3 flex-row items-center"
         >
-          <View className="w-12 h-12 rounded-xl items-center justify-center mr-3.5" style={{ backgroundColor: '#00C8961A' }}>
-            <Icon size={22} color="#00C896" />
+          <View className="w-12 h-12 rounded-xl items-center justify-center mr-3.5" style={{ backgroundColor: '#2E7D5B1A' }}>
+            <Icon size={22} color="#2E7D5B" />
           </View>
           <View className="flex-1">
             <Text className="text-textPrimary text-lg font-bold">{title}</Text>
             <Text className="text-textMuted text-sm mt-0.5">{subtitle}</Text>
           </View>
-          <ChevronRight size={20} color="#94A3B8" />
+          <ChevronRight size={20} color="#8A8F9C" />
         </TouchableOpacity>
       ))}
     </Screen>

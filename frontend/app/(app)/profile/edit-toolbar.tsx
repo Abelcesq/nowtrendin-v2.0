@@ -38,7 +38,7 @@ export default function EditToolbar() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="pt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" /><Text className="text-textSecondary text-base">Back</Text>
+        <ChevronLeft size={22} color="#3C4663" /><Text className="text-textSecondary text-base">Back</Text>
       </TouchableOpacity>
       <Text className="text-textPrimary text-2xl font-bold mb-1">Edit Toolbar Icons</Text>
       <Text className="text-textMuted text-sm mb-4">
@@ -47,14 +47,14 @@ export default function EditToolbar() {
 
       {/* Fixed ends preview */}
       <View className="flex-row items-center gap-2 mb-5">
-        <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg border border-border">
-          <Home size={14} color="#94A3B8" /><Text className="text-textMuted text-xs font-semibold">Home</Text>
-          <Lock size={11} color="#94A3B8" />
+        <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg">
+          <Home size={14} color="#8A8F9C" /><Text className="text-textMuted text-xs font-semibold">Home</Text>
+          <Lock size={11} color="#8A8F9C" />
         </View>
         <Text className="text-textMuted text-xs">· {sel.length}/{TOOLBAR_SLOTS} chosen ·</Text>
-        <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg border border-border">
-          <User size={14} color="#94A3B8" /><Text className="text-textMuted text-xs font-semibold">Profile</Text>
-          <Lock size={11} color="#94A3B8" />
+        <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg">
+          <User size={14} color="#8A8F9C" /><Text className="text-textMuted text-xs font-semibold">Profile</Text>
+          <Lock size={11} color="#8A8F9C" />
         </View>
       </View>
 
@@ -69,20 +69,20 @@ export default function EditToolbar() {
             key={c.key}
             onPress={() => toggle(c)}
             disabled={gated}
-            className="flex-row items-center justify-between bg-surface rounded-xl border p-3.5 mb-2.5"
-            style={{ borderColor: on ? '#00C896' : '#E4E7EC', opacity: gated || full ? 0.45 : 1 }}
+            className="flex-row items-center justify-between bg-card rounded-xl p-3.5 mb-2.5"
+            style={{ borderColor: on ? '#2E7D5B' : '#ECECEC', opacity: gated || full ? 0.45 : 1 }}
           >
             <View className="flex-row items-center gap-3">
-              <Icon size={20} color={on ? '#00C896' : '#94A3B8'} />
+              <Icon size={20} color={on ? '#2E7D5B' : '#8A8F9C'} />
               <Text className="text-textPrimary text-base">{c.label}</Text>
-              {gated && <View className="flex-row items-center gap-1"><Lock size={12} color="#94A3B8" /><Text className="text-textMuted text-[11px]">Upgrade</Text></View>}
+              {gated && <View className="flex-row items-center gap-1"><Lock size={12} color="#8A8F9C" /><Text className="text-textMuted text-[11px]">Upgrade</Text></View>}
             </View>
             {on ? (
-              <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: '#00C896' }}>
+              <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: '#2E7D5B' }}>
                 <Text className="text-white text-xs font-bold">{idx + 1}</Text>
               </View>
             ) : (
-              <View className="w-6 h-6 rounded-full border border-border" />
+              <View className="w-6 h-6 rounded-full" />
             )}
           </TouchableOpacity>
         );
@@ -92,7 +92,7 @@ export default function EditToolbar() {
         onPress={save}
         disabled={!canSave}
         className="flex-row items-center justify-center gap-2 rounded-xl py-3.5 mt-3"
-        style={{ backgroundColor: canSave ? '#00C896' : '#9DDDC9' }}
+        style={{ backgroundColor: canSave ? '#2E7D5B' : '#D8DCE3' }}
       >
         <Check size={18} color="#FFFFFF" />
         <Text className="text-white font-semibold">{canSave ? 'Save toolbar' : `Pick ${TOOLBAR_SLOTS - sel.length} more`}</Text>

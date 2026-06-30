@@ -9,18 +9,18 @@ import { useConvergence } from '../../hooks/useSignals';
 // N demand metric, so it's a genuine cross-check, not a circular one.
 
 const VERDICT_COLOR: Record<string, string> = {
-  CONFIRMED: '#00C896',
-  MIXED: '#D4A017',
-  CONFLICTING: '#DC2626',
-  INCONCLUSIVE: '#9AA3B0',
-  STABLE: '#9AA3B0',
-  UNKNOWN: '#9AA3B0',
+  CONFIRMED: '#2E7D5B',
+  MIXED: '#A8456A',
+  CONFLICTING: '#B11226',
+  INCONCLUSIVE: '#9A9AA2',
+  STABLE: '#9A9AA2',
+  UNKNOWN: '#9A9AA2',
 };
 
 function DirIcon({ dir }: { dir?: string }) {
-  if (dir === 'RISING') return <TrendingUp size={14} color="#00C896" />;
-  if (dir === 'FALLING') return <TrendingDown size={14} color="#DC2626" />;
-  return <Minus size={14} color="#9AA3B0" />;
+  if (dir === 'RISING') return <TrendingUp size={14} color="#2E7D5B" />;
+  if (dir === 'FALLING') return <TrendingDown size={14} color="#B11226" />;
+  return <Minus size={14} color="#9A9AA2" />;
 }
 
 export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
@@ -30,9 +30,9 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
 
   if (c.status === 'warming_up') {
     return (
-      <View className="rounded-xl px-3 py-2.5 mt-3 border border-border bg-bg">
+      <View className="rounded-xl px-3 py-2.5 mt-3 bg-bg">
         <View className="flex-row items-center gap-1.5 mb-0.5">
-          <GitMerge size={13} color="#9AA3B0" />
+          <GitMerge size={13} color="#9A9AA2" />
           <Text className="text-textMuted text-[11px] font-bold tracking-wide uppercase">
             Signal Convergence
           </Text>
@@ -47,10 +47,10 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
 
   if (c.status !== 'ok') return null;
 
-  const col = VERDICT_COLOR[c.convergence ?? 'INCONCLUSIVE'] ?? '#9AA3B0';
+  const col = VERDICT_COLOR[c.convergence ?? 'INCONCLUSIVE'] ?? '#9A9AA2';
 
   return (
-    <View className="rounded-xl px-3 py-3 mt-3 border" style={{ borderColor: `${col}55`, backgroundColor: `${col}0C` }}>
+    <View className="rounded-xl px-3 py-3 mt-3" style={{ borderColor: `${col}55`, backgroundColor: `${col}0C` }}>
       {/* Header: overall convergence verdict + direction */}
       <View className="flex-row items-center gap-2 mb-2">
         <GitMerge size={14} color={col} />
@@ -74,7 +74,7 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
             <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wide">
               vs Gradient Score
             </Text>
-            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsGradient.validation] ?? '#9AA3B0' }}>
+            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsGradient.validation] ?? '#9A9AA2' }}>
               {c.vsGradient.validation}
             </Text>
           </View>
@@ -89,7 +89,7 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
             <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wide">
               vs Niche Analysis
             </Text>
-            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsNiche.validation] ?? '#9AA3B0' }}>
+            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsNiche.validation] ?? '#9A9AA2' }}>
               {c.vsNiche.validation}
             </Text>
           </View>

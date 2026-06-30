@@ -23,7 +23,7 @@ export default function ProfileMembership() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
+        <ChevronLeft size={22} color="#3C4663" />
         <Text className="text-textSecondary text-sm">Profile</Text>
       </TouchableOpacity>
       <View className="pb-4">

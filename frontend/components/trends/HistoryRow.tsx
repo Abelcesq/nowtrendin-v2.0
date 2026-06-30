@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Flame } from 'lucide-react-native';
-import { Signal, stageColor, stageLabel, timeLabel } from '../../lib/signals';
+import { Signal, stageColor, stageLabel, timeLabel, titleCaseTopic } from '../../lib/signals';
 
 function Metric({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -24,28 +24,28 @@ export function HistoryRow({ signal, onPress, selected }: { signal: Signal; onPr
       activeOpacity={0.85}
       onPress={() => (onPress ? onPress(signal) : router.push(`/signal/${signal.id}`))}
       className="flex-row items-center border-b border-border px-3 py-3"
-      style={{ backgroundColor: selected ? '#00C8960D' : '#FFFFFF' }}
+      style={{ backgroundColor: selected ? '#2E7D5B0D' : '#FFFFFF' }}
     >
       <View className="w-1 self-stretch rounded-full mr-3" style={{ backgroundColor: col }} />
       <View className="flex-1 pr-2">
-        <Text className="text-textPrimary text-base font-bold">{signal.topic}</Text>
+        <Text className="text-textPrimary text-base font-bold">{titleCaseTopic(signal.topic)}</Text>
         <View className="flex-row items-center gap-2 mt-1">
           <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
             <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
           </View>
           {signal.isAnomaly && (
-            <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#00C8961A' }}>
-              <Flame size={9} color="#00C896" />
-              <Text className="text-[9px] font-bold" style={{ color: '#009970' }}>ANOMALY</Text>
+            <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#2E7D5B1A' }}>
+              <Flame size={9} color="#2E7D5B" />
+              <Text className="text-[9px] font-bold" style={{ color: '#246B4A' }}>ANOMALY</Text>
             </View>
           )}
           <Text className="text-textMuted text-[10px]">{timeLabel(signal.createdAt)}</Text>
         </View>
       </View>
       <View className="flex-row">
-        <Metric label="OVR" value={signal.overall ?? signal.score} color="#1A1A2E" />
-        <Metric label="DET" value={signal.detection} color="#2D7EEF" />
-        <Metric label="CONF" value={signal.confidence} color="#00C896" />
+        <Metric label="OVR" value={signal.overall ?? signal.score} color="#16264A" />
+        <Metric label="DET" value={signal.detection} color="#2A5B9E" />
+        <Metric label="CONF" value={signal.confidence} color="#2E7D5B" />
       </View>
     </TouchableOpacity>
   );

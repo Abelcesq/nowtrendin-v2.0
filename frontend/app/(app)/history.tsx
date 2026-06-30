@@ -71,40 +71,40 @@ export default function History() {
                   <TouchableOpacity
                     key={w.k}
                     onPress={() => setWin(w.k)}
-                    className="px-3 py-1.5 rounded-lg border"
-                    style={{ backgroundColor: active ? '#00C8961A' : '#FFFFFF', borderColor: active ? '#00C896' : '#E4E7EC' }}
+                    className="px-3 py-1.5 rounded-lg"
+                    style={{ backgroundColor: active ? '#2E7D5B1A' : '#FFFFFF', borderColor: active ? '#2E7D5B' : '#ECECEC' }}
                   >
-                    <Text className="text-xs font-bold" style={{ color: active ? '#009970' : '#5B6472' }}>{w.label}</Text>
+                    <Text className="text-xs font-bold" style={{ color: active ? '#246B4A' : '#3C4663' }}>{w.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
             <View className="flex-row gap-1 ml-1">
-              <TouchableOpacity onPress={() => setDesc(false)} className="w-8 h-8 rounded-lg border items-center justify-center" style={{ borderColor: !desc ? '#00C896' : '#E4E7EC' }}>
-                <ArrowUp size={14} color={!desc ? '#00C896' : '#9AA3B0'} />
+              <TouchableOpacity onPress={() => setDesc(false)} className="w-8 h-8 rounded-lg items-center justify-center" style={{ borderColor: !desc ? '#2E7D5B' : '#ECECEC' }}>
+                <ArrowUp size={14} color={!desc ? '#2E7D5B' : '#9A9AA2'} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setDesc(true)} className="w-8 h-8 rounded-lg border items-center justify-center" style={{ borderColor: desc ? '#00C896' : '#E4E7EC' }}>
-                <ArrowDown size={14} color={desc ? '#00C896' : '#9AA3B0'} />
+              <TouchableOpacity onPress={() => setDesc(true)} className="w-8 h-8 rounded-lg items-center justify-center" style={{ borderColor: desc ? '#2E7D5B' : '#ECECEC' }}>
+                <ArrowDown size={14} color={desc ? '#2E7D5B' : '#9A9AA2'} />
               </TouchableOpacity>
             </View>
           </View>
-          <TouchableOpacity onPress={() => refetch()} className="w-8 h-8 rounded-lg border border-border items-center justify-center">
-            <RotateCcw size={14} color="#5B6472" />
+          <TouchableOpacity onPress={() => refetch()} className="w-8 h-8 rounded-lg items-center justify-center">
+            <RotateCcw size={14} color="#3C4663" />
           </TouchableOpacity>
         </View>
 
         {/* Search */}
-        <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-          <Search size={18} color="#9AA3B0" />
+        <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mb-3">
+          <Search size={18} color="#9A9AA2" />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search history..."
-            placeholderTextColor="#9AA3B0"
+            placeholderTextColor="#9A9AA2"
             className="flex-1 ml-3 text-textPrimary text-base"
-            style={{ color: '#1A1A2E' }}
+            style={{ color: '#16264A' }}
           />
-          {query ? <TouchableOpacity onPress={() => setQuery('')} className="ml-2"><X size={16} color="#9AA3B0" /></TouchableOpacity> : null}
+          {query ? <TouchableOpacity onPress={() => setQuery('')} className="ml-2"><X size={16} color="#9A9AA2" /></TouchableOpacity> : null}
         </View>
 
         <Text className="text-textSecondary text-[11px] mb-2">
@@ -124,7 +124,7 @@ export default function History() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color="#2E7D5B" style={{ marginTop: 40 }} />
       ) : (
         <>
           {groups.map((g) => (

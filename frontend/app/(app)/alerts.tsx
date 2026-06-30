@@ -1,3 +1,4 @@
+import { titleCaseTopic } from "../../lib/signals";
 import { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Switch, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -83,20 +84,20 @@ export default function Alerts() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.push('/profile')} className="pt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" /><Text className="text-textSecondary text-base">Profile</Text>
+        <ChevronLeft size={22} color="#3C4663" /><Text className="text-textSecondary text-base">Profile</Text>
       </TouchableOpacity>
       <Text className="text-textPrimary text-2xl font-bold mb-4">Alerts</Text>
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Active alerts</Text>
       {isLoading ? (
-        <ActivityIndicator color="#00C896" style={{ marginVertical: 16 }} />
+        <ActivityIndicator color="#2E7D5B" style={{ marginVertical: 16 }} />
       ) : alerts.length === 0 ? (
         <Text className="text-textMuted text-sm mb-4">No alerts yet. Create one below.</Text>
       ) : (
         alerts.map((a: any) => (
-          <View key={a.id} className="bg-surface rounded-xl border border-border p-4 mb-3 flex-row items-center">
-            <View className="w-9 h-9 rounded-full items-center justify-center mr-3" style={{ backgroundColor: '#00C89620' }}>
-              <Bell size={16} color="#00C896" />
+          <View key={a.id} className="bg-card rounded-xl p-4 mb-3 flex-row items-center">
+            <View className="w-9 h-9 rounded-full items-center justify-center mr-3" style={{ backgroundColor: '#2E7D5B20' }}>
+              <Bell size={16} color="#2E7D5B" />
             </View>
             <TouchableOpacity className="flex-1 pr-2" onPress={() => openDetail(a)} activeOpacity={0.6}>
               <Text className="text-textPrimary font-semibold">{a.topic_display || a.topic_key}</Text>
@@ -104,35 +105,35 @@ export default function Alerts() {
                 {a.kind === 'market' ? 'Market' : 'Trend'} · when {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
               {a.last_triggered_at && (
-                <Text className="text-[11px] font-bold mt-1" style={{ color: '#009970' }}>
+                <Text className="text-[11px] font-bold mt-1" style={{ color: '#246B4A' }}>
                   🔔 Triggered {ageLabel(Date.parse(a.last_triggered_at))}
                 </Text>
               )}
             </TouchableOpacity>
-            <Switch value={a.active} onValueChange={() => toggle(a)} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+            <Switch value={a.active} onValueChange={() => toggle(a)} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
             <TouchableOpacity onPress={() => remove(a)} className="ml-2 p-1">
-              <Trash2 size={18} color="#DC2626" />
+              <Trash2 size={18} color="#B11226" />
             </TouchableOpacity>
           </View>
         ))
       )}
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2 mt-5">Create new alert</Text>
-      <View className="bg-surface rounded-2xl border border-border p-4">
+      <View className="bg-card rounded-2xl p-4">
         <Text className="text-textMuted text-[11px] mb-1">Topic — search and select a verified topic or market signal</Text>
         {picked ? (
-          <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 border mb-3" style={{ borderColor: '#00C896' }}>
+          <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 mb-3" style={{ borderColor: '#2E7D5B' }}>
             <View className="flex-row items-center gap-2 flex-1">
-              <CheckCircle size={16} color="#00C896" />
-              <Text className="text-textPrimary text-base flex-1">{picked.display} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
+              <CheckCircle size={16} color="#2E7D5B" />
+              <Text className="text-textPrimary text-base flex-1">{titleCaseTopic(picked.display)} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
             </View>
-            <X size={16} color="#94A3B8" />
+            <X size={16} color="#8A8F9C" />
           </TouchableOpacity>
         ) : (
           <>
-            <View className="flex-row items-center bg-bg rounded-lg px-3 border border-border mb-2">
-              <Search size={16} color="#9AA3B0" />
-              <TextInput value={query} onChangeText={setQuery} placeholder="Search a topic or market signal…" placeholderTextColor="#9AA3B0" className="flex-1 py-2.5 ml-2" style={{ color: '#1A1A2E' }} />
+            <View className="flex-row items-center bg-bg rounded-lg px-3 mb-2">
+              <Search size={16} color="#9A9AA2" />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search a topic or market signal…" placeholderTextColor="#9A9AA2" className="flex-1 py-2.5 ml-2" style={{ color: '#16264A' }} />
             </View>
             {q.length >= 2 && matches.length === 0 ? (
               <Text className="text-textMuted text-xs mb-3">Not in our database — only existing topics/market signals can be alerted on.</Text>
@@ -140,7 +141,7 @@ export default function Alerts() {
               <View className="mb-3">
                 {matches.map((e) => (
                   <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
-                    <Text className="text-textPrimary text-[15px]">{e.display}</Text>
+                    <Text className="text-textPrimary text-[15px]">{titleCaseTopic(e.display)}</Text>
                     <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
                   </TouchableOpacity>
                 ))}
@@ -154,8 +155,8 @@ export default function Alerts() {
           {SCORE_TYPES.map((st) => {
             const active = scoreType === st;
             return (
-              <TouchableOpacity key={st} onPress={() => setScoreType(st)} className="px-3 py-1.5 rounded-full border" style={{ backgroundColor: active ? '#00C896' : '#FFFFFF', borderColor: active ? '#00C896' : '#E4E7EC' }}>
-                <Text className="text-xs font-semibold capitalize" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>{st}</Text>
+              <TouchableOpacity key={st} onPress={() => setScoreType(st)} className="px-3 py-1.5 rounded-full" style={{ backgroundColor: active ? '#2E7D5B' : '#FFFFFF', borderColor: active ? '#2E7D5B' : '#ECECEC' }}>
+                <Text className="text-xs font-semibold capitalize" style={{ color: active ? '#FFFFFF' : '#3C4663' }}>{st}</Text>
               </TouchableOpacity>
             );
           })}
@@ -163,29 +164,29 @@ export default function Alerts() {
 
         <Text className="text-textMuted text-[11px] mb-1">Alert when score reaches</Text>
         <View className="flex-row items-center gap-4 mb-3">
-          <TouchableOpacity onPress={() => bump(-5)} className="w-9 h-9 rounded-full border border-border items-center justify-center">
-            <Minus size={16} color="#5B6472" />
+          <TouchableOpacity onPress={() => bump(-5)} className="w-9 h-9 rounded-full items-center justify-center">
+            <Minus size={16} color="#3C4663" />
           </TouchableOpacity>
           <Text className="text-textPrimary text-2xl font-black w-12 text-center">{threshold}</Text>
-          <TouchableOpacity onPress={() => bump(5)} className="w-9 h-9 rounded-full border border-border items-center justify-center">
-            <Plus size={16} color="#5B6472" />
+          <TouchableOpacity onPress={() => bump(5)} className="w-9 h-9 rounded-full items-center justify-center">
+            <Plus size={16} color="#3C4663" />
           </TouchableOpacity>
         </View>
 
         <View className="flex-row items-center justify-between py-1">
           <Text className="text-textSecondary text-sm">Push notification</Text>
-          <Switch value={push} onValueChange={setPush} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+          <Switch value={push} onValueChange={setPush} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
         </View>
         <View className="flex-row items-center justify-between py-1">
           <Text className="text-textSecondary text-sm">Email</Text>
-          <Switch value={email} onValueChange={setEmail} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+          <Switch value={email} onValueChange={setEmail} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
         </View>
         <View className="flex-row items-center justify-between py-1 mb-3">
           <View className="flex-1 pr-2">
             <Text className="text-textSecondary text-sm">Text (SMS)</Text>
             <Text className="text-textMuted text-[10px]">Needs a verified phone (Profile → Notifications)</Text>
           </View>
-          <Switch value={sms} onValueChange={setSms} trackColor={{ true: '#00C896', false: '#E4E7EC' }} thumbColor="#FFFFFF" />
+          <Switch value={sms} onValueChange={setSms} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
         </View>
 
         <Button onPress={create} loading={creating} disabled={!picked} size="lg">

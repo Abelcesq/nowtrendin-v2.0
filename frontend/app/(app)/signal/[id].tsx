@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronDown, ChevronUp, Bell, Flame } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Bell, ArrowRight } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
-import { Button } from '../../../components/ui/Button';
+import { Rise } from '../../../components/ui/Rise';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
 import { DualScoreAnalysis } from '../../../components/trends/DualScoreAnalysis';
 import { WhyScoresDiverge } from '../../../components/trends/WhyScoresDiverge';
@@ -16,10 +16,12 @@ import { MethodologyExplainer } from '../../../components/trends/MethodologyExpl
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
 import { useSignal } from '../../../hooks/useSignals';
-import { ageLabel, stageColor, stageLabel, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex } from '../../../lib/signals';
+import { ageLabel, stageColor, stageLabel, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex, titleCaseTopic } from '../../../lib/signals';
 
-// Plain-English fallback for each maturity class (used when the engine's live
-// maturity_reason is absent). Explains what the lifecycle stage means for the score.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const MATURITY_EXPLAIN: Record<string, string> = {
   NEW: 'First cycles scored — the gradient is still stabilizing on this topic.',
   EMERGING: 'Gaining across cycles; calibration is still building confidence.',
@@ -28,23 +30,50 @@ const MATURITY_EXPLAIN: Record<string, string> = {
   MONITORING: 'Low-intensity background topic, below the emerging threshold.',
 };
 
+// Minimalist collapsible section — everything deep lives behind one of these,
+// closed by default. Progressive disclosure: the screen stays calm until the
+// reader chooses to go deeper. (Touch-only: tap to toggle, no hover.)
+function Section({ title, hint, defaultOpen = false, children }: {
+  title: string; hint?: string; defaultOpen?: boolean; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const toggle = () => {
+    LayoutAnimation.configureNext({
+      duration: 440,
+      create: { type: 'easeInEaseOut', property: 'opacity' },
+      update: { type: 'easeInEaseOut' },
+      delete: { type: 'easeInEaseOut', property: 'opacity' },
+    });
+    setOpen((o) => !o);
+  };
+  return (
+    <View style={{ borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.7} className="flex-row items-center py-4">
+        <View className="flex-1">
+          <Text style={{ color: '#16264A', fontSize: 13.5, fontWeight: '800', letterSpacing: 0.4 }}>{title}</Text>
+          {!!hint && <Text style={{ color: '#9A9AA2', fontSize: 11, marginTop: 3 }}>{hint}</Text>}
+        </View>
+        <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+      </TouchableOpacity>
+      {open && <Rise duration={420} distance={10}><View className="pb-5">{children}</View></Rise>}
+    </View>
+  );
+}
+
 export default function SignalDetail() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
-  // Return to where we came from (alerts / favorites / watchlist) when provided,
-  // so the back link doesn't dump the user on the Trends home.
   const goBack = () => { if (from) router.replace(from as any); else router.back(); };
-  const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Signal Intel';
+  const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Trends';
   const { signal, isLoading } = useSignal(String(id));
-  const [open, setOpen] = useState<string | null>('Signal Quality');
 
   if (isLoading) {
     return (
       <Screen>
         <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
-          <ChevronLeft size={24} color="#5B6472" />
+          <ChevronLeft size={24} color="#3C4663" />
         </TouchableOpacity>
-        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
       </Screen>
     );
   }
@@ -53,7 +82,7 @@ export default function SignalDetail() {
     return (
       <Screen>
         <TouchableOpacity onPress={goBack} className="mt-4 mb-8 self-start">
-          <ChevronLeft size={24} color="#5B6472" />
+          <ChevronLeft size={24} color="#3C4663" />
         </TouchableOpacity>
         <Text className="text-textMuted text-center mt-20">Signal not found.</Text>
       </Screen>
@@ -64,303 +93,180 @@ export default function SignalDetail() {
   const gap = scoreGap(signal);
   const action = actionFor(signal);
   const groups = breakdownGroups(signal);
-  // Use the SAME 0–15 threshold as the Gap Interpretation table (gapBandIndex 0)
-  // so the headline can't contradict the table on the same screen.
   const agree = gapBandIndex(gap) === 0;
+  const n = signal.nowTrending ?? 0;
 
   return (
     <Screen scroll>
-      <TouchableOpacity onPress={goBack} className="mt-4 mb-4 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
-        <Text className="text-textSecondary text-sm">{backLabel}</Text>
+      <TouchableOpacity onPress={goBack} className="mt-4 mb-5 self-start flex-row items-center gap-1" activeOpacity={0.6}>
+        <ChevronLeft size={22} color="#3C4663" />
+        <Text className="text-textSecondary text-sm font-semibold">{backLabel}</Text>
       </TouchableOpacity>
 
-      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Signal Intel</Text>
-      <Text className="text-textPrimary text-3xl font-bold mt-0.5">{signal.topic}</Text>
-
-      {/* Topic maturity — LIVE calibration lifecycle (NEW / EMERGING /
-          ESTABLISHED / RESURGENT / MONITORING). Updates each scoring cycle.
-          Shows the engine's live maturity_reason so it's clear what the
-          classification means for THIS topic, not a static label. */}
-      {!!signal.maturityClass && (
-        <View className="rounded-xl border border-border bg-surface p-3 mt-2">
-          <View className="flex-row items-center gap-2">
-            <View
-              className="rounded-full px-2.5 py-1"
-              style={{ backgroundColor: `${maturityColourHex(signal.maturityClass)}1A` }}
-            >
-              <Text className="text-[10px] font-bold" style={{ color: maturityColourHex(signal.maturityClass) }}>
-                {signal.maturityBadge || signal.maturityClass}
-              </Text>
-            </View>
-            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wider">
-              Topic maturity
-            </Text>
-          </View>
-          <Text className="text-textSecondary text-[12px] leading-4 mt-1.5">
-            {signal.maturityReason || MATURITY_EXPLAIN[signal.maturityClass] || ''}
-          </Text>
-          <Text className="text-textMuted text-[10px] mt-1">
-            Lifecycle stage from the calibration engine · re-evaluated each scoring cycle
-          </Text>
-        </View>
-      )}
-
-      {/* AI tier badge — only for taxonomy-recognized AI topics */}
-      {!!signal.aiTierLabel && (
-        <View
-          className="self-start rounded-full px-2.5 py-1 mt-1.5"
-          style={{ backgroundColor: `${tierColourHex(signal.aiTierColour)}1A` }}
-        >
-          <Text className="text-[10px] font-bold" style={{ color: tierColourHex(signal.aiTierColour) }}>
-            {signal.aiTierLabel}{signal.aiVelocity ? ` · ${signal.aiVelocity}` : ''}
-          </Text>
-        </View>
-      )}
-      <Text className="text-textMuted text-sm mb-4">
-        {signal.totalMentions ?? 0} signals · {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
+      {/* ── Header: the essentials only ── */}
+      <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '800', letterSpacing: 2 }}>SIGNAL INTEL</Text>
+      <Text style={{ color: '#16264A', fontSize: 30, fontWeight: '800', letterSpacing: -0.6, marginTop: 6, lineHeight: 35 }}>
+        {titleCaseTopic(signal.topic)}
       </Text>
-
-{/* (N — Now TrendIn — section moved below, just above Dual Score Analysis) */}
-
-      {/* Tagline */}
-      <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
-        <Text className="text-textSecondary text-sm">
-          Two scores, one engine. Earlier detection = lower certainty. You choose.
+      <View className="flex-row items-center gap-2 mt-3">
+        <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${color}1A` }}>
+          <Text style={{ color, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6 }}>{stageLabel(signal.stage)}</Text>
+        </View>
+        <Text style={{ color: '#9A9AA2', fontSize: 11.5, fontWeight: '500' }}>
+          {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
         </Text>
       </View>
 
-      {/* Dual Gradient Score — Detection (blue) vs Confidence (green) */}
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-5" style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+      {/* ── Primary card: the two scores + gap + the one-line read ── */}
+      <View className="bg-card rounded-3xl mt-5 px-5 pt-6 pb-5"
+            style={{ shadowColor: '#0C1B3A', shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 }}>
         <View className="flex-row justify-around items-start">
           <View className="items-center">
-            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
-            </View>
             <GradientScoreRing score={signal.detection} color={SCORE_ROLES.detection.color} size="lg" caption="/100" />
-            <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-            <Text className="text-textMuted text-[10px]">{SCORE_ROLES.detection.falsePositive}</Text>
+            <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800', marginTop: 8, letterSpacing: 0.5 }}>DETECTION</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 10 }}>{SCORE_ROLES.detection.falsePositive}</Text>
           </View>
           <View className="items-center">
-            <View className="px-2.5 py-1 rounded-full mb-2" style={{ backgroundColor: `${color}1A` }}>
-              <Text style={{ color }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
-            </View>
             <GradientScoreRing score={signal.confidence} color={SCORE_ROLES.confidence.color} size="lg" caption="/100" />
-            <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-            <Text className="text-textMuted text-[10px]">{SCORE_ROLES.confidence.falsePositive}</Text>
+            <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800', marginTop: 8, letterSpacing: 0.5 }}>CONFIDENCE</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 10 }}>{SCORE_ROLES.confidence.falsePositive}</Text>
           </View>
         </View>
-        <View className="rounded-xl px-3 py-2 mt-4 border" style={{ borderColor: agree ? '#00C89655' : '#2D7EEF55', backgroundColor: agree ? '#00C8960F' : '#2D7EEF0F' }}>
-          <Text className="text-sm font-bold" style={{ color: agree ? '#009970' : '#2D7EEF' }}>
+        <View className="rounded-2xl px-4 py-3 mt-5" style={{ backgroundColor: agree ? '#2E7D5B0F' : '#B112260D' }}>
+          <Text style={{ color: agree ? '#246B4A' : '#B11226', fontSize: 13, fontWeight: '800' }}>
             {gap}-point gap — {agree ? `scores aligned at ${stageLabel(signal.stage)}` : 'early stage, confirmation building'}
           </Text>
-          {!!signal.gapMeaning && (
-            <Text className="text-textMuted text-xs mt-1 leading-5">{signal.gapMeaning}</Text>
-          )}
-        </View>
-      </View>
-
-      {/* AI score explanation — why this taxonomy topic scores where it does */}
-      {!!signal.scoreExplanation && (
-        <View className="rounded-xl px-4 py-3 mb-5 border border-border bg-surface">
-          <Text className="text-textSecondary text-sm leading-5">{signal.scoreExplanation}</Text>
-        </View>
-      )}
-
-      {/* AI Variation Map — "AI" umbrella vs specific variations like "agentic coding" */}
-      <TopicVariationMap variations={signal.variations} />
-
-      {/* Research — AI plain-English explanation of what this trend means */}
-      <TopicResearch topicKey={signal.id} topicName={signal.topic} />
-
-      {/* Now TrendIn (N component) — internal on-platform query demand.
-          Positioned just above the Dual Score Analysis so the reader sees
-          our headline metric before reading about Detection/Confidence gap
-          mechanics. Always rendered — when N=0 we explain why (no demand yet). */}
-      <View className="rounded-2xl p-4 mb-5 border"
-            style={{ borderColor: '#EE6A2A55', backgroundColor: '#EE6A2A0C' }}>
-        <View className="flex-row items-center gap-2 mb-2">
-          <Flame size={16} color="#EE6A2A" />
-          <View className="flex-row items-baseline">
-            <Text className="text-base font-black" style={{ color: '#EE6A2A' }}>Now</Text>
-            <Text className="text-base font-black" style={{ color: '#B5341B' }}>TrendIn</Text>
-            <Text className="text-textSecondary text-sm font-semibold ml-2">
-              · N component
-            </Text>
-          </View>
-          <View className="flex-1" />
-          <Text className="text-2xl font-black" style={{ color: '#EE6A2A' }}>
-            {signal.nowTrending ?? 0}
+          <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, marginTop: 6, fontWeight: '500' }}>
+            {action.title}{action.body ? ` ${action.body}` : ''}
           </Text>
         </View>
-        <Text className="text-textSecondary text-[12px] leading-4 mb-2">
-          The on-platform demand signal — how often Now TrendIn users have been asking the
-          engine about this topic. Captures real institutional curiosity that no public
-          source can see.
-        </Text>
-        {/* The "Now Trending Gradient Score" — a separate, demand-inclusive read
-            unique to the trend signal section. The headline Detection/Confidence
-            stay N-free (external-world only); this shows where the score would land
-            if internal demand (N) were folded in as an extra factor. The weighting
-            is computed server-side and never exposed (internal trade secret). */}
-        {signal.nowTrending != null && signal.nowTrending > 0 &&
-         signal.nowTrendingGradientDetection != null &&
-         signal.nowTrendingGradientConfidence != null && (
-          <View className="mt-3 pt-3 border-t" style={{ borderColor: '#EE6A2A33' }}>
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#EE6A2A' }}>
-                Now Trending Gradient Score
-              </Text>
-              <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EE6A2A1A' }}>
-                <Text className="text-[9px] font-bold" style={{ color: '#EE6A2A' }}>SEPARATE · DEMAND-INCLUSIVE</Text>
+      </View>
+
+      {/* ── Everything deeper: collapsed by default ── */}
+      <View className="mt-5">
+        <Section title={`Now TrendIn demand · N ${n}`} hint="On-platform query demand for this topic">
+          <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500' }}>
+            How often Now TrendIn users have asked the engine about this topic — real institutional
+            curiosity no public source can see. The headline scores above stay demand-free.
+          </Text>
+          {n > 0 && signal.nowTrendingGradientDetection != null && signal.nowTrendingGradientConfidence != null && (
+            <View className="flex-row gap-3 mt-4">
+              <View className="flex-1 rounded-2xl p-3" style={{ borderColor: '#2A5B9E33', backgroundColor: '#2A5B9E0A' }}>
+                <Text style={{ color: '#9A9AA2', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>DETECTION + N</Text>
+                <Text style={{ color: '#2A5B9E', fontSize: 22, fontWeight: '800' }}>{Math.round(signal.nowTrendingGradientDetection)}</Text>
+              </View>
+              <View className="flex-1 rounded-2xl p-3" style={{ borderColor: '#2E7D5B33', backgroundColor: '#2E7D5B0A' }}>
+                <Text style={{ color: '#9A9AA2', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>CONFIDENCE + N</Text>
+                <Text style={{ color: '#2E7D5B', fontSize: 22, fontWeight: '800' }}>{Math.round(signal.nowTrendingGradientConfidence)}</Text>
               </View>
             </View>
-            <Text className="text-textMuted text-[11px] leading-4 mb-2">
-              A separate, what-if read: where the score would land if on-platform demand (N)
-              were folded in. The headline Detection/Confidence above stay N-free (external
-              world only) — this demand-inclusive view is shown only here, never sold as the
-              Gradient Score.
+          )}
+          {n === 0 && (
+            <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+              No on-platform demand has registered yet — N rises as users query about it.
             </Text>
-            <View className="flex-row gap-3">
-              <View className="flex-1 rounded-xl border p-2.5" style={{ borderColor: '#2D7EEF33', backgroundColor: '#2D7EEF0A' }}>
-                <Text className="text-textMuted text-[9px] font-bold tracking-wider">DETECTION + N</Text>
-                <Text className="text-xl font-black" style={{ color: '#2D7EEF' }}>{Math.round(signal.nowTrendingGradientDetection)}</Text>
-              </View>
-              <View className="flex-1 rounded-xl border p-2.5" style={{ borderColor: '#00C89633', backgroundColor: '#00C8960A' }}>
-                <Text className="text-textMuted text-[9px] font-bold tracking-wider">CONFIDENCE + N</Text>
-                <Text className="text-xl font-black" style={{ color: '#00C896' }}>{Math.round(signal.nowTrendingGradientConfidence)}</Text>
-              </View>
-            </View>
-            {signal.nowTrendingGradientDemandDriven && (
-              <Text className="text-[10px] leading-4 mt-2" style={{ color: '#B5341B' }}>
-                ⚠ Substantially driven by internal demand — external confirmation is limited
-                for this topic. N's weight is reduced here so demand alone can't lift the score.
-              </Text>
+          )}
+          <View className="mt-3"><ConvergenceBadge topicKey={signal.id} /></View>
+        </Section>
+
+        <Section title="Why the two scores differ" hint="Detection leads speed, Confidence leads precision">
+          {!!signal.gapMeaning && (
+            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>{signal.gapMeaning}</Text>
+          )}
+          <DualScoreAnalysis signal={signal} />
+          <View className="h-4" />
+          <WhyScoresDiverge signal={signal} />
+        </Section>
+
+        {(!!signal.why || !!signal.whatToWatch) && (
+          <Section title="What this means" hint="Why it matters and what to watch">
+            {!!signal.why && (
+              <>
+                <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHY THIS MATTERS</Text>
+                <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 22, marginBottom: 16 }}>{signal.why}</Text>
+              </>
             )}
-          </View>
+            {!!signal.whatToWatch && (
+              <>
+                <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHAT TO WATCH</Text>
+                <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 22 }}>{signal.whatToWatch}</Text>
+              </>
+            )}
+          </Section>
         )}
 
-        {(!signal.nowTrending || signal.nowTrending === 0) && (
-          <View className="mt-2 pt-2 border-t" style={{ borderColor: '#EE6A2A33' }}>
-            <Text className="text-textMuted text-[11px] italic">
-              No on-platform demand has registered for this topic yet — N will rise as
-              users query about it.
+        <Section title="Score breakdown" hint="The components behind the score">
+          {groups.map((g) => (
+            <View key={g.title} className="mb-4">
+              <Text style={{ color: '#16264A', fontSize: 12.5, fontWeight: '700', marginBottom: 8 }}>{g.title}</Text>
+              {g.items.map((it) => (
+                <View key={it.label} className="mb-2.5">
+                  <View className="flex-row justify-between mb-1">
+                    <Text style={{ color: '#3C4663', fontSize: 12.5, flex: 1, paddingRight: 8 }}>{it.label}</Text>
+                    <Text style={{ color: '#16264A', fontSize: 12.5, fontWeight: '700' }}>
+                      {it.value}{it.conf != null ? <Text style={{ color: '#9A9AA2' }}> / {it.conf}</Text> : null}
+                    </Text>
+                  </View>
+                  <View style={{ height: 5, borderRadius: 980, backgroundColor: '#EDEDED', overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.max(0, Math.min(100, it.value))}%`, height: '100%', backgroundColor: color }} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
+        </Section>
+
+        <Section title="Research & variations" hint="Plain-English context for this trend">
+          {!!signal.scoreExplanation && (
+            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, marginBottom: 12, fontWeight: '500' }}>{signal.scoreExplanation}</Text>
+          )}
+          <TopicVariationMap variations={signal.variations} />
+          <TopicResearch topicKey={signal.id} topicName={signal.topic} />
+          <View className="h-3" />
+          <ResearchHistory topicKey={signal.id} />
+        </Section>
+
+        <Section title="Deeper signals" hint="Cross-platform & private-conversation indicators">
+          <XSignalPanel topic={signal.topic} />
+          <View className="h-4" />
+          <DarkMatterPanel signal={signal} />
+        </Section>
+
+        {!!signal.maturityClass && (
+          <Section title="Topic maturity" hint={signal.maturityBadge || signal.maturityClass}>
+            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500' }}>
+              {signal.maturityReason || MATURITY_EXPLAIN[signal.maturityClass] || ''}
             </Text>
-          </View>
+            <Text style={{ color: '#9A9AA2', fontSize: 10, marginTop: 8 }}>
+              Lifecycle stage from the calibration engine · re-evaluated each scoring cycle
+            </Text>
+          </Section>
         )}
 
-        {/* Signal Convergence — downstream directional validation of the score's
-            direction against raw volume + niche concentration. Lazy-loaded;
-            independent of N (non-circular). */}
-        <ConvergenceBadge topicKey={signal.id} />
+        <Section title="How scoring works" hint="The methodology behind the Gradient Score">
+          <MethodologyExplainer />
+        </Section>
+
+        <Section title="Scoring history" hint="How this score has moved over time">
+          <ScoringHistory signal={signal} />
+        </Section>
       </View>
 
-      {/* Dual Score Analysis (gap bands + who uses which score) */}
-      <DualScoreAnalysis signal={signal} />
-      <View className="h-5" />
+      {/* Primary action */}
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/alerts', params: { topic: signal.topic, key: signal.id } })}
+        activeOpacity={0.9}
+        className="flex-row items-center justify-center mt-7 mb-2"
+        style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 16 }}
+      >
+        <Bell size={17} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', letterSpacing: 0.5, marginLeft: 8 }}>Set an alert for this topic</Text>
+        <ArrowRight size={15} color="#F0758A" style={{ marginLeft: 8 }} />
+      </TouchableOpacity>
 
-      {/* Research history (lazy) */}
-      <ResearchHistory topicKey={signal.id} />
-      <View className="h-4" />
-
-      {/* X dual-role signal (lazy) */}
-      <XSignalPanel topic={signal.topic} />
-      <View className="h-4" />
-
-      {/* Dark Matter signatures — inferred private-conversation indicators */}
-      <DarkMatterPanel signal={signal} />
-
-      {/* WHAT THIS MEANS (signal read — analysis only, not advice) */}
-      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Signal read</Text>
-      <View className="rounded-2xl p-5 mb-2 border" style={{ borderColor: color, backgroundColor: `${color}10` }}>
-        <Text className="text-2xl font-black mb-1" style={{ color }}>
-          {action.title}
-        </Text>
-        {!!action.body && <Text className="text-textSecondary text-base leading-6">{action.body}</Text>}
-        {!!signal.whatToDo?.detail && signal.whatToDo.detail !== action.body && (
-          <Text className="text-textMuted text-sm leading-5 mt-2">{signal.whatToDo.detail}</Text>
-        )}
-      </View>
-      <Text className="text-textMuted text-[10px] mb-5">
+      <Text style={{ color: '#9A9AA2', fontSize: 10, textAlign: 'center', marginTop: 6, lineHeight: 15 }}>
         Signal analysis only — not financial, investment, or legal advice. You decide any action.
       </Text>
-
-      {/* WHY THIS MATTERS */}
-      {!!signal.why && (
-        <>
-          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Why this matters</Text>
-          <Text className="text-textSecondary text-base leading-6 mb-5">{signal.why}</Text>
-        </>
-      )}
-
-      {/* WHAT TO WATCH */}
-      {!!signal.whatToWatch && (
-        <>
-          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">What to watch</Text>
-          <Text className="text-textSecondary text-base leading-6 mb-5">{signal.whatToWatch}</Text>
-        </>
-      )}
-
-      {/* SCORE BREAKDOWN */}
-      <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Score breakdown</Text>
-      {groups.map((g) => {
-        const isOpen = open === g.title;
-        return (
-          <View key={g.title} className="bg-surface rounded-xl border border-border mb-3 overflow-hidden">
-            <TouchableOpacity
-              onPress={() => setOpen(isOpen ? null : g.title)}
-              className="flex-row items-center justify-between px-4 py-3.5"
-              activeOpacity={0.8}
-            >
-              <View className="flex-row items-center gap-2">
-                <Text className="text-textPrimary font-semibold">{g.title}</Text>
-                {!!g.status && <Text className="text-textMuted text-[10px] font-bold">{g.status}</Text>}
-              </View>
-              {isOpen ? <ChevronUp size={18} color="#9AA3B0" /> : <ChevronDown size={18} color="#9AA3B0" />}
-            </TouchableOpacity>
-            {isOpen && (
-              <View className="px-4 pb-4 gap-3">
-                {g.items.map((it) => (
-                  <View key={it.label}>
-                    <View className="flex-row justify-between mb-1">
-                      <Text className="text-textSecondary text-sm flex-1 pr-2">{it.label}</Text>
-                      <Text className="text-textPrimary text-sm font-semibold">
-                        {it.value}
-                        {it.conf != null ? <Text className="text-textMuted"> / {it.conf}</Text> : null}
-                      </Text>
-                    </View>
-                    <View className="h-1.5 rounded-full bg-border overflow-hidden">
-                      <View style={{ width: `${Math.max(0, Math.min(100, it.value))}%`, backgroundColor: color }} className="h-full rounded-full" />
-                    </View>
-                    {!!it.desc && <Text className="text-textMuted text-[11px] mt-1">{it.desc}</Text>}
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        );
-      })}
-
-      {/* Why the scores diverge */}
-      <View className="mt-5">
-        <WhyScoresDiverge signal={signal} />
-      </View>
-
-      {/* How the Gradient Score works (methodology — the 3 laws + Duality) */}
-      <View className="mt-5">
-        <MethodologyExplainer />
-      </View>
-
-      {/* Actual scoring history */}
-      <View className="mt-5">
-        <ScoringHistory signal={signal} />
-      </View>
-
-      <View className="mt-5 mb-2">
-        <Button size="lg" icon={<Bell size={18} color="#FFFFFF" />} onPress={() => router.push({ pathname: '/alerts', params: { topic: signal.topic, key: signal.id } })}>
-          Set Alert for this topic
-        </Button>
-      </View>
     </Screen>
   );
 }

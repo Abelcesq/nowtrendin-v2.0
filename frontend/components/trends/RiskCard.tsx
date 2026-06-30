@@ -1,20 +1,23 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Activity, Globe } from 'lucide-react-native';
+import { ChevronDown, ArrowRight, Globe } from 'lucide-react-native';
+import { Rise } from '../ui/Rise';
 import { RiskScore } from '../../lib/gradientApi';
+import { titleCaseTopic } from '../../lib/signals';
 
-// Positioning classification → colour.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const CLASS_COLOR: Record<string, string> = {
-  UNUSUAL: '#CF2A1B',
-  ELEVATED: '#E85A1E',
-  WATCH: '#2D7EEF',
-  ROUTINE: '#9AA3B0',
-  CALIBRATING: '#9AA3B0',
+  UNUSUAL: '#B11226',
+  ELEVATED: '#A8456A',
+  WATCH: '#2A5B9E',
+  ROUTINE: '#9A9AA2',
+  CALIBRATING: '#9A9AA2',
 };
 
-// Diffusion stages (positioning shape: label -> {count, z}). Stage 1 is the
-// early/high-value detection stage.
 const STAGES = [
   { key: 'Dark Positioning', label: 'Insider' },
   { key: 'Expert Warning', label: 'Expert' },
@@ -23,94 +26,98 @@ const STAGES = [
   { key: 'Retail Amplify', label: 'Retail' },
 ] as const;
 
+// Calm, tap-to-expand market row — mirrors TrendCard. Collapsed: name,
+// classification·signals, positioning score, chevron. Expanded: diffusion
+// stages, narrative, financial sustainability, sources, and Full detail.
 export function RiskCard({ risk }: { risk: RiskScore }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const cls = risk.classification ?? 'CALIBRATING';
-  const color = CLASS_COLOR[cls] ?? '#9AA3B0';
+  const color = CLASS_COLOR[cls] ?? '#9A9AA2';
   const score = risk.positioningScore ?? 0;
   const stages = risk.stages ?? {};
   const counts = STAGES.map((s) => stages[s.key]?.count ?? 0);
   const maxStage = Math.max(1, ...counts);
 
+  const toggle = () => {
+    LayoutAnimation.configureNext({
+      duration: 440,
+      create: { type: 'easeInEaseOut', property: 'opacity' },
+      update: { type: 'easeInEaseOut' },
+      delete: { type: 'easeInEaseOut', property: 'opacity' },
+    });
+    setOpen((o) => !o);
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => router.push(`/risk/${risk.key}`)}
-      className="bg-surface rounded-2xl p-4 mb-3 border border-border"
-      style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
-    >
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2 flex-1 pr-2">
-          <Activity size={16} color={color} />
-          <Text className="text-textPrimary font-bold text-base flex-1">{risk.display}</Text>
-        </View>
-        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${color}1A` }}>
-          <Text style={{ color }} className="text-[10px] font-bold tracking-wide">{cls}</Text>
-        </View>
-      </View>
-
-      <View className="flex-row items-end gap-3 mt-2">
-        <View>
-          <Text className="text-textMuted text-[9px] font-bold">POSITIONING</Text>
-          <Text style={{ color }} className="text-2xl font-black">{score}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
-        </View>
-        {risk.percentDelta != null && (
-          <Text className="text-textMuted text-[11px] mb-1">
-            {risk.percentDelta >= 0 ? '+' : ''}{Math.round(risk.percentDelta)}% vs baseline
-          </Text>
-        )}
-        <Text className="text-textMuted text-[10px] ml-auto mb-1">{risk.totalSignals} signals</Text>
-      </View>
-
-      {/* Diffusion stages (insider → retail) */}
-      <View className="flex-row gap-1.5 mt-3">
-        {STAGES.map((s, i) => {
-          const v = counts[i];
-          const h = 4 + Math.round((v / maxStage) * 18);
-          const on = v > 0;
-          const isDetect = i === 0;
-          return (
-            <View key={s.key} className="flex-1 items-center">
-              <View className="w-full justify-end" style={{ height: 22 }}>
-                <View style={{ height: h, backgroundColor: on ? color : '#E4E7EC', borderRadius: 3 }} />
-              </View>
-              <Text className="text-textMuted text-[8px] mt-1">{s.label}</Text>
-              <Text className="text-textSecondary text-[9px] font-bold">{v}</Text>
-              {isDetect && (
-                <View className="px-1 rounded mt-0.5" style={{ backgroundColor: color }}>
-                  <Text style={{ fontSize: 6, color: '#FFFFFF', fontWeight: '700' }}>EARLY</Text>
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
-
-      {!!(risk.narrative || risk.interpretation) && (
-        <Text className="text-textSecondary text-[12px] leading-5 mt-3">{risk.narrative || risk.interpretation}</Text>
-      )}
-
-      {/* Financial sustainability (factual fundamentals) — compact line */}
-      {!!risk.sustainability && (
-        <View className="flex-row items-center gap-2 mt-3">
-          <Text className="text-textMuted text-[11px]">Financial sustainability</Text>
-          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${risk.sustainability.score >= 75 ? '#00C896' : risk.sustainability.score >= 50 ? '#2D7EEF' : risk.sustainability.score >= 30 ? '#D4A017' : '#CF2A1B'}1A` }}>
-            <Text className="text-[11px] font-bold" style={{ color: risk.sustainability.score >= 75 ? '#009970' : risk.sustainability.score >= 50 ? '#2D7EEF' : risk.sustainability.score >= 30 ? '#B8860B' : '#CF2A1B' }}>
-              {risk.sustainability.score}/100 · {risk.sustainability.label}
+    <View style={{ borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
+      <TouchableOpacity activeOpacity={0.7} onPress={toggle} className="py-4">
+        <View className="flex-row items-center" style={{ gap: 14 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>{titleCaseTopic(risk.display)}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 9.5, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
+              <Text style={{ color }}>{cls}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
             </Text>
           </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{score}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 8, fontWeight: '700', letterSpacing: 1 }}>POS</Text>
+          </View>
+          <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
-      )}
 
-      {/* Source provenance — the audit trail (institutional trust) */}
-      {risk.sources.length > 0 && (
-        <View className="flex-row items-center gap-1 mt-3 pt-2 border-t border-border">
-          <Globe size={10} color="#9AA3B0" />
-          <Text className="text-textMuted text-[10px] flex-1" numberOfLines={1}>
-            Sources: {risk.sources.join(' · ')}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+        {open && (
+          <Rise duration={420} distance={10} style={{ paddingTop: 16 }}>
+            {/* Diffusion stages: insider → retail */}
+            <View className="flex-row" style={{ gap: 6, marginBottom: 14 }}>
+              {STAGES.map((s, i) => {
+                const v = counts[i];
+                const h = 4 + Math.round((v / maxStage) * 18);
+                return (
+                  <View key={s.key} className="flex-1 items-center">
+                    <View className="w-full justify-end" style={{ height: 22 }}>
+                      <View style={{ height: h, backgroundColor: v > 0 ? color : '#ECECEC', borderRadius: 3 }} />
+                    </View>
+                    <Text style={{ color: '#9A9AA2', fontSize: 8, marginTop: 4 }}>{s.label}</Text>
+                    <Text style={{ color: '#3C4663', fontSize: 9, fontWeight: '700' }}>{v}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {!!(risk.narrative || risk.interpretation) && (
+              <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>
+                {risk.narrative || risk.interpretation}
+              </Text>
+            )}
+
+            {!!risk.sustainability && (
+              <View className="flex-row items-center gap-2 mb-3">
+                <Text style={{ color: '#9A9AA2', fontSize: 11 }}>Financial sustainability</Text>
+                <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${risk.sustainability.score >= 75 ? '#2E7D5B' : risk.sustainability.score >= 50 ? '#2A5B9E' : risk.sustainability.score >= 30 ? '#A8456A' : '#B11226'}1A` }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: risk.sustainability.score >= 75 ? '#246B4A' : risk.sustainability.score >= 50 ? '#2A5B9E' : risk.sustainability.score >= 30 ? '#A8456A' : '#B11226' }}>
+                    {risk.sustainability.score}/100 · {risk.sustainability.label}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {risk.sources.length > 0 && (
+              <View className="flex-row items-center gap-1 mb-4">
+                <Globe size={10} color="#9A9AA2" />
+                <Text style={{ color: '#9A9AA2', fontSize: 10, flex: 1 }} numberOfLines={1}>Sources: {risk.sources.join(' · ')}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity onPress={() => router.push(`/risk/${risk.key}`)} activeOpacity={0.85}
+              className="flex-row items-center self-start" style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 11, paddingHorizontal: 22 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>FULL DETAIL</Text>
+              <ArrowRight size={13} color="#F0758A" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          </Rise>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 }

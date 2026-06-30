@@ -5,36 +5,52 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary:   '#00C896',
-        primaryDk: '#009970',
-        // Brand wordmark (matches logo PNG): "Now" maroon, "TrendIn" orange-red
+        // === Aurora design system ===
+        // Midnight blue is the dominant brand/action color (was neon green).
+        primary:   '#1B3066',
+        primaryDk: '#0C1B3A',
+        // Accent system: garnet red for sparing emphasis, midnight ink, single gold.
+        accent:    '#B11226',
+        accentDk:  '#7A0D1A',
+        accentSoft:'#F0758A',
+        ink:       '#16264A',
+        midnight:  '#1B3066',
+        indigo:    '#1A1442',
+        gold:      '#C9A24B',
+        goldLite:  '#E2C275',
+        // Brand wordmark (matches logo PNG): "Now" maroon, "TrendIn" orange-red — UNTOUCHED
         brandMaroon: '#6E1A17',
         brandOrange: '#E8551C',
-        // Flame gradient stops
+        // Flame gradient stops — UNTOUCHED
         flameGold: '#F7A41C',
         flameOrange: '#F26522',
         flameRed: '#CF2A1B',
         flameDeep: '#6E1410',
-        // Light theme (matches v1.0)
-        bg:        '#F4F5F7',
+        // Canvas / surfaces — approved white system, midnight ink text
+        bg:        '#FFFFFF',
         surface:   '#FFFFFF',
         elevated:  '#FFFFFF',
-        border:    '#E4E7EC',
-        textPrimary:   '#1A1A2E',
-        textSecondary: '#5B6472',
-        textMuted:     '#9AA3B0',
-        consumer:   '#2D7EEF',
-        business:   '#00C896',
-        enterprise: '#D4A017',
-        success: '#00C896',
-        warning: '#D4A017',
-        error:   '#DC2626',
-        info:    '#2D7EEF',
-        breakout:   '#00C896',
-        strong:     '#2D7EEF',
-        emerging:   '#D4A017',
-        watching:   '#E85A1E',
-        monitoring: '#94A3B8',
+        // Borderless card fill — soft light gray, no outline (Apple grouped style)
+        card:      '#F4F5F8',
+        cardAlt:   '#EEF0F4',
+        border:    '#ECECEC',
+        textPrimary:   '#16264A',
+        textSecondary: '#3C4663',
+        textMuted:     '#9A9AA2',
+        // Tier identity (gold = Enterprise, the premium tier)
+        consumer:   '#2A5B9E',
+        business:   '#2E7D5B',
+        enterprise: '#C9A24B',
+        success: '#2E7D5B',
+        warning: '#C9A24B',
+        error:   '#B11226',
+        info:    '#2A5B9E',
+        // Stage coding — jewel tones (approved)
+        breakout:   '#2E7D5B',
+        strong:     '#2A5B9E',
+        emerging:   '#6B4FA0',
+        watching:   '#A8456A',
+        monitoring: '#8A8F9C',
       },
     },
   },

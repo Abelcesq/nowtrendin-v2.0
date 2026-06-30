@@ -1,3 +1,4 @@
+import { titleCaseTopic } from "../../lib/signals";
 import { View, Text } from 'react-native';
 import { Layers } from 'lucide-react-native';
 import { TopicVariation, tierColourHex } from '../../lib/signals';
@@ -19,14 +20,14 @@ export function TopicVariationMap({
   return (
     <View className="mb-5">
       <View className="flex-row items-center gap-2 mb-2">
-        <Layers size={16} color="#5B6472" />
+        <Layers size={16} color="#3C4663" />
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
           AI Variation Map
         </Text>
       </View>
       {!!intro && <Text className="text-textMuted text-xs mb-3 leading-5">{intro}</Text>}
 
-      <View className="bg-surface rounded-2xl border border-border overflow-hidden">
+      <View className="bg-card rounded-2xl overflow-hidden">
         {variations.map((v, i) => {
           const c = tierColourHex(v.tierColour);
           return (
@@ -45,7 +46,7 @@ export function TopicVariationMap({
                     className={`text-sm ${v.isQueried ? 'font-bold text-textPrimary' : 'text-textSecondary'}`}
                     numberOfLines={1}
                   >
-                    {v.display}
+                    {titleCaseTopic(v.display)}
                     {v.isQueried ? '  ·  this topic' : ''}
                   </Text>
                 </View>

@@ -14,7 +14,7 @@ function Row({ icon, label, onPress }: { icon: React.ReactNode; label: string; o
         {icon}
         <Text className="text-textPrimary text-base">{label}</Text>
       </View>
-      <ChevronRight size={18} color="#475569" />
+      <ChevronRight size={18} color="#3C4663" />
     </TouchableOpacity>
   );
 }
@@ -36,9 +36,9 @@ export default function Profile() {
     <Screen scroll>
       <Text className="text-textPrimary text-2xl font-bold pt-4 mb-4">Profile</Text>
 
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-6">
+      <View className="bg-card rounded-2xl p-5 mb-6">
         <View className="w-14 h-14 rounded-full bg-elevated items-center justify-center mb-3">
-          <User size={26} color="#94A3B8" />
+          <User size={26} color="#8A8F9C" />
         </View>
         <Text className="text-textPrimary text-lg font-bold">{user?.name ?? 'Member'}</Text>
         <Text className="text-textMuted text-sm mb-3">{user?.email ?? ''}</Text>
@@ -49,22 +49,22 @@ export default function Profile() {
       </View>
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Account</Text>
-      <Row icon={<User size={18} color="#94A3B8" />} label="Edit Profile" onPress={() => router.push('/profile/edit')} />
-      <Row icon={<BellRing size={18} color="#94A3B8" />} label="Alerts" onPress={() => router.push('/alerts')} />
-      <Row icon={<Bell size={18} color="#94A3B8" />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
-      <Row icon={<CreditCard size={18} color="#94A3B8" />} label="Billing" onPress={() => router.push('/profile/billing')} />
-      <Row icon={<Shield size={18} color="#94A3B8" />} label="Membership" onPress={() => router.push('/profile/membership')} />
-      <Row icon={<Star size={18} color="#94A3B8" />} label="Watchlists" onPress={() => router.push('/profile/watchlists')} />
-      <Row icon={<Star size={18} color="#94A3B8" />} label="Favorites" onPress={() => router.push('/profile/favorites')} />
-      <Row icon={<Target size={18} color="#94A3B8" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
-      <Row icon={<Sparkles size={18} color="#94A3B8" />} label="Methodology" onPress={() => router.push('/profile/methodology')} />
-      <Row icon={<LayoutGrid size={18} color="#94A3B8" />} label="Edit Toolbar Icons" onPress={() => router.push('/profile/edit-toolbar')} />
+      <Row icon={<User size={18} color="#8A8F9C" />} label="Edit Profile" onPress={() => router.push('/profile/edit')} />
+      <Row icon={<BellRing size={18} color="#8A8F9C" />} label="Alerts" onPress={() => router.push('/alerts')} />
+      <Row icon={<Bell size={18} color="#8A8F9C" />} label="Notifications" onPress={() => router.push('/profile/notifications')} />
+      <Row icon={<CreditCard size={18} color="#8A8F9C" />} label="Billing" onPress={() => router.push('/profile/billing')} />
+      <Row icon={<Shield size={18} color="#8A8F9C" />} label="Membership" onPress={() => router.push('/profile/membership')} />
+      <Row icon={<Star size={18} color="#8A8F9C" />} label="Watchlists" onPress={() => router.push('/profile/watchlists')} />
+      <Row icon={<Star size={18} color="#8A8F9C" />} label="Favorites" onPress={() => router.push('/profile/favorites')} />
+      <Row icon={<Target size={18} color="#8A8F9C" />} label="Accuracy Ledger" onPress={() => router.push('/profile/accuracy')} />
+      <Row icon={<Sparkles size={18} color="#8A8F9C" />} label="Methodology" onPress={() => router.push('/profile/methodology')} />
+      <Row icon={<LayoutGrid size={18} color="#8A8F9C" />} label="Edit Toolbar Icons" onPress={() => router.push('/profile/edit-toolbar')} />
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1 mt-5">Legal</Text>
-      <Row icon={<FileText size={18} color="#94A3B8" />} label="Legal Documents" onPress={() => router.push('/profile/legal')} />
+      <Row icon={<FileText size={18} color="#8A8F9C" />} label="Legal Documents" onPress={() => router.push('/profile/legal')} />
 
       <TouchableOpacity onPress={signOut} className="flex-row items-center gap-3 py-4 mt-4">
-        <LogOut size={18} color="#DC2626" />
+        <LogOut size={18} color="#B11226" />
         <Text className="text-error text-base font-semibold">Sign Out</Text>
       </TouchableOpacity>
     </Screen>

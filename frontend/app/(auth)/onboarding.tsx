@@ -9,21 +9,21 @@ import { Button } from '../../components/ui/Button';
 const SLIDES = [
   {
     icon: TrendingUp,
-    colour: '#00C896',
+    colour: '#2E7D5B',
     title: "The world has data.\nIt doesn't have foresight.",
     titleColour: 'text-textPrimary',
     body: 'By the time Google Trends fires, the opportunity is already captured.',
   },
   {
     icon: Activity,
-    colour: '#00C896',
+    colour: '#2E7D5B',
     title: 'Introducing the\nGradient Score.',
     titleColour: 'text-primary',
     body: 'The only instrument that measures where human attention is moving before it arrives.',
   },
   {
     icon: Building2,
-    colour: '#D4A017',
+    colour: '#A8456A',
     title: 'Built for every\ndecision-maker.',
     titleColour: 'text-textPrimary',
     body: 'Consumer · Business · Enterprise. Three tiers. One engine. Your competitive edge.',
@@ -78,7 +78,7 @@ export default function Onboarding() {
           const Icon = s.icon;
           return (
             <View key={i} style={{ width }} className="flex-1 items-center justify-center px-8">
-              <View className="w-20 h-20 rounded-3xl bg-surface items-center justify-center border border-border mb-8">
+              <View className="w-20 h-20 rounded-3xl bg-card items-center justify-center mb-8">
                 <Icon size={40} color={s.colour} />
               </View>
               <Text className={`text-2xl font-bold text-center mb-4 ${s.titleColour}`}>{s.title}</Text>

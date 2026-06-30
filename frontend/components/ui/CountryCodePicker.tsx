@@ -20,12 +20,12 @@ export function CountryCodePicker({ dial, onSelect }: { dial: string; onSelect: 
     <>
       <TouchableOpacity
         onPress={() => setOpen(true)}
-        className="flex-row items-center bg-surface rounded-xl px-3 border border-border"
+        className="flex-row items-center bg-card rounded-xl px-3"
         style={{ height: 50 }}
       >
         <Text className="text-base mr-1">{current.flag}</Text>
         <Text className="text-textPrimary text-base font-semibold mr-1">{current.dial}</Text>
-        <ChevronDown size={16} color="#9AA3B0" />
+        <ChevronDown size={16} color="#9A9AA2" />
       </TouchableOpacity>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -33,17 +33,17 @@ export function CountryCodePicker({ dial, onSelect }: { dial: string; onSelect: 
           <View className="bg-elevated rounded-t-2xl pt-4" style={{ maxHeight: '75%' }}>
             <View className="flex-row items-center justify-between px-5 mb-3">
               <Text className="text-textPrimary text-lg font-bold">Select country</Text>
-              <TouchableOpacity onPress={() => setOpen(false)}><X size={22} color="#5B6472" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setOpen(false)}><X size={22} color="#3C4663" /></TouchableOpacity>
             </View>
-            <View className="flex-row items-center bg-surface rounded-xl px-4 py-2.5 border border-border mx-5 mb-3">
-              <Search size={16} color="#9AA3B0" />
+            <View className="flex-row items-center bg-card rounded-xl px-4 py-2.5 mx-5 mb-3">
+              <Search size={16} color="#9A9AA2" />
               <TextInput
                 value={q}
                 onChangeText={setQ}
                 placeholder="Search country or code"
-                placeholderTextColor="#9AA3B0"
+                placeholderTextColor="#9A9AA2"
                 className="flex-1 ml-2"
-                style={{ color: '#1A1A2E' }}
+                style={{ color: '#16264A' }}
               />
             </View>
             <FlatList

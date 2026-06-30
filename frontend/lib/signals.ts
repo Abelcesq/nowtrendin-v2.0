@@ -50,23 +50,23 @@ export interface TopicVariation {
 // Map maturity class → design palette hex.
 export function maturityColourHex(cls?: string): string {
   switch ((cls || '').toUpperCase()) {
-    case 'RESURGENT': return '#D4A017';   // gold — established but re-accelerating
-    case 'EMERGING': return '#00C896';    // green
-    case 'NEW': return '#2D7EEF';         // blue
-    case 'ESTABLISHED': return '#94A3B8'; // slate — permanent expert home
-    case 'MONITORING': return '#9AA3B0';  // muted
-    default: return '#5B6472';
+    case 'RESURGENT': return '#A8456A';   // gold — established but re-accelerating
+    case 'EMERGING': return '#2E7D5B';    // green
+    case 'NEW': return '#2A5B9E';         // blue
+    case 'ESTABLISHED': return '#8A8F9C'; // slate — permanent expert home
+    case 'MONITORING': return '#9A9AA2';  // muted
+    default: return '#3C4663';
   }
 }
 
 // Map AI taxonomy colour names → design palette hex.
 export function tierColourHex(name?: string): string {
   switch ((name || '').toLowerCase()) {
-    case 'green': return '#00C896';
-    case 'blue': return '#2D7EEF';
-    case 'gray': case 'grey': return '#94A3B8';
-    case 'muted': return '#9AA3B0';
-    default: return '#5B6472';
+    case 'green': return '#2E7D5B';
+    case 'blue': return '#2A5B9E';
+    case 'gray': case 'grey': return '#8A8F9C';
+    case 'muted': return '#9A9AA2';
+    default: return '#3C4663';
   }
 }
 
@@ -125,10 +125,10 @@ export interface Signal {
 export const STAGE_META = [
   // Neutral, descriptive labels only — no prescriptive "what to do" guidance.
   // We surface the analysis; the user decides any action.
-  { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', desc: 'Strongest signal', color: '#00C896' },
-  { key: 'STRONG', label: 'STRONG', range: '70–84', desc: 'High signal strength', color: '#2D7EEF' },
-  { key: 'EMERGING', label: 'INDICATING', range: '55–69', desc: 'Building signal', color: '#D4A017' },
-  { key: 'MARGINAL', label: 'MARGINAL', range: '35–54', desc: 'Early / unconfirmed', color: '#E85A1E' },
+  { key: 'BREAKOUT', label: 'BREAKOUT', range: '85–100', desc: 'Strongest signal', color: '#2E7D5B' },
+  { key: 'STRONG', label: 'STRONG', range: '70–84', desc: 'High signal strength', color: '#2A5B9E' },
+  { key: 'EMERGING', label: 'INDICATING', range: '55–69', desc: 'Building signal', color: '#6B4FA0' },
+  { key: 'MARGINAL', label: 'MARGINAL', range: '35–54', desc: 'Early / unconfirmed', color: '#A8456A' },
 ] as const;
 
 // Single source of truth for the displayed stage band. Derived from the
@@ -177,7 +177,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Now TrendIn',
     short: 'NOW TRENDIN',
     range: 'Sorted by Detection Score 100 → 0',
-    color: '#EE6A2A', altColor: '#B5341B',
+    color: '#B11226', altColor: '#B11226',
     definition:
       'Every accessible trend, ranked by Detection Score from highest to lowest. ' +
       'Detection Score weights the early-edge components (Gradient Strength, Dark Matter, ' +
@@ -195,7 +195,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'All Signals',
     short: 'ALL',
     range: 'Every accessible signal',
-    color: '#5B6472',
+    color: '#3C4663',
     definition: 'Every signal currently visible to your tier, in the default engine ordering.',
     howReached: 'No filter applied.',
     showTile: false,
@@ -206,7 +206,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Breakout ≥85',
     short: 'BREAKOUT',
     range: 'Detection Score 85–100',
-    color: '#00C896',
+    color: '#2E7D5B',
     definition:
       'Topics where Detection Score is at or above 85 — the strongest live signal band. ' +
       'These are trends already breaking out across multiple platforms with the engine ' +
@@ -223,7 +223,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Strong ≥70',
     short: 'STRONG',
     range: 'Detection Score 70–84',
-    color: '#2D7EEF',
+    color: '#2A5B9E',
     definition:
       'Topics with high signal strength but not yet at breakout intensity. The diffusion ' +
       'is established and momentum is steady — a candidate to watch for promotion to Breakout.',
@@ -239,7 +239,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Indicating',
     short: 'INDICATING',
     range: 'Detection Score 55–69',
-    color: '#D4A017',
+    color: '#6B4FA0',
     definition:
       'Building signals — early momentum is forming but the engine has not yet confirmed ' +
       'sustained acceleration across multiple cycles. The earliest end of the actionable band.',
@@ -254,7 +254,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Marginal',
     short: 'MARGINAL',
     range: 'Detection Score 35–54',
-    color: '#E85A1E',
+    color: '#A8456A',
     definition:
       'Marginal signals — early and unconfirmed. Detection is in the 35–54 band: present and ' +
       'worth watching, but the engine has not yet seen sustained acceleration or broad confirmation.',
@@ -269,7 +269,7 @@ export const CATEGORY_DEFS: Array<{
     label: 'Anomalies',
     short: 'ANOMALIES',
     range: 'Detection ahead of Confidence by 16+ pts',
-    color: '#8B5CF6',
+    color: '#6B4FA0',
     definition:
       'Topics where the Detection Score is running well AHEAD of the Confidence Score (a 16+ ' +
       'point lead) — the engine sees strong early-edge evidence before broad confirmation has ' +
@@ -292,18 +292,18 @@ export function getCategory(key: string) {
 // topic_categories.py keys so the chip row, card badge, and ?category= API
 // filter all agree. Each entry: engine key + display label + accent color.
 export const CONTENT_CATEGORIES: Array<{ key: string; label: string; color: string }> = [
-  { key: 'technology',     label: 'Technology',     color: '#2D7EEF' },
-  { key: 'business',       label: 'Business',       color: '#0EA5A0' },
-  { key: 'economy',        label: 'Economy',        color: '#D4A017' },
-  { key: 'sports',         label: 'Sports',         color: '#00C896' },
-  { key: 'entertainment',  label: 'Entertainment',  color: '#E0457B' },
-  { key: 'politics',       label: 'Politics',       color: '#9333EA' },
-  { key: 'current_events', label: 'Current Events', color: '#E85A1E' },
-  { key: 'health',         label: 'Health',         color: '#16A34A' },
-  { key: 'fashion',        label: 'Fashion',        color: '#DB2777' },
-  { key: 'education',      label: 'Education',       color: '#7C5CFC' },
-  { key: 'religion',       label: 'Religion',        color: '#B5341B' },
-  { key: 'news',           label: 'News',            color: '#5B6472' },
+  { key: 'technology',     label: 'Technology',     color: '#2A5B9E' },
+  { key: 'business',       label: 'Business',       color: '#2A5B9E' },
+  { key: 'economy',        label: 'Economy',        color: '#A8456A' },
+  { key: 'sports',         label: 'Sports',         color: '#2E7D5B' },
+  { key: 'entertainment',  label: 'Entertainment',  color: '#A8456A' },
+  { key: 'politics',       label: 'Politics',       color: '#6B4FA0' },
+  { key: 'current_events', label: 'Current Events', color: '#A8456A' },
+  { key: 'health',         label: 'Health',         color: '#2E7D5B' },
+  { key: 'fashion',        label: 'Fashion',        color: '#A8456A' },
+  { key: 'education',      label: 'Education',       color: '#6B4FA0' },
+  { key: 'religion',       label: 'Religion',        color: '#B11226' },
+  { key: 'news',           label: 'News',            color: '#3C4663' },
 ];
 
 const CONTENT_CATEGORY_INDEX: Record<string, { key: string; label: string; color: string }> =
@@ -311,9 +311,9 @@ const CONTENT_CATEGORY_INDEX: Record<string, { key: string; label: string; color
 
 // Look up display metadata for a content-category key (case/spacing tolerant).
 export function contentCategoryMeta(key?: string) {
-  if (!key) return { key: 'general', label: 'General', color: '#9AA3B0' };
+  if (!key) return { key: 'general', label: 'General', color: '#9A9AA2' };
   const norm = key.toLowerCase().trim().replace(/\s+/g, '_');
-  return CONTENT_CATEGORY_INDEX[norm] ?? { key: norm, label: key, color: '#9AA3B0' };
+  return CONTENT_CATEGORY_INDEX[norm] ?? { key: norm, label: key, color: '#9A9AA2' };
 }
 
 // Short, descriptive signal-read per stage (analysis only — no action guidance).
@@ -333,12 +333,12 @@ export const actionLine = (s: Stage) => ACTION_LINE[s] ?? ACTION_LINE.MONITORING
 // Detection vs Confidence — fixed engine characteristics (the "Duality split").
 export const SCORE_ROLES = {
   detection: {
-    color: '#2D7EEF',
+    color: '#2A5B9E',
     falsePositive: 'Speed',
     who: 'Content creators, brand managers, trend-forward marketers. Optimized for speed — surfaces signals early, accepting more false alarms in exchange.',
   },
   confidence: {
-    color: '#00C896',
+    color: '#2E7D5B',
     falsePositive: 'Precision',
     who: 'Institutional analysts, strategic planners, investors. Optimized for precision over speed — requires sustained, repeated confirmation.',
   },
@@ -346,10 +346,10 @@ export const SCORE_ROLES = {
 
 // Gap interpretation bands — how early the signal is.
 export const GAP_BANDS = [
-  { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#00C896' },
-  { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#D4A017' },
-  { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#CF2A1B' },
-  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#8B5CF6' },
+  { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#2E7D5B' },
+  { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#A8456A' },
+  { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#B11226' },
+  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#6B4FA0' },
 ] as const;
 
 export function gapBandIndex(gap: number): number {
@@ -434,22 +434,40 @@ export function dayLabel(createdAt: number): string {
 }
 
 const STAGE_COLORS: Record<Stage, string> = {
-  VIRAL: '#CF2A1B',
-  BREAKOUT: '#00C896',
-  STRONG: '#2D7EEF',
-  EMERGING: '#D4A017',
-  MARGINAL: '#E85A1E',
-  WATCHING: '#E85A1E',
-  WATCH: '#E85A1E',
-  MONITORING: '#9AA3B0',
-  DECAY: '#94A3B8',
+  VIRAL: '#B11226',
+  BREAKOUT: '#2E7D5B',
+  STRONG: '#2A5B9E',
+  EMERGING: '#6B4FA0',
+  MARGINAL: '#A8456A',
+  WATCHING: '#A8456A',
+  WATCH: '#A8456A',
+  MONITORING: '#8A8F9C',
+  DECAY: '#8A8F9C',
 };
-export const stageColor = (s: Stage) => STAGE_COLORS[s] ?? '#9AA3B0';
+export const stageColor = (s: Stage) => STAGE_COLORS[s] ?? '#9A9AA2';
 
 // Display rename: the EMERGING signal stage is shown to users as INDICATING.
 // Internal keys/values stay EMERGING (type, colors, scoring) — display only.
 export const stageLabel = (s?: string) =>
   (s || '').toUpperCase() === 'EMERGING' ? 'INDICATING' : (s || '');
+
+// Title-case a trend topic for display (design rule: trend titles are Title Case).
+// Capitalizes the first letter of each word but PRESERVES words that already carry
+// an interior capital or are all-caps — so acronyms/brands stay intact
+// ("quantum LLMs" → "Quantum LLMs", "AI" → "AI", "stablecoin bill" → "Stablecoin Bill").
+export function titleCaseTopic(s?: string): string {
+  if (!s) return '';
+  return s
+    .split(/(\s+)/)
+    .map((w) => {
+      if (!w.trim()) return w; // keep whitespace runs
+      if (w === w.toUpperCase() || /[A-Z]/.test(w.slice(1))) {
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    })
+    .join('');
+}
 
 export function scoreGap(s: Signal): number {
   return s.gap ?? Math.abs(s.detection - s.confidence);

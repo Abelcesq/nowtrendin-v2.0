@@ -23,7 +23,7 @@ export function LockedSignalsBanner({ tier, lockedCount }: { tier: TierID; locke
 
   return (
     <View
-      className="rounded-xl p-5 mb-3 border items-center"
+      className="rounded-xl p-5 mb-3 items-center"
       style={{ borderColor: cfg.colour, backgroundColor: `${cfg.colour}10` }}
     >
       <View className="w-11 h-11 rounded-full items-center justify-center mb-3" style={{ backgroundColor: `${cfg.colour}20` }}>

@@ -21,13 +21,13 @@ export function TopicResearch({ topicKey, topicName }: { topicKey: string; topic
   return (
     <View className="mb-5">
       <View className="flex-row items-center gap-2 mb-2">
-        <BookOpen size={15} color="#2D7EEF" />
+        <BookOpen size={15} color="#2A5B9E" />
         <Text className="text-textSecondary text-xs uppercase tracking-wider">Research — what this means</Text>
       </View>
-      <View className="bg-surface rounded-2xl border border-border p-4">
+      <View className="bg-card rounded-2xl p-4">
         {isLoading && !blocks.length ? (
           <View className="flex-row items-center gap-2">
-            <ActivityIndicator size="small" color="#2D7EEF" />
+            <ActivityIndicator size="small" color="#2A5B9E" />
             <Text className="text-textMuted text-xs">Researching what this trend means…</Text>
           </View>
         ) : (

@@ -107,38 +107,38 @@ export default function EditProfile() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" />
+        <ChevronLeft size={22} color="#3C4663" />
         <Text className="text-textSecondary text-sm">Profile</Text>
       </TouchableOpacity>
       <Text className="text-textPrimary text-3xl font-bold mb-6">Edit Profile</Text>
 
       {/* Account details */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Account details</Text>
-      <Input placeholder="Full name" value={name} onChangeText={setName} icon={<UserIcon size={18} color="#94A3B8" />} autoCapitalize="words" />
-      <Input placeholder="Email address" value={email} onChangeText={setEmail} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
+      <Input placeholder="Full name" value={name} onChangeText={setName} icon={<UserIcon size={18} color="#8A8F9C" />} autoCapitalize="words" />
+      <Input placeholder="Email address" value={email} onChangeText={setEmail} icon={<Mail size={18} color="#8A8F9C" />} keyboardType="email-address" />
 
       {/* Phone / 2FA */}
       <View className="flex-row items-center gap-2 mb-1 mt-1">
-        <ShieldCheck size={14} color="#00C896" />
+        <ShieldCheck size={14} color="#2E7D5B" />
         <Text className="text-textSecondary text-xs font-semibold">Phone (extra security)</Text>
         {user?.phone ? (
-          <Text className="text-[10px] font-bold" style={{ color: user?.phoneVerified ? '#009970' : '#D4A017' }}>
+          <Text className="text-[10px] font-bold" style={{ color: user?.phoneVerified ? '#246B4A' : '#A8456A' }}>
             {user?.phoneVerified ? 'VERIFIED' : 'UNVERIFIED'}
           </Text>
         ) : null}
       </View>
       <View className="flex-row gap-2 mb-1">
         <CountryCodePicker dial={countryDial} onSelect={setCountryDial} />
-        <View className="flex-1 flex-row items-center bg-surface rounded-xl px-4 border border-border" style={{ height: 50 }}>
-          <Phone size={18} color="#94A3B8" />
+        <View className="flex-1 flex-row items-center bg-card rounded-xl px-4" style={{ height: 50 }}>
+          <Phone size={18} color="#8A8F9C" />
           <TextInput
             value={localPhone}
             onChangeText={setLocalPhone}
             placeholder="555 123 4567"
-            placeholderTextColor="#9AA3B0"
+            placeholderTextColor="#9A9AA2"
             keyboardType="phone-pad"
             className="flex-1 ml-3 text-base"
-            style={{ color: '#1A1A2E' }}
+            style={{ color: '#16264A' }}
           />
         </View>
       </View>
@@ -148,8 +148,8 @@ export default function EditProfile() {
 
       {profileMsg && (
         <View className="flex-row items-center gap-2 mb-3">
-          {profileMsg.ok && <CheckCircle size={14} color="#00C896" />}
-          <Text className="text-sm" style={{ color: profileMsg.ok ? '#009970' : '#DC2626' }}>{profileMsg.text}</Text>
+          {profileMsg.ok && <CheckCircle size={14} color="#2E7D5B" />}
+          <Text className="text-sm" style={{ color: profileMsg.ok ? '#246B4A' : '#B11226' }}>{profileMsg.text}</Text>
         </View>
       )}
 
@@ -160,7 +160,7 @@ export default function EditProfile() {
         <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2">Two-factor authentication</Text>
         {user?.phoneVerified ? (
           <View className="flex-row items-center gap-2">
-            <CheckCircle size={16} color="#00C896" />
+            <CheckCircle size={16} color="#2E7D5B" />
             <Text className="text-textSecondary text-sm">Your phone is verified for two-factor security.</Text>
           </View>
         ) : (
@@ -178,7 +178,7 @@ export default function EditProfile() {
                   value={code}
                   onChangeText={setCode}
                   keyboardType="numeric"
-                  icon={<KeyRound size={18} color="#94A3B8" />}
+                  icon={<KeyRound size={18} color="#8A8F9C" />}
                 />
                 <Button size="md" onPress={verifyCode} loading={verifying2fa}>Verify code</Button>
               </View>
@@ -187,8 +187,8 @@ export default function EditProfile() {
         )}
         {twoFAMsg && (
           <View className="flex-row items-center gap-2 mt-3">
-            {twoFAMsg.ok && <CheckCircle size={14} color="#00C896" />}
-            <Text className="text-sm" style={{ color: twoFAMsg.ok ? '#009970' : '#DC2626' }}>{twoFAMsg.text}</Text>
+            {twoFAMsg.ok && <CheckCircle size={14} color="#2E7D5B" />}
+            <Text className="text-sm" style={{ color: twoFAMsg.ok ? '#246B4A' : '#B11226' }}>{twoFAMsg.text}</Text>
           </View>
         )}
       </View>
@@ -197,14 +197,14 @@ export default function EditProfile() {
 
       {/* Change password */}
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Change password</Text>
-      <Input placeholder="Current password" value={current} onChangeText={setCurrent} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
-      <Input placeholder="New password" value={next} onChangeText={setNext} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
-      <Input placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
+      <Input placeholder="Current password" value={current} onChangeText={setCurrent} icon={<KeyRound size={18} color="#8A8F9C" />} secureText />
+      <Input placeholder="New password" value={next} onChangeText={setNext} icon={<KeyRound size={18} color="#8A8F9C" />} secureText />
+      <Input placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} icon={<KeyRound size={18} color="#8A8F9C" />} secureText />
 
       {pwMsg && (
         <View className="flex-row items-center gap-2 mb-3">
-          {pwMsg.ok && <CheckCircle size={14} color="#00C896" />}
-          <Text className="text-sm" style={{ color: pwMsg.ok ? '#009970' : '#DC2626' }}>{pwMsg.text}</Text>
+          {pwMsg.ok && <CheckCircle size={14} color="#2E7D5B" />}
+          <Text className="text-sm" style={{ color: pwMsg.ok ? '#246B4A' : '#B11226' }}>{pwMsg.text}</Text>
         </View>
       )}
 

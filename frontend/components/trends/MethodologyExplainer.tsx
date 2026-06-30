@@ -11,19 +11,19 @@ const LAWS = [
   {
     tag: 'Law 1',
     title: 'Attention follows energy gradients',
-    color: '#00C896',
+    color: '#2E7D5B',
     body: 'Attention moves from high-concentration communities (niche, expert, passionate) to low-concentration ones (mainstream, passive). Gradient Strength measures that density difference — a steep gradient means maximum potential energy is still to be released.',
   },
   {
     tag: 'Law 2',
     title: 'Attention has inertia',
-    color: '#2D7EEF',
+    color: '#2A5B9E',
     body: 'A trend accelerating for 72 hours is more likely to continue than one that spiked in the last 6. Inertia + Persistence measure self-reinforcing momentum across consecutive windows — separating genuine trends from viral spikes.',
   },
   {
     tag: 'Law 3',
     title: 'Attention requires a medium',
-    color: '#7C3AED',
+    color: '#6B4FA0',
     body: 'Different platforms carry attention differently. GitHub → Hacker News → Reddit is a technology-commercialization path; niche → general → mainstream is a cultural one. The sequence a signal travels reveals its trajectory and velocity.',
   },
 ];
@@ -31,17 +31,17 @@ const LAWS = [
 export function MethodologyExplainer() {
   const [open, setOpen] = useState(false);
   return (
-    <View className="mb-5 rounded-2xl border border-border bg-surface overflow-hidden">
+    <View className="mb-5 rounded-2xl bg-card overflow-hidden">
       <TouchableOpacity
         onPress={() => setOpen(!open)}
         className="flex-row items-center justify-between px-4 py-3.5"
         activeOpacity={0.8}
       >
         <View className="flex-row items-center gap-2">
-          <Atom size={16} color="#5B6472" />
+          <Atom size={16} color="#3C4663" />
           <Text className="text-textPrimary font-semibold">How the Gradient Score works</Text>
         </View>
-        {open ? <ChevronUp size={18} color="#9AA3B0" /> : <ChevronDown size={18} color="#9AA3B0" />}
+        {open ? <ChevronUp size={18} color="#9A9AA2" /> : <ChevronDown size={18} color="#9A9AA2" />}
       </TouchableOpacity>
 
       {open && (
@@ -54,7 +54,7 @@ export function MethodologyExplainer() {
           {LAWS.map((l) => (
             <View
               key={l.tag}
-              className="rounded-xl px-3 py-3 mb-2 border"
+              className="rounded-xl px-3 py-3 mb-2"
               style={{ borderColor: `${l.color}33`, backgroundColor: `${l.color}0A` }}
             >
               <View className="flex-row items-center gap-2 mb-1">
@@ -67,8 +67,8 @@ export function MethodologyExplainer() {
             </View>
           ))}
 
-          <View className="rounded-xl px-3 py-3 mt-1 border" style={{ borderColor: '#D4A01733', backgroundColor: '#D4A0170D' }}>
-            <Text className="text-[11px] font-bold mb-1" style={{ color: '#B8860B' }}>THE DUALITY PRINCIPLE</Text>
+          <View className="rounded-xl px-3 py-3 mt-1" style={{ borderColor: '#A8456A33', backgroundColor: '#A8456A0D' }}>
+            <Text className="text-[11px] font-bold mb-1" style={{ color: '#A8456A' }}>THE DUALITY PRINCIPLE</Text>
             <Text className="text-textMuted text-[11px] leading-5">
               Earlier detection comes with lower certainty; higher certainty needs more data, which means later
               detection. That's why every topic shows two scores — Detection (optimized for earliness) and
