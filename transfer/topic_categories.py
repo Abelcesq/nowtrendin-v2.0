@@ -67,7 +67,9 @@ _LEX = {
         ["soccer", "football", "basketball", "baseball", "hockey", "tennis",
          "golf", "boxing", "cricket", "rugby", "cycling", "match", "league",
          "tournament", "championship", "coach", "striker", "midfielder",
-         "goalkeeper", "athlete", "medal", "fixture", "transfer", "squad"],
+         "goalkeeper", "athlete", "medal", "fixture", "transfer", "squad",
+         # tracked-call reclassifications (Catch-All Auditor 2026-06-30)
+         "valentín barco"],
     ),
     "technology": (
         ["llm", "gpt", "openai", "anthropic", "claude", "chatgpt", "gemini",
@@ -76,7 +78,9 @@ _LEX = {
          "cryptocurrency", "github", "iphone", "android", "cybersecurity",
          "malware", "data breach", "software", "algorithm", "robotics",
          # unambiguous tech terms tracked-in-catchall (Catch-All Auditor 2026-06-24)
-         "javascript", "typescript", "wwdc", "chatbot", "chatbots", "webassembly"],
+         "javascript", "typescript", "wwdc", "chatbot", "chatbots", "webassembly",
+         # tracked-call reclassifications (Catch-All Auditor 2026-06-30)
+         "token efficiency", "rag sqlite"],
         ["ai", "app", "chip", "rocket", "tesla", "ev", "robot", "crypto",
          "bitcoin", "ethereum", "coding", "programming", "developer", "startup",
          "gadget", "cloud", "server", "api", "hack", "cyber", "tech", "device",
@@ -86,7 +90,9 @@ _LEX = {
          "langchain", "bioinformatics", "semantic search", "prompt engineering",
          "diffusion model", "object detection", "vector database", "hugging face",
          # unambiguous tech entities (Catch-All Auditor candidates 2026-06-23)
-         "google", "bsky", "bluesky"],
+         "google", "bsky", "bluesky",
+         # tracked-call + lexicon-candidate additions (Catch-All Auditor 2026-06-30)
+         "data pipeline", "asi", "meta"],
     ),
     "politics": (
         ["election", "president", "senate", "congress", "parliament",
@@ -103,13 +109,17 @@ _LEX = {
     "business": (
         ["ipo", "merger", "acquisition", "earnings", "quarterly results",
          "layoffs", "bankruptcy", "valuation", "venture capital", "private equity",
-         "stock split", "shareholder", "ceo", "startup funding"],
+         "stock split", "shareholder", "ceo", "startup funding",
+         # tracked-call reclassification (Catch-All Auditor 2026-06-30)
+         "eli lilly"],
         # NOTE: "deal" deliberately NOT here — it routed geopolitical "X deal"
         # (Iran deal, trade deal, peace deal) to Business. M&A is still caught by
         # the strong list (ipo/merger/acquisition) + "merge".
         ["company", "stock", "market", "shares", "revenue", "profit", "brand",
          "retail", "funding", "investor", "business", "corporate", "firm",
-         "executive", "merge"],
+         "executive", "merge",
+         # "lilly" alone in trending context = Eli Lilly (pharma company) (2026-06-30)
+         "lilly"],
     ),
     "economy": (
         ["inflation", "interest rate", "federal reserve", "gdp", "recession",
@@ -124,7 +134,9 @@ _LEX = {
          "movie premiere", "celebrity", "reality show"],
         ["movie", "film", "show", "series", "music", "album", "song", "concert",
          "actor", "actress", "singer", "rapper", "band", "streaming", "trailer",
-         "premiere", "hollywood", "comedy", "drama", "tour"],
+         "premiere", "hollywood", "comedy", "drama", "tour",
+         # tracked-call reclassification (Catch-All Auditor 2026-06-30)
+         "jessica alba"],
     ),
     "health": (
         ["vaccine", "covid", "pandemic", "outbreak", "cancer", "alzheimer",
@@ -170,7 +182,10 @@ _LEX = {
          # NOTE: bare peaceful countries (australia/canada/france…) are deliberately NOT
          # added — a country alone is multi-category; the SITUATION layer routes them by
          # context (canada+hockey→sports, canada+election→politics).
-         "iranian", "israeli", "chinese", "strait of hormuz", "hormuz", "juneteenth"],
+         "iranian", "israeli", "chinese", "strait of hormuz", "hormuz", "juneteenth",
+         # tracked-call + lexicon-candidate additions (Catch-All Auditor 2026-06-30)
+         # "britain" in trending = UK political/current-events discourse (NHS, Starmer, etc.)
+         "britain", "heatwave", "epstein"],
     ),
     # "news" and "general" are fallbacks — no lexicon; assigned when nothing
     # else scores. "economy"/"business" and "politics"/"current_events" overlap
