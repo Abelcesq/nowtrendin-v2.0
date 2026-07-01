@@ -16,8 +16,8 @@ function barColor(v: number) {
   return '#D8DCE3';
 }
 
-const metaLabel = { color: '#9A9AA2', fontSize: 9, fontWeight: '700', letterSpacing: 1 } as const;
-const metaNum = { color: '#16264A', fontSize: 26, fontWeight: '800', letterSpacing: -0.6 } as const;
+const metaLabel = { color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 } as const;
+const metaNum = { color: '#16264A', fontSize: 28, fontWeight: '800', letterSpacing: -0.6 } as const;
 
 // Calm, tap-to-expand trend row (Aurora journey). Collapsed: rank, title,
 // platform·stage·age, score, chevron. Expanded (quick-look): detection /
@@ -54,21 +54,21 @@ export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
       <TouchableOpacity activeOpacity={0.7} onPress={toggle} className="py-4">
         <View className="flex-row items-center" style={{ gap: 14 }}>
           {rank != null && (
-            <Text style={{ color: stageCol, fontSize: 30, fontWeight: '800', letterSpacing: -1.5, width: 38 }}>
+            <Text numberOfLines={1} style={{ color: stageCol, fontSize: 28, fontWeight: '800', letterSpacing: -1.5, minWidth: 38, marginRight: 2 }}>
               {String(rank).padStart(2, '0')}
             </Text>
           )}
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 17, fontWeight: '700', letterSpacing: -0.3 }}>
+            <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}>
               {titleCaseTopic(signal.topic)}
             </Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 9.5, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
+            <Text numberOfLines={1} style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
               {platform.toUpperCase()} · <Text style={{ color: stageCol }}>{stageLabel(signal.stage)}</Text> · {ageLabel(signal.createdAt).toUpperCase()}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{signal.score}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 8, fontWeight: '700', letterSpacing: 1 }}>SCORE</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>SCORE</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
@@ -98,7 +98,7 @@ export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
               ))}
             </View>
 
-            <Text style={{ color: '#3C4663', fontSize: 13.5, lineHeight: 21, fontWeight: '500', marginBottom: 10 }}>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginBottom: 10 }}>
               {gap}-point gap: {insight.text}
             </Text>
             <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 19, fontWeight: '500', marginBottom: 16 }}>
@@ -111,7 +111,7 @@ export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
               className="flex-row items-center self-start"
               style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 11, paddingHorizontal: 22 }}
             >
-              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>MORE INFO</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>MORE INFO</Text>
               <ArrowRight size={13} color="#F0758A" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           </Rise>

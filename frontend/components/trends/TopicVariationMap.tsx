@@ -56,13 +56,13 @@ export function TopicVariationMap({
                 </Text>
               </View>
               {!!v.tierLabel && (
-                <Text className="text-[10px] mt-1 ml-3.5" style={{ color: c }}>
+                <Text className="text-[12px] mt-1 ml-3.5" style={{ color: c }}>
                   {v.tierLabel}
                   {v.velocity ? ` · ${v.velocity}` : ''}
                 </Text>
               )}
               {!!v.whyDifferent && !v.isQueried && (
-                <Text className="text-textMuted text-[11px] mt-1 ml-3.5 leading-4">
+                <Text className="text-textMuted text-[12px] mt-1 ml-3.5 leading-4">
                   {v.whyDifferent}
                 </Text>
               )}
@@ -70,7 +70,7 @@ export function TopicVariationMap({
           );
         })}
       </View>
-      <Text className="text-textMuted text-[10px] mt-2">Detection / Confidence — typical range for each variation.</Text>
+      <Text className="text-textMuted text-[12px] mt-2">Detection / Confidence — typical range for each variation.</Text>
     </View>
   );
 }

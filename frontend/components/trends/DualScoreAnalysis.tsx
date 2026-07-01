@@ -4,7 +4,7 @@ import { Signal, scoreGap, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../../li
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-2 mt-5">
+    <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2 mt-5">
       {children}
     </Text>
   );

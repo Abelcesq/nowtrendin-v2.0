@@ -42,6 +42,20 @@ If merged code introduces any of these, remap to the nearest token above.
   a raw lowercase name ("correction", "quantum LLMs").
 - **Eyebrows / nav / filters / CTAs / small labels → UPPERCASE** with letter-spacing.
 - Numbers shown to users → `Number(n).toLocaleString()` (e.g. `2,417`, not `2417`).
+- **Type scale — STANDARDIZED. Use ONLY these sizes** (px). Minimum 12 (mobile readability).
+  The Tailwind named classes already map to it (`text-xs`=12 … `text-5xl`=44), so prefer those;
+  if you must use an explicit size, snap to the nearest step. Never introduce a new size.
+
+  | Size | Use | Tailwind |
+  |---|---|---|
+  | **12** | caption / label / eyebrow / meta / fine print (the floor) | `text-xs` |
+  | **14** | small / secondary text | `text-sm` |
+  | **16** | body (default reading) | `text-base` |
+  | **18** | row title / subheading | `text-lg` |
+  | **22** | card title | `text-xl` / `text-2xl` |
+  | **28** | screen / detail title | `text-3xl` |
+  | **32** | hero headline | `text-4xl` |
+  | **44** | hero score (the one special display number) | `text-5xl` |
 
 ## 3. Cards & containers — BORDERLESS
 

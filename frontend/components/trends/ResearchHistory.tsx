@@ -29,7 +29,7 @@ export function ResearchHistory({ topicKey }: { topicKey: string }) {
             <>
               {!!research.trajectoryLabel && (
                 <View className="self-start px-3 py-1 rounded-full mb-2" style={{ backgroundColor: '#2A5B9E1A' }}>
-                  <Text className="text-[11px] font-bold" style={{ color: '#2A5B9E' }}>{research.trajectoryLabel}</Text>
+                  <Text className="text-[12px] font-bold" style={{ color: '#2A5B9E' }}>{research.trajectoryLabel}</Text>
                 </View>
               )}
               {!!research.summaryShort && (
@@ -42,14 +42,14 @@ export function ResearchHistory({ topicKey }: { topicKey: string }) {
                 </Text>
               )}
               {!!research.gradientImplication && (
-                <Text className="text-textSecondary text-[13px] leading-5 mt-1">{research.gradientImplication}</Text>
+                <Text className="text-textSecondary text-[14px] leading-5 mt-1">{research.gradientImplication}</Text>
               )}
               {!!research.milestones?.length && (
                 <View className="mt-3 gap-1.5">
                   {research.milestones.slice(0, 6).map((m, i) => (
                     <View key={i} className="flex-row gap-2">
-                      <Text className="text-textMuted text-[11px] w-12">{String(m.year ?? '')}</Text>
-                      <Text className="text-textSecondary text-[11px] flex-1">{m.label ?? ''}</Text>
+                      <Text className="text-textMuted text-[12px] w-12">{String(m.year ?? '')}</Text>
+                      <Text className="text-textSecondary text-[12px] flex-1">{m.label ?? ''}</Text>
                     </View>
                   ))}
                 </View>

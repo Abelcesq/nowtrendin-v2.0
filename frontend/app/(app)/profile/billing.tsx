@@ -31,7 +31,7 @@ export default function Billing() {
           {(cfg.features ?? []).slice(0, 5).map((f: string, i: number) => (
             <View key={i} className="flex-row items-center gap-2 py-1">
               <Check size={14} color="#2E7D5B" />
-              <Text className="text-textSecondary text-[13px]">{f}</Text>
+              <Text className="text-textSecondary text-[14px]">{f}</Text>
             </View>
           ))}
         </View>

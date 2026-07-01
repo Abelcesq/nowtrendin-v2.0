@@ -108,7 +108,7 @@ export default function Notifications() {
         </View>
       )}
 
-      <Text className="text-textMuted text-[11px] mt-4">
+      <Text className="text-textMuted text-[12px] mt-4">
         These control how trend alerts you create are delivered. Manage individual alerts on the Alerts tab.
       </Text>
     </Screen>

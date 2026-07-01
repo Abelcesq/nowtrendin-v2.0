@@ -66,7 +66,7 @@ export default function Splash() {
       </Animated.View>
 
       <Animated.View style={tagStyle} className="mt-2">
-        <Text className="text-textMuted text-[11px] font-bold tracking-[3px] uppercase">
+        <Text className="text-textMuted text-[12px] font-bold tracking-[3px] uppercase">
           Attention Intelligence
         </Text>
       </Animated.View>

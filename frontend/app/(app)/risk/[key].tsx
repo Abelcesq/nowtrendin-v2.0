@@ -103,7 +103,7 @@ export default function RiskDetail() {
               <Text className="text-textSecondary text-sm">{backLabel}</Text>
             </TouchableOpacity>
 
-            <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">Now TrendIn · Market Signal</Text>
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase">Now TrendIn · Market Signal</Text>
             <View className="flex-row items-center gap-2 mt-0.5">
               <Activity size={22} color={tierCol} />
               <Text className="text-textPrimary text-3xl font-bold flex-1">{titleCaseTopic(risk.display)}</Text>
@@ -116,18 +116,18 @@ export default function RiskDetail() {
                 {/* Company / item name above the tier badge + scores */}
                 <Text className="text-textPrimary text-lg font-black text-center mb-1">{titleCaseTopic(risk.display)}</Text>
                 <View className="self-center px-2.5 py-1 rounded-full mb-3" style={{ backgroundColor: `${tierCol}1A` }}>
-                  <Text style={{ color: tierCol }} className="text-[9px] font-bold tracking-wide">{tier}</Text>
+                  <Text style={{ color: tierCol }} className="text-[12px] font-bold tracking-wide">{tier}</Text>
                 </View>
                 <View className="flex-row justify-around items-start">
                   <View className="items-center">
                     <GradientScoreRing score={Math.round(mg.detection)} color={MKT_DET} size="lg" caption="/100" />
                     <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
-                    <Text className="text-textMuted text-[10px]">analysts + positioning</Text>
+                    <Text className="text-textMuted text-[12px]">analysts + positioning</Text>
                   </View>
                   <View className="items-center">
                     <GradientScoreRing score={Math.round(mg.confidence)} color={MKT_CONF} size="lg" caption="/100" />
                     <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
-                    <Text className="text-textMuted text-[10px]">fundamentals + price</Text>
+                    <Text className="text-textMuted text-[12px]">fundamentals + price</Text>
                   </View>
                 </View>
                 <View className="rounded-xl px-3 py-2 mt-4" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
@@ -136,7 +136,7 @@ export default function RiskDetail() {
                     {!mg.calibrating && ` · ${gap}-pt gap`}
                   </Text>
                   {!!mg.interpretation && (
-                    <Text className="text-textSecondary text-[13px] leading-5 mt-1">{mg.interpretation}</Text>
+                    <Text className="text-textSecondary text-[14px] leading-5 mt-1">{mg.interpretation}</Text>
                   )}
                 </View>
               </View>
@@ -145,10 +145,10 @@ export default function RiskDetail() {
               <View className="bg-card rounded-2xl p-5 mb-2 items-center">
                 <GradientScoreRing score={risk.positioningScore ?? 0} color={tierCol} size="lg" caption="/100" />
                 <Text className="text-textPrimary text-xs font-bold mt-2">POSITIONING</Text>
-                <Text className="text-textMuted text-[10px]">{risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}</Text>
+                <Text className="text-textMuted text-[12px]">{risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}</Text>
               </View>
             )}
-            <Text className="text-textMuted text-[10px] mb-4">
+            <Text className="text-textMuted text-[12px] mb-4">
               The Market Gradient splits signals by type: Detection = what analysts say + how smart money is
               positioned (leading); Confidence = what fundamentals and price confirm (hard data). The gap shows
               how early the move is. Measurement only — not financial advice.
@@ -159,7 +159,7 @@ export default function RiskDetail() {
                 history); otherwise still calibrating on absolute scale. */}
             {mg && Object.keys(mg.components).length > 0 && (
               <View className="bg-card rounded-2xl p-4 mb-3">
-                <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">Market factors</Text>
+                <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-3">Market factors</Text>
                 {Object.entries(mg.components).map(([label, c]) => {
                   const col = FEEDS_COLOR[c.feeds] ?? '#9A9AA2';
                   return (
@@ -167,8 +167,8 @@ export default function RiskDetail() {
                       <View className="flex-row justify-between mb-1">
                         <View className="flex-row items-center gap-1.5 flex-1 pr-2">
                           <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: col }} />
-                          <Text className="text-textSecondary text-[11px] flex-1" numberOfLines={1}>{label}</Text>
-                          {c.baselineRelative && <Text className="text-[9px]" style={{ color: '#2E7D5B' }}>✓ base</Text>}
+                          <Text className="text-textSecondary text-[12px] flex-1" numberOfLines={1}>{label}</Text>
+                          {c.baselineRelative && <Text className="text-[12px]" style={{ color: '#2E7D5B' }}>✓ base</Text>}
                         </View>
                         <Text className="text-textPrimary text-[12px] font-bold">{Math.round(c.score)}</Text>
                       </View>
@@ -178,7 +178,7 @@ export default function RiskDetail() {
                     </View>
                   );
                 })}
-                <Text className="text-textMuted text-[10px] mt-1">
+                <Text className="text-textMuted text-[12px] mt-1">
                   <Text style={{ color: '#2A5B9E' }}>Blue</Text> = leading (Detection) · <Text style={{ color: '#2E7D5B' }}>Green</Text> = confirming · <Text style={{ color: '#6B4FA0' }}>Purple</Text> = both. ✓ base = scored vs this item's own history.
                 </Text>
               </View>
@@ -186,15 +186,15 @@ export default function RiskDetail() {
 
             {/* Tier legend — what the intensity bands mean (mirrors Trends legend) */}
             <View className="bg-card rounded-2xl p-4 mb-5">
-              <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-3">What the tiers mean</Text>
+              <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-3">What the tiers mean</Text>
               <View className="flex-row flex-wrap gap-2">
                 {MARKET_TIERS.map((t) => {
                   const tc = MARKET_TIER_COLOR[t.key];
                   return (
                     <View key={t.key} className="flex-1 min-w-[46%] rounded-xl p-3" style={{ borderColor: `${tc}55`, backgroundColor: `${tc}12` }}>
                       <Text style={{ color: tc }} className="text-xs font-bold">{t.key}</Text>
-                      <Text className="text-textMuted text-[10px] mt-0.5">{t.range}</Text>
-                      <Text style={{ color: tc }} className="text-[11px] font-semibold mt-1">{t.desc}</Text>
+                      <Text className="text-textMuted text-[12px] mt-0.5">{t.range}</Text>
+                      <Text style={{ color: tc }} className="text-[12px] font-semibold mt-1">{t.desc}</Text>
                     </View>
                   );
                 })}
@@ -230,33 +230,33 @@ export default function RiskDetail() {
               {/* Dual score: raw (vs all companies) + sector-adjusted */}
               <View className="flex-row gap-3 mb-3">
                 <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: `${sc}12` }}>
-                  <Text className="text-textMuted text-[10px] font-bold">SCORE</Text>
+                  <Text className="text-textMuted text-[12px] font-bold">SCORE</Text>
                   <Text className="text-2xl font-black" style={{ color: sc }}>{s.score}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
-                  <Text className="text-[11px] font-semibold" style={{ color: sc }}>{s.label}</Text>
-                  <Text className="text-textMuted text-[9px] mt-0.5">vs all companies</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: sc }}>{s.label}</Text>
+                  <Text className="text-textMuted text-[12px] mt-0.5">vs all companies</Text>
                 </View>
                 <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: `${adjC}12` }}>
-                  <Text className="text-textMuted text-[10px] font-bold">SECTOR-ADJUSTED</Text>
+                  <Text className="text-textMuted text-[12px] font-bold">SECTOR-ADJUSTED</Text>
                   <Text className="text-2xl font-black" style={{ color: adjC }}>{adj}<Text className="text-textMuted text-sm font-bold">/100</Text></Text>
-                  <Text className="text-[11px] font-semibold" style={{ color: adjC }}>{s.sectorAdjustedLabel || s.label}</Text>
-                  <Text className="text-textMuted text-[9px] mt-0.5">vs {s.sector || 'sector'} peers</Text>
+                  <Text className="text-[12px] font-semibold" style={{ color: adjC }}>{s.sectorAdjustedLabel || s.label}</Text>
+                  <Text className="text-textMuted text-[12px] mt-0.5">vs {s.sector || 'sector'} peers</Text>
                 </View>
               </View>
               {!!s.sectorExplanation && (
-                <Text className="text-textSecondary text-[11px] leading-4 mb-3">{s.sectorExplanation}</Text>
+                <Text className="text-textSecondary text-[12px] leading-4 mb-3">{s.sectorExplanation}</Text>
               )}
               <Bar label="Profitability (margin · ROE)" val={s.profitability} />
               <Bar label="Cash & liquidity" val={s.liquidity} />
               <Bar label={hasAdj ? 'Leverage health (raw)' : 'Leverage health (lower debt = higher)'} val={s.leverageHealth} />
               {hasAdj && <Bar label={`Leverage health (vs ${s.sector || 'sector'})`} val={s.leverageHealthSector ?? null} />}
               <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-border">
-                {s.netProfitMargin != null && <Text className="text-textMuted text-[11px]">Net margin {s.netProfitMargin}%</Text>}
-                {s.roe != null && <Text className="text-textMuted text-[11px]">ROE {s.roe}%</Text>}
-                {s.currentRatio != null && <Text className="text-textMuted text-[11px]">Current ratio {s.currentRatio}</Text>}
-                {s.debtToEquity != null && <Text className="text-textMuted text-[11px]">Debt/equity {s.debtToEquity}</Text>}
+                {s.netProfitMargin != null && <Text className="text-textMuted text-[12px]">Net margin {s.netProfitMargin}%</Text>}
+                {s.roe != null && <Text className="text-textMuted text-[12px]">ROE {s.roe}%</Text>}
+                {s.currentRatio != null && <Text className="text-textMuted text-[12px]">Current ratio {s.currentRatio}</Text>}
+                {s.debtToEquity != null && <Text className="text-textMuted text-[12px]">Debt/equity {s.debtToEquity}</Text>}
               </View>
             </View>
-            <Text className="text-textMuted text-[10px] mb-5">
+            <Text className="text-textMuted text-[12px] mb-5">
               From {s.ticker}'s reported financials. Descriptive data only — not a buy/sell recommendation or financial advice.
             </Text>
           </>
@@ -279,7 +279,7 @@ export default function RiskDetail() {
                 {(risk.alphaVantage.recent ?? []).slice(0, 3).map((a, i) => (
                   <View key={i} className="mb-1">
                     <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {a.title}</Text>
-                    <Text className="text-textMuted text-[10px]">{a.source} · {(a.published || '').slice(0, 8)}</Text>
+                    <Text className="text-textMuted text-[12px]">{a.source} · {(a.published || '').slice(0, 8)}</Text>
                   </View>
                 ))}
               </View>
@@ -297,11 +297,11 @@ export default function RiskDetail() {
                 </View>
                 {cr.covered && (cr.recent ?? []).map((v, i) => (
                   <View key={i} className="mb-1.5">
-                    <Text className="text-textSecondary text-[13px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
-                    <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+                    <Text className="text-textSecondary text-[14px] leading-5" numberOfLines={2}>▸ {v.title}</Text>
+                    <Text className="text-textMuted text-[12px]">{(v.published || '').slice(0, 10)}</Text>
                   </View>
                 ))}
-                <Text className="text-textMuted text-[10px] mt-1">Source: {cr.name} (youtube.com/@{cr.handle})</Text>
+                <Text className="text-textMuted text-[12px] mt-1">Source: {cr.name} (youtube.com/@{cr.handle})</Text>
               </View>
             ))}
           </View>
@@ -315,14 +315,14 @@ export default function RiskDetail() {
                 <View key={ch.handle} className={ci > 0 ? 'pt-2 border-t border-border mt-1' : ''}>
                   <View className="flex-row items-center gap-2 mb-0.5">
                     <Play size={14} color="#3C4663" />
-                    <Text className="text-textPrimary text-[13px] font-semibold flex-1">
+                    <Text className="text-textPrimary text-[14px] font-semibold flex-1">
                       {ch.name}{ch.region ? ` · ${ch.region}` : ''}: {ch.count} recent video{ch.count === 1 ? '' : 's'}
                     </Text>
                   </View>
                   {(ch.recent ?? []).slice(0, 2).map((v, i) => (
                     <View key={i} className="mb-1">
                       <Text className="text-textSecondary text-[12px] leading-4" numberOfLines={2}>▸ {v.title}</Text>
-                      <Text className="text-textMuted text-[10px]">{(v.published || '').slice(0, 10)}</Text>
+                      <Text className="text-textMuted text-[12px]">{(v.published || '').slice(0, 10)}</Text>
                     </View>
                   ))}
                 </View>
@@ -334,7 +334,7 @@ export default function RiskDetail() {
               <Text className="text-textMuted text-[12px]">No recent broadcast media coverage across {risk.broadcastCoverage.totalChannels} monitored channels.</Text>
             </View>
           )}
-          <Text className="text-textMuted text-[10px] mb-5">
+          <Text className="text-textMuted text-[12px] mb-5">
             {risk.alphaVantage?.note || risk.creatorCoverage?.note || risk.meetKevin?.note}
           </Text>
         </>
@@ -359,7 +359,7 @@ export default function RiskDetail() {
                     <Text className="text-textSecondary text-[12px]">{risk.shortInterest.daysToCover} days to cover</Text>
                   )}
                 </View>
-                <Text className="text-textMuted text-[10px] mt-1">FINRA short interest{risk.shortInterest.settlementDate ? ` · ${risk.shortInterest.settlementDate}` : ''}</Text>
+                <Text className="text-textMuted text-[12px] mt-1">FINRA short interest{risk.shortInterest.settlementDate ? ` · ${risk.shortInterest.settlementDate}` : ''}</Text>
               </View>
             )}
             {!!risk.macroLeverage && (
@@ -368,7 +368,7 @@ export default function RiskDetail() {
                   Market funding: <Text className="font-semibold text-textPrimary">{risk.macroLeverage.leverageLabel}</Text>
                   {risk.macroLeverage.stressLabel ? ` · ${risk.macroLeverage.stressLabel}` : ''}
                 </Text>
-                <Text className="text-textMuted text-[10px] mt-1">OFR Short-Term Funding Monitor (repo){risk.macroLeverage.asOf ? ` · ${risk.macroLeverage.asOf}` : ''}</Text>
+                <Text className="text-textMuted text-[12px] mt-1">OFR Short-Term Funding Monitor (repo){risk.macroLeverage.asOf ? ` · ${risk.macroLeverage.asOf}` : ''}</Text>
               </View>
             )}
             {!!risk.institutionalHoldings && (
@@ -383,14 +383,14 @@ export default function RiskDetail() {
                   )}
                 </View>
                 {!!risk.institutionalHoldings.topHolders?.length && (
-                  <Text className="text-textMuted text-[11px] mt-1" numberOfLines={2}>
+                  <Text className="text-textMuted text-[12px] mt-1" numberOfLines={2}>
                     Top: {risk.institutionalHoldings.topHolders.slice(0, 4).map((h) => h.name).join(', ')}
                   </Text>
                 )}
-                <Text className="text-textMuted text-[10px] mt-1">WhaleWisdom 13F institutional holdings</Text>
+                <Text className="text-textMuted text-[12px] mt-1">WhaleWisdom 13F institutional holdings</Text>
               </View>
             )}
-            <Text className="text-textMuted text-[10px] mt-2">Descriptive leverage indicators — not investment advice.</Text>
+            <Text className="text-textMuted text-[12px] mt-2">Descriptive leverage indicators — not investment advice.</Text>
           </View>
         </>
       )}
@@ -402,7 +402,7 @@ export default function RiskDetail() {
           <Clock size={14} color={matColor} />
           <Text className="text-sm font-bold" style={{ color: matColor }}>{risk.maturity || 'UNCLASSIFIED'}</Text>
         </View>
-        <Text className="text-textSecondary text-[13px] leading-5">{risk.maturityNote}</Text>
+        <Text className="text-textSecondary text-[14px] leading-5">{risk.maturityNote}</Text>
       </View>
 
       {/* Abnormal-vs-own-baseline — emerging vs. always-present */}
@@ -425,15 +425,15 @@ export default function RiskDetail() {
                 )}
               </View>
               {!insufficient && (
-                <Text className="text-textMuted text-[11px] mb-2">
+                <Text className="text-textMuted text-[12px] mb-2">
                   Now {risk.totalSignals} signals vs. a {risk.baselineSignals}-signal baseline over{' '}
                   {risk.baselineCycles} prior cycles.
                 </Text>
               )}
-              <Text className="text-textSecondary text-[13px] leading-5">{risk.baselineNote}</Text>
+              <Text className="text-textSecondary text-[14px] leading-5">{risk.baselineNote}</Text>
               <View className="flex-row items-start gap-2 mt-3 pt-3 border-t border-border">
                 <Info size={13} color="#9A9AA2" />
-                <Text className="text-textMuted text-[11px] leading-4 flex-1">
+                <Text className="text-textMuted text-[12px] leading-4 flex-1">
                   Established names carry routine insider / 8-K activity every cycle, so absolute counts always
                   look elevated. This compares the topic against ITS OWN history — only an abnormal rise above
                   its baseline marks genuinely unusual positioning.
@@ -465,7 +465,7 @@ export default function RiskDetail() {
                   <Text className="text-textPrimary text-sm font-semibold">{s.label}</Text>
                   {s.detect && (
                     <View className="px-1.5 rounded" style={{ backgroundColor: color }}>
-                      <Text style={{ fontSize: 8, color: '#FFF', fontWeight: '700' }}>DETECT</Text>
+                      <Text style={{ fontSize: 12, color: '#FFF', fontWeight: '700' }}>DETECT</Text>
                     </View>
                   )}
                 </View>
@@ -474,7 +474,7 @@ export default function RiskDetail() {
               <View className="h-1.5 rounded-full bg-border overflow-hidden">
                 <View style={{ width: `${pct}%`, backgroundColor: v > 0 ? color : '#ECECEC' }} className="h-full rounded-full" />
               </View>
-              <Text className="text-textMuted text-[10px] mt-1">{s.desc}</Text>
+              <Text className="text-textMuted text-[12px] mt-1">{s.desc}</Text>
             </View>
           );
         })}
@@ -510,7 +510,7 @@ export default function RiskDetail() {
         </View>
       )}
 
-      <Text className="text-textMuted text-[10px] text-center mb-8 px-2 leading-4">
+      <Text className="text-textMuted text-[12px] text-center mb-8 px-2 leading-4">
         Positioning analysis for informational purposes only — not financial, investment, or legal advice,
         and not a risk rating of any company. All decisions are your own.
       </Text>

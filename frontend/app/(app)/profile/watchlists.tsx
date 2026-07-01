@@ -139,7 +139,7 @@ export default function ProfileWatchlists() {
               className="px-3 py-2 rounded-full flex-row items-center gap-1.5"
               style={{ backgroundColor: on ? '#16264A' : '#FFFFFF', borderColor: on ? '#16264A' : '#ECECEC' }}>
               <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#3C4663' }}>{l.name}</Text>
-              <Text className="text-[10px] font-bold" style={{ color: on ? '#9A9AA2' : '#9A9AA2' }}>{l.items.length}</Text>
+              <Text className="text-[12px] font-bold" style={{ color: on ? '#9A9AA2' : '#9A9AA2' }}>{l.items.length}</Text>
             </TouchableOpacity>
           );
         })}
@@ -147,7 +147,7 @@ export default function ProfileWatchlists() {
           <Plus size={13} color="#2A5B9E" /><Text className="text-xs font-bold" style={{ color: '#2A5B9E' }}>New</Text>
         </TouchableOpacity>
       </View>
-      {current && <Text className="text-textMuted text-[11px] mb-3">Long-press a list to delete it.</Text>}
+      {current && <Text className="text-textMuted text-[12px] mb-3">Long-press a list to delete it.</Text>}
 
       {/* add row — verified search: only a real, linkable topic/instrument can be added.
           Shown even with no list yet (the first add auto-creates "My Watchlist"). */}
@@ -176,8 +176,8 @@ export default function ProfileWatchlists() {
                 <View className="bg-card rounded-xl mt-2 overflow-hidden">
                   {matches.map((e) => (
                     <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between px-3 py-2.5 border-b border-border">
-                      <Text className="text-textPrimary text-[15px]">{titleCaseTopic(e.display)}</Text>
-                      <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
+                      <Text className="text-textPrimary text-[16px]">{titleCaseTopic(e.display)}</Text>
+                      <Text className="text-textMuted text-[12px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -209,7 +209,7 @@ export default function ProfileWatchlists() {
           <View className="flex-row items-center justify-between py-1">
             <View className="flex-1 pr-2">
               <Text className="text-textSecondary text-sm">Text (SMS)</Text>
-              {!phoneVerified && <Text className="text-textMuted text-[10px]">Needs a verified phone (Profile → Notifications)</Text>}
+              {!phoneVerified && <Text className="text-textMuted text-[12px]">Needs a verified phone (Profile → Notifications)</Text>}
             </View>
             <Switch value={!!current.notify_sms} disabled={!phoneVerified} onValueChange={(v) => setNotify({ notify_sms: v })} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
           </View>
@@ -236,16 +236,16 @@ export default function ProfileWatchlists() {
             <View key={it.id} className="bg-card rounded-2xl p-4 mb-2.5 flex-row items-center">
               <TouchableOpacity className="flex-1" onPress={() => openDetail(it)} activeOpacity={0.6}>
                 <Text className="text-textPrimary text-base font-bold">{it.display || it.key}</Text>
-                <Text className="text-textMuted text-[11px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend Signal'}</Text>
+                <Text className="text-textMuted text-[12px] mt-0.5">{it.kind === 'market' ? 'Market Signal' : 'Trend Signal'}</Text>
               </TouchableOpacity>
               {lv ? (
                 <View className="flex-row items-center gap-3 mr-1">
-                  <View className="items-center"><Text className="text-textMuted text-[9px] font-bold">DET</Text><Text style={{ color: DET }} className="text-lg font-black">{det}</Text></View>
-                  <View className="items-center"><Text className="text-textMuted text-[9px] font-bold">CONF</Text><Text style={{ color: CONF }} className="text-lg font-black">{conf}</Text></View>
-                  <View className="items-center"><Text className="text-textMuted text-[9px] font-bold">GAP</Text><Text className="text-lg font-black" style={{ color: Math.abs(gap) >= 20 ? '#B11226' : '#3C4663' }}>{gap > 0 ? '+' : ''}{gap}</Text></View>
+                  <View className="items-center"><Text className="text-textMuted text-[12px] font-bold">DET</Text><Text style={{ color: DET }} className="text-lg font-black">{det}</Text></View>
+                  <View className="items-center"><Text className="text-textMuted text-[12px] font-bold">CONF</Text><Text style={{ color: CONF }} className="text-lg font-black">{conf}</Text></View>
+                  <View className="items-center"><Text className="text-textMuted text-[12px] font-bold">GAP</Text><Text className="text-lg font-black" style={{ color: Math.abs(gap) >= 20 ? '#B11226' : '#3C4663' }}>{gap > 0 ? '+' : ''}{gap}</Text></View>
                 </View>
               ) : (
-                <Text className="text-textMuted text-[11px] mr-2 flex-1 text-right">Not yet scored</Text>
+                <Text className="text-textMuted text-[12px] mr-2 flex-1 text-right">Not yet scored</Text>
               )}
               <TouchableOpacity onPress={() => removeItem(it.id)} className="p-1.5"><X size={16} color="#9A9AA2" /></TouchableOpacity>
             </View>

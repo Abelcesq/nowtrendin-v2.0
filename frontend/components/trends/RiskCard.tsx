@@ -56,13 +56,13 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
           <View style={{ flex: 1 }}>
             <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>{titleCaseTopic(risk.display)}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 9.5, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
               <Text style={{ color }}>{cls}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{score}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 8, fontWeight: '700', letterSpacing: 1 }}>POS</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>POS</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
@@ -79,24 +79,24 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
                     <View className="w-full justify-end" style={{ height: 22 }}>
                       <View style={{ height: h, backgroundColor: v > 0 ? color : '#ECECEC', borderRadius: 3 }} />
                     </View>
-                    <Text style={{ color: '#9A9AA2', fontSize: 8, marginTop: 4 }}>{s.label}</Text>
-                    <Text style={{ color: '#3C4663', fontSize: 9, fontWeight: '700' }}>{v}</Text>
+                    <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 4 }}>{s.label}</Text>
+                    <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '700' }}>{v}</Text>
                   </View>
                 );
               })}
             </View>
 
             {!!(risk.narrative || risk.interpretation) && (
-              <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>
+              <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>
                 {risk.narrative || risk.interpretation}
               </Text>
             )}
 
             {!!risk.sustainability && (
               <View className="flex-row items-center gap-2 mb-3">
-                <Text style={{ color: '#9A9AA2', fontSize: 11 }}>Financial sustainability</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12 }}>Financial sustainability</Text>
                 <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${risk.sustainability.score >= 75 ? '#2E7D5B' : risk.sustainability.score >= 50 ? '#2A5B9E' : risk.sustainability.score >= 30 ? '#A8456A' : '#B11226'}1A` }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: risk.sustainability.score >= 75 ? '#246B4A' : risk.sustainability.score >= 50 ? '#2A5B9E' : risk.sustainability.score >= 30 ? '#A8456A' : '#B11226' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: risk.sustainability.score >= 75 ? '#246B4A' : risk.sustainability.score >= 50 ? '#2A5B9E' : risk.sustainability.score >= 30 ? '#A8456A' : '#B11226' }}>
                     {risk.sustainability.score}/100 · {risk.sustainability.label}
                   </Text>
                 </View>
@@ -106,13 +106,13 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
             {risk.sources.length > 0 && (
               <View className="flex-row items-center gap-1 mb-4">
                 <Globe size={10} color="#9A9AA2" />
-                <Text style={{ color: '#9A9AA2', fontSize: 10, flex: 1 }} numberOfLines={1}>Sources: {risk.sources.join(' · ')}</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, flex: 1 }} numberOfLines={1}>Sources: {risk.sources.join(' · ')}</Text>
               </View>
             )}
 
             <TouchableOpacity onPress={() => router.push(`/risk/${risk.key}`)} activeOpacity={0.85}
               className="flex-row items-center self-start" style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 11, paddingHorizontal: 22 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>FULL DETAIL</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>FULL DETAIL</Text>
               <ArrowRight size={13} color="#F0758A" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           </Rise>

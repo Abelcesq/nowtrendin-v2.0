@@ -13,7 +13,7 @@ function Metric({ label, value, suffix }: { label: string; value: number | strin
         {value}
         {suffix ? <Text className="text-sm text-textMuted">{suffix}</Text> : null}
       </Text>
-      <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">{label}</Text>
+      <Text className="text-textMuted text-[12px] font-bold tracking-wider mt-0.5">{label}</Text>
     </View>
   );
 }

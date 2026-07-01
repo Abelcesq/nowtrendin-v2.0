@@ -58,18 +58,18 @@ export function MethodologyExplainer() {
               style={{ borderColor: `${l.color}33`, backgroundColor: `${l.color}0A` }}
             >
               <View className="flex-row items-center gap-2 mb-1">
-                <Text className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ color: l.color, backgroundColor: `${l.color}1A` }}>
+                <Text className="text-[12px] font-bold px-1.5 py-0.5 rounded" style={{ color: l.color, backgroundColor: `${l.color}1A` }}>
                   {l.tag}
                 </Text>
                 <Text className="text-textPrimary text-sm font-bold flex-1">{l.title}</Text>
               </View>
-              <Text className="text-textMuted text-[11px] leading-5">{l.body}</Text>
+              <Text className="text-textMuted text-[12px] leading-5">{l.body}</Text>
             </View>
           ))}
 
           <View className="rounded-xl px-3 py-3 mt-1" style={{ borderColor: '#A8456A33', backgroundColor: '#A8456A0D' }}>
-            <Text className="text-[11px] font-bold mb-1" style={{ color: '#A8456A' }}>THE DUALITY PRINCIPLE</Text>
-            <Text className="text-textMuted text-[11px] leading-5">
+            <Text className="text-[12px] font-bold mb-1" style={{ color: '#A8456A' }}>THE DUALITY PRINCIPLE</Text>
+            <Text className="text-textMuted text-[12px] leading-5">
               Earlier detection comes with lower certainty; higher certainty needs more data, which means later
               detection. That's why every topic shows two scores — Detection (optimized for earliness) and
               Confidence (optimized for precision). You choose based on your risk tolerance.

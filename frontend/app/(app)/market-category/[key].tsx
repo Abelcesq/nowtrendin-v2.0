@@ -43,7 +43,7 @@ export default function MarketCategoryPage() {
           <Text className="text-textSecondary text-sm font-semibold">Back</Text>
         </TouchableOpacity>
         <View className="flex-1" />
-        <Text className="text-textMuted text-[10px]">{dataWindowLabel(tier)}</Text>
+        <Text className="text-textMuted text-[12px]">{dataWindowLabel(tier)}</Text>
       </View>
 
       {/* Hero */}
@@ -56,7 +56,7 @@ export default function MarketCategoryPage() {
         ) : (
           <Text className="text-3xl font-black uppercase mb-1" style={{ color: cat.color }}>{cat.short}</Text>
         )}
-        <Text className="text-textMuted text-[11px] font-bold uppercase tracking-wider mb-3">{cat.range}</Text>
+        <Text className="text-textMuted text-[12px] font-bold uppercase tracking-wider mb-3">{cat.range}</Text>
         <View className="flex-row items-baseline gap-3">
           <Text className="text-5xl font-black" style={{ color: cat.color }}>{list.length}</Text>
           <Text className="text-textSecondary text-sm">{list.length === 1 ? 'item' : 'items'} in this view</Text>
@@ -65,10 +65,10 @@ export default function MarketCategoryPage() {
 
       {/* Definition */}
       <View className="bg-card rounded-2xl p-5 mb-4">
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-2">What is {cat.short}?</Text>
+        <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2">What is {cat.short}?</Text>
         <Text className="text-textPrimary text-sm leading-5 mb-4">{cat.definition}</Text>
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-2">How an item reaches this view</Text>
-        <Text className="text-textSecondary text-[13px] leading-5">{cat.howReached}</Text>
+        <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2">How an item reaches this view</Text>
+        <Text className="text-textSecondary text-[14px] leading-5">{cat.howReached}</Text>
       </View>
 
       {/* Search within view */}
@@ -89,7 +89,7 @@ export default function MarketCategoryPage() {
               {/* For Leverage Health, surface the score prominently on each card. */}
               {isLeverage && leverageOf(r) != null && (
                 <View className="flex-row items-center justify-end -mb-1 mt-1 pr-1">
-                  <Text className="text-[11px] font-bold" style={{ color: '#2E7D5B' }}>
+                  <Text className="text-[12px] font-bold" style={{ color: '#2E7D5B' }}>
                     Leverage Health {Math.round(leverageOf(r) as number)}/100
                   </Text>
                 </View>
@@ -100,7 +100,7 @@ export default function MarketCategoryPage() {
           {list.length === 0 && (
             <View className="bg-card rounded-2xl p-6 items-center mt-2">
               <Text className="text-textMuted text-center text-sm">No market items currently in this view.</Text>
-              <Text className="text-textMuted text-center text-[11px] mt-1">Check back after the next collection cycle.</Text>
+              <Text className="text-textMuted text-center text-[12px] mt-1">Check back after the next collection cycle.</Text>
             </View>
           )}
           {lockedCount > 0 && (
@@ -109,7 +109,7 @@ export default function MarketCategoryPage() {
         </>
       )}
 
-      <Text className="text-textMuted text-[10px] text-center mt-6 mb-2 px-4 leading-4">
+      <Text className="text-textMuted text-[12px] text-center mt-6 mb-2 px-4 leading-4">
         Now TrendIn provides signal analysis for informational purposes only — not financial,
         investment, or legal advice. All decisions are your own.
       </Text>

@@ -7,7 +7,7 @@ import { Signal, stageColor, stageLabel, timeLabel, titleCaseTopic } from '../..
 function Metric({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View className="items-center w-9">
-      <Text className="text-textMuted text-[9px] font-bold">{label}</Text>
+      <Text className="text-textMuted text-[12px] font-bold">{label}</Text>
       <Text style={{ color }} className="text-base font-black">{value}</Text>
     </View>
   );
@@ -31,15 +31,15 @@ export function HistoryRow({ signal, onPress, selected }: { signal: Signal; onPr
         <Text className="text-textPrimary text-base font-bold">{titleCaseTopic(signal.topic)}</Text>
         <View className="flex-row items-center gap-2 mt-1">
           <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
-            <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
+            <Text style={{ color: col }} className="text-[12px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
           </View>
           {signal.isAnomaly && (
             <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#2E7D5B1A' }}>
               <Flame size={9} color="#2E7D5B" />
-              <Text className="text-[9px] font-bold" style={{ color: '#246B4A' }}>ANOMALY</Text>
+              <Text className="text-[12px] font-bold" style={{ color: '#246B4A' }}>ANOMALY</Text>
             </View>
           )}
-          <Text className="text-textMuted text-[10px]">{timeLabel(signal.createdAt)}</Text>
+          <Text className="text-textMuted text-[12px]">{timeLabel(signal.createdAt)}</Text>
         </View>
       </View>
       <View className="flex-row">

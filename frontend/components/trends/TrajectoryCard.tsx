@@ -62,7 +62,7 @@ export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal;
       <View className="flex-row items-center justify-between mb-1">
         <Text className="text-textPrimary text-base font-bold flex-1 pr-2" numberOfLines={1}>{titleCaseTopic(signal.topic)}</Text>
         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
-          <Text style={{ color: col }} className="text-[9px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
+          <Text style={{ color: col }} className="text-[12px] font-bold tracking-wide">{stageLabel(signal.stage)}</Text>
         </View>
       </View>
       <View className="flex-row gap-4 mb-2">
@@ -117,24 +117,24 @@ export function TrajectoryCard({ signal, windowMs, winLabel }: { signal: Signal;
 
           {sp ? (
             <View className="bg-bg rounded-lg p-2.5 mt-2">
-              <Text className="text-textPrimary text-[11px] font-bold mb-1">{fmtTime(sp.scoredAt)}{sp.stage ? ` · ${stageLabel(sp.stage)}` : ''}</Text>
+              <Text className="text-textPrimary text-[12px] font-bold mb-1">{fmtTime(sp.scoredAt)}{sp.stage ? ` · ${stageLabel(sp.stage)}` : ''}</Text>
               <View className="flex-row flex-wrap" style={{ columnGap: 14, rowGap: 2 }}>
-                <Text className="text-[11px]" style={{ color: DET }}>Det {sp.detection}<Text className="text-textMuted">{delta(sp.detection, prev?.detection)}</Text></Text>
-                <Text className="text-[11px]" style={{ color: CONF }}>Conf {sp.confidence}<Text className="text-textMuted">{delta(sp.confidence, prev?.confidence)}</Text></Text>
-                <Text className="text-[11px] text-textSecondary">Gap {sp.gap}</Text>
-                {sp.mentions != null && <Text className="text-[11px] text-textSecondary">{sp.mentions.toLocaleString()} mentions<Text className="text-textMuted">{delta(sp.mentions, prev?.mentions)}</Text></Text>}
-                {sp.platforms != null && <Text className="text-[11px] text-textSecondary">{sp.platforms} platform{sp.platforms === 1 ? '' : 's'}</Text>}
-                {sp.darkMatter ? <Text className="text-[11px] text-textMuted">dark-matter {sp.darkMatter}</Text> : null}
+                <Text className="text-[12px]" style={{ color: DET }}>Det {sp.detection}<Text className="text-textMuted">{delta(sp.detection, prev?.detection)}</Text></Text>
+                <Text className="text-[12px]" style={{ color: CONF }}>Conf {sp.confidence}<Text className="text-textMuted">{delta(sp.confidence, prev?.confidence)}</Text></Text>
+                <Text className="text-[12px] text-textSecondary">Gap {sp.gap}</Text>
+                {sp.mentions != null && <Text className="text-[12px] text-textSecondary">{sp.mentions.toLocaleString()} mentions<Text className="text-textMuted">{delta(sp.mentions, prev?.mentions)}</Text></Text>}
+                {sp.platforms != null && <Text className="text-[12px] text-textSecondary">{sp.platforms} platform{sp.platforms === 1 ? '' : 's'}</Text>}
+                {sp.darkMatter ? <Text className="text-[12px] text-textMuted">dark-matter {sp.darkMatter}</Text> : null}
               </View>
             </View>
           ) : (
-            <Text className="text-textMuted text-[10px] mt-1.5">Tap the chart to see the factors at each point.</Text>
+            <Text className="text-textMuted text-[12px] mt-1.5">Tap the chart to see the factors at each point.</Text>
           )}
         </>
       )}
 
       <View className="flex-row items-center justify-between mt-2">
-        <Text className="text-textMuted text-[10px]">
+        <Text className="text-textMuted text-[12px]">
           <Text style={{ color: DET }}>● Detection</Text> · <Text style={{ color: CONF }}>● Confidence</Text>
           {winLabel ? ` · ${pts.length} run${pts.length === 1 ? '' : 's'} in ${winLabel}` : ''}
         </Text>

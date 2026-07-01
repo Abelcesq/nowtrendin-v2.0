@@ -39,13 +39,13 @@ export function TopicResearch({ topicKey, topicName }: { topicKey: string; topic
                   key={i}
                   className={isHeading
                     ? 'text-textPrimary text-sm font-bold mt-2 mb-1'
-                    : 'text-textSecondary text-[13px] leading-5 mb-2'}
+                    : 'text-textSecondary text-[14px] leading-5 mb-2'}
                 >
                   {b}
                 </Text>
               );
             })}
-            <Text className="text-textMuted text-[10px] mt-1">AI-generated overview · qualitative context, not investment advice. Any figures are approximate; the measured score and velocity are the engine's.</Text>
+            <Text className="text-textMuted text-[12px] mt-1">AI-generated overview · qualitative context, not investment advice. Any figures are approximate; the measured score and velocity are the engine's.</Text>
           </>
         )}
       </View>

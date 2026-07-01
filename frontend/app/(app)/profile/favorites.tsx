@@ -110,12 +110,12 @@ export default function Favorites() {
         </TouchableOpacity>
       ) : (
         <View className="bg-card rounded-2xl p-4 mt-2">
-          <Text className="text-textMuted text-[11px] mb-1.5">Section</Text>
+          <Text className="text-textMuted text-[12px] mb-1.5">Section</Text>
           <View className="flex-row flex-wrap mb-3">{SECTIONS.map(([s, label]) => chip(section === s, label, () => { setSection(s); setPicked(null); setQuery(''); if (s !== 'history') setFilter(OPTIONS[s][0].k); }))}</View>
 
           {section === 'history' ? (
             <>
-              <Text className="text-textMuted text-[11px] mb-1.5">Search a topic or company</Text>
+              <Text className="text-textMuted text-[12px] mb-1.5">Search a topic or company</Text>
               {picked ? (
                 <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 mb-3" style={{ borderColor: '#2E7D5B' }}>
                   <Text className="text-textPrimary text-base">{titleCaseTopic(picked.display)} <Text className="text-textMuted text-xs">· {picked.kind === 'market' ? 'Market' : 'Trend'}</Text></Text>
@@ -135,8 +135,8 @@ export default function Favorites() {
                     <View className="mb-3">
                       {matches.map((e) => (
                         <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
-                          <Text className="text-textPrimary text-[15px]">{titleCaseTopic(e.display)}</Text>
-                          <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
+                          <Text className="text-textPrimary text-[16px]">{titleCaseTopic(e.display)}</Text>
+                          <Text className="text-textMuted text-[12px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -145,7 +145,7 @@ export default function Favorites() {
               )}
             </>
           ) : (
-            <><Text className="text-textMuted text-[11px] mb-1.5">Filter</Text>
+            <><Text className="text-textMuted text-[12px] mb-1.5">Filter</Text>
               <View className="flex-row flex-wrap mb-3">{OPTIONS[section].map((o) => chip(filter === o.k, o.label, () => setFilter(o.k)))}</View></>
           )}
 

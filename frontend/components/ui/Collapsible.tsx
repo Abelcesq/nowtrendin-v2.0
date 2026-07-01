@@ -37,8 +37,8 @@ export function Collapsible({
     <View style={{ borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
       <TouchableOpacity onPress={toggle} activeOpacity={0.7} className="flex-row items-center py-4">
         <View className="flex-1">
-          <Text style={{ color: '#16264A', fontSize: 13.5, fontWeight: '800', letterSpacing: 0.4 }}>{title}</Text>
-          {!!hint && <Text style={{ color: '#9A9AA2', fontSize: 11, marginTop: 3 }}>{hint}</Text>}
+          <Text style={{ color: '#16264A', fontSize: 14, fontWeight: '800', letterSpacing: 0.4 }}>{title}</Text>
+          {!!hint && <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 3 }}>{hint}</Text>}
         </View>
         <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
       </TouchableOpacity>

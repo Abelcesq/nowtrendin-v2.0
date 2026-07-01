@@ -45,11 +45,11 @@ export function GradientScoreRing({ score, color, size = 'md', label, caption }:
           {score}
         </Text>
         {label && (
-          <Text style={{ color }} className="text-[10px] font-bold tracking-wide">
+          <Text style={{ color }} className="text-[12px] font-bold tracking-wide">
             {label}
           </Text>
         )}
-        {caption && <Text className="text-textMuted text-[9px] mt-0.5">{caption}</Text>}
+        {caption && <Text className="text-textMuted text-[12px] mt-0.5">{caption}</Text>}
       </View>
     </View>
   );

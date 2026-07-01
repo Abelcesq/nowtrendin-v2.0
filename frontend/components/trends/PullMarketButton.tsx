@@ -44,7 +44,9 @@ export function PullMarketButton() {
   return (
     <View>
       {!!msg && (
-        <Text style={{ color: '#16264A', fontSize: 11, fontWeight: '600', textAlign: 'center', marginBottom: 8 }}>{msg}</Text>
+        <View style={{ alignSelf: 'center', maxWidth: '100%', backgroundColor: '#FFFFFF', borderRadius: 980, paddingVertical: 7, paddingHorizontal: 16, marginBottom: 10, shadowColor: '#0C1B3A', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}>
+          <Text numberOfLines={2} style={{ color: '#16264A', fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{msg}</Text>
+        </View>
       )}
       <TouchableOpacity
         onPress={pull}
@@ -58,14 +60,14 @@ export function PullMarketButton() {
         }}
       >
         {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Sparkles size={16} color="#F0758A" />}
-        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800', letterSpacing: 1.2, marginLeft: 8 }}>
+        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1.2, marginLeft: 8 }}>
           {tokens <= 0 ? 'NO TOKENS LEFT' : 'PULL MARKET DATA'}
         </Text>
         {tokens > 0 && (
-          <Text style={{ color: '#F0758A', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginLeft: 8 }}>· 1 TOKEN</Text>
+          <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 0.5, marginLeft: 8 }}>· 1 TOKEN</Text>
         )}
       </TouchableOpacity>
-      <Text style={{ color: '#9A9AA2', fontSize: 9.5, fontWeight: '700', letterSpacing: 1, textAlign: 'center', marginTop: 7 }}>
+      <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, textAlign: 'center', marginTop: 7 }}>
         {tokens.toLocaleString()} TOKENS REMAINING
       </Text>
     </View>

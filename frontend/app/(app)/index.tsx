@@ -72,11 +72,9 @@ export default function Dashboard() {
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
   const greeting =
-    hour >= 1 && hour < 11 ? 'Good morning'
-      : hour >= 11 && hour < 15 ? 'Good day'
-      : hour >= 15 && hour < 18 ? 'Good afternoon'
-      : hour >= 18 && hour < 21 ? 'Good evening'
-      : 'Good night';
+    hour < 12 ? 'Good morning'          // 12:00am – 11:59am
+      : hour < 18 ? 'Good afternoon'    // 12:00pm – 5:59pm
+      : 'Good evening';                 // 6:00pm – 11:59pm
 
   // Reset the visible window whenever the feed/filter/mode changes.
   useEffect(() => { setVisible(PAGE); }, [mode, contentCat, query, marketQuery]);
@@ -128,7 +126,7 @@ export default function Dashboard() {
             <Logo size={34} />
             <View>
               <Wordmark size="text-xl" />
-              <Text className="text-textMuted text-[10px] tracking-widest uppercase">Attention Intelligence</Text>
+              <Text className="text-textMuted text-[12px] tracking-widest uppercase">Attention Intelligence</Text>
             </View>
           </View>
           <View className="flex-row items-center gap-4">
@@ -140,17 +138,17 @@ export default function Dashboard() {
         {/* Greeting + tier status */}
         <Rise>
           <View className="mt-7">
-            <Text className="text-textPrimary text-[11px] font-extrabold tracking-[2.5px] uppercase">{greeting}, {firstName}</Text>
-            <Text className="text-textPrimary text-[33px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
-              {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up.</Text>
+            <Text className="text-textPrimary text-[12px] font-extrabold tracking-[2.5px] uppercase">{greeting}, {firstName}</Text>
+            <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
+              {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
             </Text>
             <View className="flex-row items-center gap-2.5 mt-3.5">
               <View className="flex-row items-center gap-1.5">
                 <TierBadgeIcon size={13} color={cfg.colour} />
-                <Text className="text-textPrimary text-[10.5px] font-extrabold tracking-[1.6px] uppercase">{cfg.name}</Text>
+                <Text className="text-textPrimary text-[12px] font-extrabold tracking-[1.6px] uppercase">{cfg.name}</Text>
               </View>
-              <Text className="text-[11px] font-bold" style={{ color: '#D6D6DC' }}>·</Text>
-              <Text className="text-textMuted text-[10px] font-bold tracking-[1.4px] uppercase">Updated {lastUpdated}</Text>
+              <Text className="text-[12px] font-bold" style={{ color: '#D6D6DC' }}>·</Text>
+              <Text className="text-textMuted text-[12px] font-bold tracking-[1.4px] uppercase">Updated {lastUpdated}</Text>
             </View>
           </View>
         </Rise>
@@ -177,13 +175,13 @@ export default function Dashboard() {
                   <LinearGradient colors={['#1B3066', '#0C1B3A', '#1A1442']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 24 }}>
                     <View style={{ position: 'absolute', right: -34, top: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(201,162,75,0.13)' }} />
                     <View style={{ position: 'absolute', left: -44, bottom: -54, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(177,18,38,0.16)' }} />
-                    <Text style={{ color: '#F0758A', fontSize: 10, fontWeight: '800', letterSpacing: 2.2 }}>TODAY'S #1 · NOWTRENDIN PICK</Text>
+                    <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 2.2 }}>TODAY'S #1 · NOWTRENDIN PICK</Text>
                     <Text numberOfLines={2} style={{ color: '#FBF4E4', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginTop: 11, lineHeight: 33 }}>{titleCaseTopic(topPick.topic)}</Text>
                     <View className="flex-row items-end justify-between" style={{ marginTop: 16 }}>
-                      <Text style={{ color: '#B9C4E0', fontSize: 12.5, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>{actionLine(topPick.stage)}</Text>
+                      <Text style={{ color: '#B9C4E0', fontSize: 12, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>{actionLine(topPick.stage)}</Text>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: '#E2C275', fontSize: 46, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topPick.score}</Text>
-                        <Text style={{ color: '#C9A24B', fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
+                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topPick.score}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
                       </View>
                     </View>
                     <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>
@@ -198,7 +196,7 @@ export default function Dashboard() {
             {/* ONE filter row only — pick a single category to filter the list (or All).
                 Removed the parallel "Signal" row, which made it look like two filters
                 could be combined when they couldn't. One clear control. */}
-            <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mt-7 mb-2.5">Filter by Category</Text>
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-7 mb-2.5">Filter by Category</Text>
             <View style={{ marginHorizontal: -20 }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
                 {[{ key: 'all', label: 'All', color: '#16264A' }, ...CONTENT_CATEGORIES].map((c) => {
@@ -208,8 +206,8 @@ export default function Dashboard() {
                   return (
                     <TouchableOpacity key={c.key} onPress={() => setContentCat(c.key)} disabled={empty} activeOpacity={0.8} className="flex-row items-center rounded-full"
                       style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? c.color : '#F1F1F4', borderColor: on ? c.color : '#ECECEC', opacity: empty ? 0.4 : 1 }}>
-                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 11.5, fontWeight: '700' }}>{c.label}</Text>
-                      {count > 0 && <Text style={{ color: on ? '#FFFFFF' : '#9A9AA2', fontSize: 10, fontWeight: '800', marginLeft: 7 }}>{count}</Text>}
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{c.label}</Text>
+                      {count > 0 && <Text style={{ color: on ? '#FFFFFF' : '#9A9AA2', fontSize: 12, fontWeight: '800', marginLeft: 7 }}>{count}</Text>}
                     </TouchableOpacity>
                   );
                 })}
@@ -222,12 +220,12 @@ export default function Dashboard() {
             </View>
 
             <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase">More Trending</Text>
-            <Text className="text-textMuted text-[10.5px] font-semibold mt-1">Ranked by score, after #1</Text>
-            <Text className="text-textMuted text-[10.5px] mt-2 mb-3">Tap any trend to open its full breakdown.</Text>
+            <Text className="text-textMuted text-[12px] font-semibold mt-1">Ranked by score, after #1</Text>
+            <Text className="text-textMuted text-[12px] mt-2 mb-3">Tap any trend to open its full breakdown.</Text>
 
             {isSample && (
               <View className="rounded-lg px-3 py-2 mb-4 bg-card">
-                <Text className="text-textMuted text-[11px]">Showing sample data — live engine unreachable.</Text>
+                <Text className="text-textMuted text-[12px]">Showing sample data — live engine unreachable.</Text>
               </View>
             )}
 
@@ -240,7 +238,7 @@ export default function Dashboard() {
                 ))}
                 {ranked.length === 0 && <Text className="text-textMuted text-center mt-8 mb-4">No trends match your search.</Text>}
                 {visible < rest.length && (
-                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 11, letterSpacing: 0.5 }}>
+                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 12, letterSpacing: 0.5 }}>
                     Showing {visible + 1} of {ranked.length} · scroll for more
                   </Text>
                 )}
@@ -259,14 +257,14 @@ export default function Dashboard() {
               <TextInput value={marketQuery} onChangeText={setMarketQuery} placeholder="Search market signals" placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
             </View>
 
-            <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-2.5">Market</Text>
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2.5">Market</Text>
             <View style={{ marginHorizontal: -20 }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
                 {MARKET_CATEGORY_DEFS.map((c) => (
                   <TouchableOpacity key={c.key} onPress={() => goToMarketCategory(c.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
                     style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: '#F1F1F4', borderColor: '#ECECEC' }}>
                     <View style={{ width: 6, height: 6, borderRadius: 3, marginRight: 8, backgroundColor: c.color }} />
-                    <Text style={{ color: '#3C4663', fontSize: 11.5, fontWeight: '700' }}>{c.short ?? c.label}</Text>
+                    <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '700' }}>{c.short ?? c.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -276,7 +274,7 @@ export default function Dashboard() {
             <View className="mt-4"><MacroLeverageCard /></View>
 
             <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mt-6">Market Signals</Text>
-            <Text className="text-textMuted text-[10.5px] font-semibold mt-1 mb-3">{dataWindowLabel(tier)} · tap any to expand</Text>
+            <Text className="text-textMuted text-[12px] font-semibold mt-1 mb-3">{dataWindowLabel(tier)} · tap any to expand</Text>
 
             {riskLoading ? (
               <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
@@ -288,7 +286,7 @@ export default function Dashboard() {
               <>
                 {marketFiltered.slice(0, visible).map((r) => <RiskCard key={r.key} risk={r} />)}
                 {visible < marketFiltered.length && (
-                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 11, letterSpacing: 0.5 }}>
+                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 12, letterSpacing: 0.5 }}>
                     Showing {visible} of {marketFiltered.length} · scroll for more
                   </Text>
                 )}
@@ -300,7 +298,7 @@ export default function Dashboard() {
           </>
         )}
 
-        <Text className="text-textMuted text-[10px] text-center mt-8 mb-2 px-4 leading-4">
+        <Text className="text-textMuted text-[12px] text-center mt-8 mb-2 px-4 leading-4">
           Now TrendIn provides signal analysis for informational purposes only — not financial,
           investment, or legal advice. All decisions are your own.
         </Text>

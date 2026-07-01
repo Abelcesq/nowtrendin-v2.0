@@ -105,7 +105,7 @@ export default function Alerts() {
                 {a.kind === 'market' ? 'Market' : 'Trend'} · when {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
               {a.last_triggered_at && (
-                <Text className="text-[11px] font-bold mt-1" style={{ color: '#246B4A' }}>
+                <Text className="text-[12px] font-bold mt-1" style={{ color: '#246B4A' }}>
                   🔔 Triggered {ageLabel(Date.parse(a.last_triggered_at))}
                 </Text>
               )}
@@ -120,7 +120,7 @@ export default function Alerts() {
 
       <Text className="text-textSecondary text-xs uppercase tracking-wider mb-2 mt-5">Create new alert</Text>
       <View className="bg-card rounded-2xl p-4">
-        <Text className="text-textMuted text-[11px] mb-1">Topic — search and select a verified topic or market signal</Text>
+        <Text className="text-textMuted text-[12px] mb-1">Topic — search and select a verified topic or market signal</Text>
         {picked ? (
           <TouchableOpacity onPress={() => setPicked(null)} className="flex-row items-center justify-between bg-bg rounded-lg px-3 py-2.5 mb-3" style={{ borderColor: '#2E7D5B' }}>
             <View className="flex-row items-center gap-2 flex-1">
@@ -141,8 +141,8 @@ export default function Alerts() {
               <View className="mb-3">
                 {matches.map((e) => (
                   <TouchableOpacity key={`${e.kind}:${e.key}`} onPress={() => { setPicked(e); setQuery(''); }} className="flex-row items-center justify-between py-2 border-b border-border">
-                    <Text className="text-textPrimary text-[15px]">{titleCaseTopic(e.display)}</Text>
-                    <Text className="text-textMuted text-[11px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
+                    <Text className="text-textPrimary text-[16px]">{titleCaseTopic(e.display)}</Text>
+                    <Text className="text-textMuted text-[12px]">{e.kind === 'market' ? 'Market' : 'Trend'}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -150,7 +150,7 @@ export default function Alerts() {
           </>
         )}
 
-        <Text className="text-textMuted text-[11px] mb-1">Score type</Text>
+        <Text className="text-textMuted text-[12px] mb-1">Score type</Text>
         <View className="flex-row gap-2 mb-3">
           {SCORE_TYPES.map((st) => {
             const active = scoreType === st;
@@ -162,7 +162,7 @@ export default function Alerts() {
           })}
         </View>
 
-        <Text className="text-textMuted text-[11px] mb-1">Alert when score reaches</Text>
+        <Text className="text-textMuted text-[12px] mb-1">Alert when score reaches</Text>
         <View className="flex-row items-center gap-4 mb-3">
           <TouchableOpacity onPress={() => bump(-5)} className="w-9 h-9 rounded-full items-center justify-center">
             <Minus size={16} color="#3C4663" />
@@ -184,7 +184,7 @@ export default function Alerts() {
         <View className="flex-row items-center justify-between py-1 mb-3">
           <View className="flex-1 pr-2">
             <Text className="text-textSecondary text-sm">Text (SMS)</Text>
-            <Text className="text-textMuted text-[10px]">Needs a verified phone (Profile → Notifications)</Text>
+            <Text className="text-textMuted text-[12px]">Needs a verified phone (Profile → Notifications)</Text>
           </View>
           <Switch value={sms} onValueChange={setSms} trackColor={{ true: '#2E7D5B', false: '#ECECEC' }} thumbColor="#FFFFFF" />
         </View>

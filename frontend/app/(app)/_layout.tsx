@@ -51,7 +51,7 @@ function NowTabBar({ state, descriptors, navigation }: any) {
             style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 2 }}
           >
             {options.tabBarIcon ? options.tabBarIcon({ focused, color, size: 22 }) : null}
-            <Text style={{ fontSize: 10.5, fontWeight: '700', color, marginTop: 4 }}>{label}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color, marginTop: 4 }}>{label}</Text>
           </TouchableOpacity>
         );
       })}

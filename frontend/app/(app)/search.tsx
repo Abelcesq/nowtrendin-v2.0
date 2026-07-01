@@ -83,7 +83,7 @@ function TrendsSearch({ tier }: { tier: TierID }) {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search trends…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">{results.length} trend{results.length === 1 ? '' : 's'} in your data window</Text>
+      <Text className="text-textMuted text-[12px] mb-2">{results.length} trend{results.length === 1 ? '' : 's'} in your data window</Text>
       {isLoading ? <ActivityIndicator size="large" color="#2E7D5B" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No trends match "${q}".`} />
         : results.map((s) => <TrendCard key={s.id} signal={s} />)}
@@ -100,7 +100,7 @@ function MarketSearch({ tier }: { tier: TierID }) {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search market topics…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">{results.length} market item{results.length === 1 ? '' : 's'} in your data window</Text>
+      <Text className="text-textMuted text-[12px] mb-2">{results.length} market item{results.length === 1 ? '' : 's'} in your data window</Text>
       {isLoading ? <ActivityIndicator size="large" color="#B11226" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No market topics match "${q}".`} />
         : results.map((r) => <RiskCard key={r.key} risk={r} />)}
@@ -122,7 +122,7 @@ function GradedSearch() {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search graded topics…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">Topics graded by members across all plans — free to view.</Text>
+      <Text className="text-textMuted text-[12px] mb-2">Topics graded by members across all plans — free to view.</Text>
       {loading ? <ActivityIndicator size="small" color="#A8456A" style={{ marginTop: 28 }} />
         : rows.length === 0 ? <Empty text={q ? `No graded topics match "${q}".` : 'No topics have been graded yet.'} />
         : rows.map((g) => {
@@ -131,12 +131,12 @@ function GradedSearch() {
               <View key={g.id} className="bg-card rounded-xl p-3 mb-2">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{titleCaseTopic(g.topic)}</Text>
-                  {!!g.stage && <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}><Text className="text-[9px] font-bold" style={{ color: col }}>{g.stage}</Text></View>}
+                  {!!g.stage && <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}><Text className="text-[12px] font-bold" style={{ color: col }}>{g.stage}</Text></View>}
                 </View>
                 <View className="flex-row items-center gap-3 mt-1">
-                  <Text className="text-[11px]" style={{ color: '#2A5B9E' }}>DET {Math.round(g.detection)}</Text>
-                  <Text className="text-[11px]" style={{ color: '#2E7D5B' }}>CONF {Math.round(g.confidence)}</Text>
-                  <Text className="text-textMuted text-[11px] ml-auto">{timeAgo(g.createdAt)}</Text>
+                  <Text className="text-[12px]" style={{ color: '#2A5B9E' }}>DET {Math.round(g.detection)}</Text>
+                  <Text className="text-[12px]" style={{ color: '#2E7D5B' }}>CONF {Math.round(g.confidence)}</Text>
+                  <Text className="text-textMuted text-[12px] ml-auto">{timeAgo(g.createdAt)}</Text>
                 </View>
               </View>
             );

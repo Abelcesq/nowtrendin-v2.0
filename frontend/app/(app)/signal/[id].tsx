@@ -50,8 +50,8 @@ function Section({ title, hint, defaultOpen = false, children }: {
     <View style={{ borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
       <TouchableOpacity onPress={toggle} activeOpacity={0.7} className="flex-row items-center py-4">
         <View className="flex-1">
-          <Text style={{ color: '#16264A', fontSize: 13.5, fontWeight: '800', letterSpacing: 0.4 }}>{title}</Text>
-          {!!hint && <Text style={{ color: '#9A9AA2', fontSize: 11, marginTop: 3 }}>{hint}</Text>}
+          <Text style={{ color: '#16264A', fontSize: 14, fontWeight: '800', letterSpacing: 0.4 }}>{title}</Text>
+          {!!hint && <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 3 }}>{hint}</Text>}
         </View>
         <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
       </TouchableOpacity>
@@ -104,15 +104,15 @@ export default function SignalDetail() {
       </TouchableOpacity>
 
       {/* ── Header: the essentials only ── */}
-      <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '800', letterSpacing: 2 }}>SIGNAL INTEL</Text>
-      <Text style={{ color: '#16264A', fontSize: 30, fontWeight: '800', letterSpacing: -0.6, marginTop: 6, lineHeight: 35 }}>
+      <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '800', letterSpacing: 2 }}>SIGNAL INTEL</Text>
+      <Text style={{ color: '#16264A', fontSize: 28, fontWeight: '800', letterSpacing: -0.6, marginTop: 6, lineHeight: 35 }}>
         {titleCaseTopic(signal.topic)}
       </Text>
       <View className="flex-row items-center gap-2 mt-3">
         <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: `${color}1A` }}>
-          <Text style={{ color, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6 }}>{stageLabel(signal.stage)}</Text>
+          <Text style={{ color, fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>{stageLabel(signal.stage)}</Text>
         </View>
-        <Text style={{ color: '#9A9AA2', fontSize: 11.5, fontWeight: '500' }}>
+        <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '500' }}>
           {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
         </Text>
       </View>
@@ -124,19 +124,19 @@ export default function SignalDetail() {
           <View className="items-center">
             <GradientScoreRing score={signal.detection} color={SCORE_ROLES.detection.color} size="lg" caption="/100" />
             <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800', marginTop: 8, letterSpacing: 0.5 }}>DETECTION</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 10 }}>{SCORE_ROLES.detection.falsePositive}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12 }}>{SCORE_ROLES.detection.falsePositive}</Text>
           </View>
           <View className="items-center">
             <GradientScoreRing score={signal.confidence} color={SCORE_ROLES.confidence.color} size="lg" caption="/100" />
             <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800', marginTop: 8, letterSpacing: 0.5 }}>CONFIDENCE</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 10 }}>{SCORE_ROLES.confidence.falsePositive}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12 }}>{SCORE_ROLES.confidence.falsePositive}</Text>
           </View>
         </View>
         <View className="rounded-2xl px-4 py-3 mt-5" style={{ backgroundColor: agree ? '#2E7D5B0F' : '#B112260D' }}>
-          <Text style={{ color: agree ? '#246B4A' : '#B11226', fontSize: 13, fontWeight: '800' }}>
+          <Text style={{ color: agree ? '#246B4A' : '#B11226', fontSize: 14, fontWeight: '800' }}>
             {gap}-point gap — {agree ? `scores aligned at ${stageLabel(signal.stage)}` : 'early stage, confirmation building'}
           </Text>
-          <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, marginTop: 6, fontWeight: '500' }}>
+          <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, marginTop: 6, fontWeight: '500' }}>
             {action.title}{action.body ? ` ${action.body}` : ''}
           </Text>
         </View>
@@ -145,18 +145,18 @@ export default function SignalDetail() {
       {/* ── Everything deeper: collapsed by default ── */}
       <View className="mt-5">
         <Section title={`Now TrendIn demand · N ${n}`} hint="On-platform query demand for this topic">
-          <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500' }}>
+          <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500' }}>
             How often Now TrendIn users have asked the engine about this topic — real institutional
             curiosity no public source can see. The headline scores above stay demand-free.
           </Text>
           {n > 0 && signal.nowTrendingGradientDetection != null && signal.nowTrendingGradientConfidence != null && (
             <View className="flex-row gap-3 mt-4">
               <View className="flex-1 rounded-2xl p-3" style={{ borderColor: '#2A5B9E33', backgroundColor: '#2A5B9E0A' }}>
-                <Text style={{ color: '#9A9AA2', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>DETECTION + N</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>DETECTION + N</Text>
                 <Text style={{ color: '#2A5B9E', fontSize: 22, fontWeight: '800' }}>{Math.round(signal.nowTrendingGradientDetection)}</Text>
               </View>
               <View className="flex-1 rounded-2xl p-3" style={{ borderColor: '#2E7D5B33', backgroundColor: '#2E7D5B0A' }}>
-                <Text style={{ color: '#9A9AA2', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>CONFIDENCE + N</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>CONFIDENCE + N</Text>
                 <Text style={{ color: '#2E7D5B', fontSize: 22, fontWeight: '800' }}>{Math.round(signal.nowTrendingGradientConfidence)}</Text>
               </View>
             </View>
@@ -171,7 +171,7 @@ export default function SignalDetail() {
 
         <Section title="Why the two scores differ" hint="Detection leads speed, Confidence leads precision">
           {!!signal.gapMeaning && (
-            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>{signal.gapMeaning}</Text>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>{signal.gapMeaning}</Text>
           )}
           <DualScoreAnalysis signal={signal} />
           <View className="h-4" />
@@ -182,13 +182,13 @@ export default function SignalDetail() {
           <Section title="What this means" hint="Why it matters and what to watch">
             {!!signal.why && (
               <>
-                <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHY THIS MATTERS</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHY THIS MATTERS</Text>
                 <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 22, marginBottom: 16 }}>{signal.why}</Text>
               </>
             )}
             {!!signal.whatToWatch && (
               <>
-                <Text style={{ color: '#9A9AA2', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHAT TO WATCH</Text>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHAT TO WATCH</Text>
                 <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 22 }}>{signal.whatToWatch}</Text>
               </>
             )}
@@ -198,12 +198,12 @@ export default function SignalDetail() {
         <Section title="Score breakdown" hint="The components behind the score">
           {groups.map((g) => (
             <View key={g.title} className="mb-4">
-              <Text style={{ color: '#16264A', fontSize: 12.5, fontWeight: '700', marginBottom: 8 }}>{g.title}</Text>
+              <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{g.title}</Text>
               {g.items.map((it) => (
                 <View key={it.label} className="mb-2.5">
                   <View className="flex-row justify-between mb-1">
-                    <Text style={{ color: '#3C4663', fontSize: 12.5, flex: 1, paddingRight: 8 }}>{it.label}</Text>
-                    <Text style={{ color: '#16264A', fontSize: 12.5, fontWeight: '700' }}>
+                    <Text style={{ color: '#3C4663', fontSize: 12, flex: 1, paddingRight: 8 }}>{it.label}</Text>
+                    <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
                       {it.value}{it.conf != null ? <Text style={{ color: '#9A9AA2' }}> / {it.conf}</Text> : null}
                     </Text>
                   </View>
@@ -218,7 +218,7 @@ export default function SignalDetail() {
 
         <Section title="Research & variations" hint="Plain-English context for this trend">
           {!!signal.scoreExplanation && (
-            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, marginBottom: 12, fontWeight: '500' }}>{signal.scoreExplanation}</Text>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, marginBottom: 12, fontWeight: '500' }}>{signal.scoreExplanation}</Text>
           )}
           <TopicVariationMap variations={signal.variations} />
           <TopicResearch topicKey={signal.id} topicName={signal.topic} />
@@ -234,10 +234,10 @@ export default function SignalDetail() {
 
         {!!signal.maturityClass && (
           <Section title="Topic maturity" hint={signal.maturityBadge || signal.maturityClass}>
-            <Text style={{ color: '#3C4663', fontSize: 13, lineHeight: 20, fontWeight: '500' }}>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500' }}>
               {signal.maturityReason || MATURITY_EXPLAIN[signal.maturityClass] || ''}
             </Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 10, marginTop: 8 }}>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 8 }}>
               Lifecycle stage from the calibration engine · re-evaluated each scoring cycle
             </Text>
           </Section>
@@ -260,11 +260,11 @@ export default function SignalDetail() {
         style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 16 }}
       >
         <Bell size={17} color="#FFFFFF" />
-        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', letterSpacing: 0.5, marginLeft: 8 }}>Set an alert for this topic</Text>
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 0.5, marginLeft: 8 }}>Set an alert for this topic</Text>
         <ArrowRight size={15} color="#F0758A" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
 
-      <Text style={{ color: '#9A9AA2', fontSize: 10, textAlign: 'center', marginTop: 6, lineHeight: 15 }}>
+      <Text style={{ color: '#9A9AA2', fontSize: 12, textAlign: 'center', marginTop: 6, lineHeight: 15 }}>
         Signal analysis only — not financial, investment, or legal advice. You decide any action.
       </Text>
     </Screen>

@@ -122,7 +122,7 @@ export default function EditProfile() {
         <ShieldCheck size={14} color="#2E7D5B" />
         <Text className="text-textSecondary text-xs font-semibold">Phone (extra security)</Text>
         {user?.phone ? (
-          <Text className="text-[10px] font-bold" style={{ color: user?.phoneVerified ? '#246B4A' : '#A8456A' }}>
+          <Text className="text-[12px] font-bold" style={{ color: user?.phoneVerified ? '#246B4A' : '#A8456A' }}>
             {user?.phoneVerified ? 'VERIFIED' : 'UNVERIFIED'}
           </Text>
         ) : null}
@@ -142,7 +142,7 @@ export default function EditProfile() {
           />
         </View>
       </View>
-      <Text className="text-textMuted text-[11px] mb-3 mt-1">
+      <Text className="text-textMuted text-[12px] mb-3 mt-1">
         Pick your country code and enter your number, then verify it below for two-factor security.
       </Text>
 

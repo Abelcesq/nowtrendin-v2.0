@@ -28,14 +28,14 @@ function Indicator({
         className="w-6 h-6 rounded-full items-center justify-center mt-0.5"
         style={{ backgroundColor: active ? '#6B4FA022' : '#FFFFFF', borderColor: c }}
       >
-        <Text style={{ color: c, fontSize: 11 }}>{active ? '●' : '○'}</Text>
+        <Text style={{ color: c, fontSize: 12 }}>{active ? '●' : '○'}</Text>
       </View>
       <View className="flex-1">
         <View className="flex-row items-center gap-2 mb-0.5">
           <Text className="text-sm font-bold" style={{ color: active ? '#6B4FA0' : '#3C4663' }}>{label}</Text>
-          <Text className="text-[10px] font-bold px-1.5 rounded" style={{ color: c, backgroundColor: `${c}1A` }}>{value}</Text>
+          <Text className="text-[12px] font-bold px-1.5 rounded" style={{ color: c, backgroundColor: `${c}1A` }}>{value}</Text>
         </View>
-        <Text className="text-textMuted text-[11px] leading-4">{desc}</Text>
+        <Text className="text-textMuted text-[12px] leading-4">{desc}</Text>
       </View>
     </View>
   );
@@ -85,7 +85,7 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         }
       />
 
-      <Text className="text-textMuted text-[10px] mt-1 leading-4">
+      <Text className="text-textMuted text-[12px] mt-1 leading-4">
         Dark Matter is probabilistic, not deterministic — it flags public behavior that has historically
         preceded trend emergence, not a confirmed private signal.
       </Text>

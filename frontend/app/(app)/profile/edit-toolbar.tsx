@@ -75,7 +75,7 @@ export default function EditToolbar() {
             <View className="flex-row items-center gap-3">
               <Icon size={20} color={on ? '#2E7D5B' : '#8A8F9C'} />
               <Text className="text-textPrimary text-base">{c.label}</Text>
-              {gated && <View className="flex-row items-center gap-1"><Lock size={12} color="#8A8F9C" /><Text className="text-textMuted text-[11px]">Upgrade</Text></View>}
+              {gated && <View className="flex-row items-center gap-1"><Lock size={12} color="#8A8F9C" /><Text className="text-textMuted text-[12px]">Upgrade</Text></View>}
             </View>
             {on ? (
               <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: '#2E7D5B' }}>

@@ -24,7 +24,7 @@ export function RiskExplainer({ onDismiss }: { onDismiss: () => void }) {
         Reserve / OFR data, FINRA, and official APIs — so a high score means activity is unusual for that
         item, not that it is "risky."
       </Text>
-      <Text className="text-textMuted text-[11px] leading-4 mb-3">
+      <Text className="text-textMuted text-[12px] leading-4 mb-3">
         Analysis only — not financial, investment, or legal advice, and not a risk rating. All data is public,
         government-published, or accessed via official APIs; results are proprietary to Now TrendIn under your Terms of Service.
       </Text>

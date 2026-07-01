@@ -8,7 +8,7 @@ function Block({ title, color, children }: { title: string; color: string; child
   return (
     <View className="bg-card rounded-2xl p-4 mb-3">
       <Text className="text-sm font-bold mb-1.5" style={{ color }}>{title}</Text>
-      <Text className="text-textSecondary text-[13px] leading-5">{children}</Text>
+      <Text className="text-textSecondary text-[14px] leading-5">{children}</Text>
     </View>
   );
 }

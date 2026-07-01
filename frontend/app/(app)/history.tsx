@@ -63,7 +63,7 @@ export default function History() {
         {/* Window toggle + sort + refresh */}
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center gap-2">
-            <Text className="text-textMuted text-[10px] font-bold tracking-wider">WINDOW</Text>
+            <Text className="text-textMuted text-[12px] font-bold tracking-wider">WINDOW</Text>
             <View className="flex-row gap-1.5">
               {WINDOWS.map((w) => {
                 const active = win === w.k;
@@ -107,7 +107,7 @@ export default function History() {
           {query ? <TouchableOpacity onPress={() => setQuery('')} className="ml-2"><X size={16} color="#9A9AA2" /></TouchableOpacity> : null}
         </View>
 
-        <Text className="text-textSecondary text-[11px] mb-2">
+        <Text className="text-textSecondary text-[12px] mb-2">
           <Text className="font-bold text-textPrimary">{filtered.length}</Text> topics scored in the last {winLabel}
         </Text>
 
@@ -115,8 +115,8 @@ export default function History() {
         {selected && (
           <View className="mt-1">
             <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-textMuted text-[10px] font-bold tracking-wider">SCORE TRAJECTORY</Text>
-              <TouchableOpacity onPress={() => setSelected(null)}><Text className="text-textMuted text-[11px]">Hide</Text></TouchableOpacity>
+              <Text className="text-textMuted text-[12px] font-bold tracking-wider">SCORE TRAJECTORY</Text>
+              <TouchableOpacity onPress={() => setSelected(null)}><Text className="text-textMuted text-[12px]">Hide</Text></TouchableOpacity>
             </View>
             <TrajectoryCard signal={selected} windowMs={windowMs} winLabel={winLabel} />
           </View>
@@ -130,7 +130,7 @@ export default function History() {
           {groups.map((g) => (
             <View key={g.day}>
               <View className="bg-bg px-5 py-2">
-                <Text className="text-textMuted text-[10px] font-bold tracking-wider">
+                <Text className="text-textMuted text-[12px] font-bold tracking-wider">
                   {g.day} · {g.items.length} topics
                 </Text>
               </View>

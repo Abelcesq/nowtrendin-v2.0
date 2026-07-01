@@ -4,6 +4,20 @@ module.exports = {
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
+      // === Aurora type scale (standardized; min 12px for mobile readability) ===
+      // 12 caption/label · 14 small · 16 body · 18 row title · 22 card title ·
+      // 28 screen title · 32 hero headline · 44 hero score.
+      fontSize: {
+        xs:    ['12px', '16px'],  // caption / label (minimum)
+        sm:    ['14px', '20px'],  // small / secondary text
+        base:  ['16px', '23px'],  // body
+        lg:    ['18px', '24px'],  // row title / subheading
+        xl:    ['22px', '28px'],  // card title
+        '2xl': ['22px', '28px'],  // card title (alias)
+        '3xl': ['28px', '34px'],  // screen / detail title
+        '4xl': ['32px', '38px'],  // hero headline
+        '5xl': ['44px', '46px'],  // hero score (special)
+      },
       colors: {
         // === Aurora design system ===
         // Midnight blue is the dominant brand/action color (was neon green).

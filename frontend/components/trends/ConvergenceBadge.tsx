@@ -33,11 +33,11 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
       <View className="rounded-xl px-3 py-2.5 mt-3 bg-bg">
         <View className="flex-row items-center gap-1.5 mb-0.5">
           <GitMerge size={13} color="#9A9AA2" />
-          <Text className="text-textMuted text-[11px] font-bold tracking-wide uppercase">
+          <Text className="text-textMuted text-[12px] font-bold tracking-wide uppercase">
             Signal Convergence
           </Text>
         </View>
-        <Text className="text-textMuted text-[11px] leading-4">
+        <Text className="text-textMuted text-[12px] leading-4">
           Warming up — needs {c.needed ?? 3} daily snapshots to validate direction
           ({c.snapshots ?? 0} so far). The reading appears once history accumulates.
         </Text>
@@ -54,12 +54,12 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
       {/* Header: overall convergence verdict + direction */}
       <View className="flex-row items-center gap-2 mb-2">
         <GitMerge size={14} color={col} />
-        <Text className="text-[11px] font-bold tracking-wide uppercase" style={{ color: col }}>
+        <Text className="text-[12px] font-bold tracking-wide uppercase" style={{ color: col }}>
           Signal Convergence
         </Text>
         <View className="flex-row items-center gap-1 ml-auto">
           <DirIcon dir={c.direction} />
-          <Text className="text-textSecondary text-[11px] font-semibold">{c.direction}</Text>
+          <Text className="text-textSecondary text-[12px] font-semibold">{c.direction}</Text>
         </View>
       </View>
 
@@ -71,10 +71,10 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
       {!!c.vsGradient && (
         <View className="mb-2">
           <View className="flex-row items-center gap-1.5 mb-0.5">
-            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wide">
+            <Text className="text-textMuted text-[12px] font-bold uppercase tracking-wide">
               vs Gradient Score
             </Text>
-            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsGradient.validation] ?? '#9A9AA2' }}>
+            <Text className="text-[12px] font-bold" style={{ color: VERDICT_COLOR[c.vsGradient.validation] ?? '#9A9AA2' }}>
               {c.vsGradient.validation}
             </Text>
           </View>
@@ -86,10 +86,10 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
       {!!c.vsNiche && (
         <View>
           <View className="flex-row items-center gap-1.5 mb-0.5">
-            <Text className="text-textMuted text-[10px] font-bold uppercase tracking-wide">
+            <Text className="text-textMuted text-[12px] font-bold uppercase tracking-wide">
               vs Niche Analysis
             </Text>
-            <Text className="text-[10px] font-bold" style={{ color: VERDICT_COLOR[c.vsNiche.validation] ?? '#9A9AA2' }}>
+            <Text className="text-[12px] font-bold" style={{ color: VERDICT_COLOR[c.vsNiche.validation] ?? '#9A9AA2' }}>
               {c.vsNiche.validation}
             </Text>
           </View>
@@ -97,7 +97,7 @@ export function ConvergenceBadge({ topicKey }: { topicKey: string }) {
         </View>
       )}
 
-      <Text className="text-textMuted text-[10px] leading-3 mt-2">
+      <Text className="text-textMuted text-[12px] leading-3 mt-2">
         Downstream validation — reads the score + raw data, never feeds it. Independent of N demand.
       </Text>
     </View>
