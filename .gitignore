@@ -6,3 +6,6 @@ Gradient Score info/
 .DS_Store
 Thumbs.db
 web-deploy/
+
+# Enterprise web preview deploy staging (built artifact — deployed to nowtrendin-v2-preview Heroku app)
+web-preview/

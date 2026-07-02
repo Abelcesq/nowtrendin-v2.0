@@ -7,6 +7,8 @@ import { useAuthStore } from '../../store/auth.store';
 import { usePrefsStore } from '../../store/prefs.store';
 import { canAccess, TierID } from '../../constants/tiers';
 import { TOOLBAR_CANDIDATES, ToolbarItem } from '../../constants/toolbar';
+import { ENTERPRISE_ONLY } from '../../constants/preview';
+import { EnterprisePreviewGate } from '../../components/PreviewGate';
 
 // Fully custom tab bar — we own the layout so labels can never be clipped by the
 // navigator's internal sizing. Icons + labels are stacked in a flex row with
@@ -65,6 +67,12 @@ export default function AppLayout() {
   const toolbar = usePrefsStore((s) => s.toolbar);
   const load = usePrefsStore((s) => s.load);
   useEffect(() => { load(); }, []);
+
+  // Hard gate for the enterprise-only preview build — no app screen mounts for a
+  // non-Enterprise account (defense in depth: the backend already tier-gates data).
+  if (ENTERPRISE_ONLY && user && tier !== 'enterprise') {
+    return <EnterprisePreviewGate />;
+  }
 
   // Home and Profile are fixed; the 3 middle slots are user-customizable
   // (Edit Toolbar Icons). Resolve the chosen items in the user's order, skipping
