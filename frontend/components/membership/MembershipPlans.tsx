@@ -29,8 +29,8 @@ function TierCard({
     <TouchableOpacity
       onPress={onSelect}
       activeOpacity={0.9}
-      className="rounded-2xl p-5 mb-4 border-2 bg-surface"
-      style={{ borderColor: selected ? tier.colour : '#E4E7EC' }}
+      className="rounded-2xl p-5 mb-4 border-2 bg-card"
+      style={{ borderColor: selected ? tier.colour : '#ECECEC' }}
     >
       {isPopular && (
         <View className="self-start px-3 py-1 rounded-full mb-3" style={{ backgroundColor: `${tier.colour}30` }}>
@@ -60,13 +60,13 @@ function TierCard({
       <View className="gap-2 mb-4">
         {tier.features.map((f) => (
           <View key={f} className="flex-row items-start gap-2">
-            <Check size={14} color="#00C896" />
+            <Check size={14} color="#2E7D5B" />
             <Text className="text-textSecondary text-sm flex-1">{f}</Text>
           </View>
         ))}
         {tier.restrictions.map((r) => (
           <View key={r} className="flex-row items-start gap-2">
-            <X size={14} color="#9AA3B0" />
+            <X size={14} color="#9A9AA2" />
             <Text className="text-textMuted text-sm flex-1">{r}</Text>
           </View>
         ))}

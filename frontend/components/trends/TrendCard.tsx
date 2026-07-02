@@ -1,162 +1,122 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Sparkles, Flame } from 'lucide-react-native';
-import { Signal, ageLabel, stageColor, stageLabel, scoreGap, gapInsight, STAGE_META, contentCategoryMeta } from '../../lib/signals';
-import { useExplainer } from '../../hooks/useSignals';
+import { ChevronDown, ArrowRight } from 'lucide-react-native';
+import { Rise } from '../ui/Rise';
+import { Signal, ageLabel, stageColor, stageLabel, scoreGap, gapInsight, contentCategoryMeta, titleCaseTopic } from '../../lib/signals';
 
-const DET_COLOR = '#2D7EEF';
-const CONF_COLOR = '#00C896';
-
-function barColor(v: number) {
-  if (v >= 70) return '#00C896';
-  if (v >= 40) return '#2D7EEF';
-  return '#C7CDD6';
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Web-prototype-style trend card: source header, dual score, component bars,
-// gap pill, and a coloured gap-insight footer.
-export function TrendCard({ signal }: { signal: Signal }) {
+// Component-bar fill color by strength (sapphire → faded → track).
+function barColor(v: number) {
+  if (v >= 70) return '#2A5B9E';
+  if (v >= 40) return '#7C93C8';
+  return '#D8DCE3';
+}
+
+const metaLabel = { color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 } as const;
+const metaNum = { color: '#16264A', fontSize: 28, fontWeight: '800', letterSpacing: -0.6 } as const;
+
+// Calm, tap-to-expand trend row (Aurora journey). Collapsed: rank, title,
+// platform·stage·age, score, chevron. Expanded (quick-look): detection /
+// confidence / gap, the component bars, the gap insight, category·stage, and a
+// MORE INFO button that opens the full Trend Detail screen. Nothing is removed —
+// the deeper analysis (AI explainer, history, etc.) lives one tap further in.
+export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const stageCol = stageColor(signal.stage);
   const gap = scoreGap(signal);
   const insight = gapInsight(gap);
-  const { explainer } = useExplainer(signal.id, signal.topic);
   const platform = signal.platforms?.[0] ?? 'Multi-Platform';
-  const multi = (signal.platforms?.length ?? 0) > 1;
-  const isNew = (signal.timesScored ?? 0) <= 1;
-  // Short stage definition surfaced on the card (e.g. "Building signal" for
-  // EMERGING). Pulled from STAGE_META so it stays in sync with the homepage
-  // legend + the focused category page.
-  const stageDef = STAGE_META.find((m) => m.key === signal.stage)?.desc ?? '';
   const cat = contentCategoryMeta(signal.category);
-  // Now Trending score (N component) — always show; default to 0 when absent
-  // so users see the metric exists and can read its detail on tap.
-  const nowTrending = signal.nowTrending ?? 0;
-
   const bars = (signal.groups?.flatMap((g) => g.items.map((i) => i.value)) ?? [
     signal.detection,
     signal.confidence,
     signal.score,
   ]).slice(0, 6);
 
+  const toggle = () => {
+    // Soft, relaxed expand — slower easeInEaseOut, no spring/bounce (Apple feel).
+    LayoutAnimation.configureNext({
+      duration: 440,
+      create: { type: 'easeInEaseOut', property: 'opacity' },
+      update: { type: 'easeInEaseOut' },
+      delete: { type: 'easeInEaseOut', property: 'opacity' },
+    });
+    setOpen((o) => !o);
+  };
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => router.push(`/signal/${signal.id}`)}
-      className="bg-surface rounded-2xl border border-border p-4 mb-3"
-      style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
-    >
-      {/* header row */}
-      <View className="flex-row items-start justify-between">
-        <Text className="text-textMuted text-[11px]">
-          {platform} · {signal.totalMentions ?? 0} signals · {ageLabel(signal.createdAt)}
-        </Text>
-        <View className="flex-row items-center gap-1.5">
-          {/* Content-category badge (WHAT) — sits beside the stage badge (HOW) */}
-          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${cat.color}1A` }}>
-            <Text style={{ color: cat.color }} className="text-[10px] font-bold tracking-wide">
-              {cat.label}
+    <View style={{ borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
+      <TouchableOpacity activeOpacity={0.7} onPress={toggle} className="py-4">
+        <View className="flex-row items-center" style={{ gap: 14 }}>
+          {rank != null && (
+            <Text numberOfLines={1} style={{ color: stageCol, fontSize: 28, fontWeight: '800', letterSpacing: -1.5, minWidth: 38, marginRight: 2 }}>
+              {String(rank).padStart(2, '0')}
+            </Text>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}>
+              {titleCaseTopic(signal.topic)}
+            </Text>
+            <Text numberOfLines={1} style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
+              {platform.toUpperCase()} · <Text style={{ color: stageCol }}>{stageLabel(signal.stage)}</Text> · {ageLabel(signal.createdAt).toUpperCase()}
             </Text>
           </View>
-          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${stageCol}1A` }}>
-            <Text style={{ color: stageCol }} className="text-[10px] font-bold tracking-wide">
-              {stageLabel(signal.stage)}
-            </Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{signal.score}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>SCORE</Text>
           </View>
+          <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
-      </View>
 
-      {/* title + scores */}
-      <View className="flex-row items-start justify-between mt-1">
-        <View className="flex-1 pr-3">
-          <Text className="text-textPrimary text-2xl font-bold">{signal.topic}</Text>
-          <View className="flex-row items-center gap-1.5 mt-0.5">
-            <Text className="text-textMuted text-xs">{multi ? 'Multi-Platform' : platform}</Text>
-            {!!stageDef && (
-              <>
-                <Text className="text-textMuted text-xs">·</Text>
-                <Text style={{ color: stageCol }} className="text-xs font-semibold">{stageDef}</Text>
-              </>
-            )}
-          </View>
-        </View>
-        <View className="flex-row gap-3">
-          <View className="items-center">
-            <Text className="text-textMuted text-[9px] font-bold">DET</Text>
-            <Text style={{ color: DET_COLOR }} className="text-xl font-black">{signal.detection}</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-textMuted text-[9px] font-bold">CONF</Text>
-            <Text style={{ color: CONF_COLOR }} className="text-xl font-black">{signal.confidence}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* component bars + Now Trending pill + gap pill row */}
-      <View className="flex-row items-center justify-between mt-3 gap-1.5">
-        <View className="flex-row items-center gap-1.5 flex-1 mr-1">
-          {bars.map((v, i) => (
-            <View key={i} className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
-              <View style={{ width: `${Math.max(6, Math.min(100, v))}%`, backgroundColor: barColor(v) }} className="h-full rounded-full" />
+        {open && (
+          <Rise duration={420} distance={10} style={{ paddingLeft: rank != null ? 52 : 0, paddingTop: 16 }}>
+            <View className="flex-row" style={{ gap: 24, marginBottom: 16 }}>
+              <View>
+                <Text style={metaLabel}>DETECTION</Text>
+                <Text style={metaNum}>{signal.detection}</Text>
+              </View>
+              <View>
+                <Text style={metaLabel}>CONFIDENCE</Text>
+                <Text style={metaNum}>{signal.confidence}</Text>
+              </View>
+              <View style={{ marginLeft: 'auto', alignItems: 'flex-end' }}>
+                <Text style={metaLabel}>GAP</Text>
+                <Text style={[metaNum, { color: '#B11226' }]}>{gap}</Text>
+              </View>
             </View>
-          ))}
-        </View>
-        {/* Now TrendIn (N) — brand-colored pill, parallel to the gap pill.
-            Surfaces the headline metric on every card for visual consistency
-            with the chip + tile rows on the homepage. */}
-        <View className="flex-row items-center px-2 py-1 rounded-full"
-              style={{ backgroundColor: '#EE6A2A1A' }}>
-          <Flame size={10} color="#EE6A2A" />
-          <Text className="text-[10px] font-bold ml-0.5" style={{ color: '#B5341B' }}>
-            N {nowTrending}
-          </Text>
-        </View>
-        <View
-          className="px-2.5 py-1 rounded-full"
-          style={{ backgroundColor: insight.agree ? '#00C8961A' : '#D4A0171A' }}
-        >
-          <Text style={{ color: insight.agree ? '#009970' : '#9A7B16' }} className="text-[10px] font-bold">
-            {gap}pt gap
-          </Text>
-        </View>
-      </View>
 
-      {isNew && (
-        <View className="flex-row items-center gap-1 mt-2">
-          <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: DET_COLOR }} />
-          <Text className="text-textMuted text-[10px]">New</Text>
-        </View>
-      )}
+            <View className="flex-row" style={{ gap: 5, marginBottom: 16 }}>
+              {bars.map((v, i) => (
+                <View key={i} style={{ flex: 1, height: 5, borderRadius: 980, backgroundColor: '#EDEDED', overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.max(6, Math.min(100, v))}%`, height: '100%', backgroundColor: barColor(v) }} />
+                </View>
+              ))}
+            </View>
 
-      {/* gap insight footer */}
-      <View
-        className="rounded-xl px-3 py-2 mt-3 border"
-        style={{
-          borderColor: insight.agree ? '#00C89655' : '#D4A01755',
-          backgroundColor: insight.agree ? '#00C8960F' : '#D4A0170F',
-        }}
-      >
-        <Text className="text-[11px]" style={{ color: insight.agree ? '#009970' : '#9A7B16' }}>
-          {gap}-point gap: {insight.text}
-        </Text>
-      </View>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginBottom: 10 }}>
+              {gap}-point gap: {insight.text}
+            </Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 19, fontWeight: '500', marginBottom: 16 }}>
+              Category: {cat.label} · Stage: {stageLabel(signal.stage)}
+            </Text>
 
-      {/* AI explainer (when available) + ALWAYS-visible MORE INFO button.
-          The button now renders regardless of whether the AI explainer has
-          generated yet — matches the per-item pattern used in the Market tab. */}
-      <View className="mt-3">
-        {!!explainer?.short && (
-          <Text className="text-textSecondary text-[13px] leading-5 mb-2" numberOfLines={3}>
-            {explainer.short}
-          </Text>
+            <TouchableOpacity
+              onPress={() => router.push(`/signal/${signal.id}`)}
+              activeOpacity={0.85}
+              className="flex-row items-center self-start"
+              style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 11, paddingHorizontal: 22 }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>MORE INFO</Text>
+              <ArrowRight size={13} color="#F0758A" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+          </Rise>
         )}
-        <View className="flex-row items-center self-start px-3 py-1.5 rounded-full" style={{ backgroundColor: '#2D7EEF' }}>
-          <Sparkles size={12} color="#FFFFFF" />
-          <Text className="text-white text-[11px] font-bold ml-1 mr-0.5">MORE INFO</Text>
-          <ChevronRight size={13} color="#FFFFFF" />
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }

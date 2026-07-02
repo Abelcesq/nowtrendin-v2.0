@@ -1,3 +1,4 @@
+import { titleCaseTopic } from "../../lib/signals";
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Search as SearchIcon, TrendingUp, Activity, Globe, X } from 'lucide-react-native';
@@ -12,7 +13,7 @@ import { queryApi } from '../../lib/api';
 type Tab = 'trends' | 'market' | 'graded';
 
 const STAGE_COLOR: Record<string, string> = {
-  BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017', MARGINAL: '#E85A1E', WATCHING: '#E85A1E', MONITORING: '#94A3B8',
+  BREAKOUT: '#2E7D5B', STRONG: '#2A5B9E', EMERGING: '#A8456A', MARGINAL: '#A8456A', WATCHING: '#A8456A', MONITORING: '#8A8F9C',
 };
 
 function timeAgo(iso: string): string {
@@ -41,9 +42,9 @@ export default function Search() {
 
       {/* Three section tabs */}
       <View className="flex-row gap-2 mb-4">
-        <TabBtn icon={<TrendingUp size={15} color={tab === 'trends' ? '#FFFFFF' : '#5B6472'} />} label="Trends" color="#00C896" active={tab === 'trends'} onPress={() => setTab('trends')} />
-        <TabBtn icon={<Activity size={15} color={tab === 'market' ? '#FFFFFF' : '#5B6472'} />} label="Market" color="#CF2A1B" active={tab === 'market'} onPress={() => setTab('market')} />
-        <TabBtn icon={<Globe size={15} color={tab === 'graded' ? '#FFFFFF' : '#5B6472'} />} label="Graded" color="#D4A017" active={tab === 'graded'} onPress={() => setTab('graded')} />
+        <TabBtn icon={<TrendingUp size={15} color={tab === 'trends' ? '#FFFFFF' : '#3C4663'} />} label="Trends" color="#2E7D5B" active={tab === 'trends'} onPress={() => setTab('trends')} />
+        <TabBtn icon={<Activity size={15} color={tab === 'market' ? '#FFFFFF' : '#3C4663'} />} label="Market" color="#B11226" active={tab === 'market'} onPress={() => setTab('market')} />
+        <TabBtn icon={<Globe size={15} color={tab === 'graded' ? '#FFFFFF' : '#3C4663'} />} label="Graded" color="#A8456A" active={tab === 'graded'} onPress={() => setTab('graded')} />
       </View>
 
       {tab === 'trends' && <TrendsSearch tier={tier} />}
@@ -55,21 +56,21 @@ export default function Search() {
 
 function TabBtn({ icon, label, color, active, onPress }: { icon: React.ReactNode; label: string; color: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border"
-      style={{ backgroundColor: active ? color : '#FFFFFF', borderColor: active ? color : '#E4E7EC' }}>
+    <TouchableOpacity onPress={onPress} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
+      style={{ backgroundColor: active ? color : '#FFFFFF', borderColor: active ? color : '#ECECEC' }}>
       {icon}
-      <Text className="text-[12px] font-bold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>{label}</Text>
+      <Text className="text-[12px] font-bold" style={{ color: active ? '#FFFFFF' : '#3C4663' }}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 function SearchBar({ value, onChange, placeholder, onClear }: { value: string; onChange: (s: string) => void; placeholder: string; onClear?: () => void }) {
   return (
-    <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-      <SearchIcon size={18} color="#9AA3B0" />
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#9AA3B0"
-        className="flex-1 ml-3 text-base" style={{ color: '#1A1A2E' }} />
-      {value && onClear ? <TouchableOpacity onPress={onClear} className="ml-2"><X size={16} color="#9AA3B0" /></TouchableOpacity> : null}
+    <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mb-3">
+      <SearchIcon size={18} color="#9A9AA2" />
+      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#9A9AA2"
+        className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
+      {value && onClear ? <TouchableOpacity onPress={onClear} className="ml-2"><X size={16} color="#9A9AA2" /></TouchableOpacity> : null}
     </View>
   );
 }
@@ -82,8 +83,8 @@ function TrendsSearch({ tier }: { tier: TierID }) {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search trends…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">{results.length} trend{results.length === 1 ? '' : 's'} in your data window</Text>
-      {isLoading ? <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 32 }} />
+      <Text className="text-textMuted text-[12px] mb-2">{results.length} trend{results.length === 1 ? '' : 's'} in your data window</Text>
+      {isLoading ? <ActivityIndicator size="large" color="#2E7D5B" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No trends match "${q}".`} />
         : results.map((s) => <TrendCard key={s.id} signal={s} />)}
     </>
@@ -99,8 +100,8 @@ function MarketSearch({ tier }: { tier: TierID }) {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search market topics…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">{results.length} market item{results.length === 1 ? '' : 's'} in your data window</Text>
-      {isLoading ? <ActivityIndicator size="large" color="#CF2A1B" style={{ marginTop: 32 }} />
+      <Text className="text-textMuted text-[12px] mb-2">{results.length} market item{results.length === 1 ? '' : 's'} in your data window</Text>
+      {isLoading ? <ActivityIndicator size="large" color="#B11226" style={{ marginTop: 32 }} />
         : results.length === 0 ? <Empty text={`No market topics match "${q}".`} />
         : results.map((r) => <RiskCard key={r.key} risk={r} />)}
     </>
@@ -121,21 +122,21 @@ function GradedSearch() {
   return (
     <>
       <SearchBar value={q} onChange={setQ} placeholder="Search graded topics…" onClear={() => setQ('')} />
-      <Text className="text-textMuted text-[11px] mb-2">Topics graded by members across all plans — free to view.</Text>
-      {loading ? <ActivityIndicator size="small" color="#D4A017" style={{ marginTop: 28 }} />
+      <Text className="text-textMuted text-[12px] mb-2">Topics graded by members across all plans — free to view.</Text>
+      {loading ? <ActivityIndicator size="small" color="#A8456A" style={{ marginTop: 28 }} />
         : rows.length === 0 ? <Empty text={q ? `No graded topics match "${q}".` : 'No topics have been graded yet.'} />
         : rows.map((g) => {
-            const col = STAGE_COLOR[g.stage] ?? '#94A3B8';
+            const col = STAGE_COLOR[g.stage] ?? '#8A8F9C';
             return (
-              <View key={g.id} className="bg-surface rounded-xl border border-border p-3 mb-2">
+              <View key={g.id} className="bg-card rounded-xl p-3 mb-2">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{g.topic}</Text>
-                  {!!g.stage && <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}><Text className="text-[9px] font-bold" style={{ color: col }}>{g.stage}</Text></View>}
+                  <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{titleCaseTopic(g.topic)}</Text>
+                  {!!g.stage && <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}><Text className="text-[12px] font-bold" style={{ color: col }}>{g.stage}</Text></View>}
                 </View>
                 <View className="flex-row items-center gap-3 mt-1">
-                  <Text className="text-[11px]" style={{ color: '#2D7EEF' }}>DET {Math.round(g.detection)}</Text>
-                  <Text className="text-[11px]" style={{ color: '#00C896' }}>CONF {Math.round(g.confidence)}</Text>
-                  <Text className="text-textMuted text-[11px] ml-auto">{timeAgo(g.createdAt)}</Text>
+                  <Text className="text-[12px]" style={{ color: '#2A5B9E' }}>DET {Math.round(g.detection)}</Text>
+                  <Text className="text-[12px]" style={{ color: '#2E7D5B' }}>CONF {Math.round(g.confidence)}</Text>
+                  <Text className="text-textMuted text-[12px] ml-auto">{timeAgo(g.createdAt)}</Text>
                 </View>
               </View>
             );
@@ -147,7 +148,7 @@ function GradedSearch() {
 function Empty({ text }: { text: string }) {
   return (
     <View className="items-center mt-12">
-      <SearchIcon size={44} color="#C7CDD6" />
+      <SearchIcon size={44} color="#D8DCE3" />
       <Text className="text-textMuted text-sm mt-4 text-center px-6">{text}</Text>
     </View>
   );

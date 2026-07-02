@@ -3,6 +3,7 @@ import { ScrollView, View, StatusBar, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { Rise } from './Rise';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -39,10 +40,12 @@ export function Screen({ children, scroll = false, className = '', padded = true
     });
   const zoomStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
+  // Every screen fades + settles in on navigation — a subtle, consistent
+  // transition between screens (touch app, so motion is light and purposeful).
   const frame = (inner: React.ReactNode) => (
     <SafeAreaView className="flex-1 bg-bg" edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F4F5F7" />
-      {inner}
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <Rise style={{ flex: 1 }} axis="x" distance={28} duration={420}>{inner}</Rise>
     </SafeAreaView>
   );
 

@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Signal, scoreGap } from '../../lib/signals';
 
-const DET = '#2D7EEF';   // Detection — earliness
-const CONF = '#00C896';  // Confidence — confirmation
+const DET = '#2A5B9E';   // Detection — earliness
+const CONF = '#2E7D5B';  // Confidence — confirmation
 
 // LIVE per-signal explanation of WHY Detection and Confidence diverge for THIS
 // topic. Detection weights the early-edge components (Dark Matter, first-timers,
@@ -48,21 +48,21 @@ export function WhyScoresDiverge({ signal }: { signal: Signal }) {
           {rows.map((r) => {
             const col = r.favors === 'DET' ? DET : CONF;
             return (
-              <View key={r.label} className="flex-1 min-w-[46%] bg-surface rounded-xl border border-border p-3">
-                <Text className="text-textMuted text-[9px] font-bold tracking-wider mb-1">{r.label}</Text>
+              <View key={r.label} className="flex-1 min-w-[46%] bg-card rounded-xl p-3">
+                <Text className="text-textMuted text-[12px] font-bold tracking-wider mb-1">{r.label}</Text>
                 <View className="flex-row items-center gap-1.5">
                   <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: col }} />
                   <Text style={{ color: col }} className="text-base font-black flex-1">{r.value}</Text>
                 </View>
-                <Text className="text-textMuted text-[10px] leading-3 mt-1">{r.note}</Text>
+                <Text className="text-textMuted text-[12px] leading-3 mt-1">{r.note}</Text>
               </View>
             );
           })}
         </View>
       ) : (
-        <Text className="text-textMuted text-[11px]">Component-level detail isn't available for this signal yet.</Text>
+        <Text className="text-textMuted text-[12px]">Component-level detail isn't available for this signal yet.</Text>
       )}
-      <Text className="text-textMuted text-[10px] mt-2">
+      <Text className="text-textMuted text-[12px] mt-2">
         <Text style={{ color: DET }}>Blue</Text> lifts Detection (earliness) · <Text style={{ color: CONF }}>Green</Text> lifts Confidence (confirmation)
       </Text>
     </View>

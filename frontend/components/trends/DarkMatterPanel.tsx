@@ -18,24 +18,24 @@ function Indicator({
   active: boolean;
   desc: string;
 }) {
-  const c = active ? '#7C3AED' : '#9AA3B0';
+  const c = active ? '#6B4FA0' : '#9A9AA2';
   return (
     <View
-      className="rounded-xl px-3 py-3 mb-2 border flex-row gap-3"
-      style={{ borderColor: active ? '#7C3AED55' : '#E4E7EC', backgroundColor: active ? '#7C3AED0D' : '#FFFFFF' }}
+      className="rounded-xl px-3 py-3 mb-2 flex-row gap-3"
+      style={{ borderColor: active ? '#6B4FA055' : '#ECECEC', backgroundColor: active ? '#6B4FA00D' : '#FFFFFF' }}
     >
       <View
         className="w-6 h-6 rounded-full items-center justify-center mt-0.5"
-        style={{ backgroundColor: active ? '#7C3AED22' : '#F4F5F7', borderWidth: 1, borderColor: c }}
+        style={{ backgroundColor: active ? '#6B4FA022' : '#FFFFFF', borderColor: c }}
       >
-        <Text style={{ color: c, fontSize: 11 }}>{active ? '●' : '○'}</Text>
+        <Text style={{ color: c, fontSize: 12 }}>{active ? '●' : '○'}</Text>
       </View>
       <View className="flex-1">
         <View className="flex-row items-center gap-2 mb-0.5">
-          <Text className="text-sm font-bold" style={{ color: active ? '#6D28D9' : '#5B6472' }}>{label}</Text>
-          <Text className="text-[10px] font-bold px-1.5 rounded" style={{ color: c, backgroundColor: `${c}1A` }}>{value}</Text>
+          <Text className="text-sm font-bold" style={{ color: active ? '#6B4FA0' : '#3C4663' }}>{label}</Text>
+          <Text className="text-[12px] font-bold px-1.5 rounded" style={{ color: c, backgroundColor: `${c}1A` }}>{value}</Text>
         </View>
-        <Text className="text-textMuted text-[11px] leading-4">{desc}</Text>
+        <Text className="text-textMuted text-[12px] leading-4">{desc}</Text>
       </View>
     </View>
   );
@@ -52,12 +52,12 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
   return (
     <View className="mb-5">
       <View className="flex-row items-center gap-2 mb-2">
-        <Orbit size={16} color="#7C3AED" />
+        <Orbit size={16} color="#6B4FA0" />
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
           Dark Matter · {dm ?? 0}/100
         </Text>
       </View>
-      <View className="rounded-xl px-4 py-3 mb-3 border" style={{ borderColor: '#7C3AED33', backgroundColor: '#7C3AED08' }}>
+      <View className="rounded-xl px-4 py-3 mb-3" style={{ borderColor: '#6B4FA033', backgroundColor: '#6B4FA008' }}>
         <Text className="text-textSecondary text-xs leading-5">
           Like dark matter in cosmology, the earliest signals live in private channels we can't see —
           but their effects on public data are measurable. These indicators infer that unseen activity.
@@ -85,7 +85,7 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         }
       />
 
-      <Text className="text-textMuted text-[10px] mt-1 leading-4">
+      <Text className="text-textMuted text-[12px] mt-1 leading-4">
         Dark Matter is probabilistic, not deterministic — it flags public behavior that has historically
         preceded trend emergence, not a confirmed private signal.
       </Text>

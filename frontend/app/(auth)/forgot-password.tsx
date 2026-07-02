@@ -57,19 +57,19 @@ export default function ForgotPassword() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-8 self-start">
-        <ChevronLeft size={24} color="#94A3B8" />
+        <ChevronLeft size={24} color="#8A8F9C" />
       </TouchableOpacity>
 
       {step === 'email' && (
         <View>
-          <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
-            <Mail size={26} color="#00C896" />
+          <View className="w-14 h-14 rounded-2xl bg-card items-center justify-center mb-6">
+            <Mail size={26} color="#2E7D5B" />
           </View>
           <Text className="text-textPrimary text-2xl font-bold mb-2">Forgot your password?</Text>
           <Text className="text-textMuted text-sm mb-8 leading-5">
             Enter your email and we'll send you a 6-digit reset code.
           </Text>
-          <Input placeholder="Email address" value={email} onChangeText={setEmail} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
+          <Input placeholder="Email address" value={email} onChangeText={setEmail} icon={<Mail size={18} color="#8A8F9C" />} keyboardType="email-address" />
           {msg && <Text className="text-error text-sm mb-3">{msg}</Text>}
           <Button onPress={sendCode} loading={busy} size="lg" className="mt-2">Send Reset Code</Button>
         </View>
@@ -77,16 +77,16 @@ export default function ForgotPassword() {
 
       {step === 'reset' && (
         <View>
-          <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
-            <KeyRound size={26} color="#00C896" />
+          <View className="w-14 h-14 rounded-2xl bg-card items-center justify-center mb-6">
+            <KeyRound size={26} color="#2E7D5B" />
           </View>
           <Text className="text-textPrimary text-2xl font-bold mb-2">Enter your code</Text>
           <Text className="text-textMuted text-sm mb-6 leading-5">
             We sent a 6-digit code to {email}. Enter it with your new password.
           </Text>
-          <Input placeholder="6-digit code" value={code} onChangeText={setCode} keyboardType="numeric" icon={<KeyRound size={18} color="#94A3B8" />} />
-          <Input placeholder="New password" value={password} onChangeText={setPassword} secureText icon={<KeyRound size={18} color="#94A3B8" />} />
-          <Input placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} secureText icon={<KeyRound size={18} color="#94A3B8" />} />
+          <Input placeholder="6-digit code" value={code} onChangeText={setCode} keyboardType="numeric" icon={<KeyRound size={18} color="#8A8F9C" />} />
+          <Input placeholder="New password" value={password} onChangeText={setPassword} secureText icon={<KeyRound size={18} color="#8A8F9C" />} />
+          <Input placeholder="Confirm new password" value={confirm} onChangeText={setConfirm} secureText icon={<KeyRound size={18} color="#8A8F9C" />} />
           {msg && <Text className="text-error text-sm mb-3">{msg}</Text>}
           <Button onPress={submitReset} loading={busy} size="lg">Reset Password</Button>
           <Button variant="secondary" size="lg" className="mt-3" disabled={cooldown > 0} onPress={sendCode}>
@@ -97,8 +97,8 @@ export default function ForgotPassword() {
 
       {step === 'done' && (
         <View>
-          <View className="w-14 h-14 rounded-2xl bg-surface items-center justify-center border border-border mb-6">
-            <CheckCircle size={26} color="#00C896" />
+          <View className="w-14 h-14 rounded-2xl bg-card items-center justify-center mb-6">
+            <CheckCircle size={26} color="#2E7D5B" />
           </View>
           <Text className="text-primary text-2xl font-bold mb-2">Password updated</Text>
           <Text className="text-textMuted text-sm mb-8 leading-5">You can now sign in with your new password.</Text>

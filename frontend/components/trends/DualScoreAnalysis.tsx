@@ -4,7 +4,7 @@ import { Signal, scoreGap, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../../li
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-2 mt-5">
+    <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2 mt-5">
       {children}
     </Text>
   );
@@ -37,7 +37,7 @@ export function DualScoreAnalysis({ signal }: { signal: Signal }) {
 
       {/* Gap interpretation */}
       <SectionLabel>Gap interpretation</SectionLabel>
-      <View className="bg-surface rounded-2xl border border-border p-4">
+      <View className="bg-card rounded-2xl p-4">
         {GAP_BANDS.map((b, i) => (
           <View key={b.range} className="flex-row gap-3 mb-3" style={{ opacity: i === activeIdx ? 1 : 0.5 }}>
             <View className="w-1 rounded-full" style={{ backgroundColor: b.color }} />
@@ -48,7 +48,7 @@ export function DualScoreAnalysis({ signal }: { signal: Signal }) {
           </View>
         ))}
         <View
-          className="rounded-xl px-3 py-2 mt-1 border"
+          className="rounded-xl px-3 py-2 mt-1"
           style={{ borderColor: `${band.color}66`, backgroundColor: `${band.color}12` }}
         >
           <Text className="text-xs font-bold" style={{ color: band.color }}>
@@ -60,7 +60,7 @@ export function DualScoreAnalysis({ signal }: { signal: Signal }) {
       {/* Who uses which score */}
       <SectionLabel>Who uses which score</SectionLabel>
       <View
-        className="rounded-2xl border p-4 mb-3"
+        className="rounded-2xl p-4 mb-3"
         style={{ borderColor: `${SCORE_ROLES.detection.color}55`, backgroundColor: `${SCORE_ROLES.detection.color}0D` }}
       >
         <Text style={{ color: SCORE_ROLES.detection.color }} className="text-sm font-bold">
@@ -69,7 +69,7 @@ export function DualScoreAnalysis({ signal }: { signal: Signal }) {
         <Text className="text-textSecondary text-xs leading-5 mt-1">{SCORE_ROLES.detection.who}</Text>
       </View>
       <View
-        className="rounded-2xl border p-4"
+        className="rounded-2xl p-4"
         style={{ borderColor: `${SCORE_ROLES.confidence.color}55`, backgroundColor: `${SCORE_ROLES.confidence.color}0D` }}
       >
         <Text style={{ color: SCORE_ROLES.confidence.color }} className="text-sm font-bold">

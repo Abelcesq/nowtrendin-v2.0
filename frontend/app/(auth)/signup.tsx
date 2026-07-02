@@ -66,7 +66,7 @@ export default function Signup() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-6 self-start">
-        <ChevronLeft size={24} color="#94A3B8" />
+        <ChevronLeft size={24} color="#8A8F9C" />
       </TouchableOpacity>
 
       <Text className="text-textPrimary text-3xl font-bold mb-1">Create account</Text>
@@ -76,34 +76,34 @@ export default function Signup() {
         control={control}
         name="name"
         render={({ field: { onChange, value } }) => (
-          <Input placeholder="Full name" value={value} onChangeText={onChange} error={errors.name?.message} icon={<User size={18} color="#94A3B8" />} autoCapitalize="words" />
+          <Input placeholder="Full name" value={value} onChangeText={onChange} error={errors.name?.message} icon={<User size={18} color="#8A8F9C" />} autoCapitalize="words" />
         )}
       />
       <Controller
         control={control}
         name="email"
         render={({ field: { onChange, value } }) => (
-          <Input placeholder="Email address" value={value} onChangeText={onChange} error={errors.email?.message} icon={<Mail size={18} color="#94A3B8" />} keyboardType="email-address" />
+          <Input placeholder="Email address" value={value} onChangeText={onChange} error={errors.email?.message} icon={<Mail size={18} color="#8A8F9C" />} keyboardType="email-address" />
         )}
       />
       <Controller
         control={control}
         name="password"
         render={({ field: { onChange, value } }) => (
-          <Input placeholder="Password" value={value} onChangeText={onChange} error={errors.password?.message} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
+          <Input placeholder="Password" value={value} onChangeText={onChange} error={errors.password?.message} icon={<KeyRound size={18} color="#8A8F9C" />} secureText />
         )}
       />
       <Controller
         control={control}
         name="confirmPassword"
         render={({ field: { onChange, value } }) => (
-          <Input placeholder="Confirm password" value={value} onChangeText={onChange} error={errors.confirmPassword?.message} icon={<KeyRound size={18} color="#94A3B8" />} secureText />
+          <Input placeholder="Confirm password" value={value} onChangeText={onChange} error={errors.confirmPassword?.message} icon={<KeyRound size={18} color="#8A8F9C" />} secureText />
         )}
       />
 
       <TouchableOpacity onPress={toggleTerms} className="flex-row items-start gap-3 mb-6" activeOpacity={0.8}>
-        <View className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${terms ? 'bg-primary border-primary' : 'border-border bg-surface'}`}>
-          {terms && <Check size={12} color="#07080C" />}
+        <View className={`w-5 h-5 rounded mt-0.5 items-center justify-center ${terms ? 'bg-primary border-primary' : 'border-border bg-card'}`}>
+          {terms && <Check size={12} color="#16264A" />}
         </View>
         <View className="flex-1">
           <Text className="text-textSecondary text-sm leading-5">

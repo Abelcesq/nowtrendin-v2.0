@@ -6,7 +6,7 @@ export const TIERS = {
     id: 'consumer' as const,
     name: 'Consumer',
     price: 49,
-    colour: '#2D7EEF',
+    colour: '#2A5B9E',
     dataFreshness: 24 * 60 * 60 * 1000, // 24h in ms — can only see data >= 24h old
     canSearch: false,
     canQueryNew: false,
@@ -34,7 +34,7 @@ export const TIERS = {
     id: 'business' as const,
     name: 'Business',
     price: 499,
-    colour: '#00C896',
+    colour: '#2E7D5B',
     dataFreshness: 12 * 60 * 60 * 1000, // 12h in ms
     canSearch: true,
     canQueryNew: false,
@@ -63,7 +63,7 @@ export const TIERS = {
     id: 'enterprise' as const,
     name: 'Enterprise',
     price: 250000,
-    colour: '#D4A017',
+    colour: '#C9A24B',
     dataFreshness: 0, // live — data available as soon as it is obtained
     canSearch: true,
     canQueryNew: true,

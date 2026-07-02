@@ -18,12 +18,12 @@ interface ButtonProps {
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-primary',
-  secondary: 'bg-transparent border border-primary',
+  secondary: 'bg-transparent border-primary',
   ghost: 'bg-transparent',
   danger: 'bg-error',
-  consumer: 'bg-transparent border border-consumer',
+  consumer: 'bg-transparent border-consumer',
   business: 'bg-primary',
-  enterprise: 'bg-transparent border border-enterprise',
+  enterprise: 'bg-transparent border-enterprise',
 };
 
 const TEXT_VARIANTS: Record<Variant, string> = {
@@ -61,7 +61,7 @@ export function Button({
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const spinnerColor =
-    variant === 'primary' || variant === 'business' || variant === 'danger' ? '#FFFFFF' : '#00C896';
+    variant === 'primary' || variant === 'business' || variant === 'danger' ? '#FFFFFF' : '#2E7D5B';
 
   return (
     <TouchableOpacity

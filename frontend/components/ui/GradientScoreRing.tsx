@@ -27,7 +27,7 @@ export function GradientScoreRing({ score, color, size = 'md', label, caption }:
   return (
     <View style={{ width: dim, height: dim }} className="items-center justify-center">
       <Svg width={dim} height={dim}>
-        <Circle cx={dim / 2} cy={dim / 2} r={r} stroke="#E4E7EC" strokeWidth={stroke} fill="none" />
+        <Circle cx={dim / 2} cy={dim / 2} r={r} stroke="#ECECEC" strokeWidth={stroke} fill="none" />
         <Circle
           cx={dim / 2}
           cy={dim / 2}
@@ -41,15 +41,15 @@ export function GradientScoreRing({ score, color, size = 'md', label, caption }:
         />
       </Svg>
       <View style={{ position: 'absolute' }} className="items-center">
-        <Text style={{ fontSize: FONT[size], color: '#1A1A2E', lineHeight: FONT[size] * 1.05 }} className="font-black">
+        <Text style={{ fontSize: FONT[size], color: '#16264A', lineHeight: FONT[size] * 1.05 }} className="font-black">
           {score}
         </Text>
         {label && (
-          <Text style={{ color }} className="text-[10px] font-bold tracking-wide">
+          <Text style={{ color }} className="text-[12px] font-bold tracking-wide">
             {label}
           </Text>
         )}
-        {caption && <Text className="text-textMuted text-[9px] mt-0.5">{caption}</Text>}
+        {caption && <Text className="text-textMuted text-[12px] mt-0.5">{caption}</Text>}
       </View>
     </View>
   );

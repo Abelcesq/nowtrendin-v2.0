@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Bell, Zap, Briefcase, Building2, Search, Printer } from 'lucide-react-native';
-import { printSignalsReport } from '../../lib/printReport';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useNavigation } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Bell, Zap, Briefcase, Building2, Search, Crown, ArrowRight } from 'lucide-react-native';
 import { Logo, Wordmark } from '../../components/ui/Logo';
-import { Screen } from '../../components/ui/Screen';
+import { Rise } from '../../components/ui/Rise';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
 import { RiskExplainer } from '../../components/trends/RiskExplainer';
@@ -15,420 +16,310 @@ import { PullMarketButton } from '../../components/trends/PullMarketButton';
 import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
-import { dataWindowLabel, scoreGap, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
+import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
 import { MARKET_CATEGORY_DEFS } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
+const PAGE = 6; // how many rows reveal per batch (mobile perf + gentle discovery)
 
 export default function Dashboard() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const scrollRef = useRef<ScrollView>(null);
   const user = useAuthStore((s) => s.user);
   const tier = (user?.tier ?? 'consumer') as TierID;
   const cfg = TIERS[tier];
   const Icon = TIER_ICONS[tier];
+  const TierBadgeIcon = tier === 'enterprise' ? Crown : Icon;
+  const canPull = cfg.canQueryNew;
 
   const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
-  const [contentCat, setContentCat] = useState('all'); // WHAT-axis filter (content category)
+  const [contentCat, setContentCat] = useState('all');
   const [marketQuery, setMarketQuery] = useState('');
+  const [visible, setVisible] = useState(PAGE);
+
   const goToMarketCategory = (key: string) => router.push(`/market-category/${key}` as any);
+  const goToCategory = (key: string) => router.push(`/category/${key}` as any);
 
-  // Risk obeys the same data-aging waterfall as Attention.
-  const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
-  const lockedRiskCount = risks.length - accessibleRisks.length;
-
-  const firstName = (user?.name ?? 'there').split(' ')[0];
-  const hour = new Date().getHours();
-  const greeting =
-    hour >= 1 && hour < 11 ? 'Good morning'      // 1:00am – 10:59am
-      : hour >= 11 && hour < 15 ? 'Good day'      // 11:00am – 2:59pm
-      : hour >= 15 && hour < 18 ? 'Good afternoon' // 3:00pm – 5:59pm
-      : hour >= 18 && hour < 21 ? 'Good evening'   // 6:00pm – 8:59pm
-      : 'Good night';                              // 9:00pm – 12:59am
-
-  // Counts per category — single source of truth: CATEGORY_DEFS.filter
-  const counts = Object.fromEntries(
-    CATEGORY_DEFS.map((c) => [c.key, accessible.filter(c.filter).length])
-  ) as Record<string, number>;
-
-  // The inline list on the homepage shows ALL accessible signals (with the
-  // search query applied). Filtering by category navigates to the focused page.
+  // ── Attention feed ──
   const filtered = accessible.filter((s) =>
     (!query || s.topic.toLowerCase().includes(query.toLowerCase())) &&
     (contentCat === 'all' || contentCategoryMeta(s.category).key === contentCat)
   );
+  const ranked = [...filtered].sort((a, b) => b.score - a.score);
+  const topPick = ranked[0];
+  const rest = ranked.slice(1);
+  const lastUpdated = accessible.length ? ageLabel(accessible[0].createdAt) : '—';
 
-  // Live per-content-category counts for the chip row (so empty categories
-  // can be visually de-emphasized rather than leading to a blank list).
+  const counts = Object.fromEntries(
+    CATEGORY_DEFS.map((c) => [c.key, accessible.filter(c.filter).length])
+  ) as Record<string, number>;
   const contentCounts = Object.fromEntries(
     CONTENT_CATEGORIES.map((c) => [c.key, accessible.filter((s) => contentCategoryMeta(s.category).key === c.key).length])
   ) as Record<string, number>;
 
-  const goToCategory = (key: string) => router.push(`/category/${key}` as any);
+  // ── Market feed ──
+  const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
+  const lockedRiskCount = risks.length - accessibleRisks.length;
+  const mq = marketQuery.trim().toLowerCase();
+  const marketFiltered = accessibleRisks.filter((r) => !mq || r.display.toLowerCase().includes(mq));
+
+  const firstName = (user?.name ?? 'there').split(' ')[0];
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? 'Good morning'          // 12:00am – 11:59am
+      : hour < 18 ? 'Good afternoon'    // 12:00pm – 5:59pm
+      : 'Good evening';                 // 6:00pm – 11:59pm
+
+  // Reset the visible window whenever the feed/filter/mode changes.
+  useEffect(() => { setVisible(PAGE); }, [mode, contentCat, query, marketQuery]);
+
+  // Tapping the Home tab resets the screen to its just-opened state: Trends
+  // selected (not Market/Grade), filters cleared, scrolled to the top.
+  useEffect(() => {
+    const unsub = (navigation as any).addListener('tabPress', () => {
+      setMode('attention');
+      setContentCat('all');
+      setQuery('');
+      setMarketQuery('');
+      setVisible(PAGE);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return unsub;
+  }, [navigation]);
+
+  const activeLen = mode === 'attention' ? rest.length : mode === 'risk' ? marketFiltered.length : 0;
+  // Seamless reveal: as the user nears the bottom, load the next batch.
+  const onScroll = (e: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 480) {
+      setVisible((v) => (v < activeLen ? Math.min(v + PAGE, activeLen) : v));
+    }
+  };
+
+  const MODES = [
+    { k: 'attention', label: 'Trends' },
+    { k: 'risk', label: 'Market' },
+    { k: 'grade', label: 'Grade' },
+  ] as const;
+
+  const showPull = canPull && mode !== 'grade';
 
   return (
-    <Screen scroll>
-      {/* Brand header */}
-      <View className="flex-row items-center justify-between pt-4 mb-1">
-        <View className="flex-row items-center gap-2">
-          <Logo size={34} />
-          <View>
-            <Wordmark size="text-xl" />
-            <Text className="text-textMuted text-[10px] tracking-widest uppercase">Attention Intelligence</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: showPull ? 132 : 36 }}
+      >
+        {/* Brand header */}
+        <View className="flex-row items-center justify-between pt-3">
+          <View className="flex-row items-center gap-2">
+            <Logo size={34} />
+            <View>
+              <Wordmark size="text-xl" />
+              <Text className="text-textMuted text-[12px] tracking-widest uppercase">Attention Intelligence</Text>
+            </View>
+          </View>
+          <View className="flex-row items-center gap-4">
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/search' as any)}><Search size={20} color="#16264A" /></TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/alerts' as any)}><Bell size={20} color="#16264A" /></TouchableOpacity>
           </View>
         </View>
-        <View className="w-9 h-9 rounded-full bg-surface items-center justify-center border border-border">
-          <Bell size={18} color="#5B6472" />
-        </View>
-      </View>
 
-      {/* Greeting */}
-      <View className="bg-surface rounded-2xl p-5 border border-border my-4">
-        <Text className="text-textPrimary text-2xl font-bold">{greeting}, {firstName}!</Text>
-        <Text className="text-textSecondary text-sm mt-1 mb-3">Let me show you what's trending.</Text>
-        <View className="flex-row items-center gap-2">
-          <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${cfg.colour}20` }}>
-            <Icon size={14} color={cfg.colour} />
-            <Text style={{ color: cfg.colour }} className="text-xs font-bold uppercase">{cfg.name} Plan</Text>
+        {/* Greeting + tier status */}
+        <Rise>
+          <View className="mt-7">
+            <Text className="text-textPrimary text-[12px] font-extrabold tracking-[2.5px] uppercase">{greeting}, {firstName}</Text>
+            <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
+              {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
+            </Text>
+            <View className="flex-row items-center gap-2.5 mt-3.5">
+              <View className="flex-row items-center gap-1.5">
+                <TierBadgeIcon size={13} color={cfg.colour} />
+                <Text className="text-textPrimary text-[12px] font-extrabold tracking-[1.6px] uppercase">{cfg.name}</Text>
+              </View>
+              <Text className="text-[12px] font-bold" style={{ color: '#D6D6DC' }}>·</Text>
+              <Text className="text-textMuted text-[12px] font-bold tracking-[1.4px] uppercase">Updated {lastUpdated}</Text>
+            </View>
           </View>
-          <Text className="text-textMuted text-xs">{dataWindowLabel(tier)}</Text>
-        </View>
-      </View>
+        </Rise>
 
-      {/* Trends | Other | Grade toggle */}
-      <View className="flex-row bg-surface rounded-xl border border-border p-1 mb-4">
-        {([
-          { k: 'attention', label: 'Trends', color: '#00C896' },
-          { k: 'risk', label: 'Market', color: '#CF2A1B' },
-          { k: 'grade', label: 'Grade', color: '#D4A017' },
-        ] as const).map((t) => {
-          const on = mode === t.k;
-          return (
-            <TouchableOpacity
-              key={t.k}
-              onPress={() => setMode(t.k)}
-              className="flex-1 rounded-lg py-2 items-center"
-              style={{ backgroundColor: on ? t.color : 'transparent' }}
-            >
-              <Text className="text-xs font-bold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>
-                {t.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {mode === 'attention' && (
-        <>
-      {/* Search bar */}
-      <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-        <Search size={18} color="#9AA3B0" />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search Current Trends"
-          placeholderTextColor="#9AA3B0"
-          className="flex-1 ml-3 text-textPrimary text-base"
-          style={{ color: '#1A1A2E' }}
-        />
-      </View>
-
-      {/* Enterprise: token-metered Pull Trends (renders only for enterprise tier) */}
-      <PullTrendsButton />
-
-      {/* ── ROW 1: SIGNAL chips (the HOW axis — strength/stage). These navigate
-          to a focused signal page and are different IN KIND from the content
-          categories below, so they get their own labelled row. */}
-      <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase mb-1.5">Signal</Text>
-      <View style={{ height: 40 }} className="mb-3">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {CATEGORY_DEFS.map((c) => {
-            const isNT = c.key === 'nowtrendin';
-            // Every chip now navigates to a focused category page — including
-            // "All Signals", which gets its own page for symmetry with the rest.
+        {/* Tabs */}
+        <View className="flex-row gap-6 mt-6 mb-1" style={{ borderBottomWidth: 1.5, borderBottomColor: '#ECECEC' }}>
+          {MODES.map((t) => {
+            const on = mode === t.k;
             return (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => goToCategory(c.key)}
-                className="px-4 rounded-full items-center justify-center"
-                style={{
-                  height: 34,
-                  borderWidth: isNT ? 1.5 : 1,
-                  backgroundColor: '#FFFFFF',
-                  borderColor: isNT ? c.color : '#E4E7EC',
-                }}
-              >
-                {isNT ? (
-                  <View className="flex-row items-baseline">
-                    <Text className="text-xs font-bold" style={{ color: c.color }}>Now</Text>
-                    <Text className="text-xs font-bold" style={{ color: c.altColor }}>TrendIn</Text>
-                  </View>
-                ) : (
-                  <Text className="text-xs font-semibold" style={{ color: '#5B6472' }}>
-                    {c.label}
+              <TouchableOpacity key={t.k} onPress={() => setMode(t.k as typeof mode)} activeOpacity={0.7}
+                style={{ paddingBottom: 11, marginBottom: -1.5, borderBottomWidth: on ? 2.5 : 0, borderBottomColor: '#B11226' }}>
+                <Text className="text-xs uppercase" style={{ letterSpacing: 1.8, fontWeight: on ? '800' : '700', color: on ? '#16264A' : '#B6B6BD' }}>{t.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {mode === 'attention' && (
+          <>
+            {topPick && (
+              <Rise delay={90}>
+                <TouchableOpacity activeOpacity={0.93} onPress={() => router.push(`/signal/${topPick.id}`)} className="rounded-3xl overflow-hidden mt-6"
+                  style={{ shadowColor: '#0C1B3A', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 16 }, elevation: 9 }}>
+                  <LinearGradient colors={['#1B3066', '#0C1B3A', '#1A1442']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 24 }}>
+                    <View style={{ position: 'absolute', right: -34, top: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(201,162,75,0.13)' }} />
+                    <View style={{ position: 'absolute', left: -44, bottom: -54, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(177,18,38,0.16)' }} />
+                    <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 2.2 }}>TODAY'S #1 · NOWTRENDIN PICK</Text>
+                    <Text numberOfLines={2} style={{ color: '#FBF4E4', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginTop: 11, lineHeight: 33 }}>{titleCaseTopic(topPick.topic)}</Text>
+                    <View className="flex-row items-end justify-between" style={{ marginTop: 16 }}>
+                      <Text style={{ color: '#B9C4E0', fontSize: 12, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>{actionLine(topPick.stage)}</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topPick.score}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
+                      </View>
+                    </View>
+                    <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>VIEW TREND</Text>
+                      <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Rise>
+            )}
+
+            {/* ONE filter row only — pick a single category to filter the list (or All).
+                Removed the parallel "Signal" row, which made it look like two filters
+                could be combined when they couldn't. One clear control. */}
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-7 mb-2.5">Filter by Category</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {[{ key: 'all', label: 'All', color: '#16264A' }, ...CONTENT_CATEGORIES].map((c) => {
+                  const on = contentCat === c.key;
+                  const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
+                  const empty = c.key !== 'all' && count === 0;
+                  return (
+                    <TouchableOpacity key={c.key} onPress={() => setContentCat(c.key)} disabled={empty} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? c.color : '#F1F1F4', borderColor: on ? c.color : '#ECECEC', opacity: empty ? 0.4 : 1 }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{c.label}</Text>
+                      {count > 0 && <Text style={{ color: on ? '#FFFFFF' : '#9A9AA2', fontSize: 12, fontWeight: '800', marginLeft: 7 }}>{count}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mt-5 mb-4">
+              <Search size={18} color="#9A9AA2" />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search trends" placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
+            </View>
+
+            <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase">More Trending</Text>
+            <Text className="text-textMuted text-[12px] font-semibold mt-1">Ranked by score, after #1</Text>
+            <Text className="text-textMuted text-[12px] mt-2 mb-3">Tap any trend to open its full breakdown.</Text>
+
+            {isSample && (
+              <View className="rounded-lg px-3 py-2 mb-4 bg-card">
+                <Text className="text-textMuted text-[12px]">Showing sample data — live engine unreachable.</Text>
+              </View>
+            )}
+
+            {isLoading ? (
+              <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
+            ) : (
+              <>
+                {rest.slice(0, visible).map((s, i) => (
+                  <TrendCard key={s.id} signal={s} rank={i + 2} />
+                ))}
+                {ranked.length === 0 && <Text className="text-textMuted text-center mt-8 mb-4">No trends match your search.</Text>}
+                {visible < rest.length && (
+                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 12, letterSpacing: 0.5 }}>
+                    Showing {visible + 1} of {ranked.length} · scroll for more
                   </Text>
                 )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Trends header (SIGNAL big tiles below) */}
-      <View className="flex-row items-center justify-between mb-3">
-        <View className="flex-row items-center gap-2">
-          <View className="w-1 h-5 rounded-full bg-brandMaroon" />
-          <Text className="text-textPrimary text-xl font-black">Trends</Text>
-          <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
-            <Text className="text-textMuted text-[11px] font-bold">{filtered.length}</Text>
-          </View>
-        </View>
-        {/* Print / export-to-PDF the FULL list (web only). The browser's native
-            print captures only the visible viewport because the app scrolls inside
-            an RN ScrollView; this renders the entire list as a paginating report. */}
-        {Platform.OS === 'web' && filtered.length > 0 && (
-          <TouchableOpacity
-            onPress={() => printSignalsReport(filtered, {
-              subtitle: `${filtered.length} signals · ${cfg.name} tier · ${dataWindowLabel(tier)}`,
-            })}
-            className="flex-row items-center px-3 py-1.5 rounded-full border border-border bg-surface"
-            activeOpacity={0.7}
-          >
-            <Printer size={14} color="#5B6472" />
-            <Text className="text-textSecondary text-[11px] font-bold ml-1.5">Print / PDF</Text>
-          </TouchableOpacity>
+                <View className="mt-3"><LockedSignalsBanner tier={tier} lockedCount={lockedCount} /></View>
+              </>
+            )}
+          </>
         )}
-      </View>
 
-      {/* Stat tiles — 3 cols × 2 rows, each tappable → focused category page.
-          Same source of truth as the chip row (CATEGORY_DEFS with showTile=true).
-          NowTrendin tile renders the brand wordmark (Now orange + TrendIn maroon)
-          for visual parity with the chip. The old "What does this mean?" static
-          legend was removed; the focused page now carries the per-category
-          definition + how-reached explanation. */}
-      <View className="flex-row flex-wrap gap-2 mb-4">
-        {CATEGORY_DEFS.filter((c) => c.showTile).map((c) => {
-          const isNT = c.key === 'nowtrendin';
-          return (
-            <TouchableOpacity
-              key={c.key}
-              onPress={() => goToCategory(c.key)}
-              className="bg-surface rounded-xl border py-3 items-center"
-              style={{
-                width: '32%',
-                borderColor: isNT ? c.color : `${c.color}33`,
-                borderWidth: isNT ? 1.5 : 1,
-              }}
-              activeOpacity={0.7}
-            >
-              <Text className="text-2xl font-black" style={{ color: c.color }}>{counts[c.key] ?? 0}</Text>
-              {isNT ? (
-                <View className="flex-row items-baseline mt-0.5">
-                  <Text className="text-[9px] font-bold tracking-wider" style={{ color: c.color }}>NOW</Text>
-                  <Text className="text-[9px] font-bold tracking-wider" style={{ color: c.altColor }}>TRENDIN</Text>
-                </View>
-              ) : (
-                <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">
-                  {c.short}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        {mode === 'grade' && <View className="mt-6"><GradeTool /></View>}
 
-      {/* ── CATEGORY section (the WHAT axis) — chips + big tiles, mirroring the
-          Trends/Signal section above. Sits under the signal tiles per the
-          mobile layout spec. Chip OR tile filters the trend list in place. */}
-      <View className="flex-row items-center mb-3 mt-1">
-        <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#2D7EEF' }} />
-        <Text className="text-textPrimary text-xl font-black ml-2">Category</Text>
-      </View>
-      <View style={{ height: 38 }} className="mb-3">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-          {[{ key: 'all', label: 'All', color: '#1A1A2E' }, ...CONTENT_CATEGORIES].map((c) => {
-            const on = contentCat === c.key;
-            const count = c.key === 'all' ? accessible.length : (contentCounts[c.key] ?? 0);
-            const empty = c.key !== 'all' && count === 0;
-            return (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => setContentCat(c.key)}
-                disabled={empty}
-                className="px-3.5 rounded-full flex-row items-center"
-                style={{ height: 32, backgroundColor: on ? c.color : '#FFFFFF', borderWidth: 1,
-                  borderColor: on ? c.color : '#E4E7EC', opacity: empty ? 0.4 : 1 }}
-              >
-                <Text className="text-xs font-semibold" style={{ color: on ? '#FFFFFF' : '#5B6472' }}>{c.label}</Text>
-                {count > 0 && (
-                  <Text className="text-[10px] font-bold ml-1.5" style={{ color: on ? '#FFFFFF' : '#9AA3B0' }}>{count}</Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-      {/* Category BIG tiles — same format as the Trends tiles, one per content
-          category. Tap to filter (toggle); count from contentCounts; dim empties. */}
-      <View className="flex-row flex-wrap gap-2 mb-4">
-        {CONTENT_CATEGORIES.map((c) => {
-          const on = contentCat === c.key;
-          const n = contentCounts[c.key] ?? 0;
-          return (
-            <TouchableOpacity
-              key={c.key}
-              onPress={() => setContentCat(on ? 'all' : c.key)}
-              className="bg-surface rounded-xl border py-3 items-center"
-              activeOpacity={0.7}
-              style={{ width: '32%', borderColor: on ? c.color : `${c.color}33`,
-                borderWidth: on ? 1.5 : 1, opacity: n === 0 ? 0.45 : 1 }}
-            >
-              <Text className="text-2xl font-black" style={{ color: c.color }}>{n}</Text>
-              <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5" numberOfLines={1}>
-                {c.label.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        {mode === 'risk' && (
+          <>
+            <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mt-6 mb-4">
+              <Search size={18} color="#9A9AA2" />
+              <TextInput value={marketQuery} onChangeText={setMarketQuery} placeholder="Search market signals" placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
+            </View>
 
-      {isSample && (
-        <View className="rounded-lg px-3 py-2 mb-4 border border-border bg-surface">
-          <Text className="text-textMuted text-[11px]">Showing sample data — live engine unreachable.</Text>
-        </View>
-      )}
-
-      {/* Trend list */}
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#00C896" style={{ marginTop: 40 }} />
-      ) : (
-        <>
-          {filtered.map((s) => (
-            <TrendCard key={s.id} signal={s} />
-          ))}
-          {filtered.length === 0 && (
-            <Text className="text-textMuted text-center mt-8 mb-4">No trends match your search.</Text>
-          )}
-          <View className="mt-1">
-            <LockedSignalsBanner tier={tier} lockedCount={lockedCount} />
-          </View>
-        </>
-      )}
-        </>
-      )}
-
-      {mode === 'grade' && <GradeTool />}
-
-      {mode === 'risk' && (() => {
-        const mq = marketQuery.trim().toLowerCase();
-        const marketFiltered = accessibleRisks.filter((r) => !mq || r.display.toLowerCase().includes(mq));
-        const mCounts = Object.fromEntries(
-          MARKET_CATEGORY_DEFS.map((c) => [c.key, accessibleRisks.filter(c.filter).length])
-        ) as Record<string, number>;
-        return (
-        <>
-          {/* Search bar — mirrors the Trends section */}
-          <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-            <Search size={18} color="#9AA3B0" />
-            <TextInput
-              value={marketQuery}
-              onChangeText={setMarketQuery}
-              placeholder="Search Current Market Trends"
-              placeholderTextColor="#9AA3B0"
-              className="flex-1 ml-3 text-textPrimary text-base"
-              style={{ color: '#1A1A2E' }}
-            />
-          </View>
-
-          {/* Enterprise: Pull Market Trends button (1 token) */}
-          <PullMarketButton />
-
-          {/* Revised Market Signal explanation box */}
-          {!riskExplainerDismissed && <RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} />}
-
-          <MacroLeverageCard />
-
-          {/* Market category chips — each navigates to a focused page. Mirrors
-              the Trends chip row. 'Market Signal' leads (brand-colored). */}
-          <View style={{ height: 40 }} className="mb-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-              {MARKET_CATEGORY_DEFS.map((c) => {
-                const isMS = c.key === 'marketsignal';
-                return (
-                  <TouchableOpacity
-                    key={c.key}
-                    onPress={() => goToMarketCategory(c.key)}
-                    className="px-4 rounded-full items-center justify-center"
-                    style={{ height: 34, borderWidth: isMS ? 1.5 : 1, backgroundColor: '#FFFFFF',
-                      borderColor: isMS ? c.color : '#E4E7EC' }}
-                  >
-                    {isMS ? (
-                      <View className="flex-row items-baseline">
-                        <Text className="text-xs font-bold" style={{ color: c.color }}>Market</Text>
-                        <Text className="text-xs font-bold" style={{ color: c.altColor }}>Signal</Text>
-                      </View>
-                    ) : (
-                      <Text className="text-xs font-semibold" style={{ color: '#5B6472' }}>{c.label}</Text>
-                    )}
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2.5">Market</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {MARKET_CATEGORY_DEFS.map((c) => (
+                  <TouchableOpacity key={c.key} onPress={() => goToMarketCategory(c.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                    style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: '#F1F1F4', borderColor: '#ECECEC' }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, marginRight: 8, backgroundColor: c.color }} />
+                    <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '700' }}>{c.short ?? c.label}</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Market stat tiles — tappable → focused category page (mirrors Trends) */}
-          <View className="flex-row flex-wrap gap-2 mb-4">
-            {MARKET_CATEGORY_DEFS.filter((c) => c.showTile).map((c) => (
-              <TouchableOpacity
-                key={c.key}
-                onPress={() => goToMarketCategory(c.key)}
-                className="bg-surface rounded-xl border py-3 items-center"
-                style={{ width: '32%', borderColor: `${c.color}33` }}
-                activeOpacity={0.7}
-              >
-                <Text className="text-2xl font-black" style={{ color: c.color }}>{mCounts[c.key] ?? 0}</Text>
-                <Text className="text-textMuted text-[9px] font-bold tracking-wider mt-0.5">{c.short}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Market list header */}
-          <View className="flex-row items-center gap-2 mb-2">
-            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: '#E85A1E' }} />
-            <Text className="text-textPrimary text-xl font-black">Market</Text>
-            <View className="px-2 py-0.5 rounded-full bg-surface border border-border">
-              <Text className="text-textMuted text-[11px] font-bold">{marketFiltered.length}</Text>
+                ))}
+              </ScrollView>
             </View>
-            <Text className="text-textMuted text-[10px] ml-auto">{dataWindowLabel(tier)}</Text>
+
+            {!riskExplainerDismissed && <View className="mt-4"><RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} /></View>}
+            <View className="mt-4"><MacroLeverageCard /></View>
+
+            <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mt-6">Market Signals</Text>
+            <Text className="text-textMuted text-[12px] font-semibold mt-1 mb-3">{dataWindowLabel(tier)} · tap any to expand</Text>
+
+            {riskLoading ? (
+              <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
+            ) : marketFiltered.length === 0 ? (
+              <Text className="text-textMuted text-center mt-8">
+                {mq ? `No market items match "${marketQuery}".` : lockedRiskCount > 0 ? 'Newer market signals are still aging into your tier.' : 'No market signals yet.'}
+              </Text>
+            ) : (
+              <>
+                {marketFiltered.slice(0, visible).map((r) => <RiskCard key={r.key} risk={r} />)}
+                {visible < marketFiltered.length && (
+                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 12, letterSpacing: 0.5 }}>
+                    Showing {visible} of {marketFiltered.length} · scroll for more
+                  </Text>
+                )}
+              </>
+            )}
+            {lockedRiskCount > 0 && marketFiltered.length > 0 && (
+              <View className="mt-3"><LockedSignalsBanner tier={tier} lockedCount={lockedRiskCount} /></View>
+            )}
+          </>
+        )}
+
+        <Text className="text-textMuted text-[12px] text-center mt-8 mb-2 px-4 leading-4">
+          Now TrendIn provides signal analysis for informational purposes only — not financial,
+          investment, or legal advice. All decisions are your own.
+        </Text>
+      </ScrollView>
+
+      {/* Persistent action bar — always visible, never buried in the list. A soft
+          white fade sits behind it so it reads cleanly over scrolling content
+          without a hard edge (kept short so it doesn't eat the screen). */}
+      {showPull && (
+        <>
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.92)', '#FFFFFF']}
+            locations={[0, 0.55, 1]}
+            pointerEvents="none"
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 120 }}
+          />
+          <View style={{ position: 'absolute', left: 18, right: 18, bottom: 14 }}>
+            {mode === 'attention' ? <PullTrendsButton /> : <PullMarketButton />}
           </View>
-          {riskLoading ? (
-            <ActivityIndicator size="large" color="#E85A1E" style={{ marginTop: 40 }} />
-          ) : marketFiltered.length === 0 ? (
-            <Text className="text-textMuted text-center mt-8">
-              {mq ? `No market items match "${marketQuery}".`
-                : lockedRiskCount > 0 ? 'Newer market signals are still aging into your tier.' : 'No market signals yet.'}
-            </Text>
-          ) : (
-            marketFiltered.map((r) => <RiskCard key={r.key} risk={r} />)
-          )}
-          {lockedRiskCount > 0 && marketFiltered.length > 0 && (
-            <View className="mt-1">
-              <LockedSignalsBanner tier={tier} lockedCount={lockedRiskCount} />
-            </View>
-          )}
         </>
-        );
-      })()}
-
-      {/* Global disclaimer — we provide analysis, not advice. */}
-      <Text className="text-textMuted text-[10px] text-center mt-6 mb-2 px-4 leading-4">
-        Now TrendIn provides signal analysis for informational purposes only — not financial,
-        investment, or legal advice. All decisions are your own.
-      </Text>
-    </Screen>
+      )}
+    </SafeAreaView>
   );
 }

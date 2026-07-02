@@ -10,31 +10,31 @@ function fmtUsd(n?: number | null) {
 }
 
 const STRESS_COLOR: Record<string, string> = {
-  'Calm funding markets': '#00C896',
-  'Mild funding stress': '#D4A017',
-  'Elevated funding stress': '#CF2A1B',
+  'Calm funding markets': '#2E7D5B',
+  'Mild funding stress': '#A8456A',
+  'Elevated funding stress': '#B11226',
 };
 
 /** Systemic-leverage + funding-stress card (OFR Short-Term Funding Monitor). */
 export function MacroLeverageCard() {
   const { macro } = useMacroLeverage();
   if (!macro) return null;
-  const stressColor = STRESS_COLOR[macro.stressLabel || ''] || '#5B6472';
+  const stressColor = STRESS_COLOR[macro.stressLabel || ''] || '#3C4663';
   const chg = macro.repoVolumeChangePct;
 
   return (
-    <View className="bg-surface rounded-2xl border border-border p-4 mb-4">
+    <View className="bg-card rounded-2xl p-4 mb-4">
       <View className="flex-row items-center gap-2 mb-2">
-        <Gauge size={18} color="#2D7EEF" />
+        <Gauge size={18} color="#2A5B9E" />
         <Text className="text-textPrimary text-sm font-bold flex-1">Systemic Leverage</Text>
-        {!!macro.asOf && <Text className="text-textMuted text-[10px]">as of {macro.asOf}</Text>}
+        {!!macro.asOf && <Text className="text-textMuted text-[12px]">as of {macro.asOf}</Text>}
       </View>
 
       <View className="flex-row gap-3">
-        <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: '#2D7EEF12' }}>
-          <Text className="text-textMuted text-[10px] font-bold">REPO LEVERAGE</Text>
+        <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: '#2A5B9E12' }}>
+          <Text className="text-textMuted text-[12px] font-bold">REPO LEVERAGE</Text>
           <Text className="text-textPrimary text-sm font-black mt-0.5">{macro.leverageLabel}</Text>
-          <Text className="text-textSecondary text-[11px] mt-1">
+          <Text className="text-textSecondary text-[12px] mt-1">
             Repo volume {fmtUsd(macro.repoVolumeUsd)}
             {chg != null ? `  ·  ${chg >= 0 ? '+' : ''}${chg}%` : ''}
           </Text>
@@ -42,16 +42,16 @@ export function MacroLeverageCard() {
         <View className="flex-1 rounded-xl p-3" style={{ backgroundColor: `${stressColor}12` }}>
           <View className="flex-row items-center gap-1">
             <Activity size={12} color={stressColor} />
-            <Text className="text-textMuted text-[10px] font-bold">FUNDING STRESS</Text>
+            <Text className="text-textMuted text-[12px] font-bold">FUNDING STRESS</Text>
           </View>
           <Text className="text-sm font-black mt-0.5" style={{ color: stressColor }}>{macro.stressLabel}</Text>
           {macro.repoSpreadBps != null && (
-            <Text className="text-textSecondary text-[11px] mt-1">Rate spread {macro.repoSpreadBps} bps</Text>
+            <Text className="text-textSecondary text-[12px] mt-1">Rate spread {macro.repoSpreadBps} bps</Text>
           )}
         </View>
       </View>
 
-      <Text className="text-textMuted text-[9px] mt-2 leading-3">
+      <Text className="text-textMuted text-[12px] mt-2 leading-3">
         Source: U.S. Office of Financial Research — Short-Term Funding Monitor. Descriptive macro
         analysis only, not investment advice.
       </Text>

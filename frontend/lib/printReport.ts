@@ -52,21 +52,21 @@ export function printSignalsReport(
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-           color: #1A1A2E; margin: 24px; }
+           color: #16264A; margin: 24px; }
     h1 { font-size: 18px; margin: 0 0 2px; }
-    h1 .now { color: #EE6A2A; } h1 .trend { color: #B5341B; }
-    .sub { color: #5B6472; font-size: 12px; margin: 0 0 16px; }
+    h1 .now { color: #B11226; } h1 .trend { color: #B11226; }
+    .sub { color: #3C4663; font-size: 12px; margin: 0 0 16px; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    thead th { text-align: left; border-bottom: 2px solid #1A1A2E; padding: 6px 8px;
-               font-size: 9px; letter-spacing: .04em; text-transform: uppercase; color: #5B6472; }
-    tbody td { padding: 6px 8px; border-bottom: 1px solid #E4E7EC; vertical-align: top; }
-    tbody tr:nth-child(even) { background: #F7F8FA; }
+    thead th { text-align: left; border-bottom: 2px solid #16264A; padding: 6px 8px;
+               font-size: 9px; letter-spacing: .04em; text-transform: uppercase; color: #3C4663; }
+    tbody td { padding: 6px 8px; border-bottom: 1px solid #ECECEC; vertical-align: top; }
+    tbody tr:nth-child(even) { background: #F1F1F4; }
     .num { text-align: right; white-space: nowrap; }
     .topic { font-weight: 700; }
-    .det { color: #2D7EEF; font-weight: 700; }
-    .conf { color: #009970; font-weight: 700; }
-    .src { color: #5B6472; max-width: 220px; }
-    tfoot td { padding-top: 10px; color: #9AA3B0; font-size: 10px; }
+    .det { color: #2A5B9E; font-weight: 700; }
+    .conf { color: #246B4A; font-weight: 700; }
+    .src { color: #3C4663; max-width: 220px; }
+    tfoot td { padding-top: 10px; color: #9A9AA2; font-size: 10px; }
     @media print {
       body { margin: 12mm; }
       thead { display: table-header-group; }   /* repeat header on every page */

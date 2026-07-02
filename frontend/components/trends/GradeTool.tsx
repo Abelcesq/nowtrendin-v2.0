@@ -5,10 +5,10 @@ import { Button } from '../ui/Button';
 import { GradientScoreRing } from '../ui/GradientScoreRing';
 import { useAuthStore } from '../../store/auth.store';
 import { queryApi } from '../../lib/api';
-import { GAP_BANDS, gapBandIndex } from '../../lib/signals';
+import { GAP_BANDS, gapBandIndex, titleCaseTopic } from '../../lib/signals';
 
 const STAGE_COLOR: Record<string, string> = {
-  BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017', MARGINAL: '#E85A1E', WATCHING: '#E85A1E', MONITORING: '#94A3B8',
+  BREAKOUT: '#2E7D5B', STRONG: '#2A5B9E', EMERGING: '#A8456A', MARGINAL: '#A8456A', WATCHING: '#A8456A', MONITORING: '#8A8F9C',
 };
 
 interface Proposed {
@@ -22,14 +22,13 @@ interface Proposed {
     market_gradient?: {
       detection: number; confidence: number; tier: string; gap: number;
       gap_state?: string; calibrating?: boolean; leverage_health?: number | null;
-      interpretation?: string; model_version?: string; flow?: string;
+      interpretation?: string;
     };
   };
-  market_analysis?: { text?: string; provider?: string; cached?: boolean };
 }
 
 const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017', ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+  ELEVATED: '#B11226', ACTIVE: '#A8456A', BUILDING: '#A8456A', ROUTINE: '#2A5B9E', DORMANT: '#9A9AA2',
 };
 interface GradeRow {
   id: number; topic: string; detection: number; confidence: number;
@@ -79,7 +78,7 @@ export function GradeTool() {
   return (
     <View>
       <View className="flex-row items-center gap-2 mb-1">
-        <GraduationCap size={20} color="#D4A017" />
+        <GraduationCap size={20} color="#A8456A" />
         <Text className="text-textPrimary text-xl font-black">Grade a Topic</Text>
       </View>
       <Text className="text-textMuted text-[12px] leading-4 mb-3">
@@ -89,38 +88,39 @@ export function GradeTool() {
 
       {/* Three tab icons — New Grade | History | Graded */}
       <View className="flex-row gap-2 mb-4">
-        <TabBtn icon={<Plus size={15} color={tab === 'new' ? '#FFFFFF' : '#5B6472'} />} label="New Grade" active={tab === 'new'} onPress={() => setTab('new')} />
-        <TabBtn icon={<Clock size={15} color={tab === 'history' ? '#FFFFFF' : '#5B6472'} />} label="History" active={tab === 'history'} onPress={() => setTab('history')} />
-        <TabBtn icon={<Globe size={15} color={tab === 'graded' ? '#FFFFFF' : '#5B6472'} />} label="Graded" active={tab === 'graded'} onPress={() => setTab('graded')} />
+        <TabBtn icon={<Plus size={15} color={tab === 'new' ? '#FFFFFF' : '#3C4663'} />} label="New Grade" active={tab === 'new'} onPress={() => setTab('new')} />
+        <TabBtn icon={<Clock size={15} color={tab === 'history' ? '#FFFFFF' : '#3C4663'} />} label="History" active={tab === 'history'} onPress={() => setTab('history')} />
+        <TabBtn icon={<Globe size={15} color={tab === 'graded' ? '#FFFFFF' : '#3C4663'} />} label="Graded" active={tab === 'graded'} onPress={() => setTab('graded')} />
       </View>
 
       {tab === 'new' && (
         !canGrade ? (
-          <View className="rounded-xl border p-5 items-center" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
-            <Lock size={22} color="#D4A017" />
+          <View className="rounded-xl p-5 items-center" style={{ borderColor: '#A8456A66', backgroundColor: '#A8456A0D' }}>
+            <Lock size={22} color="#A8456A" />
             <Text className="text-textPrimary font-bold text-sm mt-2 text-center">Choose a plan</Text>
             <Text className="text-textMuted text-xs mt-1 text-center">AI grading is included on every plan with a monthly credit allowance.</Text>
           </View>
         ) : (
           <>
-            <View className="flex-row items-center bg-surface rounded-xl px-4 py-3 border border-border mb-3">
-              <Sparkles size={18} color="#D4A017" />
+            <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mb-3">
+              <Sparkles size={18} color="#A8456A" />
               <TextInput value={topic} onChangeText={setTopic} placeholder="Enter any word or topic to grade…"
-                placeholderTextColor="#9AA3B0" className="flex-1 ml-3 text-base" style={{ color: '#1A1A2E' }} />
+                placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
             </View>
-            <View className="rounded-xl border p-4 mb-4" style={{ borderColor: '#D4A01766', backgroundColor: '#D4A0170D' }}>
-              <View className="flex-row items-center gap-2 mb-1">
-                <Sparkles size={15} color="#D4A017" />
-                <Text className="text-textPrimary text-sm font-bold">AI Proposed Gradient Score</Text>
-                <Text className="text-textMuted text-xs ml-auto">{tokens} grade tokens left</Text>
-              </View>
-              <Text className="text-textMuted text-xs mb-3">Researches the open web and proposes a score with citations — uses 1 token.</Text>
-              <Button variant="enterprise" size="md" loading={busy} disabled={!topic.trim() || tokens <= 0} onPress={grade}>
-                {tokens <= 0 ? 'No grade tokens remaining this month' : 'Grade · 1 token'}
-              </Button>
-              {msg && <Text className="text-error text-xs mt-2">{msg}</Text>}
-              {busy && <Text className="text-textMuted text-[11px] mt-2">Researching the web and scoring… ~20–40s.</Text>}
-            </View>
+            <Text className="text-textMuted text-[12px] leading-4 mb-3">Researches the open web and proposes a score with citations — uses 1 grade token.</Text>
+            <TouchableOpacity onPress={grade} disabled={!topic.trim() || tokens <= 0 || busy} activeOpacity={0.9}
+              className="flex-row items-center justify-center"
+              style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 15, opacity: (!topic.trim() || tokens <= 0) ? 0.5 : 1 }}>
+              {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Sparkles size={16} color="#F0758A" />}
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginLeft: 8 }}>
+                {tokens <= 0 ? 'NO GRADE TOKENS LEFT' : 'GRADE THIS TOPIC'}
+              </Text>
+              {tokens > 0 && <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', marginLeft: 8 }}>· 1 TOKEN</Text>}
+            </TouchableOpacity>
+            <Text className="text-textMuted text-[12px] font-bold tracking-wide text-center mt-2 uppercase">{tokens} grade tokens left</Text>
+            {msg && <Text className="text-error text-xs mt-2 text-center">{msg}</Text>}
+            {busy && <Text className="text-textMuted text-[12px] mt-2 text-center">Researching the web and scoring… ~20–40s.</Text>}
+            <View className="mb-4" />
             {result && <ProposedCard result={result} />}
           </>
         )
@@ -134,10 +134,10 @@ export function GradeTool() {
 
 function TabBtn({ icon, label, active, onPress }: { icon: React.ReactNode; label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border"
-      style={{ backgroundColor: active ? '#D4A017' : '#FFFFFF', borderColor: active ? '#D4A017' : '#E4E7EC' }}>
+    <TouchableOpacity onPress={onPress} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
+      style={{ backgroundColor: active ? '#A8456A' : '#FFFFFF', borderColor: active ? '#A8456A' : '#ECECEC' }}>
       {icon}
-      <Text className="text-[12px] font-bold" style={{ color: active ? '#FFFFFF' : '#5B6472' }}>{label}</Text>
+      <Text className="text-[12px] font-bold" style={{ color: active ? '#FFFFFF' : '#3C4663' }}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -166,43 +166,43 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
 
   return (
     <View>
-      <View className="flex-row items-center bg-surface rounded-xl px-4 py-2.5 border border-border mb-3">
-        <Search size={16} color="#9AA3B0" />
+      <View className="flex-row items-center bg-card rounded-xl px-4 py-2.5 mb-3">
+        <Search size={16} color="#9A9AA2" />
         <TextInput value={q} onChangeText={setQ}
           placeholder={kind === 'history' ? 'Search your graded topics…' : 'Search all graded topics…'}
-          placeholderTextColor="#9AA3B0" className="flex-1 ml-2.5 text-sm" style={{ color: '#1A1A2E' }} />
+          placeholderTextColor="#9A9AA2" className="flex-1 ml-2.5 text-sm" style={{ color: '#16264A' }} />
       </View>
-      <Text className="text-textMuted text-[11px] mb-3">
+      <Text className="text-textMuted text-[12px] mb-3">
         {kind === 'history'
           ? 'Your AI grades from the last 12 months. No token charge to view.'
           : 'Topics graded by Now TrendIn members across all plans. No token charge to view.'}
       </Text>
 
       {loading ? (
-        <ActivityIndicator size="small" color="#D4A017" style={{ marginTop: 24 }} />
+        <ActivityIndicator size="small" color="#A8456A" style={{ marginTop: 24 }} />
       ) : rows.length === 0 ? (
-        <View className="bg-surface rounded-2xl border border-border p-6 items-center">
+        <View className="bg-card rounded-2xl p-6 items-center">
           <Text className="text-textMuted text-sm text-center">
             {q ? 'No graded topics match your search.' : (kind === 'history' ? 'You haven’t graded any topics yet.' : 'No topics have been graded yet.')}
           </Text>
         </View>
       ) : (
         rows.map((g) => {
-          const col = STAGE_COLOR[g.stage] ?? '#94A3B8';
+          const col = STAGE_COLOR[g.stage] ?? '#8A8F9C';
           return (
-            <View key={g.id} className="bg-surface rounded-xl border border-border p-3 mb-2">
+            <View key={g.id} className="bg-card rounded-xl p-3 mb-2">
               <View className="flex-row items-center justify-between">
-                <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{g.topic}</Text>
+                <Text className="text-textPrimary text-sm font-bold flex-1 pr-2" numberOfLines={1}>{titleCaseTopic(g.topic)}</Text>
                 {!!g.stage && (
                   <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${col}1A` }}>
-                    <Text className="text-[9px] font-bold" style={{ color: col }}>{g.stage}</Text>
+                    <Text className="text-[12px] font-bold" style={{ color: col }}>{g.stage}</Text>
                   </View>
                 )}
               </View>
               <View className="flex-row items-center gap-3 mt-1">
-                <Text className="text-[11px]" style={{ color: '#2D7EEF' }}>DET {Math.round(g.detection)}</Text>
-                <Text className="text-[11px]" style={{ color: '#00C896' }}>CONF {Math.round(g.confidence)}</Text>
-                <Text className="text-textMuted text-[11px] ml-auto">{timeAgo(g.createdAt)}</Text>
+                <Text className="text-[12px]" style={{ color: '#2A5B9E' }}>DET {Math.round(g.detection)}</Text>
+                <Text className="text-[12px]" style={{ color: '#2E7D5B' }}>CONF {Math.round(g.confidence)}</Text>
+                <Text className="text-textMuted text-[12px] ml-auto">{timeAgo(g.createdAt)}</Text>
               </View>
             </View>
           );
@@ -224,96 +224,77 @@ function ProposedCard({ result }: { result: Proposed }) {
     {/* MARKET read for companies — identical to the Market section, pulled from
         the full financial stack. Shown FIRST so a company's market read leads. */}
     {ms && (() => {
-      const tc = MARKET_TIER_COLOR[ms.tier] ?? '#9AA3B0';
-      const msV2 = !!(ms.model_version || ms.flow);
-      const flow = ms.flow;
-      const flowMeta = flow === 'inflow' ? { t: '▲ inflow', c: '#00C896' }
-        : flow === 'outflow' ? { t: '▼ outflow', c: '#DC2626' }
-        : flow === 'neutral' ? { t: '• neutral', c: '#9AA3B0' } : null;
-      const mAnalysis = result.market_analysis?.text;
+      const tc = MARKET_TIER_COLOR[ms.tier] ?? '#9A9AA2';
       return (
-        <View className="bg-surface rounded-2xl border p-5 mb-4" style={{ borderColor: `${tc}44` }}>
+        <View className="bg-card rounded-2xl p-5 mb-4" style={{ borderColor: `${tc}44` }}>
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#E85A1E' }}>Market Signal · {msV2 ? 'money movement' : 'measured'}</Text>
-            <View className="flex-row items-center gap-1.5">
-              {msV2 && flowMeta && (
-                <View className="px-2 py-1 rounded-full" style={{ backgroundColor: `${flowMeta.c}1A` }}>
-                  <Text className="text-[10px] font-bold" style={{ color: flowMeta.c }}>{flowMeta.t}</Text>
-                </View>
-              )}
-              <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tc}1A` }}>
-                <Text className="text-[10px] font-bold" style={{ color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</Text>
-              </View>
+            <Text className="text-[12px] font-bold tracking-widest uppercase" style={{ color: '#A8456A' }}>Market Signal · measured</Text>
+            <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tc}1A` }}>
+              <Text className="text-[12px] font-bold" style={{ color: tc }}>{ms.calibrating ? 'CALIBRATING' : ms.tier}</Text>
             </View>
           </View>
           <View className="flex-row justify-around items-start mb-2">
             <View className="items-center">
-              <GradientScoreRing score={Math.round(ms.detection)} color="#2D7EEF" size="md" caption="/100" />
-              <Text className="text-textPrimary text-xs font-bold mt-2">{msV2 ? 'MONEY MOVEMENT' : 'DETECTION'}</Text>
-              <Text className="text-textMuted text-[9px]">{msV2 ? 'informed money · D' : 'analysts + positioning'}</Text>
+              <GradientScoreRing score={Math.round(ms.detection)} color="#2A5B9E" size="md" caption="/100" />
+              <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
+              <Text className="text-textMuted text-[12px]">analysts + positioning</Text>
             </View>
             <View className="items-center">
-              <GradientScoreRing score={Math.round(ms.confidence)} color="#00C896" size="md" caption="/100" />
-              <Text className="text-textPrimary text-xs font-bold mt-2">{msV2 ? 'MARKET CONFIRMATION' : 'CONFIDENCE'}</Text>
-              <Text className="text-textMuted text-[9px]">{msV2 ? 'broad market · M' : 'fundamentals + price'}</Text>
+              <GradientScoreRing score={Math.round(ms.confidence)} color="#2E7D5B" size="md" caption="/100" />
+              <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
+              <Text className="text-textMuted text-[12px]">fundamentals + price</Text>
             </View>
           </View>
           {ms.leverage_health != null && (
-            <Text className="text-[11px] font-bold text-center mb-1" style={{ color: '#10B981' }}>Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</Text>
+            <Text className="text-[12px] font-bold text-center mb-1" style={{ color: '#2E7D5B' }}>Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</Text>
           )}
           {!!ms.interpretation && <Text className="text-textSecondary text-[12px] leading-4">{ms.interpretation}</Text>}
-          {!!mAnalysis && (
-            <View className="mt-2 pt-2 border-t border-border">
-              <Text className="text-[12px] leading-4 text-textSecondary"><Text className="font-bold" style={{ color: '#E85A1E' }}>AI analysis</Text> — {mAnalysis}</Text>
-              <Text className="text-textMuted text-[9px] mt-1">AI measurement of money movement, market confirmation & leverage from our scores — computer-generated, not financial advice.</Text>
-            </View>
-          )}
-          <Text className="text-textMuted text-[10px] mt-2">This is the measured MARKET read — the same as the Market section. The AI estimate below is the separate ATTENTION read.</Text>
+          <Text className="text-textMuted text-[12px] mt-2">This is the measured MARKET read — the same as the Market section. The AI estimate below is the separate ATTENTION read.</Text>
         </View>
       );
     })()}
 
-    <View className="bg-surface rounded-2xl border border-border p-5 mb-4">
+    <View className="bg-card rounded-2xl p-5 mb-4">
       <View className="flex-row items-center justify-between mb-1">
-        <Text className="text-textMuted text-[10px] font-bold tracking-widest uppercase">
+        <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase">
           {measured ? 'Gradient Score · measured' : (ms ? 'Attention estimate · AI' : 'Proposed · AI estimate')}
         </Text>
         <View className="flex-row items-center gap-1.5">
-          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${measured ? '#00C896' : '#D4A017'}1A` }}>
-            <Text className="text-[9px] font-bold" style={{ color: measured ? '#00C896' : '#D4A017' }}>{measured ? 'IN DATA POOL' : 'AI ESTIMATE'}</Text>
+          <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${measured ? '#2E7D5B' : '#A8456A'}1A` }}>
+            <Text className="text-[12px] font-bold" style={{ color: measured ? '#2E7D5B' : '#A8456A' }}>{measured ? 'IN DATA POOL' : 'AI ESTIMATE'}</Text>
           </View>
-          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#94A3B8'}1A` }}>
-            <Text className="text-[10px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#94A3B8' }}>{result.stage}</Text>
+          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${STAGE_COLOR[result.stage] ?? '#8A8F9C'}1A` }}>
+            <Text className="text-[12px] font-bold" style={{ color: STAGE_COLOR[result.stage] ?? '#8A8F9C' }}>{result.stage}</Text>
           </View>
         </View>
       </View>
-      {!!(result as any).note && <Text className="text-textMuted text-[10px] leading-4 mb-2">{(result as any).note}</Text>}
+      {!!(result as any).note && <Text className="text-textMuted text-[12px] leading-4 mb-2">{(result as any).note}</Text>}
       <View className="flex-row justify-around items-start mt-2 mb-3">
         <View className="items-center">
-          <GradientScoreRing score={Math.round(result.detection_score)} color="#2D7EEF" size="md" caption="/100" />
+          <GradientScoreRing score={Math.round(result.detection_score)} color="#2A5B9E" size="md" caption="/100" />
           <Text className="text-textPrimary text-xs font-bold mt-2">DETECTION</Text>
         </View>
         <View className="items-center">
-          <GradientScoreRing score={Math.round(result.confidence_score)} color="#00C896" size="md" caption="/100" />
+          <GradientScoreRing score={Math.round(result.confidence_score)} color="#2E7D5B" size="md" caption="/100" />
           <Text className="text-textPrimary text-xs font-bold mt-2">CONFIDENCE</Text>
         </View>
       </View>
-      <View className="rounded-xl px-3 py-2 mb-3 border" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
+      <View className="rounded-xl px-3 py-2 mb-3" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
         <Text className="text-sm font-bold" style={{ color: band.color }}>{gap}-point gap — {band.label}</Text>
       </View>
-      {!!result.action && <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#1A1A2E' }}>{result.action}</Text>}
-      {!!result.reasoning && <Text className="text-textSecondary text-[13px] leading-5 mb-3">{result.reasoning}</Text>}
+      {!!result.action && <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#16264A' }}>{result.action}</Text>}
+      {!!result.reasoning && <Text className="text-textSecondary text-[14px] leading-5 mb-3">{result.reasoning}</Text>}
       {!!(result as any).mainstream_vs_niche && (() => {
         const mv = (result as any).mainstream_vs_niche;
-        const col = mv.label === 'mainstream' ? '#00C896' : mv.label === 'emerging' ? '#D4A017' : mv.label === 'fading' ? '#94A3B8' : '#2D7EEF';
+        const col = mv.label === 'mainstream' ? '#2E7D5B' : mv.label === 'emerging' ? '#A8456A' : mv.label === 'fading' ? '#8A8F9C' : '#2A5B9E';
         return (
           <View className="mb-3">
             <View className="flex-row items-center justify-between">
               <Text className="text-textSecondary text-xs uppercase tracking-wider">Mainstream vs Niche</Text>
               <Text className="text-sm font-black capitalize" style={{ color: col }}>{mv.label}</Text>
             </View>
-            {!!mv.note && <Text className="text-textMuted text-[11px] leading-4 mt-1">{mv.note}</Text>}
-            <Text className="text-textMuted text-[10px] mt-1">Determined from: {mv.source}</Text>
+            {!!mv.note && <Text className="text-textMuted text-[12px] leading-4 mt-1">{mv.note}</Text>}
+            <Text className="text-textMuted text-[12px] mt-1">Determined from: {mv.source}</Text>
           </View>
         );
       })()}
@@ -335,26 +316,25 @@ function ProposedCard({ result }: { result: Proposed }) {
         <>
           <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Sources</Text>
           {result.citations.slice(0, 8).map((c, i) => (
-            <Text key={i} selectable className="text-textMuted text-[11px] mb-1" numberOfLines={1}>• {c}</Text>
+            <Text key={i} selectable className="text-textMuted text-[12px] mb-1" numberOfLines={1}>• {c}</Text>
           ))}
         </>
       )}
-      {/* N (platform tracking) explanation — kept consistent with the trend
+      {/* N (on-platform demand) explanation — kept consistent with the trend
           signal section. N is a separate, measured signal; the Gradient Score
-          itself stays N-free (no feedback loop). */}
+          itself stays demand-free (no internal-demand feedback loop). */}
       <View className="mt-3 pt-3 border-t border-border">
         <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#EE6A2A' }}>N Score · Now Trending</Text>
-          <Text className="text-base font-black" style={{ color: '#EE6A2A' }}>{nScore != null && nScore > 0 ? nScore : '—'}</Text>
+          <Text className="text-[12px] font-bold tracking-widest uppercase" style={{ color: '#B11226' }}>N Score · Now Trending</Text>
+          <Text className="text-base font-black" style={{ color: '#B11226' }}>{nScore != null && nScore > 0 ? nScore : '—'}</Text>
         </View>
-        <Text className="text-textMuted text-[11px] leading-4">
-          N (platform tracking) — how often a topic is triggered + surfaced as a tracked topic
-          across the Now TrendIn platform — is a separate signal, never folded into the Gradient
-          (no feedback loop).
-          {measured ? ' Measured live from the engine.' : ' Registers once platform tracking accrues; this grade query logs it.'}
+        <Text className="text-textMuted text-[12px] leading-4">
+          On-platform demand (N) — how often Now TrendIn users ask about a topic — is a
+          separate signal, never folded into the Gradient (no demand feedback loop).
+          {measured ? ' Measured live from the engine.' : ' Registers once demand accrues; this grade query logs it.'}
         </Text>
       </View>
-      <Text className="text-textMuted text-[10px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
+      <Text className="text-textMuted text-[12px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>
     </View>
     </>
   );
@@ -369,7 +349,7 @@ function Bar({ label, value }: { label: string; value: number }) {
         <Text className="text-textPrimary text-sm font-semibold">{v}</Text>
       </View>
       <View className="h-1.5 rounded-full bg-border overflow-hidden">
-        <View style={{ width: `${v}%`, backgroundColor: '#D4A017' }} className="h-full rounded-full" />
+        <View style={{ width: `${v}%`, backgroundColor: '#A8456A' }} className="h-full rounded-full" />
       </View>
     </View>
   );

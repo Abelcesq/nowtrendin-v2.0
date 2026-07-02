@@ -16,12 +16,12 @@ export default function Billing() {
   return (
     <Screen scroll>
       <TouchableOpacity onPress={() => router.back()} className="pt-4 mb-2 self-start flex-row items-center gap-1">
-        <ChevronLeft size={22} color="#5B6472" /><Text className="text-textSecondary text-base">Back</Text>
+        <ChevronLeft size={22} color="#3C4663" /><Text className="text-textSecondary text-base">Back</Text>
       </TouchableOpacity>
       <Text className="text-textPrimary text-2xl font-bold mb-1">Billing</Text>
       <Text className="text-textMuted text-sm mb-4">Your plan and payment.</Text>
 
-      <View className="bg-surface rounded-2xl p-5 border border-border mb-4">
+      <View className="bg-card rounded-2xl p-5 mb-4">
         <View className="flex-row items-center gap-2 mb-2">
           <CreditCard size={18} color={cfg.colour} />
           <Text className="text-base font-bold" style={{ color: cfg.colour }}>{cfg.name} Plan</Text>
@@ -30,14 +30,14 @@ export default function Billing() {
         <View className="mt-3">
           {(cfg.features ?? []).slice(0, 5).map((f: string, i: number) => (
             <View key={i} className="flex-row items-center gap-2 py-1">
-              <Check size={14} color="#00C896" />
-              <Text className="text-textSecondary text-[13px]">{f}</Text>
+              <Check size={14} color="#2E7D5B" />
+              <Text className="text-textSecondary text-[14px]">{f}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      <TouchableOpacity className="bg-elevated rounded-xl border border-border py-3.5 items-center" disabled>
+      <TouchableOpacity className="bg-elevated rounded-xl py-3.5 items-center" disabled>
         <Text className="text-textMuted text-sm font-semibold">Manage billing — coming soon</Text>
       </TouchableOpacity>
       <Text className="text-textMuted text-xs text-center mt-3 px-4 leading-4">
