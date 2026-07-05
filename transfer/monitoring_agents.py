@@ -512,9 +512,13 @@ def fragment_category_auditor(conn, sample: int = 400) -> dict:
         # (1) news-filler fragment — multi-word anchored by a filler token
         if len(toks) >= 2 and (toks[0] in nf or toks[-1] in nf):
             fragments.append(disp)
-        # category (computed the same way serve does)
+        # category — measured with the SERVE-TIME classifier (_category_for: situation +
+        # context layered, the same fn the /scores feed uses), NOT the bare lexicon
+        # (_topic_category). The bare lexicon structurally over-counts the catch-all
+        # because it can't see a topic's situation/headline context, so measuring it
+        # misreports the user-facing catch-all (the 80.5%-vs-served-56% gap).
         try:
-            cat = g._topic_category(disp) or ""
+            cat = g._category_for(r["topic_key"], disp) or ""
         except Exception:
             cat = ""
         if cat in ("news", "general", ""):
@@ -727,11 +731,19 @@ def catchall_auditor(conn) -> dict:
            - datetime.timedelta(hours=SCORE_WINDOW_H + RECENT_LEAK_H)).isoformat()
     recent_cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=RECENT_LEAK_H)).isoformat()
     try:
+        # Scope the DISTINCT-source aggregation to topic_keys scored within the window
+        # (the recent working set) instead of scanning the whole topic_signals table on
+        # the unindexed extracted_at range — the latter is the H12 (30s) timeout that
+        # took /monitor/catchall down. The topic_key IN (...) semi-join lets Postgres use
+        # idx_ts_key (topic_key, extracted_at). Dormant topics (scored before the window)
+        # fall out → nsrc=0 → counted as the retained dormant pile, exactly as before.
         for r in conn.execute(
-            "SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
-            "MAX(engagement_raw) maxe, "
-            "MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
-            "FROM topic_signals WHERE extracted_at >= ? GROUP BY topic_key", (cut,)).fetchall():
+            "SELECT ts.topic_key, COUNT(DISTINCT ts.source_name) nsrc, "
+            "MAX(ts.engagement_raw) maxe, "
+            "MAX(CASE WHEN ts.platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
+            "FROM topic_signals ts WHERE ts.extracted_at >= ? "
+            "AND ts.topic_key IN (SELECT DISTINCT topic_key FROM velocity_scores "
+            "WHERE scored_at >= ?) GROUP BY ts.topic_key", (cut, cut)).fetchall():
             agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0.0))
     except Exception as e:
         alerts.append({"level": "warn", "block": "B3", "msg": f"corroboration read failed: {e}"})
@@ -771,8 +783,11 @@ def catchall_auditor(conn) -> dict:
     for r in rows:
         k = r["topic_key"]
         disp = (r["topic_display"] or k or "")
+        # Serve-time classifier (_category_for) — see fragment_category_auditor above:
+        # measure the catch-all the way the /scores feed actually serves it, not the
+        # bare-lexicon _topic_category that structurally over-counts it.
         try:
-            cat = g._topic_category(disp) or ""
+            cat = g._category_for(k, disp) or ""
         except Exception:
             cat = ""
         if cat not in catch_cats:
