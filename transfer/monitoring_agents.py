@@ -705,7 +705,7 @@ def data_subscriptions() -> dict:
 #     true category — the real lever on the catch-all %.
 # Designed to be run end-of-day: its summary is a worklist, not just a number.
 def catchall_auditor(conn) -> dict:
-    import datetime, collections
+    import datetime, collections, os
     import gravitational_anomaly_detector as g
     alerts = []
     nf = getattr(g, "NEWS_FILLER", set())
@@ -748,11 +748,18 @@ def catchall_auditor(conn) -> dict:
     except Exception:
         pass
 
+    # Bound the scan to the recent WORKING SET (latest scores first). velocity_scores
+    # retains 365 days, so an unbounded latest-per-topic scan returns every topic ever
+    # seen and classifying all of them (PASS 1) blew past Heroku's 30s router limit (H12).
+    # The recent working set is exactly what the /scores feed serves, so the catch-all %
+    # measured over it is representative — matching how fragment_category_auditor samples.
+    WORKING_SET = int(os.getenv("CATCHALL_WORKING_SET", "6000"))
     try:
         rows = conn.execute(
             "SELECT v.topic_key, v.topic_display, v.scored_at FROM velocity_scores v "
             "INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
-            "GROUP BY topic_key) l ON v.topic_key=l.topic_key AND v.scored_at=l.m").fetchall()
+            "GROUP BY topic_key) l ON v.topic_key=l.topic_key AND v.scored_at=l.m "
+            "ORDER BY v.scored_at DESC LIMIT ?", (WORKING_SET,)).fetchall()
     except Exception as e:
         return {"agent": "catchall_auditor", "status": "warn",
                 "alerts": [{"level": "warn", "block": "B3", "msg": f"scored read failed: {e}"}],
