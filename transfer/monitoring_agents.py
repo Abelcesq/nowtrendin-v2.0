@@ -726,27 +726,9 @@ def catchall_auditor(conn) -> dict:
     # source count conservative (never under-counts the floor's sources → no false leak).
     SCORE_WINDOW_H = 72        # matches AnomalyDetector.score_all_topics(hours=72)
     RECENT_LEAK_H = 24         # "current admission" sample = last day (≈4 collect cycles)
-    agg = {}
     cut = (datetime.datetime.utcnow()
            - datetime.timedelta(hours=SCORE_WINDOW_H + RECENT_LEAK_H)).isoformat()
     recent_cut = (datetime.datetime.utcnow() - datetime.timedelta(hours=RECENT_LEAK_H)).isoformat()
-    try:
-        # Scope the DISTINCT-source aggregation to topic_keys scored within the window
-        # (the recent working set) instead of scanning the whole topic_signals table on
-        # the unindexed extracted_at range — the latter is the H12 (30s) timeout that
-        # took /monitor/catchall down. The topic_key IN (...) semi-join lets Postgres use
-        # idx_ts_key (topic_key, extracted_at). Dormant topics (scored before the window)
-        # fall out → nsrc=0 → counted as the retained dormant pile, exactly as before.
-        for r in conn.execute(
-            "SELECT ts.topic_key, COUNT(DISTINCT ts.source_name) nsrc, "
-            "MAX(ts.engagement_raw) maxe, "
-            "MAX(CASE WHEN ts.platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
-            "FROM topic_signals ts WHERE ts.extracted_at >= ? "
-            "AND ts.topic_key IN (SELECT DISTINCT topic_key FROM velocity_scores "
-            "WHERE scored_at >= ?) GROUP BY ts.topic_key", (cut, cut)).fetchall():
-            agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0.0))
-    except Exception as e:
-        alerts.append({"level": "warn", "block": "B3", "msg": f"corroboration read failed: {e}"})
 
     # tracked calls (never legitimately catch-all junk) — for misclassified detect
     protect = set()
@@ -777,33 +759,61 @@ def catchall_auditor(conn) -> dict:
                 "summary": {}, "checked_at": _now().isoformat()}
 
     total = len(rows) or 1
-    catch = single_src = dormant_pile = 0
-    misclassified_real, samples = [], []
-    token_freq = collections.Counter()
+
+    # PASS 1 — classify each topic's LATEST score with the SERVE-TIME category
+    # (_category_for: situation + context layered, the same fn the /scores feed uses),
+    # NOT the bare lexicon (_topic_category), which structurally over-counts the catch-all
+    # because it can't see a topic's situation/headline context (the 80.5%-vs-served-56%
+    # gap). Collect only the catch-all topics for the corroboration + lexicon passes.
+    catch_meta = []                                   # (key, disp, scored_at)
     for r in rows:
         k = r["topic_key"]
         disp = (r["topic_display"] or k or "")
-        # Serve-time classifier (_category_for) — see fragment_category_auditor above:
-        # measure the catch-all the way the /scores feed actually serves it, not the
-        # bare-lexicon _topic_category that structurally over-counts it.
         try:
             cat = g._category_for(k, disp) or ""
         except Exception:
             cat = ""
-        if cat not in catch_cats:
-            continue
+        if cat in catch_cats:
+            catch_meta.append((k, disp, r["scored_at"] or ""))
+
+    # Corroboration — aggregate topic_signals for ONLY the catch-all keys scored within
+    # the window, passed EXPLICITLY in chunks so Postgres nested-loops index seeks on
+    # idx_ts_key (topic_key, extracted_at). The prior full-table scan on the unindexed
+    # extracted_at range was the H12 (30s) timeout that took /monitor/catchall down; an
+    # IN-(subquery) still seq-scans, an explicit key list forces the per-key seek. Keys
+    # scored before the window are dormant by definition → agg absent → nsrc=0 → dormant
+    # pile (the aged pre-floor rows we RETAIN under the 365-day rule), exactly as before.
+    agg = {}
+    window_keys = [m[0] for m in catch_meta if m[2] >= cut]
+    CHUNK = 400
+    for i in range(0, len(window_keys), CHUNK):
+        chunk = window_keys[i:i + CHUNK]
+        ph = ",".join("?" for _ in chunk)
+        try:
+            for r in conn.execute(
+                f"SELECT topic_key, COUNT(DISTINCT source_name) nsrc, "
+                f"MAX(engagement_raw) maxe, "
+                f"MAX(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) hasx "
+                f"FROM topic_signals WHERE topic_key IN ({ph}) AND extracted_at >= ? "
+                f"GROUP BY topic_key", tuple(chunk) + (cut,)).fetchall():
+                agg[r["topic_key"]] = (int(r["nsrc"] or 0), int(r["hasx"] or 0), float(r["maxe"] or 0.0))
+        except Exception as e:
+            alerts.append({"level": "warn", "block": "B3", "msg": f"corroboration read failed: {e}"})
+            break
+
+    # PASS 2 — leak / misclassified-tracked / lexicon-candidate tally over catch-all topics.
+    # ADMISSION leak vs DORMANT pile: the corroboration map only covers topics scored within
+    # the window (forward-only floor). A topic scored earlier has had its signals age out →
+    # absent from agg → nsrc=0; if not recent it is the retained pre-floor pile, NOT a leak.
+    # Only a topic scored within RECENT_LEAK_H still lacking ≥min_src distinct sources — and
+    # not floor-exempt (expert tier, tracked call, HIGH-MAGNITUDE) — is a real current leak.
+    catch = single_src = dormant_pile = 0
+    misclassified_real, samples = [], []
+    token_freq = collections.Counter()
+    for (k, disp, scored_at) in catch_meta:
         catch += 1
         nsrc, hasx, maxe = agg.get(k, (0, 0, 0.0))
-        # ADMISSION leak vs DORMANT pile. The corroboration map `agg` only sees the
-        # last 72h of topic_signals, so a topic whose LATEST score predates that window
-        # has had its corroborating signals age out → a low nsrc there is a 72h-window
-        # artifact, NOT a floor failure. The floor is enforced at SCORING time
-        # (forward-only); old single-source rows are the pre-floor pile we RETAIN under
-        # the 365-day rule (it shrinks as rows age out). Only a topic scored WITHIN the
-        # 72h window that still lacks ≥min_src distinct sources is a real current leak —
-        # AND must not be one the floor legitimately exempts (expert tier, tracked call,
-        # or HIGH-MAGNITUDE mass attention). Replicate _passes_corroboration exactly.
-        recent = (r["scored_at"] or "") >= recent_cut
+        recent = scored_at >= recent_cut
         exempt = hasx or (maxe >= hi_mag) or (k in protect)
         if nsrc < min_src and not exempt:
             if recent:
