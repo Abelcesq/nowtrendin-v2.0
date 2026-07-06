@@ -47,11 +47,18 @@ export default function AccuracyLedger() {
             <Metric label="AVG LEAD" value={report!.avgLead ?? 0} suffix="d" />
             <Metric label="MAX LEAD" value={report!.maxLead ?? 0} suffix="d" />
           </View>
-          <View className="flex-row gap-2 mb-6">
-            <Metric label="PREDICTIONS" value={report!.total ?? 0} />
+          <View className="flex-row gap-2 mb-2">
+            {/* "RESOLVED", not "PREDICTIONS" — total counts only resolved rows
+                (honest denominator, same as the web ledger's "70 resolved"). */}
+            <Metric label="RESOLVED" value={report!.total ?? 0} />
             <Metric label="LED" value={report!.led ?? 0} />
             <Metric label="MEDIAN LEAD" value={report!.medianLead ?? 0} suffix="d" />
           </View>
+          {report!.pending != null && (
+            <Text className="text-textMuted text-[12px] text-center mb-6">
+              {Number(report!.pending).toLocaleString()} pending detections still in flight — 365-day patience window
+            </Text>
+          )}
 
           {!!report!.best?.length && (
             <>
@@ -64,7 +71,7 @@ export default function AccuracyLedger() {
                     <Clock size={12} color="#3C4663" />
                     <Text className="text-textPrimary font-black">{b.leadDays}d</Text>
                   </View>
-                  <Text className="text-textMuted text-xs ml-3">{b.multiple}×</Text>
+                  {b.multiple != null && <Text className="text-textMuted text-xs ml-3">{b.multiple}×</Text>}
                 </View>
               ))}
             </>

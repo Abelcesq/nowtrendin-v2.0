@@ -527,28 +527,37 @@ export interface AccuracyReport {
   total?: number;
   led?: number;
   lagged?: number;
+  pending?: number;
   hitRate?: number;
   avgLead?: number;
   medianLead?: number;
   maxLead?: number;
-  best?: { topic: string; leadDays: number; multiple: number }[];
+  best?: { topic: string; leadDays: number; multiple?: number }[];
 }
 
 // The Accuracy Ledger — documented lead time vs Google Trends breakout.
+// The engine serves camelCase fields (hitRate/avgLead/total/led/best[].leadDays)
+// — the same payload the web ledger reads. The old snake_case names are kept as
+// fallbacks so an older payload can't zero the screen again (the 2026-07-06
+// mobile glitch: every metric read an extinct snake_case field → `?? 0` → a
+// wall of zeros rendered as if it were data).
 export async function fetchAccuracy(): Promise<AccuracyReport> {
   const res = await fetch(`${GRADIENT_API}/accuracy/ledger`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Accuracy ${res.status}`);
   const d = await res.json();
   return {
     status: d.status,
-    total: d.total_predictions,
-    led: d.led_count,
-    lagged: d.lagged_count,
-    hitRate: d.hit_rate_pct,
-    avgLead: d.avg_lead_time_days,
-    medianLead: d.median_lead_time_days,
-    maxLead: d.max_lead_time_days,
-    best: (d.best_predictions || []).map((b: any) => ({ topic: b.topic, leadDays: b.lead_days, multiple: b.multiple })),
+    total: d.total ?? d.total_predictions,
+    led: d.led ?? d.led_count,
+    lagged: d.lagged ?? d.lagged_count,
+    pending: d.pending,
+    hitRate: d.hitRate ?? d.hit_rate_pct,
+    avgLead: d.avgLead ?? d.avg_lead_time_days,
+    medianLead: d.medianLead ?? d.median_lead_time_days,
+    maxLead: d.maxLead ?? d.max_lead_time_days,
+    best: (d.best ?? d.best_predictions ?? []).map((b: any) => ({
+      topic: b.topic, leadDays: b.leadDays ?? b.lead_days, multiple: b.multiple,
+    })),
   };
 }
 
