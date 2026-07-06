@@ -1125,3 +1125,11 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 ### New skill
 - **/engine-recovery** — signature table (fast-500 PoolError / FATAL too-many / H12-cold / wedged
   prewarm) + safe recovery sequences + verify/log steps. Roster updated in /nowtrendin2.0.
+
+### Addendum 2026-07-06 — PULL-SYNCHRONIZED PREWARM (founder rule)
+- Prewarm now fires `PREWARM_AFTER_PULL_S` (60s) after EVERY data pull completes: end of the
+  score phase (6h scheduled cycles + failover; cloud/API process only — local worker's cache
+  isn't the serving one) and the `/collect` user pull. Serving caches carry fresh scores the
+  moment they exist (was: up to 25 min later on the loop). Warms are now OVERLAP-GUARDED
+  (one at a time; stacked kicks no-op — the thundering-herd lesson). The 25-min loop stays
+  as the TTL safety net. AGENT_CHARTER Agent 15 spec updated.

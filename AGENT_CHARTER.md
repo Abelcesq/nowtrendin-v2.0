@@ -771,7 +771,12 @@ regression, or the agent running in the wrong process). Resolution: check the fe
 
 **7. Ongoing monitoring.** Background loop (self-scheduling) + manual `/prewarm`
 (non-blocking). Read-only; safe to call anytime. Re-warms automatically after a deploy
-restart (the startup thread fires on boot).
+restart (the startup thread fires on boot). **PULL-SYNCHRONIZED (founder rule
+2026-07-06):** a warm also fires `PREWARM_AFTER_PULL_S` (60s) after every data pull
+completes — end of the score phase (6h cycles + failover, cloud/API process only) and
+the `/collect` user pull — so serving caches carry fresh scores the moment they exist
+instead of up to 25 min later. Warms are overlap-guarded (one at a time; stacked kicks
+no-op — the 2026-07-06 thundering-herd lesson).
 
 ## AGENT 16 — CANONICAL DATE AUDITOR
 

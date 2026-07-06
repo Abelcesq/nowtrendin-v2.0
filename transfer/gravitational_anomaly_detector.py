@@ -5070,6 +5070,12 @@ def start_scheduler():
                 # only worker; otherwise this is the Heroku cloud collect+score dyno.
                 _is_local = os.getenv("WORKER_COLLECT", "1").lower() not in ("1", "true", "yes")
                 _write_heartbeat("score_local" if _is_local else "score_cloud")
+                # PULL-SYNCHRONIZED WARM (founder rule 2026-07-06): fresh scores
+                # just landed — warm the serving caches ~60s from now so clients
+                # see them immediately (not up to 25 min later). Cloud/API
+                # process only: the local worker's _cache is not the serving one.
+                if not _is_local:
+                    _prewarm_after_pull("post-score")
             except Exception as _ce:
                 print(f"[scheduler] score phase error: {_ce}")
 
@@ -5359,10 +5365,46 @@ def start_scheduler():
 # scores changed, no rows touched), so it cannot affect any served data.
 # ─────────────────────────────────────────────────────────────────────────────
 _PREWARM_STATUS: dict = {"last_run": None, "warmed": [], "elapsed_s": None}
+_PREWARM_RUN_LOCK = _threading.Lock()   # overlap guard — one warm at a time
+
+
+def _prewarm_after_pull(reason: str = "post-pull"):
+    """PULL-SYNCHRONIZED WARM (founder rule 2026-07-06): fire a prewarm
+    PREWARM_AFTER_PULL_S (default 60s) after every data pull completes, so the
+    serving caches carry the FRESH scores the moment they exist instead of
+    waiting for the 25-min loop (worst case a client saw data up to ~25 min
+    older than the engine had). Wired at the end of the score phase (the pull's
+    scores + serve_payloads are final there) and the /collect user-pull
+    pipeline. Runs ONLY in the API process (the worker dyno / local worker have
+    a separate _cache — warming there warms the wrong cache, Agent 15 caveat);
+    the overlap guard in _prewarm_caches makes stacked kicks harmless."""
+    if os.getenv("PREWARM_ENABLED", "1").lower() not in ("1", "true", "yes"):
+        return
+    delay = int(os.getenv("PREWARM_AFTER_PULL_S", "60"))
+    t = _threading.Timer(delay, _prewarm_caches)
+    t.daemon = True
+    t.name = f"prewarm-{reason}"
+    t.start()
+    print(f"[prewarm-agent] {reason} warm scheduled in {delay}s")
+
 
 def _prewarm_caches() -> dict:
-    """Recompute + cache the default /scores and /topics supersets (read-only)."""
+    """Recompute + cache the default /scores and /topics supersets (read-only).
+    Overlap-guarded: a warm already in progress makes this call a no-op (a
+    stacked warm doubles the heavy builds for zero benefit — the thundering-
+    herd lesson of 2026-07-06)."""
     import time as _t
+    if not _PREWARM_RUN_LOCK.acquire(blocking=False):
+        print("[prewarm-agent] warm already in progress — skip")
+        return {"agent": "prewarm", "read_only": True, "skipped": "warm in progress",
+                **_PREWARM_STATUS}
+    try:
+        return _prewarm_caches_locked(_t)
+    finally:
+        _PREWARM_RUN_LOCK.release()
+
+
+def _prewarm_caches_locked(_t) -> dict:
     warmed = []
     t0 = _t.time()
     try:
@@ -5751,6 +5793,11 @@ def run_collection(include_blogs: bool = Query(True)):
             detector.score_all_topics(hours=72)
             _cache.invalidate()
             print("[collect] Pipeline complete — cache invalidated.")
+            # PULL-SYNCHRONIZED WARM (founder rule 2026-07-06): the user just
+            # paid a token for fresh data — rebuild the serving caches ~60s out
+            # so their next load is instant AND fresh (this endpoint runs in
+            # the API process, so the warm hits the right _cache).
+            _prewarm_after_pull("post-user-pull")
         except Exception as exc:
             print(f"[collect] Pipeline error: {exc}")
         finally:
