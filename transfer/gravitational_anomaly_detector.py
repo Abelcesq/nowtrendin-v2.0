@@ -7536,27 +7536,33 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
     # full feed once and slice it.)
     candidate_cap = int(os.getenv("SCORES_CANDIDATE_CAP", "5000"))
     mentions_floor = int(os.getenv("MENTIONS_FLOOR", "5"))
-    rows = conn.execute(f"""
-        SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
-               COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
-        FROM velocity_scores v
-        INNER JOIN (
-            SELECT topic_key, MAX(scored_at) as max_at
-            FROM velocity_scores GROUP BY topic_key
-        ) latest ON v.topic_key = latest.topic_key
-            AND v.scored_at = latest.max_at
-        INNER JOIN (
-            SELECT topic_key, MIN(scored_at) as first_at
-            FROM velocity_scores GROUP BY topic_key
-        ) fs ON v.topic_key = fs.topic_key
-        LEFT JOIN topic_lifecycle lc ON v.topic_key = lc.topic_key
-        WHERE v.overall_score >= ?
-          AND COALESCE(v.total_mentions, 0) >= ?
-        {stage_filter}
-        ORDER BY v.{sort_col} DESC, v.total_mentions DESC, v.scored_at DESC
-        LIMIT ?
-    """, (min_score, mentions_floor, candidate_cap)).fetchall()
-    conn.close()
+    try:
+        # try/finally: a query error must still return the conn to the pool —
+        # an orphaned checkout is a pool slot leaked FOREVER (the 2026-07-06
+        # /scores outage: dead conns raised here, close() never ran, the pool
+        # exhausted while the server sat near-idle).
+        rows = conn.execute(f"""
+            SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
+                   COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
+            FROM velocity_scores v
+            INNER JOIN (
+                SELECT topic_key, MAX(scored_at) as max_at
+                FROM velocity_scores GROUP BY topic_key
+            ) latest ON v.topic_key = latest.topic_key
+                AND v.scored_at = latest.max_at
+            INNER JOIN (
+                SELECT topic_key, MIN(scored_at) as first_at
+                FROM velocity_scores GROUP BY topic_key
+            ) fs ON v.topic_key = fs.topic_key
+            LEFT JOIN topic_lifecycle lc ON v.topic_key = lc.topic_key
+            WHERE v.overall_score >= ?
+              AND COALESCE(v.total_mentions, 0) >= ?
+            {stage_filter}
+            ORDER BY v.{sort_col} DESC, v.total_mentions DESC, v.scored_at DESC
+            LIMIT ?
+        """, (min_score, mentions_floor, candidate_cap)).fetchall()
+    finally:
+        conn.close()
     result = _format_score_rows(rows)
     return result.get("results", [])
 
@@ -8886,23 +8892,27 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
     # Wide candidate scan before the quality + category filters so quality topics
     # still surface even when the top-by-score rows are junk.
     scan = 2000
-    rows = conn.execute(f"""
-        SELECT r.topic_key, r.topic_display, r.current_stage,
-               r.total_mentions, r.is_anomaly, r.last_seen_at,
-               v.overall_score, v.detection_score, v.confidence_score,
-               v.nowtrendin_score, v.signal_stage, v.serve_payload
-        FROM topic_registry r
-        LEFT JOIN (
-            SELECT topic_key, MAX(scored_at) as max_at
-            FROM velocity_scores GROUP BY topic_key
-        ) latest ON r.topic_key = latest.topic_key
-        LEFT JOIN velocity_scores v
-            ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
-        WHERE 1=1 {filter_str}
-        ORDER BY v.overall_score DESC NULLS LAST
-        LIMIT ?
-    """, (scan,)).fetchall()
-    conn.close()
+    try:
+        # try/finally: never leak the pool slot on a query error (see
+        # _compute_scores_full — the 2026-07-06 outage lesson).
+        rows = conn.execute(f"""
+            SELECT r.topic_key, r.topic_display, r.current_stage,
+                   r.total_mentions, r.is_anomaly, r.last_seen_at,
+                   v.overall_score, v.detection_score, v.confidence_score,
+                   v.nowtrendin_score, v.signal_stage, v.serve_payload
+            FROM topic_registry r
+            LEFT JOIN (
+                SELECT topic_key, MAX(scored_at) as max_at
+                FROM velocity_scores GROUP BY topic_key
+            ) latest ON r.topic_key = latest.topic_key
+            LEFT JOIN velocity_scores v
+                ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
+            WHERE 1=1 {filter_str}
+            ORDER BY v.overall_score DESC NULLS LAST
+            LIMIT ?
+        """, (scan,)).fetchall()
+    finally:
+        conn.close()
     topics = []
     for r in rows:
         d = dict(r)
