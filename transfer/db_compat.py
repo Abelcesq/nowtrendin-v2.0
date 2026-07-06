@@ -69,10 +69,15 @@ if USE_PG:
     def _rebuild_pool():
         """Swap a poisoned pool (leaked slots — exhausted while the server is
         near-idle) for a fresh one. Cooldown-guarded so a genuine long burst
-        can't thrash. Old IDLE connections are closed to free server slots;
-        old CHECKED-OUT connections are left to their holders — their close()
-        falls through to a hard conn.close() (the putconn will fail on the
-        replaced pool), so nothing leaks server-side."""
+        can't thrash. Closes ALL old connections — including checked-out ones.
+        Brutal for any in-flight query on the old pool, but DETERMINISTIC:
+        server-side usage stays bounded at PG_POOL_MAX + PG_DIRECT_MAX at all
+        times. (The first version closed idle conns only and trusted holders'
+        close() for the rest — wedged holder threads never closed, so each
+        rebuild stranded more server slots, and repeated rebuilds saturated the
+        20-connection cap: the 2026-07-06 'too many connections' phase of the
+        outage.) A stale holder's later close() falls through the putconn
+        chain to a no-op conn.close() — safe."""
         global _pool, _last_rebuild, _exhausted_since
         with _pool_lock:
             if _time.time() - _last_rebuild < POOL_REBUILD_COOLDOWN_S:
@@ -82,14 +87,11 @@ if USE_PG:
             _last_rebuild = _time.time()
             _exhausted_since = None
             print("[db_compat] POOL REBUILT — exhaustion persisted "
-                  f">{POOL_REBUILD_AFTER_S}s (leaked slots); fresh pool swapped in")
+                  f">{POOL_REBUILD_AFTER_S}s (leaked slots); fresh pool swapped in; "
+                  "ALL old-pool connections closed (server slots reclaimed)")
             if old is not None:
                 try:
-                    for _c in list(getattr(old, "_pool", []) or []):  # idle conns only
-                        try:
-                            _c.close()
-                        except Exception:
-                            pass
+                    old.closeall()   # idle AND checked-out — reclaim every server slot
                 except Exception:
                     pass
 
