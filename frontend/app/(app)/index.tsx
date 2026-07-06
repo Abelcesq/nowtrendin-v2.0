@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
   const [contentCat, setContentCat] = useState('all');
+  const [signalFilter, setSignalFilter] = useState('all');
   const [marketQuery, setMarketQuery] = useState('');
   const [visible, setVisible] = useState(PAGE);
 
@@ -47,9 +48,14 @@ export default function Dashboard() {
   const goToCategory = (key: string) => router.push(`/category/${key}` as any);
 
   // ── Attention feed ──
+  // TRENDS (signal-stage) filter — same row as the web terminal, driven by
+  // CATEGORY_DEFS (the SSOT for the stage bands). Combines with the content-
+  // category chips exactly like the web: stage AND category AND search.
+  const signalDef = CATEGORY_DEFS.find((d) => d.key === signalFilter);
   const filtered = accessible.filter((s) =>
     (!query || s.topic.toLowerCase().includes(query.toLowerCase())) &&
-    (contentCat === 'all' || contentCategoryMeta(s.category).key === contentCat)
+    (contentCat === 'all' || contentCategoryMeta(s.category).key === contentCat) &&
+    (!signalDef || signalDef.filter(s))
   );
   const ranked = [...filtered].sort((a, b) => b.score - a.score);
   const topPick = ranked[0];
@@ -193,10 +199,26 @@ export default function Dashboard() {
               </Rise>
             )}
 
-            {/* ONE filter row only — pick a single category to filter the list (or All).
-                Removed the parallel "Signal" row, which made it look like two filters
-                could be combined when they couldn't. One clear control. */}
-            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-7 mb-2.5">Filter by Category</Text>
+            {/* TWO filter rows, matching the web terminal (frontend-consistency B8):
+                TRENDS (signal stage, from CATEGORY_DEFS — the SSOT) above CATEGORY
+                (content). They COMBINE exactly like the web: stage AND category.
+                (Founder-requested 2026-07-06 — restores the row Aurora dropped.) */}
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-7 mb-2.5">Trends</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {CATEGORY_DEFS.map((d) => {
+                  const on = signalFilter === d.key;
+                  return (
+                    <TouchableOpacity key={d.key} onPress={() => setSignalFilter(d.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? d.color : '#F1F1F4' }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{d.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-4 mb-2.5">Filter by Category</Text>
             <View style={{ marginHorizontal: -20 }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
                 {[{ key: 'all', label: 'All', color: '#16264A' }, ...CONTENT_CATEGORIES].map((c) => {
