@@ -1026,14 +1026,14 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
   sweep `interval+boot-fire` → `cron 0,6,12,18:45 UTC` (boot-fired paid sweeps eliminated — one per
   deploy + Heroku daily cycle); `_fetch_apify` now passes `&timeout=&memory=1024` on the run start and
   ABORTS on poll-budget expiry (the 10-min 0-result runs = the ~$93/mo compute line). Realtime confirmed
-  clean 4×/day :30 (2× overrun gone). `trudax/reddit-scraper-lite` has NO engine refs → Apify-console-side
-  schedule, founder to delete. Engine v200.
+  clean 4×/day :30 (2× overrun gone). `trudax/reddit-scraper-lite` has NO engine refs; founder verified the
+  console Schedules page is CLEAN → the $0.08 of trudax runs were one-off/pre-rotation, RESOLVED. Engine v200.
 
 ### Open / Next
 - Watch Apify usage after v200 (expect ~$221→~$70-90/mo run-rate); then consider Scale($199)→Starter($49)
   plan downgrade — with fixed usage the Scale floor is oversized.
-- Delete the trudax reddit saved task/schedule in the Apify console (not our code).
 - Set `COST_HEROKU_USD` to the new Heroku total incl. the Postgres upgrade (invoice amount pending).
+- Watch the post-Jul-7 Apify billing period: any trudax event would mean a live external caller (none expected).
 - CLAUDE.md §3/§11 still document the pre-Aurora green palette; frontend/DESIGN_SYSTEM.md is the
   enforced contract — reconcile the docs.
 - Watch: web-process boot log prints "collect+score every 30 min" vs the documented 6h cycle — verify
