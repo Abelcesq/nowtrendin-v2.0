@@ -267,8 +267,12 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   `_category_for(topic_key, display)`, layered strongest-first: **situation (event
   co-occurrence) → context (the topic's own `raw_signals.title` headlines, 0.35 conf
   floor) → bare lexicon → general**. Both override maps are background-refreshed,
-  held-out (built FROM scored signals, NEVER fed back into the score). Live drain:
-  catch-all 77%→56%. NEVER wire `_category_for` into scoring admission
+  held-out (built FROM scored signals, NEVER fed back into the score). Live served
+  catch-all: 70.2% over the 6000-topic working set (2026-07-06; the earlier 77%→56%
+  drain figure predates the World Cup surge). MEASUREMENT RULE (2026-07-06): the
+  catch-all AUDITORS measure with the SERVE-TIME `_category_for`, never the bare
+  lexicon — the bare read over-counts (the phantom 80.5%-vs-served-70.2% gap).
+  NEVER wire `_category_for` into scoring admission
   (`_passes_corroboration`) or the score — that would be circular.
 - **Stage from Detection** (`stageOf`) everywhere; `Now TrendIn` view ranks by the
   proprietary **N** (`nowtrendin_score`), `All Signals` by Detection.
@@ -435,7 +439,40 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-06-26 (evening) — **Per-item Signal Analysis + accuracy-ledger maturity segmentation + Apify
+*Last updated: 2026-07-06 — **Catch-all fixed + Apify clock-slot rule + true costs + INV-1 serve-consistency +
+self-healing DB pool + mobile parity (audit #3).** (1) **/monitor/catchall FIXED** (was 503/H12): the auditors
+measured the bare lexicon while users see the layered `_category_for` — both catch-all auditors now use the
+SERVE-TIME classifier (true served catch-all **70.2%**, not the phantom 80.5%); scan bounded to the recent
+working set (`CATCHALL_WORKING_SET`=6000); corroboration reads via explicit-key chunks (index seeks, no
+full-table scan). Lexicon drained per the Agent-6 worklist (WC-2026 cluster worldcup/mundial/golden boot/
+haaland/balogun/vozinha; khamenei/ayatollah; america250/250th birthday/july 4th/mount rushmore; mamdani/
+mcconnell; walmart/costco; zendaya/victor willis; youtube/whatsapp) — policy held: bare countries/kelce/visa
+stay OUT (situation layer routes). (2) **APIFY CLOCK-SLOT RULE (hard):** ALL paid Apify pulls fire ONLY at the
+4 daily 6h slots (00/06/12/18 UTC family) or on explicit user request — the ledger sweep moved
+interval+boot-fire → **cron :45** (a paid sweep fired on EVERY deploy/dyno-cycle before); `_fetch_apify` now
+passes `&timeout=&memory=` ON the actor run + ABORTS on poll-budget expiry (the 10-min 0-result runs were the
+~$93/mo compute line). Realtime confirmed clean 4×/day :30; trudax runs were pre-rotation one-offs (console
+Schedules clean). Recommend Scale→Starter downgrade once usage drop confirms (~$100-150/mo). (3) **True
+Heroku cost**: `COST_HEROKU_USD` 64→**112** (engine Std-2X $50 + essential-1 $9; backend $12; preview/terminal/
+web Basic ×3; **frozen-1.0 essential-2 $20 unused — archive+delete candidate**; nowtrendin-web mirror
+redundancy candidate). Cost Sentinel now honestly **CRITICAL $718.82 > $700** — the old $64 masked it; Apify
+fixes restore headroom next period. (4) **INV-1 serve-consistency FIX**: /scores re-ran live calibration
+(incl. the AI floor) on payload-less STALE rows, inflating stored 35.6→served 100 ("coding agent" ranked #1
+on mobile 4 days stale while web showed it mid-pack) — rows older than `SERVE_LIVECAL_MAX_AGE_H` (48h) now
+serve STORED values exactly like /topics. One score per topic, everywhere. (5) **Self-healing PG pool**
+(db_compat, 12/12 behavior-tested): psycopg2's pool has NO reclamation — dead conns handed out + orphaned
+checkouts = permanently leaked slots (the 07-06 /scores outage: PoolError with the server at 2/20). Now:
+SELECT-1 checkout probe, broken-conn discard, bounded DIRECT fallback (`PG_DIRECT_MAX`=4, reads keep serving
+while exhausted), auto pool-REBUILD after 90s persistent exhaustion; try/finally on the hottest builders;
+`PG_POOL_MAX`=12. NEVER `pg:killall` while dynos run — it poisons every pooled conn. (6) **Mobile parity
+(all deployed to nowtrendin-v2-preview)**: TRENDS signal-stage chip row restored (Now TrendIn/All Signals/
+Breakout≥85/Strong≥70/Indicating/Marginal/Anomalies — combines with CATEGORY like the web); per-row category
+chip on TrendCard; **Accuracy Ledger zeros fixed** (mobile mapped extinct snake_case fields; engine serves
+camelCase — now camelCase-first with fallbacks; "PREDICTIONS"→"RESOLVED" + a pending-in-flight line, honest
+denominators). (7) Weekly improve-system audit #3 committed (`audits/improve-system/`). ⚠ NOTE: mobile design
+is now the **Aurora contract** (`frontend/DESIGN_SYSTEM.md` — midnight #1B3066, #00C896 BANNED in new mobile
+UI); §3/§11 palettes predate it and pend reconciliation.
+Prior: 2026-06-26 (evening) — **Per-item Signal Analysis + accuracy-ledger maturity segmentation + Apify
 usage audit + token rotation.** (1) **Signal Analysis** — held-out `signal_analysis.py` + `POST /analysis/{kind}`:
 a reproducible, formula-CONFIDENTIAL, measurement-only narrative per item (explains each metric + analyzes the
 finding vs the accuracy-ledger track record, honest denominators). LIVE on web (trend/market/crypto rails) + mobile

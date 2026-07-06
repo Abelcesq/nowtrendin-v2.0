@@ -1046,3 +1046,47 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 ### Hard decisions made
 - Apify synchronization codified: no boot-fired or free-running paid actor runs; clock slots + explicit
   user request only (memory `project-ledger-sweep-apify` updated).
+
+## Session 2026-07-06 (overnight) — INV-1 serve fix · mobile parity · self-healing DB pool
+
+### Completed
+- **INV-1 serve-consistency FIX (engine)**: web and mobile trends didn't match — SAME database,
+  divergent serve paths on STALE rows. /scores re-ran live calibration (incl. the AI floor) on
+  payload-less rows; on a row last scored 4 days prior that re-application inflated stored 35.6 →
+  served 100 ("coding agent" + "agent memory" + "openai-codex" ranked above today's fresh signals on
+  mobile while the web grid showed them mid-pack). Rows older than `SERVE_LIVECAL_MAX_AGE_H` (48h)
+  now serve STORED values exactly like /topics. Serve-path only — no stored score changed.
+- **Mobile TRENDS chip row restored** (founder request): Now TrendIn / All Signals / Breakout ≥85 /
+  Strong ≥70 / Indicating / Marginal / Anomalies — from `CATEGORY_DEFS` (already web-consistent),
+  Aurora pill style, COMBINES with the category row like the web. (Aurora had dropped the row.)
+- **Mobile per-row category chip** on TrendCard (PLATFORM · STAGE · AGE · CATEGORY) — web parity §17/B8.
+- **Mobile Accuracy Ledger zeros FIXED**: fetchAccuracy() mapped extinct snake_case fields
+  (total_predictions/led_count/hit_rate_pct/…) while /accuracy/ledger serves camelCase → every metric
+  undefined → `?? 0` wall of zeros. Now camelCase-first with fallbacks; verified against the live
+  payload (10% / 70 resolved / 7 LED / 11d median / 821 pending — identical to web). "PREDICTIONS" →
+  "RESOLVED" + pending-in-flight line (honest denominators). Preview redeployed ×3 through the night.
+- **Self-healing PG pool (db_compat, 12/12 behavior-tested)** after the /scores outage: psycopg2's
+  pool has NO reclamation — getconn() hands out server-killed conns; first use raises; no-try/finally
+  call sites orphan the slot FOREVER (server sat at 2/20 while every request raised PoolError; plain
+  restarts re-poisoned at each boot burst; `pg:killall` under live dynos made it worse). Fixes:
+  SELECT-1 checkout probe (dead conns discarded, never handed out), broken-conn discard on close,
+  bounded DIRECT fallback (PG_DIRECT_MAX=4 — reads keep serving while exhausted), auto pool-REBUILD
+  after 90s persistent exhaustion, try/finally on _compute_scores_full/_compute_topics_full.
+  PG_POOL_MAX=12. New rule: NEVER pg:killall while dynos run.
+- **Docs updated**: CLAUDE.md footer + §13 catch-all measurement rule; AGENT_CHARTER G4 (stale-row
+  serve rule) + G5 (pool reclamation); DBB §1/§7 (clock-slot rule, true costs); COST_MODEL Apify line;
+  nowtrendin2.0 skill build state.
+
+### Open / Next
+- Confirm /scores recovery on the pool-fix release (monitor armed); then verify coding agent serves
+  stored 35.6 on both surfaces.
+- Apify Scale→Starter downgrade after ~a week of post-fix usage data.
+- Founder decisions: archive+delete frozen-1.0 essential-2 Postgres (−$20/mo); retire nowtrendin-web
+  mirror if redundant (−$7/mo).
+- Reconcile CLAUDE.md §3/§11 palettes with the Aurora contract (frontend/DESIGN_SYSTEM.md).
+- try/finally sweep of remaining get_db() call sites (the pool now self-heals, so lower urgency).
+
+### Hard decisions made
+- INV-1 sharpened (Charter G4): never re-calibrate a stale row at serve time.
+- Pool operations rule (Charter G5): psycopg2 pool slots are unrecoverable by design — engineering
+  must guarantee return-or-discard; pg:killall is forbidden under live dynos.

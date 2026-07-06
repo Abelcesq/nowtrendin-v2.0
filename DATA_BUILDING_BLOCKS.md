@@ -45,7 +45,7 @@ criticality) and the collectors in `gravitational_anomaly_detector.start_schedul
 | rss_direct (reputable outlets) | RSS direct | none | 6h | free | — | El País…**The New Yorker**; `_RSS_FEEDS` reputable-allowlist → tier `mainstream`, full weight (no aggregator) |
 | research / early-signal ⏳ | RSS direct | none | (planned) 6h | free | — | War on Rocks · Rest of World · Global Issues · Pew · RAND · NBER → **expert/niche tier = Dark Matter** via `blog_collectors` GHOST_FEEDS, NOT `_news_write` |
 | bluesky / lemmy / mastodon | open API | none | 6h | free | — | early-chatter tier (replaced Reddit) |
-| google_trends | **Apify actor** | token | clock cron 00:30/06:30/12:30/18:30 UTC | ~$0.57/run (~$68/mo) | ✅ | paid → controlled cadence |
+| google_trends | **Apify actor** | token | clock cron 00:30/06:30/12:30/18:30 UTC | pay-per-event (~$58/mo) | ✅ | CLOCK-SLOT RULE (§7); ledger sweep = its own actor at the :45 slots, run-capped |
 | youtube (mainstream coverage) | YouTube Data API v3 | key | 6h (main cycle) | quota 10k u/day | — | per-topic mainstream denominator |
 | broadcast (22 channels) | YouTube Data API v3 | key | 6h (main cycle) | quota | — | CNBC/CNN/Bloomberg… uploads |
 | creators (5 finance) | YouTube Data API v3 | key | 6h (main cycle) | quota | — | Meet Kevin, Graham Stephan… |
@@ -286,8 +286,18 @@ violation — surface it and propose the clean version; do not ship.
 | AI (Perplexity + Anthropic) | **$20/mo** | `GET /ai/costs` (`over_budget`) | unified `ai_costs` ledger; explainer/backfill/grade skip when over |
 | X posts | **12k/mo** | `GET /x/budget` | volume scan free; deep pulls budgeted |
 | YouTube Data API | 10k units/day | `/usage` youtube | cheap calls + caching |
-| Apify Google Trends | ~$68/mo | clock cron only | not boot-fired |
+| Apify (realtime + sweep) | **$250/mo cap** | `/monitor/cost` live line | CLOCK-SLOT RULE below |
+| Heroku (all NowTrendIn apps) | **$112/mo** (`COST_HEROKU_USD`) | `/monitor/cost` | verified decomposition 2026-07-05 |
+| TOTAL monthly | **$700 cap** (`COST_TOTAL_MONTHLY_CAP`) | `/monitor/cost` (warn 80% / critical over) | Cost Sentinel |
 | Dyno memory | 1GB (standard-2x) | Heroku metrics R14 | scoring co-located, every 6h only |
+
+**APIFY CLOCK-SLOT RULE (hard, 2026-07-05):** ALL paid Apify pulls fire ONLY at the four
+daily 6h clock slots — realtime discovery cron **:30**, ledger sweep cron **:45** (both on
+0/6/12/18 UTC) — or on an explicit user request (`/collect` pull, manual internal sweep).
+Nothing boot-fired, nothing free-running (the old `interval + next_run_time=_soon` sweep
+fired a PAID run on every deploy + Heroku's ~daily dyno cycle). Sweep actor runs carry
+`&timeout=&memory=` caps ON the run + an abort on poll-budget expiry — an abandoned run
+must never keep burning compute server-side.
 
 **INVARIANT (B7):** no budget exceeds its cap; paid AI calls stop at $20/mo.
 **FAILURE:** `/ai/costs.over_budget = true`, X 429 storms, or R14 memory warnings.

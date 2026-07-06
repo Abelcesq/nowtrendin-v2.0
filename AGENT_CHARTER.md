@@ -137,6 +137,29 @@ catching it is itself a defect.
   failures: yahoo_finance (429), Mises (404+archival), NBER (titles→noise). *Owner: Source Watchdog
   (B1a) — and every agent/human that proposes a source applies it before wiring.*
 
+- **GOTCHA G4 — never re-calibrate a STALE row at serve time (INV-1's sharpest edge,
+  2026-07-06).** `/scores` live-calibrates payload-less rows; on a row last scored DAYS ago
+  the re-run re-applies maturity boosts + the AI floor to old data — "coding agent" stored
+  35.6 served as 100 and ranked #1 on mobile while the web grid (which serves stored values)
+  showed it mid-pack. Rows older than `SERVE_LIVECAL_MAX_AGE_H` (48h) now serve their STORED
+  values (`_serve_row_is_stale` in `_format_score_rows`); live calibration is for FRESH
+  payload-less rows only (the G1 clear→rebuild window). *Owner: Pipeline Integrity (B8) —
+  note its serve-consistency sampler covers only fresh top rows; the stale path is guarded
+  by the code rule itself.*
+
+- **GOTCHA G5 — the psycopg2 pool has NO reclamation; never `pg:killall` while dynos run
+  (2026-07-06 /scores outage).** `getconn()` hands out connections already killed
+  server-side (they look open client-side until first use); the caller's first query raises;
+  a call site without try/finally never reaches `close()` → that pool slot is orphaned
+  FOREVER. After `PG_POOL_MAX` such events every request raises PoolError while the server
+  sits near-idle (observed: 2/20). `pg:killall` under live dynos poisons every pooled conn at
+  once. `db_compat` is now SELF-HEALING (checkout SELECT-1 probe, broken-conn discard,
+  bounded DIRECT fallback `PG_DIRECT_MAX`, auto pool-REBUILD after
+  `PG_POOL_REBUILD_AFTER_S`=90s persistent exhaustion) and the hottest builders carry
+  try/finally — but new `get_db()` call sites must still close in a finally. *Owner: Scorer
+  Watchdog / Pipeline Integrity (a frozen read path is their alarm); prevention is a code
+  rule.*
+
 When a new accuracy/consistency trap is discovered, add it here with its owning agent —
 the Charter is the durable home for these, mirrored in the `serve-payload-cache-gotcha`
 project memory.

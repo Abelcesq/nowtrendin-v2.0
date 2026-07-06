@@ -46,7 +46,7 @@ Basic→Pay-Per-Use; worker dyno live. Live AI spend June: **$15.32 / $20** (`/a
 | Heroku — **frozen 1.0 Postgres (essential-2)** | **$20** | ⚠ preserved-but-unused DB on the disabled 1.0 app — archive (pg:backups) then delete (−$20 candidate). |
 | Heroku Scheduler | $0 | free |
 | **Heroku total (NowTrendIn footprint)** | **$112** | = `COST_HEROKU_USD` (set on engine 2026-07-05, was $64 — the June invoice $82.13 + July run-rate ~$3.46/day exposed the under-count). Excludes the $5 `mytaskapp` personal app on the same account. |
-| **Apify** (Google Trends) | **$150** | current plan; capped. |
+| **Apify** (Google Trends realtime + ledger sweep) | **Scale $199 plan; usage $221 of $250 cap (Jun–Jul period)** | ⚠ upgraded Starter→Scale 2026-06-26 mid-runaway. 2026-07-05 fixes (sweep interval+boot-fire→cron :45; run-level `timeout`+`memory` caps + abort — the 10-min 0-result runs were ~$93/mo compute) should drop usage to ~$70–90/mo → **downgrade Scale→Starter ($49) once a week of usage confirms** (saves ~$100–150/mo). Clock-slot rule: DBB §7. |
 | **X API** (Pay-Per-Use) | **~$100 (est)** | was $200 Basic; migrated PPU Jun 21. June usage **9,160 / 14,880** posts. Confirm $/post on X dashboard. |
 | **QuiverQuant** (congress trades / Dark Matter) | **$30** | **confirmed 06/25** (card charge). |
 | **Finviz Elite** (PRIMARY insider Form-4 + equity market) | **$30** | **confirmed 06/25** (card charge). Uncapped market-wide insider feed (`insidertrading.ashx`) + screener export. Flag `FINVIZ_INSIDER`. NOT crypto (display-only → FMP). |
