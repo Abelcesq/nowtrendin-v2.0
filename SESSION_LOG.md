@@ -1032,7 +1032,11 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 ### Open / Next
 - Watch Apify usage after v200 (expect ~$221→~$70-90/mo run-rate); then consider Scale($199)→Starter($49)
   plan downgrade — with fixed usage the Scale floor is oversized.
-- Set `COST_HEROKU_USD` to the new Heroku total incl. the Postgres upgrade (invoice amount pending).
+- ~~Set `COST_HEROKU_USD`~~ DONE (2026-07-05, engine v201): $64→$112 from the account-wide decomposition
+  (engine Std-2X $50 + essential-1 $9; backend $12; preview/terminal/web Basic $7×3; frozen-1.0 PG $20).
+  Cost Sentinel now honestly reads **$718.82 > $700 cap (critical)** — the old $64 masked the breach.
+  Trim candidates flagged in COST_MODEL.md: archive+delete the frozen-1.0 essential-2 (−$20), review the
+  possibly-redundant nowtrendin-web mirror (−$7); Apify v200 fixes (−$130-150 next period) restore headroom.
 - Watch the post-Jul-7 Apify billing period: any trudax event would mean a live external caller (none expected).
 - CLAUDE.md §3/§11 still document the pre-Aurora green palette; frontend/DESIGN_SYSTEM.md is the
   enforced contract — reconcile the docs.

@@ -36,12 +36,16 @@ Basic→Pay-Per-Use; worker dyno live. Live AI spend June: **$15.32 / $20** (`/a
 
 | Item | Cost/mo | Notes |
 |---|---|---|
-| Heroku — engine web dyno (Basic) | ~$7 | 512MB. Scale to Standard/Perf at load (est $25–250). |
-| Heroku — engine **worker** dyno (Basic) | ~$7 | scheduler moved off web (P1, §6) — removed /scores timeouts. |
-| Heroku — engine Postgres (essential-0) | $5 | ⚠ 365-day retention (§13) grows storage → standard-0 upsize coming (~$50). |
-| Heroku — backend dyno (Basic) | ~$7 | |
+| Heroku — engine web dyno (**Standard-2X**) | **$50** | verified `heroku ps` 2026-07-05 (no worker dyno — scheduler runs in-process on web). |
+| Heroku — engine Postgres (**essential-1**) | **$9** | upsized for the 365-day retention (§13); 10GB tier. |
+| Heroku — backend dyno (Basic) | $7 | |
 | Heroku — backend Postgres (essential-0) | $5 | |
+| Heroku — v2-preview dyno (Basic) | $7 | enterprise web mobile preview (Aurora). |
+| Heroku — terminal dyno (Basic) | $7 | web-terminal Heroku mirror (canonical site = GH Pages, free). |
+| Heroku — nowtrendin-web dyno (Basic) | $7 | ⚠ possible redundant mirror — review vs terminal + GH Pages (−$7 candidate). |
+| Heroku — **frozen 1.0 Postgres (essential-2)** | **$20** | ⚠ preserved-but-unused DB on the disabled 1.0 app — archive (pg:backups) then delete (−$20 candidate). |
 | Heroku Scheduler | $0 | free |
+| **Heroku total (NowTrendIn footprint)** | **$112** | = `COST_HEROKU_USD` (set on engine 2026-07-05, was $64 — the June invoice $82.13 + July run-rate ~$3.46/day exposed the under-count). Excludes the $5 `mytaskapp` personal app on the same account. |
 | **Apify** (Google Trends) | **$150** | current plan; capped. |
 | **X API** (Pay-Per-Use) | **~$100 (est)** | was $200 Basic; migrated PPU Jun 21. June usage **9,160 / 14,880** posts. Confirm $/post on X dashboard. |
 | **QuiverQuant** (congress trades / Dark Matter) | **$30** | **confirmed 06/25** (card charge). |
