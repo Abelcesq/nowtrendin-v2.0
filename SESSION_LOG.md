@@ -1090,3 +1090,38 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 - INV-1 sharpened (Charter G4): never re-calibrate a stale row at serve time.
 - Pool operations rule (Charter G5): psycopg2 pool slots are unrecoverable by design — engineering
   must guarantee return-or-discard; pg:killall is forbidden under live dynos.
+
+## Session 2026-07-06 (day) — read-path outage POST-MORTEM + /engine-recovery skill
+
+### The outage in three phases (~12h of /scores 500s; full runbook now in /engine-recovery)
+1. **Poisoned client pool** — pg:killall/restarts left dead conns that getconn() handed out;
+   first-use raised; no-try/finally sites orphaned the slots (PoolError with the server at 2/20).
+2. **Saturated server role cap** — the first rebuild design left wedged holders' conns alive;
+   repeated rebuilds stranded slots to 20/20 (FATAL too-many-connections; even collect/score failed).
+3. **Wedged prewarm (the invisible one)** — the synchronous warm loop sat 6.3 HOURS blocked inside
+   one scores build; no cache ever warmed; every client request cold-built the superset — a
+   self-sustaining thundering herd. Freed by the (dyno-down) killall; it immediately warmed 6/7 feeds.
+
+### Hardening shipped (engine v205/v206 + config)
+- db_compat self-healing (probe / broken-discard / bounded DIRECT fallback / closeall-REBUILD /
+  OperationalError-on-growth retried) — 12/12 behavior-tested.
+- `PG_POOL_MAX` 12→**8** (my own 12 bump had eroded the deliberate headroom; engine now ≤12 of 20).
+- try/finally on _compute_scores_full/_compute_topics_full.
+
+### Process lessons (encoded as /engine-recovery PRIME DIRECTIVES)
+- Read the error SIGNATURE before acting — each phase had a different cause; the fix for one
+  worsened another. My own interventions (probing storms, killall under live dynos, restart storms)
+  EXTENDED this outage. Triage once, act once, hands off.
+- Never probe a cold /scores repeatedly (each probe launches another build) — poll /prewarm instead.
+- pg:killall only with dynos scaled to 0.
+- A wedged prewarm is visible ONLY via /prewarm last_run age → recommended engine follow-up
+  (founder-confirmed deploy): pipeline_integrity alarm on scores-cache-absent + prewarm-stale >3×interval.
+
+### Scoring impact (honest)
+- Read-path only for most of the window; during the phase-2 saturation some collect/score cycles
+  errored (log: "collect/score phase error", ~13:49 window) — a bounded data gap of a few cycles.
+  Ledger + retention unaffected. Collectors resumed automatically each subsequent slot.
+
+### New skill
+- **/engine-recovery** — signature table (fast-500 PoolError / FATAL too-many / H12-cold / wedged
+  prewarm) + safe recovery sequences + verify/log steps. Roster updated in /nowtrendin2.0.

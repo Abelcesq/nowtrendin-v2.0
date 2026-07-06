@@ -463,8 +463,16 @@ serve STORED values exactly like /topics. One score per topic, everywhere. (5) *
 (db_compat, 12/12 behavior-tested): psycopg2's pool has NO reclamation — dead conns handed out + orphaned
 checkouts = permanently leaked slots (the 07-06 /scores outage: PoolError with the server at 2/20). Now:
 SELECT-1 checkout probe, broken-conn discard, bounded DIRECT fallback (`PG_DIRECT_MAX`=4, reads keep serving
-while exhausted), auto pool-REBUILD after 90s persistent exhaustion; try/finally on the hottest builders;
-`PG_POOL_MAX`=12. NEVER `pg:killall` while dynos run — it poisons every pooled conn. (6) **Mobile parity
+while exhausted), auto pool-REBUILD after 90s persistent exhaustion (closes ALL old conns — server usage
+bounded ≤ pool+direct), `OperationalError`-on-growth retried; try/finally on the hottest builders;
+**`PG_POOL_MAX`=8** (deliberate headroom — engine ≤12 of the 20-conn cap; raising it to 12 eroded the margin
+and let the server brush the cap). NEVER `pg:killall` while dynos run — it poisons every pooled conn. THIRD
+outage phase found: the prewarm thread WEDGED 6.3h inside one build against the saturated server → no cache
+ever warmed → every client request cold-built (self-sustaining churn); a wedged prewarm is detected by
+`/prewarm` `last_run` age. Full triage/recovery runbook = the new **`/engine-recovery`** skill (signature
+table + safe sequence: scale-0 → killall → scale-1; never probe /scores repeatedly — poll /prewarm).
+Recommended next (founder-confirmed deploy): a pipeline_integrity read-path alarm on cache-absent +
+prewarm-stale. (6) **Mobile parity
 (all deployed to nowtrendin-v2-preview)**: TRENDS signal-stage chip row restored (Now TrendIn/All Signals/
 Breakout≥85/Strong≥70/Indicating/Marginal/Anomalies — combines with CATEGORY like the web); per-row category
 chip on TrendCard; **Accuracy Ledger zeros fixed** (mobile mapped extinct snake_case fields; engine serves
