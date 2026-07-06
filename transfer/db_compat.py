@@ -305,6 +305,13 @@ def connect(path=None, **kwargs):
                 pool = _get_pool()
                 continue          # retry on the fresh pool
             return _direct_conn() # burst window — keep serving, bounded
+        except psycopg2.OperationalError:
+            # The POOL tried to GROW a new server connection and the server
+            # refused ("too many connections" — role cap full). Distinct from
+            # PoolError (client-side accounting) and it must not escape as a
+            # raw 500: retry (a slot may free), and let the loop's bound turn
+            # a persistent server-full into an honest failure.
+            continue
         _exhausted_since = None   # a successful checkout ends the outage clock
         if _probe_ok(conn):
             return _Conn(conn, pooled=True)
