@@ -4605,7 +4605,22 @@ class GravitationalAnomalyDetector:
         results = []
         anomalies = []
 
-        for topic_key in topic_keys:
+        # ── BATCH PACING (founder rule 2026-07-06): score in batches of
+        # SCORE_BATCH_SIZE (default 100) with a SCORE_BATCH_PAUSE_S (default 10s)
+        # breather between batches — the prewarm philosophy applied to the
+        # scorer. A continuous full-pool slam monopolized the dyno CPU + DB and
+        # starved the serve path (the boot-window read outage); the breathers
+        # let reads, warms, and collectors interleave. Env-tunable; the pause
+        # sits BETWEEN batches only, so small pools pay nothing.
+        _batch_size = max(1, int(os.getenv("SCORE_BATCH_SIZE", "100")))
+        _batch_pause = float(os.getenv("SCORE_BATCH_PAUSE_S", "10"))
+        import time as _bt
+
+        for _bi, topic_key in enumerate(topic_keys):
+            if _bi and _batch_pause > 0 and _bi % _batch_size == 0:
+                print(f"  [score] batch {_bi}/{len(topic_keys)} — "
+                      f"{_batch_pause:.0f}s serve-path breather")
+                _bt.sleep(_batch_pause)
             signals = self._get_topic_signals(topic_key, hours=hours)
 
             result = self.score_topic(topic_key, signals)
@@ -4946,10 +4961,17 @@ def start_scheduler():
         from apscheduler.schedulers.background import BackgroundScheduler
 
         def _collect_phase():
-            """Pull data only (the always-on cloud job). No heavy scoring."""
+            """Pull data only (the always-on cloud job). No heavy scoring.
+            BATCH PACING (founder rule 2026-07-06): a COLLECT_SOURCE_PAUSE_S
+            (default 10s) breather between collectors, so the pull phase's DB
+            write bursts interleave with reads/warms instead of clogging —
+            the prewarm philosophy applied to collection."""
+            _src_pause = float(os.getenv("COLLECT_SOURCE_PAUSE_S", "10"))
+            import time as _ct
             try:
                 c = get_db(DB_PATH)
-                for _nm, _fn in (("reddit", collect_reddit),
+                for _ci, (_nm, _fn) in enumerate((
+                                 ("reddit", collect_reddit),
                                  ("github", collect_github),
                                  ("hackernews", collect_hackernews),
                                  ("newsapi_org", collect_newsapi_org),
@@ -4967,7 +4989,9 @@ def start_scheduler():
                                  # cycle (boot + every 6h) instead of a fragile
                                  # quota-bound cron that kept them DOWN.
                                  ("creators", collect_creator_trends),
-                                 ("broadcast", collect_broadcast_trends)):
+                                 ("broadcast", collect_broadcast_trends))):
+                    if _ci and _src_pause > 0:
+                        _ct.sleep(_src_pause)   # serve-path breather between sources
                     try:
                         _n = _fn(c) or 0
                         _log_health(_nm, _n, "success", conn=c)
