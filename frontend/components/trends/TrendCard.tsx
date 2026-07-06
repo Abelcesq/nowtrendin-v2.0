@@ -63,7 +63,7 @@ export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
               {titleCaseTopic(signal.topic)}
             </Text>
             <Text numberOfLines={1} style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
-              {platform.toUpperCase()} · <Text style={{ color: stageCol }}>{stageLabel(signal.stage)}</Text> · {ageLabel(signal.createdAt).toUpperCase()}
+              {platform.toUpperCase()} · <Text style={{ color: stageCol }}>{stageLabel(signal.stage)}</Text> · {ageLabel(signal.createdAt).toUpperCase()} · <Text style={{ color: cat.color }}>{cat.label.toUpperCase()}</Text>
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>

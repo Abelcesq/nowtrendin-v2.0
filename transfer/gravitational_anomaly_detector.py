@@ -9223,6 +9223,24 @@ def _calibrate_score_fields(s: dict) -> dict:
     return s
 
 
+def _serve_row_is_stale(scored_at) -> bool:
+    """True when a score row's latest scoring run is older than
+    SERVE_LIVECAL_MAX_AGE_H (default 48h). Stale rows must serve their STORED
+    values — re-running live calibration on them re-applies maturity boosts +
+    the AI floor to data scored under an older cycle, inflating the row (the
+    'coding agent' stored-35.6-served-100 INV-1 divergence vs /topics, which
+    serves stored values for the same rows). Unparseable → not stale (keep the
+    current live-calibration behavior)."""
+    try:
+        dt = datetime.fromisoformat(str(scored_at).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        max_h = int(os.getenv("SERVE_LIVECAL_MAX_AGE_H", "48"))
+        return (datetime.now(timezone.utc) - dt).total_seconds() > max_h * 3600
+    except Exception:
+        return False
+
+
 def _format_score_rows(rows) -> dict:
     results = []
     for r in rows:
@@ -9248,7 +9266,19 @@ def _format_score_rows(rows) -> dict:
             except Exception:
                 pass  # corrupt/absent → fall through to live calibration
         s = _parse_json_fields(s)
-        s = _calibrate_score_fields(s)
+        if _serve_row_is_stale(s.get("scored_at")):
+            # STALE row (fell out of the precompute top-N; last scored days ago):
+            # serve the STORED score exactly as the /topics grid does — one score
+            # per topic on every surface (INV-1). Live calibration is for FRESH
+            # payload-less rows only (the G1 clear→rebuild window); on a stale row
+            # it re-applied the AI floor and pinned old AI topics at ~100 atop the
+            # mobile feed while the web grid showed the stored mid-pack value.
+            s["heisenberg_gap"] = round(
+                (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1)
+            s["gap_label"]  = _gap_label(s["heisenberg_gap"])
+            s["is_anomaly"] = bool(s.get("is_gravitational_anomaly"))
+        else:
+            s = _calibrate_score_fields(s)
         results.append(s)
 
     # Inject content category + quality filter on EVERY served row. The /scores
