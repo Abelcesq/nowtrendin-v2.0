@@ -62,14 +62,23 @@ _LEX = {
          "super bowl", "ufc", "mma", "grand slam", "wimbledon", "f1", "formula 1",
          "world series", "playoffs", "world ranking", "national football team",
          # unambiguous franchise names (Catch-All Auditor lexicon candidates)
-         "knicks", "celtics", "lakers", "mavericks", "nuggets", "warriors nba"],
+         "knicks", "celtics", "lakers", "mavericks", "nuggets", "warriors nba",
+         # World Cup 2026 cluster (Catch-All Auditor 2026-07-05): "worldcup" is the
+         # no-space topic_key variant the "world cup" phrase can't match; "mundial" =
+         # the Spanish-language WC queries (goleadores del mundial); unambiguous
+         # football entities from the tracked-call worklist + Google-viral misses.
+         "worldcup", "mundial", "golden boot", "usmnt", "haaland",
+         "manchester united"],
         # weak — sports-ish, can appear elsewhere
         ["soccer", "football", "basketball", "baseball", "hockey", "tennis",
          "golf", "boxing", "cricket", "rugby", "cycling", "match", "league",
          "tournament", "championship", "coach", "striker", "midfielder",
          "goalkeeper", "athlete", "medal", "fixture", "transfer", "squad",
          # tracked-call reclassifications (Catch-All Auditor 2026-06-30)
-         "valentín barco"],
+         "valentín barco",
+         # tracked-call reclassifications (Catch-All Auditor 2026-07-05):
+         # Balogun = USMNT striker; Vozinha = Cape Verde goalkeeper (WC 2026)
+         "balogun", "vozinha", "quarterfinals", "goleadores"],
     ),
     "technology": (
         ["llm", "gpt", "openai", "anthropic", "claude", "chatgpt", "gemini",
@@ -92,7 +101,9 @@ _LEX = {
          # unambiguous tech entities (Catch-All Auditor candidates 2026-06-23)
          "google", "bsky", "bluesky",
          # tracked-call + lexicon-candidate additions (Catch-All Auditor 2026-06-30)
-         "data pipeline", "asi", "meta"],
+         "data pipeline", "asi", "meta",
+         # tracked-call reclassifications (Catch-All Auditor 2026-07-05)
+         "youtube", "whatsapp"],
     ),
     "politics": (
         ["election", "president", "senate", "congress", "parliament",
@@ -104,7 +115,10 @@ _LEX = {
          "regulation", "court",
          # unambiguous political figures (Catch-All Auditor candidates)
          "trump", "biden", "harris", "putin", "zelensky", "netanyahu", "starmer",
-         "modi", "macron", "obama"],
+         "modi", "macron", "obama",
+         # tracked-call reclassifications (Catch-All Auditor 2026-07-05):
+         # Zohran Mamdani = NYC mayoral figure (a ledger LED win stuck in catch-all)
+         "mamdani", "zohran", "mcconnell"],
     ),
     "business": (
         ["ipo", "merger", "acquisition", "earnings", "quarterly results",
@@ -119,7 +133,11 @@ _LEX = {
          "retail", "funding", "investor", "business", "corporate", "firm",
          "executive", "merge",
          # "lilly" alone in trending context = Eli Lilly (pharma company) (2026-06-30)
-         "lilly"],
+         "lilly",
+         # tracked-call reclassifications (Catch-All Auditor 2026-07-05).
+         # NOTE: "visa" deliberately NOT added — travel-visa vs Visa Inc is ambiguous;
+         # the situation/context layers route it.
+         "walmart", "costco"],
     ),
     "economy": (
         ["inflation", "interest rate", "federal reserve", "gdp", "recession",
@@ -136,7 +154,12 @@ _LEX = {
          "actor", "actress", "singer", "rapper", "band", "streaming", "trailer",
          "premiere", "hollywood", "comedy", "drama", "tour",
          # tracked-call reclassification (Catch-All Auditor 2026-06-30)
-         "jessica alba"],
+         "jessica alba",
+         # tracked-call reclassifications (Catch-All Auditor 2026-07-05):
+         # Victor Willis = Village People singer. NOTE: bare "kelce" deliberately NOT
+         # added — Travis Kelce trends as both NFL (sports) and the Swift wedding
+         # (entertainment); the situation layer routes him by context.
+         "zendaya", "victor willis", "adam sandler"],
     ),
     "health": (
         ["vaccine", "covid", "pandemic", "outbreak", "cancer", "alzheimer",
@@ -185,7 +208,16 @@ _LEX = {
          "iranian", "israeli", "chinese", "strait of hormuz", "hormuz", "juneteenth",
          # tracked-call + lexicon-candidate additions (Catch-All Auditor 2026-06-30)
          # "britain" in trending = UK political/current-events discourse (NHS, Starmer, etc.)
-         "britain", "heatwave", "epstein"],
+         "britain", "heatwave", "epstein",
+         # lexicon-candidate additions (Catch-All Auditor 2026-07-05):
+         # the Iran-succession cluster (khamenei/ayatollah variants dominate the
+         # worklist) + the US-semiquincentennial cluster (america250/250th birthday/
+         # July 4th topics — the "america"(48) + "250th"(20) candidates) + demonyms
+         # on the existing iranian/israeli/chinese precedent. Bare "america" is
+         # deliberately NOT added (multi-category — situation layer routes it).
+         "khamenei", "ayatollah", "ukrainian", "british",
+         "america250", "250th birthday", "july 4th", "4th of july",
+         "mount rushmore"],
     ),
     # "news" and "general" are fallbacks — no lexicon; assigned when nothing
     # else scores. "economy"/"business" and "politics"/"current_events" overlap

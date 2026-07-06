@@ -175,6 +175,12 @@ def _fetch_apify(topic: str, days: int) -> Optional[list[dict]]:
         actor = os.getenv("APIFY_TRENDS_ACTOR", "apify~google-trends-scraper")
         max_wait = int(os.getenv("APIFY_RUN_TIMEOUT", "300"))   # total budget (s)
         poll_every = int(os.getenv("APIFY_POLL_SEC", "8"))
+        # COST CAPS (hard): pass timeout+memory ON THE RUN ITSELF so Apify kills a
+        # hung run server-side at our poll budget and bills it at low memory. Without
+        # these the actor ran at its own defaults — the 10-minute 0-result runs that
+        # dominated the compute-unit bill ($93/mo) kept burning long after we stopped
+        # polling ("free timeout" freed OUR thread, not Apify's meter).
+        run_mem_mb = int(os.getenv("APIFY_RUN_MEMORY_MB", "1024"))
 
         try:
             from collector_health import log_api_call as _api
@@ -182,7 +188,8 @@ def _fetch_apify(topic: str, days: int) -> Optional[list[dict]]:
         except Exception:
             pass
         # 1) Start the run (returns immediately with id + defaultDatasetId).
-        start_url = f"https://api.apify.com/v2/acts/{actor}/runs?token={APIFY_TOKEN}"
+        start_url = (f"https://api.apify.com/v2/acts/{actor}/runs?token={APIFY_TOKEN}"
+                     f"&timeout={max_wait}&memory={run_mem_mb}")
         payload = json.dumps({
             "searchTerms":  [topic],
             "timeRange":    f"today {max(1, days//30)}-m",
@@ -209,7 +216,21 @@ def _fetch_apify(topic: str, days: int) -> Optional[list[dict]]:
             except Exception:
                 continue
         if status != "SUCCEEDED":
-            print(f"Apify run for '{topic}' ended status={status} after {waited}s")
+            # ABORT a still-running run before walking away — otherwise it keeps
+            # burning compute units server-side after we stop polling (belt to the
+            # &timeout= suspender above; abort is free and idempotent).
+            if status in ("READY", "RUNNING"):
+                try:
+                    req_abort = Request(
+                        f"https://api.apify.com/v2/actor-runs/{run_id}/abort?token={APIFY_TOKEN}",
+                        data=b"", method="POST")
+                    with urlopen(req_abort, timeout=15):
+                        pass
+                    print(f"Apify run for '{topic}' ABORTED after {waited}s (poll budget)")
+                except Exception as _ab:
+                    print(f"Apify abort failed for '{topic}': {_ab}")
+            else:
+                print(f"Apify run for '{topic}' ended status={status} after {waited}s")
             return None
 
         # 3) Read the dataset items.

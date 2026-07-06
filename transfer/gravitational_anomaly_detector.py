@@ -5203,16 +5203,22 @@ def start_scheduler():
         _sched.add_job(_scheduled_velocities, "cron", hour=6, minute=0,
                        id="recompute_velocities", max_instances=1,
                        coalesce=True)
-        # Ledger sweep on its OWN cadence (default every 6h = 4×/day, up from the old
-        # once-daily piggyback) so pending detections — especially the slow-to-confirm
-        # LED wins — drain faster. Capped at LEDGER_SWEEP_LIMIT/run; timed-out rows
-        # resolve without a fetch. Cadence/limit are env-tunable against the Apify
-        # Trends budget (each in-window row = one Apify run; watch /monitor/cost).
-        _ledger_sweep_h = int(os.getenv("LEDGER_SWEEP_INTERVAL_HOURS", "6"))
-        _sched.add_job(_scheduled_ledger_sweep, "interval", hours=_ledger_sweep_h,
+        # Ledger sweep SYNCHRONIZED to the 4 daily Apify clock slots (hard rule:
+        # ALL paid Apify pulls fire only at the scheduled 6h slots — 00/06/12/18 UTC —
+        # or on an explicit user request; nothing boot-fired, nothing free-running).
+        # :45 = 15 min after the :30 realtime-discovery pull, same slot family.
+        # The old "interval, hours=6, next_run_time=_soon" shape violated this twice:
+        # it fired a paid sweep on EVERY boot (each deploy + Heroku's ~daily dyno
+        # cycle), and the boot-anchored timer drifted off the clock slots (the
+        # 23:03–23:28 console cluster). Cron fires at the next slot regardless of
+        # restarts — same lesson as google_trends_discovery below. Capped at
+        # LEDGER_SWEEP_LIMIT/run; timed-out rows resolve without a fetch; budget
+        # guard skips paid fetches near the Apify cap (watch /monitor/cost).
+        _sweep_slots = os.getenv("LEDGER_SWEEP_CRON_HOURS", "0,6,12,18")
+        _sched.add_job(_scheduled_ledger_sweep, "cron", hour=_sweep_slots, minute=45,
                        id="ledger_sweep", max_instances=1, coalesce=True,
-                       misfire_grace_time=600, next_run_time=_soon)
-        print(f"[scheduler] LEDGER SWEEP job every {_ledger_sweep_h}h "
+                       misfire_grace_time=600)
+        print(f"[scheduler] LEDGER SWEEP job at {_sweep_slots}:45 UTC "
               f"(limit {os.getenv('LEDGER_SWEEP_LIMIT', '8')}/run, oldest-checked-first)")
         # X velocity-trigger scan every 6h over the top-N topics. The volume
         # scan (counts/recent) is FREE vs the post cap; deep author-gradient
