@@ -5407,16 +5407,23 @@ def _prewarm_caches() -> dict:
 def _prewarm_caches_locked(_t) -> dict:
     warmed = []
     t0 = _t.time()
+    # scores + topics go through the SINGLE-FLIGHT gate (force=True: a
+    # pull-synchronized warm must REBUILD, not serve the stale cache) so a
+    # warm and a client request can never double-build the same superset.
     try:
-        full = _compute_scores_full("overall", "all", 0.0)
-        _cache.set("scores_full:overall:all:0.0", full, CACHE_TTL_SCORES_FULL)
-        warmed.append({"feed": "scores", "rows": len(full)})
+        full = _get_or_build("scores_full:overall:all:0.0",
+                             lambda: _compute_scores_full("overall", "all", 0.0),
+                             CACHE_TTL_SCORES_FULL, force=True)
+        warmed.append({"feed": "scores", "rows": len(full)} if full is not None
+                      else {"feed": "scores", "error": "busy (another build in flight)"})
     except Exception as e:
         warmed.append({"feed": "scores", "error": str(e)})
     try:
-        grid = _compute_topics_full("", False)
-        _cache.set("topics_full::0", grid, CACHE_TTL_SCORES_FULL)
-        warmed.append({"feed": "topics", "rows": len(grid)})
+        grid = _get_or_build("topics_full::0",
+                             lambda: _compute_topics_full("", False),
+                             CACHE_TTL_SCORES_FULL, force=True)
+        warmed.append({"feed": "topics", "rows": len(grid)} if grid is not None
+                      else {"feed": "topics", "error": "busy (another build in flight)"})
     except Exception as e:
         warmed.append({"feed": "topics", "error": str(e)})
     # History view (web + mobile): warm every user-facing window at the default
@@ -7614,6 +7621,49 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
     return result.get("results", [])
 
 
+# ── SINGLE-FLIGHT superset builds (2026-07-06 outage lesson) ─────────────────
+# A cold cache under concurrent client load launched one FULL build PER REQUEST
+# (mobile pages the feed 100-at-a-time → dozens of simultaneous multi-minute
+# builds), starving the DB pool and riding the server's connection cap. Exactly
+# ONE request/warm builds a given superset; everyone else WAITS (bounded) for
+# its cached result. Waiters that time out get None → the endpoint answers an
+# honest 503 "warming" — it NEVER starts a second build.
+_BUILD_LOCKS: dict = {}
+_BUILD_LOCKS_GUARD = _threading.Lock()
+
+
+def _get_or_build(super_key: str, builder, ttl: int, force: bool = False):
+    """Serve `super_key` from cache or build it EXACTLY ONCE across all threads.
+    force=True (the pull-synchronized prewarm) rebuilds even when a cached value
+    exists — still single-flight, so a warm and a request can never double-build."""
+    if not force:
+        full = _cache.get(super_key)
+        if full is not None:
+            return full
+    with _BUILD_LOCKS_GUARD:
+        lock = _BUILD_LOCKS.setdefault(super_key, _threading.Lock())
+    if lock.acquire(blocking=False):
+        try:
+            if not force:
+                full = _cache.get(super_key)   # lost the race — builder just finished
+                if full is not None:
+                    return full
+            full = builder()
+            _cache.set(super_key, full, ttl)
+            return full
+        finally:
+            lock.release()
+    # Another thread is building — wait for its result; NEVER build again.
+    import time as _t
+    deadline = _t.time() + float(os.getenv("BUILD_WAIT_S", "25"))
+    while _t.time() < deadline:
+        _t.sleep(0.5)
+        full = _cache.get(super_key)
+        if full is not None:
+            return full
+    return None   # still building — caller returns a 'warming' response
+
+
 @app.get("/scores")
 def get_all_scores(
     min_score: float = Query(0.0),
@@ -7629,10 +7679,16 @@ def get_all_scores(
     no delay. Response includes `total` so the client knows when it has them all.
     """
     super_key = f"scores_full:{sort_by}:{stage}:{min_score}"
-    full = _cache.get(super_key)
+    full = _get_or_build(super_key,
+                         lambda: _compute_scores_full(sort_by, stage, min_score),
+                         CACHE_TTL_SCORES_FULL)
     if full is None:
-        full = _compute_scores_full(sort_by, stage, min_score)
-        _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, headers={"Retry-After": "30"},
+                            content={"status": "warming",
+                                     "message": "Feed cache is building — retry shortly.",
+                                     "results": [], "count": 0, "total": 0,
+                                     "offset": offset, "limit": limit})
 
     total = len(full)
     page = full[offset: offset + limit]
@@ -9000,10 +9056,16 @@ def list_topics(
     """
     cat = category.strip().lower()
     super_key = f"topics_full:{cat}:{int(anomalies_only)}"
-    full = _cache.get(super_key)
+    full = _get_or_build(super_key,
+                         lambda: _compute_topics_full(cat, anomalies_only),
+                         CACHE_TTL_SCORES_FULL)
     if full is None:
-        full = _compute_topics_full(cat, anomalies_only)
-        _cache.set(super_key, full, CACHE_TTL_SCORES_FULL)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, headers={"Retry-After": "30"},
+                            content={"status": "warming",
+                                     "message": "Topic grid cache is building — retry shortly.",
+                                     "topics": [], "count": 0, "total": 0,
+                                     "category": cat or "all", "offset": offset, "limit": limit})
     total = len(full)
     page = full[offset: offset + limit]
     return {"count": len(page), "topics": page, "category": cat or "all",
