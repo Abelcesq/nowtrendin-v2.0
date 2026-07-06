@@ -1005,3 +1005,40 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
 - Resume this thread (same machine): `claude --continue` (or `--resume`) in `NowTrendin v2.0/`.
 - Move to another machine: copy `~/.claude/projects/C--Users-acinv-...-NowTrendin-v2-0/` (transcript + `memory/`) to the same path; needs identical project path for the hash to match. Otherwise rely on `git pull` + the copied `memory/` folder + this log.
 - Update the web app after any frontend change: `./redeploy-web.sh` from `NowTrendin v2.0/`.
+
+## Session 2026-07-05 (evening) — catch-all fix · Apify streamlining · weekly audit #3
+
+### Completed
+- **Weekly improve-system audit #3** committed (`audits/improve-system/IMPROVE_SYSTEM_2026-07-05.md`).
+- **/monitor/catchall FIXED** (was 503/H12 since ~06-27). Three causes: (1) auditors measured the
+  bare lexicon `_topic_category` instead of the serve-time `_category_for` (situation+context layers)
+  — the 80.5%-vs-served gap was a measurement artifact; (2) unbounded latest-per-topic scan over the
+  365-day retention classified every topic ever seen (H12); (3) full-table `topic_signals` scan on
+  unindexed `extracted_at`. Now: serve-time classifier + `CATCHALL_WORKING_SET=6000` recent working
+  set + explicit-key chunked corroboration (index seeks). Live: HTTP 200, catch-all 70.2% (4213/6000),
+  floor STABLE, leak 20, 190 tracked calls in worklist.
+- **Catch-all lexicon (Agent 6 worklist, founder-confirmed):** WC-2026 cluster (worldcup/mundial/
+  golden boot/usmnt/haaland/manchester united/balogun/vozinha), youtube/whatsapp→tech,
+  mamdani/zohran/mcconnell→politics, walmart/costco→business, zendaya/victor willis/adam sandler→ent,
+  khamenei/ayatollah/america250/250th birthday/july 4th/mount rushmore/ukrainian/british→current_events.
+  Policy held: bare countries/kelce/visa/america stay OUT (situation layer). 33/34 tests pass.
+- **APIFY STREAMLINING (founder hard rule: ALL paid pulls at the 4×6h clock slots only):**
+  sweep `interval+boot-fire` → `cron 0,6,12,18:45 UTC` (boot-fired paid sweeps eliminated — one per
+  deploy + Heroku daily cycle); `_fetch_apify` now passes `&timeout=&memory=1024` on the run start and
+  ABORTS on poll-budget expiry (the 10-min 0-result runs = the ~$93/mo compute line). Realtime confirmed
+  clean 4×/day :30 (2× overrun gone). `trudax/reddit-scraper-lite` has NO engine refs → Apify-console-side
+  schedule, founder to delete. Engine v200.
+
+### Open / Next
+- Watch Apify usage after v200 (expect ~$221→~$70-90/mo run-rate); then consider Scale($199)→Starter($49)
+  plan downgrade — with fixed usage the Scale floor is oversized.
+- Delete the trudax reddit saved task/schedule in the Apify console (not our code).
+- Set `COST_HEROKU_USD` to the new Heroku total incl. the Postgres upgrade (invoice amount pending).
+- CLAUDE.md §3/§11 still document the pre-Aurora green palette; frontend/DESIGN_SYSTEM.md is the
+  enforced contract — reconcile the docs.
+- Watch: web-process boot log prints "collect+score every 30 min" vs the documented 6h cycle — verify
+  COLLECT_INTERVAL_MIN env on the dynos.
+
+### Hard decisions made
+- Apify synchronization codified: no boot-fired or free-running paid actor runs; clock slots + explicit
+  user request only (memory `project-ledger-sweep-apify` updated).
