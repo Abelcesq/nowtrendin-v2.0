@@ -1245,3 +1245,10 @@ Founder decision pending before any lexicon change.
 - Founder: approve/reject the 2 lexicon candidates (reddit, Roman Safiullin).
 - source_watchdog github warn clears at the first collect slot after token rotation
   (or degrades gracefully unauthenticated meanwhile).
+
+### Addendum 2026-07-07 — GITHUB_TOKEN rotated + verified (closes warn #1)
+Founder rotated to a classic no-scope, no-expiry PAT. Gotcha: the dashboard config-var
+field got the ENTIRE command line pasted as the value ("heroku config:set GITHUB_TOKEN=…"),
+so auth still 401'd — extracted the embedded 40-char ghp_ token and re-set it cleanly
+(engine v214; value never displayed). VERIFIED: /rate_limit HTTP 200, search quota 30/min,
+live search probe 200. github collector confirms at the next 6h collect slot.
