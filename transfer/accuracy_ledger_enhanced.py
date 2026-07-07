@@ -251,6 +251,23 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     if limit:
         q += f" LIMIT {int(limit)}"
     pending = [dict(r) for r in conn.execute(q).fetchall()]
+    # rec E (2026-07-07, LEDGER_SWEEP_NEWEST_SLOTS, default 0=off): reserve K of the
+    # capped slots for the NEWEST detections so the first-crossing enrollment cohort
+    # produces an early readout instead of waiting behind an 800-row rotation. The
+    # remaining slots keep the oldest-first rotation (the tail still advances).
+    _newest_k = int(os.getenv("LEDGER_SWEEP_NEWEST_SLOTS", "0"))
+    if limit and _newest_k > 0 and len(pending) == int(limit):
+        keep = pending[: int(limit) - _newest_k]
+        have = {p["id"] for p in keep}
+        newest = [dict(r) for r in conn.execute(
+            "SELECT * FROM pending_detections WHERE status='pending' "
+            "ORDER BY detection_date DESC LIMIT ?", (int(limit),)).fetchall()]
+        for p in newest:
+            if len(keep) >= int(limit):
+                break
+            if p["id"] not in have:
+                keep.append(p); have.add(p["id"])
+        pending = keep
     fetch = fetch_fn or fetch_trends_curve
     now = datetime.now(timezone.utc)
     led = lagged = same = fp = still = late = excluded = 0
