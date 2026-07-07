@@ -1304,3 +1304,20 @@ live search probe 200. github collector confirms at the next 6h collect slot.
   breadth-at-first-sighting enrollment priority; free-source fast-lane recheck;
   positioning floor-pin omission.
 - Re-run feature mining when the first-crossing enrollment cohort resolves.
+
+### Addendum 2026-07-07 — Accuracy Ledger PAGE updated (pre-broken + tracked-race + referee), live on gh-pages
+- Engine: /accuracy/ledger/detail now serves sweep_query/query_ambiguous/referee_corroborated
+  + a SERVER-computed pre_broken flag (one definition, same grace as the report) — 658bdf3.
+- Web terminal (deployed gh-pages 93cde0c, bundle index-Bxi-S792.js, verified serving):
+  filter chips All/Led/Same day/**Lagged · near miss**/**Pre-broken**/False positive;
+  stat strip adds **Tracked-race hit rate 26.9%** beside the unchanged blended Honest 10.0%,
+  breakdown 7/4/15/44/0 (near + pre-broken = lagged, nothing hidden), **LED referee check**
+  card (0✓ · 0– · 7 unchecked — honest: old wins predate the metadata); PRE-BROKEN verdict
+  chips w/ tooltip; wins carry wiki-referee status; ambiguous terms marked "broad term";
+  plain-language banner. Integrity-first: honest rate still counts every resolution.
+- Verified in preview (temp local auth stub, REVERTED before build/deploy — 0 traces,
+  bundle hash identical to clean build): cards reconcile with the API exactly; Pre-broken
+  filter → 44 rows, Near-miss → 15; zero console errors. tsc clean.
+- Desktop inherits via the web build (§12). ⏳ Mobile parity: the Aurora Accuracy Ledger
+  screen still shows the pre-split summary — add trackedRace/near/pre-broken lines +
+  /deploy-mobile-preview (next parity task).
