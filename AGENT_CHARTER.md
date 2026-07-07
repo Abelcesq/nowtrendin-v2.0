@@ -776,7 +776,13 @@ restart (the startup thread fires on boot). **PULL-SYNCHRONIZED (founder rule
 completes — end of the score phase (6h cycles + failover, cloud/API process only) and
 the `/collect` user pull — so serving caches carry fresh scores the moment they exist
 instead of up to 25 min later. Warms are overlap-guarded (one at a time; stacked kicks
-no-op — the 2026-07-06 thundering-herd lesson).
+no-op — the 2026-07-06 thundering-herd lesson) and BATCH-PACED (`PREWARM_FEED_PAUSE_S`
+10s between each of the 7 feed builds). The whole pipeline is paced on the same founder
+rule: collectors `COLLECT_SOURCE_PAUSE_S` 10s/source · scorer `SCORE_BATCH_SIZE` 100 +
+`SCORE_BATCH_PAUSE_S` 10s/batch · prewarm 10s/feed — heavy phases must never clog the
+serve path. Superset builds are additionally SINGLE-FLIGHT (`_get_or_build`): one
+builder per cache key; concurrent requests wait for its result or get an honest 503
+"warming" — never a second build.
 
 ## AGENT 16 — CANONICAL DATE AUDITOR
 
