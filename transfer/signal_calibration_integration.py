@@ -103,6 +103,11 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 # + GDELT referee) validates the direction. Flip to "true" only after backtest.
 SCORE_QUARANTINE_ENABLED = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "true"
 
+# rec F (2026-07-07, default OFF): stage keys off the calibrated DETECTION score
+# (matching the UI's stageOf) instead of the det/conf average. Must agree with the
+# detector's STAGE_FROM_DETECTION — both read the same env var.
+_STAGE_FROM_DETECTION = os.getenv("STAGE_FROM_DETECTION", "0") == "1"
+
 
 def _quarantine_weighted_sum(components: dict, weights: dict) -> float:
     """
@@ -1215,14 +1220,19 @@ def apply_calibration(
         new_overall    = round(overall_score, 1)
 
     # ── Reclassify stage with calibrated scores ───────────────────
-    avg = (new_detection + new_confidence) / 2
-    if avg >= 85:
+    # rec F (2026-07-07, STAGE_FROM_DETECTION, default OFF): the board's Executioner
+    # found the original flag was a near-no-op — this recompute (and the post-cal
+    # dual-pathway block) OVERWROTE the detector's stage from the det/conf AVERAGE.
+    # With the flag on, stage keys off the calibrated DETECTION score everywhere,
+    # matching the UI's stageOf chips (one concept, one definition).
+    _stage_basis = new_detection if _STAGE_FROM_DETECTION else (new_detection + new_confidence) / 2
+    if _stage_basis >= 85:
         new_stage = "BREAKOUT"
-    elif avg >= 70:
+    elif _stage_basis >= 70:
         new_stage = "STRONG"
-    elif avg >= 55:
+    elif _stage_basis >= 55:
         new_stage = "EMERGING"
-    elif avg >= 35:
+    elif _stage_basis >= 35:
         new_stage = "WATCHING"
     else:
         new_stage = "MONITORING"

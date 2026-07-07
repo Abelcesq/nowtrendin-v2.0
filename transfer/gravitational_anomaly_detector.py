@@ -706,6 +706,16 @@ HIGH_MAGNITUDE_ENG = 9.9
 # Set to 0 or 1 to DISABLE the floor (safe rollback).
 CATCHALL_MIN_SOURCES = int(os.getenv("CATCHALL_MIN_SOURCES", "2"))
 _CATCHALL_CATS = ("news", "general", "")
+# rec B (2026-07-07, default OFF): catch-all moat topics need corroboration too.
+MOAT_EXEMPT_STRICT = os.getenv("MOAT_EXEMPT_STRICT", "0") == "1"
+# rec C (2026-07-07, default OFF=0): dedup window in minutes for the N query log —
+# repeat surfacing of the same topic+endpoint within the window counts ONCE, damping
+# the view→N→rank ranking loop. N stays out of the composite either way.
+N_QUERY_DEDUP_MIN = int(os.getenv("N_QUERY_DEDUP_MIN", "0"))
+# rec F (2026-07-07, default OFF): assign the stored signal_stage from the DETECTION
+# score (matching the UI's stageOf chips) instead of the Overall score — ends the
+# two-vocabularies-for-one-concept drift. Display semantics only; no score change.
+STAGE_FROM_DETECTION = os.getenv("STAGE_FROM_DETECTION", "0") == "1"
 
 # Anomaly thresholds
 FIRST_TIMER_THRESHOLD  = 0.35   # 35% of commenters new to subreddit
@@ -861,8 +871,27 @@ def _prune_velocity_scores(retention_days: int = 365) -> int:
         conn.close()
 
 
+_n_dedup_seen: dict = {}   # (topic_key, endpoint) -> monotonic seconds of last log
+
+
 def _log_topic_query(topic_key: str, endpoint: str = "/scores") -> None:
-    """Enqueue a query log entry.  Drops silently when queue is full."""
+    """Enqueue a query log entry.  Drops silently when queue is full.
+
+    rec C (2026-07-07, flag N_QUERY_DEDUP_MIN, default 0=off): the view→N→rank loop —
+    every surfacing logs a query, N rises, the Now-TrendIn view ranks it higher, more
+    views follow. N never enters the composite (verified), but the RANKING dynamic is
+    rich-get-richer. With the flag on, repeat surfacing of the same topic+endpoint
+    within the window counts once, so N measures DISTINCT surfacing episodes."""
+    if N_QUERY_DEDUP_MIN > 0:
+        import time as _t
+        k = (topic_key, endpoint)
+        now_m = _t.monotonic()
+        last = _n_dedup_seen.get(k)
+        if last is not None and (now_m - last) < N_QUERY_DEDUP_MIN * 60:
+            return
+        _n_dedup_seen[k] = now_m
+        if len(_n_dedup_seen) > 50000:   # bound memory; reset is harmless (over-logs once)
+            _n_dedup_seen.clear()
     try:
         _query_log_queue.put_nowait(
             (datetime.now(timezone.utc).isoformat(), topic_key, endpoint)
@@ -4365,13 +4394,17 @@ class GravitationalAnomalyDetector:
         is_anomaly = len(anomaly_reason) >= 2
 
         # ── Signal stage classification ────────────────────────
-        if overall >= BREAKOUT_THRESHOLD:
+        # rec F (2026-07-07, STAGE_FROM_DETECTION, default OFF): the stored stage
+        # historically keyed off OVERALL while every UI chip keys off DETECTION
+        # (stageOf) — one concept, two vocabularies. Flag on = one definition.
+        _stage_basis = detection if STAGE_FROM_DETECTION else overall
+        if _stage_basis >= BREAKOUT_THRESHOLD:
             stage = "BREAKOUT"
-        elif overall >= STRONG_THRESHOLD:
+        elif _stage_basis >= STRONG_THRESHOLD:
             stage = "STRONG"
-        elif overall >= EMERGING_THRESHOLD:
+        elif _stage_basis >= EMERGING_THRESHOLD:
             stage = "EMERGING"
-        elif overall >= WATCHING_THRESHOLD:
+        elif _stage_basis >= WATCHING_THRESHOLD:
             stage = "WATCHING"
         else:
             stage = "MONITORING"
@@ -4626,15 +4659,37 @@ class GravitationalAnomalyDetector:
                 except Exception:
                     pass
 
+            _moat_shadow = []   # rec B shadow log: topics strict mode WOULD block
+
             def _passes_corroboration(tk: str) -> bool:
                 nsrc, maxe, hasx = _corro.get(tk, (0, 0.0, 0))
-                # moat / mass-attention / tracked-call exemptions — always keep
-                if hasx or maxe >= HIGH_MAGNITUDE_ENG or tk in _protected:
+                # moat / mass-attention / tracked-call exemptions — always keep.
+                # MOAT_EXEMPT_STRICT (rec B, 2026-07-07, default OFF): the moat (hasx)
+                # exemption is structural — ANY expert/niche-origin topic bypasses the
+                # floor, which is how junk fragments from an expert-tier source could
+                # score single-sourced into the catch-all (found during the research-
+                # feeds onboarding). Strict mode keeps the exemption for classifiable
+                # topics but requires CATCH-ALL moat topics to meet the same ≥2-source
+                # bar as everything else (high-magnitude + tracked-call exemptions
+                # unchanged).
+                if maxe >= HIGH_MAGNITUDE_ENG or tk in _protected:
                     return True
                 try:
                     cat = _topic_category((tk or "").replace("_", " ")) or ""
                 except Exception:
                     cat = ""
+                if hasx:
+                    _would_block = (cat in _CATCHALL_CATS) and nsrc < CATCHALL_MIN_SOURCES
+                    if not MOAT_EXEMPT_STRICT:
+                        # SHADOW LOG (board condition — 5 of 6 members demanded it):
+                        # while the flag is OFF, record what strict mode WOULD block so
+                        # the false-negative cost is measured BEFORE it is paid. The
+                        # ledger can then answer: did any shadow-blocked topic later
+                        # break out? If yes, strict mode is the wrong instrument.
+                        if _would_block:
+                            _moat_shadow.append(tk)
+                        return True
+                    return not _would_block
                 if cat in _CATCHALL_CATS:
                     return nsrc >= CATCHALL_MIN_SOURCES
                 return True  # non-catch-all: unchanged
@@ -4642,6 +4697,10 @@ class GravitationalAnomalyDetector:
             _pre2 = len(topic_keys)
             topic_keys = [tk for tk in topic_keys if _passes_corroboration(tk)]
             _corro_dropped = _pre2 - len(topic_keys)
+            if _moat_shadow:
+                print(f"  [moat-shadow] MOAT_EXEMPT_STRICT would block "
+                      f"{len(_moat_shadow)} single-source catch-all moat topic(s): "
+                      f"{_moat_shadow[:8]}")
 
         print(f"\nScoring {len(topic_keys)} scoreable topics "
               f"(filtered from raw fragment pool"
@@ -4738,7 +4797,10 @@ class GravitationalAnomalyDetector:
                     result["mainstream_confirmed"]   = _b.get("mainstream_confirmed", False)
                     result["tier_migration"]         = _b.get("tier_migration", False)
                     result["n_expert_communities"]   = _b.get("n_expert_communities", 0)
-                    _ov = _b["overall"]
+                    # rec F (2026-07-07): third stage-write site — honor the flag here
+                    # too (the board's Executioner caught this + the calibration
+                    # recompute overwriting the detector's flag-aware stage).
+                    _ov = _b["detection"] if STAGE_FROM_DETECTION else _b["overall"]
                     result["signal_stage"] = (
                         "BREAKOUT"  if _ov >= BREAKOUT_THRESHOLD else
                         "STRONG"    if _ov >= STRONG_THRESHOLD   else
@@ -7924,6 +7986,114 @@ def quarantine_dates(limit: int = Query(50, ge=1, le=500)):
                         "human decision (learns a rule so identical inputs auto-normalize)"}
     except Exception as e:
         return {"available": False, "error": str(e)}
+
+
+@app.post("/maintenance/maturity-backfill", dependencies=[Depends(_require_internal)])
+def maturity_backfill(payload: dict = Body(default={})):
+    """rec D (2026-07-07, REVISED per the board) — backfill topic_maturity rows for
+    LEDGER/PENDING topics with NO existing row.
+
+    BOARD CONDITIONS ENCODED:
+      • CALIBRATION-NEUTRAL BY CONSTRUCTION (Executioner): each row is classified with
+        the EXACT lifecycle-fallback rule calibration already applies to row-less topics
+        (NEW 0.80 / ESTABLISHED 0.45 [days>=10 & cycles>=40] / EMERGING 0.85), and
+        calibration_multiplier is written explicitly — so a DB row returns precisely
+        what the fallback would have returned. The write changes NO score.
+      • NO LOOKAHEAD LAUNDERING (Challenger): this write does NOT define the accuracy
+        report's cohorts — the report's as-of-detection basis is a separate flag
+        (LEDGER_MATURITY_AT_DETECTION in accuracy_ledger_enhanced). The dry-run delta
+        report includes the as-of-detection class per topic for comparison.
+      • Dry-run default; a human posts {"dry_run": 0} (flag-never-force). Fill-only.
+        Rollback: DELETE FROM topic_maturity WHERE maturity_reason LIKE 'backfill%'."""
+    dry = bool(payload.get("dry_run", 1))
+    conn = get_db(DB_PATH)
+    out = {"dry_run": dry, "rule": "lifecycle-fallback (calibration-neutral)",
+           "candidates": 0, "would_write": [], "written": 0, "skipped_no_lifecycle": 0}
+    try:
+        tks = {r["topic_key"] for r in conn.execute(
+            "SELECT DISTINCT topic_key FROM accuracy_ledger").fetchall()}
+        det_dates = {}
+        for r in conn.execute(
+                "SELECT topic_key, MIN(detection_date) AS dd FROM accuracy_ledger "
+                "GROUP BY topic_key").fetchall():
+            det_dates[r["topic_key"]] = dict(r).get("dd")
+        for r in conn.execute(
+                "SELECT topic_key, MIN(detection_date) AS dd FROM pending_detections "
+                "WHERE status='pending' GROUP BY topic_key").fetchall():
+            tks.add(r["topic_key"])
+            det_dates.setdefault(r["topic_key"], dict(r).get("dd"))
+        have = {r["topic_key"] for r in conn.execute(
+            "SELECT topic_key FROM topic_maturity").fetchall()}
+        missing = sorted(tks - have)
+        out["candidates"] = len(missing)
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
+        for tk in missing:
+            lc = conn.execute(
+                "SELECT total_scoring_cycles, first_detected_at FROM topic_lifecycle "
+                "WHERE topic_key = ?", (tk,)).fetchone()
+            if not lc:
+                out["skipped_no_lifecycle"] += 1
+                continue    # no lifecycle history → fallback stays authoritative; skip
+            cycles = int(dict(lc).get("total_scoring_cycles") or 0)
+            days = 0
+            fda = dict(lc).get("first_detected_at")
+            if fda:
+                try:
+                    _first = datetime.fromisoformat(str(fda).replace("Z", "+00:00"))
+                    days = max(0, (now_dt - _first).days)
+                except Exception:
+                    days = 0
+            # EXACT lifecycle-fallback rule (signal_calibration_integration lines ~779-794)
+            if cycles < 5 or days < 1:
+                cls, mult = "NEW", 0.80
+            elif days >= 10 and cycles >= 40:
+                cls, mult = "ESTABLISHED", 0.45
+            else:
+                cls, mult = "EMERGING", 0.85
+            # Informational: AS-OF-DETECTION distinct scored days (the no-lookahead
+            # basis the report's flag uses) — lets the dry-run answer whether the
+            # EMERGING-vs-ESTABLISHED inversion is a hindsight artifact.
+            aod_days = None
+            dd = det_dates.get(tk)
+            if dd:
+                try:
+                    aod = conn.execute(
+                        "SELECT COUNT(DISTINCT substr(scored_at,1,10)) AS d "
+                        "FROM velocity_scores WHERE topic_key = ? AND scored_at <= ?",
+                        (tk, str(dd) + "T23:59:59")).fetchone()
+                    aod_days = int(dict(aod).get("d") or 0)
+                except Exception:
+                    aod_days = None
+            out["would_write"].append({
+                "topic_key": tk, "class": cls, "multiplier": mult,
+                "cycles": cycles, "days_in_system": days,
+                "as_of_detection_days": aod_days})
+            if not dry:
+                conn.execute(
+                    "INSERT OR IGNORE INTO topic_maturity "
+                    "(topic_key, topic_display, first_detected_at, last_scored_at, "
+                    " times_scored, days_in_system, maturity_class, maturity_reason, "
+                    " calibration_multiplier, updated_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (tk, tk.replace("_", " "), fda, now, cycles, days, cls,
+                     f"backfill(lifecycle-rule): {cycles} cycles / {days} days — "
+                     f"calibration-neutral (matches fallback {mult})",
+                     mult, now))
+                out["written"] += 1
+        if not dry:
+            conn.commit()
+        # class distribution summary + capped sample
+        dist = {}
+        for w in out["would_write"]:
+            dist[w["class"]] = dist.get(w["class"], 0) + 1
+        out["class_distribution"] = dist
+        out["would_write"] = out["would_write"][:40]
+        return out
+    except Exception as e:
+        return {"error": str(e)[:200], **out}
+    finally:
+        conn.close()
 
 
 @app.post("/quarantine/dates/resolve", dependencies=[Depends(_require_internal)])
