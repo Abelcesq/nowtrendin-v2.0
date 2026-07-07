@@ -9,3 +9,15 @@ web-deploy/
 
 # Enterprise web preview deploy staging (built artifact — deployed to nowtrendin-v2-preview Heroku app)
 web-preview/
+
+# Deploy staging clones (each has its own .git — pushed separately)
+.ghpages-deploy/
+web-deploy-terminal/
+
+# Python bytecode + local runtime artifacts
+__pycache__/
+*.pyc
+transfer/anomaly_detector.db
+
+# Personal file (non-project) — keep local
+revised PTCS on Coffe.pdf

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Now TrendIn — Market Signal &amp; Watchlists</title>
+<style>
+  :root{
+    --ink:#0c1626; --ink-2:#13233a; --ink-3:#1b2d45; --ink-line:#22354e;
+    --ink-text:#c4d0de; --ink-text-2:#8095ab; --ink-text-3:#5e718a;
+    --canvas:#f4f6f8; --surface:#ffffff; --line:#e3e7ed; --line-2:#eef1f5;
+    --text:#15202e; --text-2:#5c6a7d; --text-3:#8a97a7;
+    --det:#2f6fed; --det-soft:#e8effd;
+    --conf:#0d9f6e; --conf-soft:#e2f4ec;
+    --early:#df7a36; --early-soft:#fbecdc;
+    --up:#15a34a; --down:#d83a3a;
+    --bk-t:#c2410c; --bk-b:#fdeadc;
+    --st-t:#1d4ed8; --st-b:#e8effd;
+    --em-t:#0d9f6e; --em-b:#e2f4ec;
+    --wa-t:#5c6a7d; --wa-b:#eef1f5;
+    --mo-t:#8a97a7; --mo-b:#f2f4f7;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--sans); color:var(--text); background:var(--canvas);
+    font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased; overflow:hidden}
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .eyebrow{font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:600}
+
+  .app{display:grid; grid-template-rows:52px 1fr 30px; height:100vh}
+
+  /* topbar */
+  .topbar{background:var(--ink); color:var(--ink-text); display:flex; align-items:center; gap:18px;
+    padding:0 16px; border-bottom:1px solid var(--ink-line)}
+  .brand{display:flex; align-items:center; gap:9px; min-width:188px}
+  .mark{width:24px;height:24px;flex:0 0 auto}
+  .brand .name{font-weight:700; letter-spacing:.02em; font-size:15px; color:#fff}
+  .brand .name b{color:var(--early)}
+  .brand .tag{font-size:8.5px; letter-spacing:.16em; color:var(--ink-text-3); text-transform:uppercase; margin-top:1px}
+  .search{flex:1; max-width:560px; position:relative}
+  .search input{width:100%; height:32px; background:var(--ink-2); border:1px solid var(--ink-line);
+    border-radius:7px; color:var(--ink-text); padding:0 12px 0 32px; font-size:12.5px; font-family:var(--sans)}
+  .search input::placeholder{color:var(--ink-text-3)}
+  .search input:focus{outline:none; border-color:#34507a; background:var(--ink-3)}
+  .search .ico{position:absolute; left:10px; top:8px; color:var(--ink-text-3)}
+  .top-right{margin-left:auto; display:flex; align-items:center; gap:14px}
+  /* honest state: amber illustrative pill, NOT a green Live dot */
+  .illpill{display:flex; align-items:center; gap:7px; font-size:10.5px; font-weight:700; letter-spacing:.08em;
+    color:var(--early); background:rgba(223,122,54,.12); border:1px solid rgba(223,122,54,.34);
+    padding:4px 9px; border-radius:6px; text-transform:uppercase}
+  .illpill i{width:6px;height:6px;border-radius:50%;background:var(--early)}
+  .asof{font-size:11px; color:var(--ink-text-2); text-align:right; line-height:1.2}
+  .asof b{color:var(--ink-text); font-family:var(--mono); font-weight:500}
+  .plan{font-size:10px; font-weight:700; letter-spacing:.07em; color:var(--early);
+    background:rgba(223,122,54,.1); border:1px solid rgba(223,122,54,.28); padding:4px 9px; border-radius:5px}
+  .avatar{width:28px;height:28px;border-radius:50%; background:linear-gradient(135deg,#2f6fed,#0d9f6e);
+    display:grid; place-items:center; color:#fff; font-size:11px; font-weight:700}
+
+  /* body */
+  .body{display:grid; grid-template-columns:208px 1fr; min-height:0; background:var(--canvas)}
+
+  /* sidebar */
+  .sidebar{background:var(--ink); color:var(--ink-text-2); padding:14px 10px; overflow-y:auto; border-right:1px solid var(--ink-line)}
+  .nav-label{font-size:9.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-text-3); padding:14px 10px 6px; font-weight:600}
+  .nav-item{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:7px; cursor:pointer;
+    font-size:13px; color:var(--ink-text); margin-bottom:2px}
+  .nav-item:hover{background:var(--ink-2)}
+  .nav-item.active{background:var(--ink-3); color:#fff; font-weight:500}
+  .nav-item.active .ni{color:var(--early)}
+  .nav-item .ni{width:16px; color:var(--ink-text-3); flex:0 0 auto; text-align:center}
+  .nav-item .badge{margin-left:auto; font-size:10px; background:var(--ink-2); color:var(--ink-text-2);
+    border-radius:5px; padding:1px 7px; font-family:var(--mono)}
+
+  /* main canvas */
+  .main{overflow-y:auto; min-width:0}
+  .view{display:none}
+  .view.show{display:block}
+
+  /* illustrative banner */
+  .ill-banner{display:flex; align-items:center; gap:10px; background:var(--early-soft);
+    border-bottom:1px solid #f1d6bd; color:#8a4a1c; font-size:11.5px; padding:8px 20px; line-height:1.35}
+  .ill-banner svg{flex:0 0 auto; color:var(--early)}
+  .ill-banner b{font-weight:700}
+
+  .main-head{padding:16px 20px 0; border-bottom:1px solid var(--line); background:var(--surface)}
+  .main-title-row{display:flex; align-items:baseline; gap:12px; margin-bottom:4px}
+  .main-title{font-size:18px; font-weight:700; letter-spacing:-.01em}
+  .main-sub{font-size:12px; color:var(--text-2)}
+  .main-actions{margin-left:auto; display:flex; gap:8px}
+  .act{height:30px; border:1px solid var(--line); border-radius:7px; background:var(--surface); padding:0 11px;
+    font-size:12px; font-weight:550; color:var(--text-2); cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-family:var(--sans)}
+  .act:hover{border-color:#d3d9e0; color:var(--text)}
+  .chips{display:flex; gap:7px; padding:13px 0; overflow-x:auto}
+  .chip{padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface);
+    font-size:12px; color:var(--text-2); cursor:pointer; display:flex; align-items:center; gap:7px; white-space:nowrap}
+  .chip:hover{border-color:#d3d9e0}
+  .chip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .chip.on .c-cnt{color:var(--ink-text-2)}
+  .chip .c-cnt{font-family:var(--mono); color:var(--text-3); font-size:11px}
+  .chip.early.on{background:var(--early); border-color:var(--early)}
+
+  /* grid */
+  .grid-wrap{padding:0 20px 20px}
+  table{width:100%; border-collapse:collapse; font-size:12.5px}
+  thead th{position:sticky; top:0; background:var(--canvas); text-align:left; font-size:10px; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--text-3); font-weight:600; padding:10px 12px; border-bottom:1px solid var(--line);
+    cursor:pointer; white-space:nowrap; z-index:1}
+  thead th.r{text-align:right}
+  thead th.sorted{color:var(--text)}
+  thead th .sort{color:var(--early); font-size:9px; margin-left:3px}
+  tbody tr{border-bottom:1px solid var(--line-2); cursor:pointer}
+  tbody tr:hover{background:var(--line-2)}
+  td{padding:11px 12px; vertical-align:middle}
+  td.r{text-align:right}
+  .topic-name{font-weight:600; color:var(--text); font-size:13px}
+  .topic-cat{font-size:11px; color:var(--text-3); margin-top:1px}
+  .tick{font-family:var(--mono); font-weight:600; font-size:12px; color:var(--text); background:var(--line-2);
+    padding:1px 6px; border-radius:4px; margin-right:8px}
+  .score-cell{font-family:var(--mono); font-weight:600; font-size:13px; padding:2px 7px; border-radius:5px}
+  .score-cell.det{color:var(--det); background:var(--det-soft)}
+  .score-cell.conf{color:var(--conf); background:var(--conf-soft)}
+  .muted{color:var(--text-3)}
+
+  .gapviz{display:flex; align-items:center; gap:8px; justify-content:flex-end}
+  .gapnum{font-family:var(--mono); font-size:12.5px; font-weight:600; min-width:30px; text-align:right}
+  .gapnum.wide{color:var(--early)} .gapnum.neg{color:var(--text-3)} .gapnum.tight{color:var(--text-2)}
+
+  .stage{font-size:9.5px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px; text-transform:uppercase}
+  .stage.BREAKOUT{background:var(--bk-b); color:var(--bk-t)}
+  .stage.STRONG{background:var(--st-b); color:var(--st-t)}
+  .stage.EMERGING{background:var(--em-b); color:var(--em-t)}
+  .stage.WATCHING{background:var(--wa-b); color:var(--wa-t)}
+  .stage.MONITORING{background:var(--mo-b); color:var(--mo-t)}
+  .vel{font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px}
+  .vel.up{color:var(--up)} .vel.down{color:var(--down)} .vel.flat{color:var(--text-3)}
+
+  .rm{opacity:0; border:0; background:transparent; color:var(--text-3); cursor:pointer; font-size:15px; padding:2px 6px; border-radius:5px}
+  tbody tr:hover .rm{opacity:1}
+  .rm:hover{background:#f4d6d6; color:var(--down)}
+
+  /* watchlist tabs + add */
+  .wl-tabs{display:flex; gap:6px; padding:12px 0 0; flex-wrap:wrap}
+  .wl-tab{padding:7px 13px; border:1px solid var(--line); border-radius:8px 8px 0 0; background:var(--canvas);
+    font-size:12.5px; font-weight:550; color:var(--text-2); cursor:pointer; border-bottom-color:transparent}
+  .wl-tab .wc{font-family:var(--mono); font-size:11px; color:var(--text-3); margin-left:6px}
+  .wl-tab.on{background:var(--surface); color:var(--text); border-color:var(--line); position:relative; top:1px}
+  .wl-tab.add{color:var(--det); font-weight:600}
+  .add-row{display:flex; gap:8px; padding:14px 20px; background:var(--surface); border-bottom:1px solid var(--line)}
+  .add-row input{flex:1; max-width:340px; height:34px; border:1px solid var(--line); border-radius:8px; padding:0 12px; font-size:13px; font-family:var(--sans)}
+  .add-row input:focus{outline:none; border-color:var(--early); box-shadow:0 0 0 3px var(--early-soft)}
+  .add-row .add-btn{height:34px; padding:0 14px; border:0; border-radius:8px; background:var(--ink); color:#fff; font-weight:600; font-size:13px; cursor:pointer}
+  .add-row .add-btn:hover{background:var(--ink-3)}
+  .empty{padding:54px 20px; text-align:center; color:var(--text-3)}
+  .empty .big{font-size:14px; color:var(--text-2); font-weight:600; margin-bottom:6px}
+
+  /* footer */
+  .footer{background:var(--ink); color:var(--ink-text-3); display:flex; align-items:center; gap:14px;
+    padding:0 16px; font-size:11px; border-top:1px solid var(--ink-line)}
+  .footer .sep{color:var(--ink-line)}
+  .footer .ill{color:var(--early); font-weight:600}
+  .footer .right{margin-left:auto; font-family:var(--mono)}
+
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdd4dd; border-radius:6px; border:2px solid var(--canvas)}
+  .sidebar::-webkit-scrollbar-thumb{background:#273a54; border-color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="7" fill="#13233a"/>
+        <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#df7a36"/>
+        <path d="M19 9l4-3-1 5z" fill="#2f6fed"/>
+      </svg>
+      <div>
+        <div class="name">Now<b>TrendIn</b></div>
+        <div class="tag">Attention Intelligence</div>
+      </div>
+    </div>
+    <div class="search">
+      <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="search" type="text" placeholder="Filter this view…" autocomplete="off">
+    </div>
+    <div class="top-right">
+      <div class="illpill" title="This prototype renders sample data, not the live feed"><i></i> Illustrative</div>
+      <div class="asof">Sample · as of<br><b id="clock">—</b></div>
+      <span class="plan">ENTERPRISE</span>
+      <div class="avatar">AB</div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="body">
+    <aside class="sidebar">
+      <div class="nav-item" data-go="market"><span class="ni">$</span> Market Signal</div>
+      <div class="nav-item" data-go="watch"><span class="ni">★</span> Watchlists <span class="badge" id="wl-total">—</span></div>
+      <div class="nav-label">Also in the terminal</div>
+      <div class="nav-item" style="opacity:.5;cursor:default"><span class="ni">▲</span> Trends</div>
+      <div class="nav-item" style="opacity:.5;cursor:default"><span class="ni">◎</span> Grade</div>
+      <div class="nav-item" style="opacity:.5;cursor:default"><span class="ni">✓</span> Accuracy Ledger</div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ============ MARKET SIGNAL ============ -->
+      <section class="view show" id="view-market">
+        <div class="ill-banner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span><b>Illustrative — sample data</b> standing in for the live Market Signal feed. Scores shown are the same Detection/Confidence measurement used on Trends; no prices, returns, or accuracy figures are shown because those aren't wired yet. No performance claims.</span>
+        </div>
+        <div class="main-head">
+          <div class="main-title-row">
+            <div class="main-title">Market Signal</div>
+            <div class="main-sub">Finance-native dual score — attention on tradeable instruments</div>
+            <div class="main-actions">
+              <button class="act" id="col-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg> Columns</button>
+              <button class="act" id="csv-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg> Export CSV</button>
+            </div>
+          </div>
+          <div class="chips" id="chips"></div>
+        </div>
+        <div class="grid-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="name">Instrument</th>
+                <th class="r" data-sort="det">Detection</th>
+                <th class="r" data-sort="conf">Confidence</th>
+                <th class="r" data-sort="gap">Gap (lead)</th>
+                <th data-sort="stage">Stage</th>
+                <th data-sort="vel">Velocity</th>
+                <th class="r" data-sort="breadth">Breadth</th>
+                <th class="r" data-sort="updated">Updated</th>
+              </tr>
+            </thead>
+            <tbody id="mkt-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ WATCHLISTS ============ -->
+      <section class="view" id="view-watch">
+        <div class="ill-banner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+          <span><b>Illustrative — sample lists.</b> A watchlist is just instruments and topics you choose to track; each shows its current Detection/Confidence and gap. Adds/removes here are local to this prototype.</span>
+        </div>
+        <div class="main-head" style="padding-bottom:0">
+          <div class="main-title-row">
+            <div class="main-title">Watchlists</div>
+            <div class="main-sub">Track the gap on the names you care about</div>
+          </div>
+          <div class="wl-tabs" id="wl-tabs"></div>
+        </div>
+        <div class="add-row">
+          <input id="wl-add-input" type="text" placeholder="Add a ticker or topic to this list… (e.g. NVDA, world models)">
+          <button class="add-btn" id="wl-add-btn">Add</button>
+        </div>
+        <div class="grid-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-wsort="name">Name</th>
+                <th class="r" data-wsort="det">Detection</th>
+                <th class="r" data-wsort="conf">Confidence</th>
+                <th class="r" data-wsort="gap">Gap (lead)</th>
+                <th data-wsort="stage">Stage</th>
+                <th data-wsort="vel">Velocity</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="wl-body"></tbody>
+          </table>
+          <div class="empty" id="wl-empty" style="display:none">
+            <div class="big">Nothing tracked yet</div>
+            Add a ticker or a topic above to start watching its gap.
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span class="ill">● ILLUSTRATIVE</span>
+    <span>Sample data — not a live feed, not investment advice, no performance or accuracy claims.</span>
+    <span class="sep">|</span>
+    <span>Sources when live: GitHub · HackerNews · DEV.to · Reddit · GDELT · Finnhub</span>
+    <span class="right">Prototype · v0</span>
+  </footer>
+</div>
+
+<script>
+  const $  = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  /* ---------- shared schema (identical to Trends engine) ---------- */
+  const VELRANK={ACCELERATING:5,RISING:4,HOLDING:3,COOLING:2,FADING:1};
+  const stageOf = d => d>=85?"BREAKOUT":d>=70?"STRONG":d>=55?"EMERGING":d>=35?"WATCHING":"MONITORING";
+  const velClass = v => (v==="ACCELERATING"||v==="RISING")?"up":(v==="FADING"||v==="COOLING")?"down":"flat";
+  const velArrow = v => v==="ACCELERATING"?"▲▲":v==="RISING"?"▲":v==="HOLDING"?"—":v==="COOLING"?"▽":"▼";
+  const titleCase = v => v.charAt(0)+v.slice(1).toLowerCase();
+
+  function gapMicro(det, conf){
+    const lo=Math.min(det,conf), hi=Math.max(det,conf), W=78, x=v=>4+(v/100)*(W-8);
+    const wide=Math.abs(det-conf)>=20, col=wide?"var(--early)":"#aab4c1";
+    return `<svg width="${W}" height="16" viewBox="0 0 ${W} 16" aria-hidden="true">
+      <line x1="${x(lo)}" y1="8" x2="${x(hi)}" y2="8" stroke="${col}" stroke-width="${wide?2.5:1.5}"/>
+      <circle cx="${x(det)}" cy="8" r="3.2" fill="var(--det)"/>
+      <circle cx="${x(conf)}" cy="8" r="3.2" fill="var(--conf)"/></svg>`;
+  }
+  const mkRow = (name, cat, det, conf, vel, breadth, updated, ticker=null) =>
+    ({name, cat, det, conf, gap:det-conf, stage:stageOf(det), vel, velrank:VELRANK[vel], breadth, updated, ticker});
+
+  /* ---------- ILLUSTRATIVE market data (sample, not live) ----------
+     Real tickers, placeholder dual scores standing in for the finance
+     engine output. No price / return / accuracy is shown — none is wired. */
+  const MARKET = [
+    mkRow("Nvidia","AI Infrastructure",       88,84,"HOLDING",      6,7,  "NVDA"),
+    mkRow("CoreWeave","AI Cloud",             83,49,"ACCELERATING", 4,4,  "CRWV"),
+    mkRow("Vertiv","Data-Center Power",       79,52,"RISING",       4,9,  "VRT"),
+    mkRow("AST SpaceMobile","Space Telecom",  64,30,"RISING",       3,11, "ASTS"),
+    mkRow("Arm Holdings","Semiconductors",    76,58,"ACCELERATING", 4,6,  "ARM"),
+    mkRow("Super Micro","Compute Hardware",   71,66,"HOLDING",      5,12, "SMCI"),
+    mkRow("TSMC","Semiconductors",            74,70,"HOLDING",      6,8,  "TSM"),
+    mkRow("Palantir","Software",              69,71,"COOLING",      6,15, "PLTR"),
+    mkRow("Broadcom","Semiconductors",        72,67,"RISING",       5,10, "AVGO"),
+    mkRow("Constellation Energy","Power",     70,46,"ACCELERATING", 3,5,  "CEG"),
+    mkRow("Cloudflare","Edge / Infra",        66,57,"HOLDING",      5,18, "NET"),
+    mkRow("MicroStrategy","Digital Assets",   61,68,"FADING",       5,22, "MSTR"),
+  ];
+
+  /* ---------- Market Signal view ---------- */
+  let mState={sort:"gap", dir:-1, filter:"all", q:""};
+  const M_FILTERS=[
+    {k:"all",      label:"All"},
+    {k:"early",    label:"⟡ Early Signals", cls:"early", test:r=>r.gap>=20},
+    {k:"strong",   label:"Strong (≥70)",    test:r=>r.det>=70},
+    {k:"cooling",  label:"Cooling",         test:r=>r.gap<0},
+  ];
+  function mFilterFn(){const f=M_FILTERS.find(x=>x.k===mState.filter); return f&&f.test?f.test:()=>true;}
+
+  function renderChips(){
+    $("#chips").innerHTML=M_FILTERS.map(f=>{
+      const n = f.test?MARKET.filter(f.test).length:MARKET.length;
+      return `<div class="chip ${f.cls||''} ${mState.filter===f.k?'on':''}" data-f="${f.k}">${f.label} <span class="c-cnt">${n}</span></div>`;
+    }).join("");
+    $$("[data-f]").forEach(c=>c.onclick=()=>{mState.filter=c.dataset.f; renderChips(); renderMarket();});
+  }
+  function sortRows(rows,sort,dir){
+    return rows.sort((a,b)=>{let va=a[sort],vb=b[sort];
+      return typeof va==="string"?va.localeCompare(vb)*dir:(va-vb)*dir;});
+  }
+  function renderMarket(){
+    let rows=MARKET.filter(mFilterFn());
+    if(mState.q){const q=mState.q.toLowerCase();
+      rows=rows.filter(r=>r.name.toLowerCase().includes(q)||(r.ticker||"").toLowerCase().includes(q)||r.cat.toLowerCase().includes(q));}
+    sortRows(rows,mState.sort,mState.dir);
+    $("#mkt-body").innerHTML=rows.map(r=>{
+      const gw=Math.abs(r.gap)>=20?"wide":(r.gap<0?"neg":"tight");
+      return `<tr>
+        <td><div class="topic-name"><span class="tick">${r.ticker}</span>${r.name}</div><div class="topic-cat">${r.cat}</div></td>
+        <td class="r"><span class="score-cell det">${r.det}</span></td>
+        <td class="r"><span class="score-cell conf">${r.conf}</span></td>
+        <td class="r"><div class="gapviz">${gapMicro(r.det,r.conf)}<span class="gapnum ${gw}">${r.gap>0?'+':''}${r.gap}</span></div></td>
+        <td><span class="stage ${r.stage}">${r.stage}</span></td>
+        <td><span class="vel ${velClass(r.vel)}">${velArrow(r.vel)} ${titleCase(r.vel)}</span></td>
+        <td class="r"><span class="muted">${r.breadth} plat</span></td>
+        <td class="r"><span class="muted">${r.updated}m</span></td>
+      </tr>`;
+    }).join("");
+    $$("thead th[data-sort]").forEach(th=>{
+      th.classList.toggle("sorted",th.dataset.sort===mState.sort);
+      th.querySelectorAll(".sort").forEach(s=>s.remove());
+      if(th.dataset.sort===mState.sort) th.insertAdjacentHTML("beforeend",`<span class="sort">${mState.dir<0?"▼":"▲"}</span>`);
+    });
+  }
+  $$("thead th[data-sort]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.sort;
+    if(mState.sort===k) mState.dir*=-1; else {mState.sort=k; mState.dir=(k==="name"||k==="stage")?1:-1;}
+    renderMarket();
+  });
+
+  /* ---------- Watchlists view ---------- */
+  const LISTS={
+    "Compute & Power":[
+      mkRow("Nvidia","AI Infrastructure",88,84,"HOLDING",6,7,"NVDA"),
+      mkRow("CoreWeave","AI Cloud",83,49,"ACCELERATING",4,4,"CRWV"),
+      mkRow("Vertiv","Data-Center Power",79,52,"RISING",4,9,"VRT"),
+      mkRow("Constellation Energy","Power",70,46,"ACCELERATING",3,5,"CEG"),
+    ],
+    "Semis":[
+      mkRow("Arm Holdings","Semiconductors",76,58,"ACCELERATING",4,6,"ARM"),
+      mkRow("TSMC","Semiconductors",74,70,"HOLDING",6,8,"TSM"),
+      mkRow("Broadcom","Semiconductors",72,67,"RISING",5,10,"AVGO"),
+    ],
+    "My Topics":[
+      mkRow("agentic coding","Dev Tools",95,93,"ACCELERATING",6,8),
+      mkRow("world models","ML Research",72,41,"ACCELERATING",3,33),
+      mkRow("neuromorphic inference","ML Research",69,31,"RISING",2,55),
+    ],
+    "New list":[],
+  };
+  let wActive="Compute & Power", wSort={sort:"gap",dir:-1};
+
+  function renderTabs(){
+    const names=Object.keys(LISTS);
+    $("#wl-tabs").innerHTML = names.map(n=>
+      `<div class="wl-tab ${n===wActive?'on':''}" data-wl="${n}">${n}<span class="wc">${LISTS[n].length}</span></div>`
+    ).join("") + `<div class="wl-tab add" id="wl-new">+ New list</div>`;
+    $$("[data-wl]").forEach(t=>t.onclick=()=>{wActive=t.dataset.wl; renderTabs(); renderWatch();});
+    $("#wl-new").onclick=()=>{
+      let base="Untitled", n=base, i=2; while(LISTS[n]) n=base+" "+(i++);
+      LISTS[n]=[]; wActive=n; renderTabs(); renderWatch(); updateTotals();
+    };
+    updateTotals();
+  }
+  function updateTotals(){
+    $("#wl-total").textContent=Object.keys(LISTS).length;
+  }
+  function renderWatch(){
+    const rows=LISTS[wActive].slice();
+    sortRows(rows,wSort.sort,wSort.dir);
+    const body=$("#wl-body"), empty=$("#wl-empty");
+    if(rows.length===0){body.innerHTML=""; empty.style.display="block"; return;}
+    empty.style.display="none";
+    body.innerHTML=rows.map((r,i)=>{
+      const gw=Math.abs(r.gap)>=20?"wide":(r.gap<0?"neg":"tight");
+      const label=r.ticker?`<span class="tick">${r.ticker}</span>${r.name}`:r.name;
+      return `<tr>
+        <td><div class="topic-name">${label}</div><div class="topic-cat">${r.cat}</div></td>
+        <td class="r"><span class="score-cell det">${r.det}</span></td>
+        <td class="r"><span class="score-cell conf">${r.conf}</span></td>
+        <td class="r"><div class="gapviz">${gapMicro(r.det,r.conf)}<span class="gapnum ${gw}">${r.gap>0?'+':''}${r.gap}</span></div></td>
+        <td><span class="stage ${r.stage}">${r.stage}</span></td>
+        <td><span class="vel ${velClass(r.vel)}">${velArrow(r.vel)} ${titleCase(r.vel)}</span></td>
+        <td class="r"><button class="rm" title="Remove" data-name="${r.name}">×</button></td>
+      </tr>`;
+    }).join("");
+    $$("#wl-body .rm").forEach(b=>b.onclick=(e)=>{
+      e.stopPropagation();
+      LISTS[wActive]=LISTS[wActive].filter(x=>x.name!==b.dataset.name);
+      renderTabs(); renderWatch();
+    });
+  }
+  $$("thead th[data-wsort]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.wsort;
+    if(wSort.sort===k) wSort.dir*=-1; else {wSort.sort=k; wSort.dir=(k==="name"||k==="stage")?1:-1;}
+    renderWatch();
+  });
+
+  /* add: looks up the sample universe; if unknown, adds as an untracked topic
+     with no scores rather than inventing numbers we can't support */
+  const UNIVERSE = MARKET.concat([].concat(...Object.values(LISTS)));
+  function addToList(){
+    const raw=$("#wl-add-input").value.trim(); if(!raw) return;
+    const q=raw.toLowerCase();
+    const found=UNIVERSE.find(r=>r.name.toLowerCase()===q || (r.ticker||"").toLowerCase()===q);
+    if(LISTS[wActive].some(x=>x.name.toLowerCase()===q || (x.ticker||"").toLowerCase()===q)){ $("#wl-add-input").value=""; return; }
+    if(found){
+      LISTS[wActive].push({...found});
+    }else{
+      // honest empty entry — no fabricated score
+      LISTS[wActive].push({name:raw, cat:"Not yet scored", det:0, conf:0, gap:0,
+        stage:"MONITORING", vel:"HOLDING", velrank:3, breadth:0, updated:0, ticker:null});
+    }
+    $("#wl-add-input").value=""; renderTabs(); renderWatch();
+  }
+  $("#wl-add-btn").onclick=addToList;
+  $("#wl-add-input").addEventListener("keydown",e=>{if(e.key==="Enter") addToList();});
+
+  /* ---------- nav switching ---------- */
+  $$("[data-go]").forEach(el=>el.onclick=()=>{
+    $$(".nav-item[data-go]").forEach(x=>x.classList.remove("active")); el.classList.add("active");
+    const go=el.dataset.go;
+    $("#view-market").classList.toggle("show",go==="market");
+    $("#view-watch").classList.toggle("show",go==="watch");
+  });
+
+  /* ---------- search (filters the active view) ---------- */
+  $("#search").addEventListener("input",e=>{
+    mState.q=e.target.value; renderMarket();
+  });
+
+  /* ---------- CSV export (Market Signal) ---------- */
+  $("#csv-btn").onclick=()=>{
+    const hdr=["ticker","name","category","detection","confidence","gap","stage","velocity","breadth_platforms","updated_min"];
+    const lines=[hdr.join(",")].concat(MARKET.filter(mFilterFn()).map(r=>
+      [r.ticker||"",`"${r.name}"`,`"${r.cat}"`,r.det,r.conf,r.gap,r.stage,r.vel,r.breadth,r.updated].join(",")));
+    const blob=new Blob([lines.join("\n")],{type:"text/csv"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="nowtrendin_market_signal_ILLUSTRATIVE.csv"; a.click();
+  };
+  $("#col-btn").onclick=()=>alert("Column picker — to be wired with the live schema.");
+
+  /* clock label (sample, not live) */
+  function tick(){const d=new Date();
+    $("#clock").textContent=d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true})+" ET";}
+  tick(); setInterval(tick,30000);
+
+  /* boot */
+  $(".nav-item[data-go='market']").classList.add("active");
+  renderChips(); renderMarket(); renderTabs(); renderWatch();
+</script>
+</body>
+</html>

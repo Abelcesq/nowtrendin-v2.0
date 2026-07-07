@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Now TrendIn — Terminal</title>
+<style>
+  :root{
+    --ink:#0c1626; --ink-2:#13233a; --ink-3:#1b2d45; --ink-line:#22354e;
+    --ink-text:#c4d0de; --ink-text-2:#8095ab; --ink-text-3:#5e718a;
+    --canvas:#f4f6f8; --surface:#ffffff; --line:#e3e7ed; --line-2:#eef1f5;
+    --text:#15202e; --text-2:#5c6a7d; --text-3:#8a97a7;
+    --det:#2f6fed; --det-soft:#e8effd;
+    --conf:#0d9f6e; --conf-soft:#e2f4ec;
+    --early:#df7a36; --early-soft:#fbecdc;
+    --up:#15a34a; --down:#d83a3a;
+    --bk-t:#c2410c; --bk-b:#fdeadc;
+    --st-t:#1d4ed8; --st-b:#e8effd;
+    --em-t:#0d9f6e; --em-b:#e2f4ec;
+    --wa-t:#5c6a7d; --wa-b:#eef1f5;
+    --mo-t:#8a97a7; --mo-b:#f2f4f7;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--sans); color:var(--text); background:var(--canvas);
+    font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .eyebrow{font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:600}
+
+  /* ---------- App shell ---------- */
+  .app{display:grid; grid-template-rows:52px 1fr 30px; height:100vh}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:var(--ink); color:var(--ink-text);
+    display:flex; align-items:center; gap:18px; padding:0 16px;
+    border-bottom:1px solid var(--ink-line);
+  }
+  .brand{display:flex; align-items:center; gap:9px; min-width:188px}
+  .mark{width:24px;height:24px;flex:0 0 auto}
+  .brand .name{font-weight:700; letter-spacing:.02em; font-size:15px; color:#fff}
+  .brand .name b{color:var(--early)}
+  .brand .tag{font-size:8.5px; letter-spacing:.16em; color:var(--ink-text-3); text-transform:uppercase; margin-top:1px}
+  .search{flex:1; max-width:560px; position:relative}
+  .search input{
+    width:100%; height:32px; background:var(--ink-2); border:1px solid var(--ink-line);
+    border-radius:7px; color:var(--ink-text); padding:0 64px 0 32px; font-size:12.5px; font-family:var(--sans);
+  }
+  .search input::placeholder{color:var(--ink-text-3)}
+  .search input:focus{outline:none; border-color:#34507a; background:var(--ink-3)}
+  .search .ico{position:absolute; left:10px; top:8px; color:var(--ink-text-3)}
+  .search .kbd{position:absolute; right:8px; top:7px; font-size:10px; color:var(--ink-text-3);
+    border:1px solid var(--ink-line); border-radius:4px; padding:1px 6px; font-family:var(--mono)}
+  .top-right{margin-left:auto; display:flex; align-items:center; gap:16px}
+  .asof{font-size:11px; color:var(--ink-text-2); text-align:right; line-height:1.25}
+  .asof .live{color:var(--conf)}
+  .asof b{color:var(--ink-text); font-family:var(--mono); font-weight:500}
+  .bell{position:relative; color:var(--ink-text-2); cursor:pointer}
+  .bell .dot{position:absolute; top:-5px; right:-6px; background:var(--early); color:#fff;
+    font-size:9px; font-weight:700; min-width:15px; height:15px; border-radius:8px; display:grid; place-items:center; padding:0 3px}
+  .plan{font-size:9.5px; font-weight:700; letter-spacing:.07em; color:#d8e6c8;
+    background:rgba(160,200,120,.12); border:1px solid rgba(160,200,120,.28); padding:4px 9px; border-radius:5px}
+  .avatar{width:28px;height:28px;border-radius:50%; background:linear-gradient(135deg,#2f6fed,#0d9f6e);
+    color:#fff; font-size:11px; font-weight:700; display:grid; place-items:center; cursor:pointer}
+
+  /* ---------- Body grid ---------- */
+  .body{display:grid; grid-template-columns:208px 1fr 340px; min-height:0; background:var(--canvas)}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{background:var(--ink); color:var(--ink-text-2); padding:14px 10px; overflow-y:auto; border-right:1px solid var(--ink-line)}
+  .nav-sec{margin-bottom:6px}
+  .nav-label{font-size:9.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-text-3); padding:14px 10px 6px; font-weight:600}
+  .nav-item{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:7px; cursor:pointer;
+    font-size:13px; color:var(--ink-text); margin-bottom:1px}
+  .nav-item:hover{background:var(--ink-2)}
+  .nav-item.active{background:var(--ink-3); color:#fff; font-weight:500}
+  .nav-item.active .ni{color:var(--early)}
+  .nav-item .ni{width:16px; color:var(--ink-text-3); flex:0 0 auto}
+  .nav-item .badge{margin-left:auto; font-size:10px; background:var(--ink-2); color:var(--ink-text-2);
+    border-radius:5px; padding:1px 6px; font-family:var(--mono)}
+  .screen-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--ink-text)}
+  .screen-item:hover{background:var(--ink-2)}
+  .screen-item .sd{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+  .screen-item .cnt{margin-left:auto;font-size:10px;color:var(--ink-text-3);font-family:var(--mono)}
+
+  /* ---------- Main ---------- */
+  .main{min-width:0; display:flex; flex-direction:column; overflow:hidden}
+  .main-head{padding:16px 20px 0; border-bottom:1px solid var(--line); background:var(--surface)}
+  .main-title-row{display:flex; align-items:baseline; gap:12px; margin-bottom:14px}
+  .main-title{font-size:18px; font-weight:680; letter-spacing:-.01em}
+  .main-sub{font-size:12px; color:var(--text-3)}
+  .main-sub b{color:var(--text-2); font-family:var(--mono); font-weight:500}
+  .main-actions{margin-left:auto; display:flex; gap:8px}
+  .btn{height:30px; padding:0 12px; border-radius:7px; border:1px solid var(--line); background:var(--surface);
+    font-size:12px; font-weight:550; color:var(--text-2); cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-family:var(--sans)}
+  .btn:hover{border-color:#cfd6df; color:var(--text)}
+  .btn.primary{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .btn.primary:hover{background:#16273e}
+  .chips{display:flex; gap:7px; padding-bottom:13px; overflow-x:auto}
+  .chip{flex:0 0 auto; height:28px; padding:0 13px; border-radius:15px; border:1px solid var(--line);
+    background:var(--surface); font-size:12px; color:var(--text-2); cursor:pointer; display:flex; align-items:center; gap:7px; white-space:nowrap}
+  .chip:hover{border-color:#cfd6df}
+  .chip.active{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .chip.early.active{background:var(--early); border-color:var(--early)}
+  .chip .c-cnt{font-family:var(--mono); font-size:10.5px; opacity:.7}
+
+  .grid-wrap{flex:1; overflow:auto; background:var(--surface)}
+  table{width:100%; border-collapse:collapse; font-size:12.5px}
+  thead th{position:sticky; top:0; background:var(--surface); z-index:2;
+    text-align:left; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3);
+    font-weight:600; padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer; white-space:nowrap; user-select:none}
+  thead th:hover{color:var(--text)}
+  thead th.r{text-align:right}
+  th .sort{opacity:0; margin-left:3px; font-size:9px}
+  th.sorted .sort{opacity:1; color:var(--early)}
+  tbody tr{border-bottom:1px solid var(--line-2); cursor:pointer}
+  tbody tr:hover{background:#fafbfc}
+  tbody tr.sel{background:var(--det-soft)}
+  tbody tr.sel:hover{background:#e1ebfb}
+  td{padding:9px 12px; vertical-align:middle}
+  td.r{text-align:right}
+  .topic-name{font-weight:600; color:var(--text); font-size:13px}
+  .topic-cat{font-size:10.5px; color:var(--text-3); margin-top:1px}
+  .score-cell{font-family:var(--mono); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums}
+  .score-cell.det{color:var(--det)}
+  .score-cell.conf{color:var(--conf)}
+  .stage{display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px}
+  .stage.BREAKOUT{color:var(--bk-t); background:var(--bk-b)}
+  .stage.STRONG{color:var(--st-t); background:var(--st-b)}
+  .stage.EMERGING{color:var(--em-t); background:var(--em-b)}
+  .stage.WATCHING{color:var(--wa-t); background:var(--wa-b)}
+  .stage.MONITORING{color:var(--mo-t); background:var(--mo-b)}
+  .vel{font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px}
+  .vel.up{color:var(--up)} .vel.down{color:var(--down)} .vel.flat{color:var(--text-3)}
+  .muted{color:var(--text-3); font-family:var(--mono); font-size:12px}
+
+  /* gap micro-viz */
+  .gapviz{display:flex; align-items:center; gap:8px; justify-content:flex-end}
+  .gapnum{font-family:var(--mono); font-size:12.5px; font-weight:600; min-width:24px; text-align:right}
+  .gapnum.wide{color:var(--early)} .gapnum.neg{color:var(--text-3)} .gapnum.tight{color:var(--text-2)}
+
+  /* ---------- Right panel ---------- */
+  .rail{background:var(--surface); border-left:1px solid var(--line); overflow-y:auto; min-width:0}
+  .rail-pad{padding:16px}
+  .rail-card{border:1px solid var(--line); border-radius:9px; padding:13px; margin-bottom:12px}
+  .rail-card h4{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin-bottom:10px; font-weight:600}
+  .move-row{display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line-2); font-size:12px}
+  .move-row:last-child{border-bottom:none}
+  .move-row .mn{font-weight:550; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .acc-stat{display:flex; justify-content:space-between; align-items:baseline; padding:6px 0}
+  .acc-stat .lab{font-size:12px; color:var(--text-2)}
+  .acc-stat .val{font-family:var(--mono); font-weight:700; font-size:16px}
+  .acc-stat .val.good{color:var(--conf)}
+  .acc-note{font-size:10.5px; color:var(--text-3); margin-top:8px; line-height:1.4}
+
+  /* detail */
+  .detail-head{padding:16px 16px 12px; border-bottom:1px solid var(--line)}
+  .detail-top{display:flex; align-items:flex-start; gap:8px}
+  .detail-name{font-size:16px; font-weight:680; letter-spacing:-.01em; line-height:1.2}
+  .detail-cat{font-size:11px; color:var(--text-3); margin-top:3px}
+  .x{margin-left:auto; cursor:pointer; color:var(--text-3); border:1px solid var(--line); border-radius:6px; width:24px; height:24px; display:grid; place-items:center; flex:0 0 auto}
+  .x:hover{color:var(--text); border-color:#cfd6df}
+  .detail-asof{font-size:10.5px; color:var(--text-3); margin-top:8px; font-family:var(--mono)}
+
+  .gauges{display:flex; gap:10px; padding:16px}
+  .gauge{flex:1; border:1px solid var(--line); border-radius:9px; padding:12px 8px; text-align:center}
+  .gauge svg{display:block; margin:0 auto}
+  .gauge .gv{font-family:var(--mono); font-size:24px; font-weight:700}
+  .gauge .gl{font-size:10px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; margin-top:2px}
+  .gauge .gf{font-size:9.5px; color:var(--text-3); margin-top:3px}
+  .gauge.det .gv{color:var(--det)} .gauge.det .gl{color:var(--det)}
+  .gauge.conf .gv{color:var(--conf)} .gauge.conf .gl{color:var(--conf)}
+
+  .sect{padding:0 16px 16px}
+  .sect h4{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:14px 0 9px; font-weight:600}
+  .gapband{border:1px solid var(--early); background:var(--early-soft); border-radius:9px; padding:12px}
+  .gapband .gbv{font-family:var(--mono); font-size:22px; font-weight:700; color:var(--early)}
+  .gapband .gbs{font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--early); text-transform:uppercase; margin-bottom:2px}
+  .gapband .gbt{font-size:12px; color:#7a4a23; line-height:1.45; margin-top:6px}
+  .gapband.tight{border-color:var(--conf); background:var(--conf-soft)}
+  .gapband.tight .gbv,.gapband.tight .gbs{color:var(--conf)}
+  .gapband.tight .gbt{color:#2c6b53}
+
+  .comp-row{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+  .comp-row .cl{font-size:11.5px; color:var(--text-2); width:96px; flex:0 0 auto}
+  .comp-bar{flex:1; height:6px; background:var(--line-2); border-radius:3px; overflow:hidden}
+  .comp-bar i{display:block; height:100%; border-radius:3px}
+  .comp-row .cv{font-family:var(--mono); font-size:11px; color:var(--text-2); width:24px; text-align:right; flex:0 0 auto}
+
+  .chart{border:1px solid var(--line); border-radius:9px; padding:10px}
+  .chart .legend{display:flex; gap:14px; font-size:10.5px; color:var(--text-2); margin-bottom:4px}
+  .chart .legend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:-1px}
+
+  .narr{font-size:12px; color:var(--text-2); line-height:1.55; background:var(--canvas); border-radius:8px; padding:12px}
+  .detail-actions{display:flex; gap:8px; padding:0 16px 18px}
+  .detail-actions .btn{flex:1; justify-content:center}
+
+  /* ---------- Footer ---------- */
+  .footer{background:var(--ink); color:var(--ink-text-3); display:flex; align-items:center; gap:16px;
+    padding:0 16px; font-size:10.5px; border-top:1px solid var(--ink-line)}
+  .footer .sep{color:var(--ink-line)}
+  .footer .live{color:var(--conf)}
+  .footer .right{margin-left:auto; font-family:var(--mono)}
+
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cfd6df; border-radius:5px; border:2px solid var(--surface)}
+  .sidebar ::-webkit-scrollbar-thumb,.sidebar::-webkit-scrollbar-thumb{background:#273a54; border-color:var(--ink)}
+  :focus-visible{outline:2px solid var(--det); outline-offset:1px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="7" fill="#13233a"/>
+        <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#df7a36"/>
+        <path d="M19 9l4-3-1 5z" fill="#2f6fed"/>
+      </svg>
+      <div>
+        <div class="name">Now<b>TrendIn</b></div>
+        <div class="tag">Attention Intelligence</div>
+      </div>
+    </div>
+
+    <div class="search">
+      <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input id="search" type="text" placeholder="Search topics, tickers, screens…" autocomplete="off">
+      <span class="kbd">⌘K</span>
+    </div>
+
+    <div class="top-right">
+      <div class="asof"><span class="live">●</span> Live · as of<br><b id="clock">2:08:13 PM ET</b></div>
+      <div class="bell" title="Alerts">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="dot">3</span>
+      </div>
+      <span class="plan">ENTERPRISE</span>
+      <div class="avatar" title="Account">AB</div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="nav-sec">
+        <div class="nav-item" data-nav><span class="ni">▦</span> Dashboard</div>
+        <div class="nav-item active" data-nav><span class="ni">▲</span> Trends <span class="badge num" id="navcount">17</span></div>
+        <div class="nav-item" data-nav><span class="ni">$</span> Market Signal</div>
+        <div class="nav-item" data-nav><span class="ni">◎</span> Grade</div>
+        <div class="nav-item" data-nav><span class="ni">★</span> Watchlists</div>
+        <div class="nav-item" data-nav><span class="ni">⚑</span> Alerts <span class="badge">3</span></div>
+        <div class="nav-item" data-nav><span class="ni">✓</span> Accuracy Ledger</div>
+        <div class="nav-item" data-nav><span class="ni">❋</span> Methodology</div>
+      </div>
+      <div class="nav-label">Saved Screens</div>
+      <div class="screen-item" data-screen="early"><span class="sd" style="background:var(--early)"></span> Early Signals <span class="cnt" id="sc-early">—</span></div>
+      <div class="screen-item" data-screen="breakout"><span class="sd" style="background:var(--bk-t)"></span> Breakouts <span class="cnt" id="sc-bk">—</span></div>
+      <div class="screen-item" data-screen="ai"><span class="sd" style="background:var(--det)"></span> AI Infrastructure <span class="cnt" id="sc-ai">—</span></div>
+      <div class="screen-item" data-screen="watch"><span class="sd" style="background:var(--conf)"></span> My Watchlist <span class="cnt">6</span></div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="main-head">
+        <div class="main-title-row">
+          <div class="main-title">Signal Screener</div>
+          <div class="main-sub"><b id="rowcount">17</b> topics · diffusion-scored · <span id="screenlabel">all categories</span></div>
+          <div class="main-actions">
+            <button class="btn" id="cols">▦ Columns</button>
+            <button class="btn primary" id="export">↧ Export</button>
+          </div>
+        </div>
+        <div class="chips" id="chips">
+          <div class="chip active" data-filter="all">All <span class="c-cnt">17</span></div>
+          <div class="chip early" data-filter="early">⟡ Early Signals <span class="c-cnt" id="ch-early">—</span></div>
+          <div class="chip" data-filter="breakout">Breakout ≥85 <span class="c-cnt" id="ch-bk">—</span></div>
+          <div class="chip" data-filter="strong">Strong ≥70 <span class="c-cnt" id="ch-st">—</span></div>
+          <div class="chip" data-filter="cooling">Cooling <span class="c-cnt" id="ch-cool">—</span></div>
+          <div class="chip" data-filter="AI Infra">AI Infra</div>
+          <div class="chip" data-filter="Dev Tools">Dev Tools</div>
+          <div class="chip" data-filter="ML Research">ML Research</div>
+        </div>
+      </div>
+
+      <div class="grid-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="name">Topic <span class="sort">▼</span></th>
+              <th data-sort="det" class="r">Det <span class="sort">▼</span></th>
+              <th data-sort="conf" class="r">Conf <span class="sort">▼</span></th>
+              <th data-sort="gap" class="r">Gap <span class="sort">▼</span></th>
+              <th data-sort="stage">Stage <span class="sort">▼</span></th>
+              <th data-sort="velrank">Velocity <span class="sort">▼</span></th>
+              <th data-sort="breadth" class="r">Breadth <span class="sort">▼</span></th>
+              <th data-sort="age" class="r">Age <span class="sort">▼</span></th>
+              <th data-sort="updated" class="r">Updated <span class="sort">▼</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- RIGHT: default rail -->
+    <aside class="rail" id="rail">
+      <div class="rail-pad">
+        <div class="rail-card">
+          <h4>What's Moving</h4>
+          <div id="moving"></div>
+        </div>
+        <div class="rail-card">
+          <h4>Active Alerts</h4>
+          <div class="move-row"><span class="mn">agent memory crossed BREAKOUT</span><span class="muted">3m</span></div>
+          <div class="move-row"><span class="mn">neuromorphic inference · gap ≥ 35</span><span class="muted">1h</span></div>
+          <div class="move-row"><span class="mn">world models entered STRONG</span><span class="muted">2h</span></div>
+        </div>
+        <div class="rail-card">
+          <h4>Accuracy Ledger</h4>
+          <div class="acc-stat"><span class="lab">Median lead time</span><span class="val good">14d</span></div>
+          <div class="acc-stat"><span class="lab">Honest hit rate</span><span class="val">31.4%</span></div>
+          <div class="acc-stat"><span class="lab">Resolved detections</span><span class="val">51</span></div>
+          <div class="acc-note">Timestamped detections validated against observed breakouts. Survivorship-adjusted; false positives counted.</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: detail (hidden until row selected) -->
+    <aside class="rail hidden" id="detail"></aside>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span class="live">●</span>
+    <span>Measurement, not investment advice — not a recommendation or risk rating.</span>
+    <span class="sep">|</span>
+    <span>Sources: GitHub · HackerNews · DEV.to · Reddit · GDELT · Finnhub</span>
+    <span class="right">Engine v2.4 · as of <span id="clock2">2:08:13 PM ET</span></span>
+  </footer>
+</div>
+
+<script>
+// ---------- Data ----------
+const RAW = [
+  ["model context protocol","Dev Tools",74,73,"NORMALISING",4,19,32],
+  ["agentic coding","Dev Tools",95,93,"ACCELERATING",6,11,8],
+  ["agent memory","AI Infra",95,92,"ACCELERATING",5,7,12],
+  ["multi-agent systems","AI Infra",77,72,"ACCELERATING",5,14,21],
+  ["A2A protocol","AI Infra",70,64,"RISING",3,6,40],
+  ["Claude Code","Dev Tools",77,73,"HOLDING",4,9,18],
+  ["neuromorphic inference","ML Research",69,31,"RISING",2,5,55],
+  ["homomorphic ML","ML Research",58,23,"RISING",2,4,72],
+  ["photonic compute","ML Research",64,33,"RISING",2,6,61],
+  ["world models","ML Research",72,41,"ACCELERATING",3,8,33],
+  ["RISC-V datacenter","AI Infra",66,44,"RISING",3,10,47],
+  ["small language models","AI Infra",73,60,"HOLDING",4,13,26],
+  ["synthetic data","ML Research",67,58,"HOLDING",4,16,29],
+  ["AI evals","Dev Tools",64,55,"RISING",3,12,35],
+  ["vector databases","Data",56,62,"COOLING",5,22,44],
+  ["prompt engineering","Dev Tools",48,55,"FADING",4,28,52],
+  ["RAG pipelines","AI Infra",61,66,"COOLING",5,20,38],
+];
+const VELRANK={ACCELERATING:5,RISING:4,HOLDING:3,COOLING:2,FADING:1};
+function stageOf(d){return d>=85?"BREAKOUT":d>=70?"STRONG":d>=55?"EMERGING":d>=35?"WATCHING":"MONITORING";}
+function seed(s){let x=Math.sin(s)*10000;return x-Math.floor(x);}
+const DATA = RAW.map((r,i)=>{
+  const [name,cat,det,conf,vel,breadth,age,updated]=r;
+  const gap=det-conf;
+  // components derived deterministically, plausible
+  const s=det+conf*0.3+i;
+  const comps={
+    "Gradient Strength":Math.round(40+seed(s)*55),
+    "Inertia":Math.round(30+seed(s+1)*60),
+    "Medium Sequence":Math.round(breadth*14+seed(s+2)*20),
+    "Dark Matter":Math.round(25+seed(s+3)*70),
+    "Confidence Decay":Math.round(20+seed(s+4)*40),
+  };
+  // history (12 pts) trending toward current det/conf
+  const hist=[]; let d0=det-Math.round(seed(s+5)*14)+ (vel==="FADING"||vel==="COOLING"?10:-2);
+  let c0=conf-Math.round(seed(s+6)*16);
+  for(let k=0;k<12;k++){
+    const t=k/11;
+    hist.push({det:Math.round(d0+(det-d0)*t+ (seed(s+k)*4-2)), conf:Math.round(c0+(conf-c0)*t+(seed(s+k+9)*4-2))});
+  }
+  hist[11]={det,conf};
+  return {id:i,name,cat,det,conf,gap,stage:stageOf(det),vel,velrank:VELRANK[vel],breadth,age,updated,comps,hist};
+});
+
+// ---------- State ----------
+let sortKey="det", sortDir=-1, filter="all", selId=null, search="";
+
+// ---------- Helpers ----------
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function velClass(v){return (v==="ACCELERATING"||v==="RISING")?"up":(v==="FADING"||v==="COOLING")?"down":"flat";}
+function velArrow(v){return v==="ACCELERATING"?"▲▲":v==="RISING"?"▲":v==="HOLDING"?"—":v==="COOLING"?"▽":"▼";}
+function gapMicro(det,conf){
+  const lo=Math.min(det,conf), hi=Math.max(det,conf), W=78, x=v=>4+(v/100)*(W-8);
+  const wide=Math.abs(det-conf)>=20, col=wide?"var(--early)":"#aab4c1";
+  return `<svg width="${W}" height="16" viewBox="0 0 ${W} 16">
+    <line x1="${x(lo)}" y1="8" x2="${x(hi)}" y2="8" stroke="${col}" stroke-width="${wide?2.5:1.5}"/>
+    <circle cx="${x(det)}" cy="8" r="3.2" fill="var(--det)"/>
+    <circle cx="${x(conf)}" cy="8" r="3.2" fill="var(--conf)"/>
+  </svg>`;
+}
+
+// ---------- Filter + sort ----------
+function visible(){
+  let rows=DATA.slice();
+  if(search){const q=search.toLowerCase(); rows=rows.filter(r=>r.name.toLowerCase().includes(q)||r.cat.toLowerCase().includes(q));}
+  if(filter==="early") rows=rows.filter(r=>r.gap>=20);
+  else if(filter==="breakout") rows=rows.filter(r=>r.det>=85);
+  else if(filter==="strong") rows=rows.filter(r=>r.det>=70);
+  else if(filter==="cooling") rows=rows.filter(r=>r.gap<0);
+  else if(["AI Infra","Dev Tools","ML Research","Data"].includes(filter)) rows=rows.filter(r=>r.cat===filter);
+  rows.sort((a,b)=>{
+    let va=a[sortKey], vb=b[sortKey];
+    if(typeof va==="string"){return va.localeCompare(vb)*(sortDir);}
+    return (va-vb)*sortDir;
+  });
+  return rows;
+}
+
+// ---------- Render grid ----------
+function renderGrid(){
+  const rows=visible();
+  $("#tbody").innerHTML = rows.map(r=>{
+    const gw=Math.abs(r.gap)>=20?"wide":(r.gap<0?"neg":"tight");
+    return `<tr data-id="${r.id}" class="${r.id===selId?'sel':''}">
+      <td><div class="topic-name">${r.name}</div><div class="topic-cat">${r.cat}</div></td>
+      <td class="r"><span class="score-cell det">${r.det}</span></td>
+      <td class="r"><span class="score-cell conf">${r.conf}</span></td>
+      <td class="r"><div class="gapviz">${gapMicro(r.det,r.conf)}<span class="gapnum ${gw}">${r.gap>0?'+':''}${r.gap}</span></div></td>
+      <td><span class="stage ${r.stage}">${r.stage}</span></td>
+      <td><span class="vel ${velClass(r.vel)}">${velArrow(r.vel)} ${r.vel.charAt(0)+r.vel.slice(1).toLowerCase()}</span></td>
+      <td class="r"><span class="muted">${r.breadth} plat</span></td>
+      <td class="r"><span class="muted">${r.age}mo</span></td>
+      <td class="r"><span class="muted">${r.updated}m</span></td>
+    </tr>`;
+  }).join("");
+  $("#rowcount").textContent=rows.length;
+  $$("th").forEach(th=>{th.classList.toggle("sorted",th.dataset.sort===sortKey);
+    const a=th.querySelector(".sort"); if(a) a.textContent=sortDir<0?"▼":"▲";});
+}
+
+// ---------- Counts ----------
+function counts(){
+  const e=DATA.filter(r=>r.gap>=20).length, b=DATA.filter(r=>r.det>=85).length,
+        s=DATA.filter(r=>r.det>=70).length, c=DATA.filter(r=>r.gap<0).length,
+        ai=DATA.filter(r=>r.cat==="AI Infra").length;
+  $("#ch-early").textContent=e; $("#ch-bk").textContent=b; $("#ch-st").textContent=s; $("#ch-cool").textContent=c;
+  $("#sc-early").textContent=e; $("#sc-bk").textContent=b; $("#sc-ai").textContent=ai;
+}
+
+// ---------- What's moving ----------
+function renderMoving(){
+  const top=DATA.filter(r=>r.velrank>=4).sort((a,b)=>b.velrank-a.velrank||b.det-a.det).slice(0,6);
+  $("#moving").innerHTML=top.map(r=>`
+    <div class="move-row" data-id="${r.id}" style="cursor:pointer">
+      <span class="mn">${r.name}</span>
+      <span class="vel ${velClass(r.vel)}">${velArrow(r.vel)}</span>
+      <span class="score-cell det" style="font-size:12px">${r.det}</span>
+    </div>`).join("");
+}
+
+// ---------- Detail panel ----------
+function ring(val,color){
+  const r=26,c=2*Math.PI*r,off=c*(1-val/100);
+  return `<svg width="72" height="72" viewBox="0 0 72 72">
+    <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/>
+    <circle cx="36" cy="36" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 36 36)"/>
+  </svg>`;
+}
+function gapInterp(d){
+  const g=Math.abs(d);
+  if(d<0) return ["LAGGING","tight","Confirmation now exceeds early detection — the hard signal arrived after the early window. A late-stage read."];
+  if(g<=15) return ["ALIGNED","tight","Detection and confidence agree. High-conviction signal at this level — both rule-sets concur on where it sits."];
+  if(g<=35) return ["CONFIRMATION BUILDING","wide","Early edge is running ahead of confirmation. The gap typically closes over the next one to two cycles."];
+  return ["VERY EARLY","wide","Detected but not yet confirmed — corroborated among expert communities, not yet broad across the mainstream. The widest early-mover window."];
+}
+function histChart(hist){
+  const W=300,H=86,pad=6, xs=i=>pad+(i/(hist.length-1))*(W-pad*2);
+  const all=hist.flatMap(h=>[h.det,h.conf]), mn=Math.min(...all)-4, mx=Math.max(...all)+4;
+  const ys=v=>H-pad-((v-mn)/(mx-mn))*(H-pad*2);
+  const line=(k,col)=>`<polyline fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"
+     points="${hist.map((h,i)=>xs(i).toFixed(1)+','+ys(h[k]).toFixed(1)).join(' ')}"/>`;
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    ${line('conf','var(--conf)')}${line('det','var(--det)')}
+  </svg>`;
+}
+function compColor(name){
+  if(["Gradient Strength","Dark Matter"].includes(name)) return "var(--det)";
+  if(["Inertia","Medium Sequence"].includes(name)) return "var(--conf)";
+  return "#9aa6b4";
+}
+function showDetail(id){
+  selId=id; const r=DATA.find(x=>x.id===id);
+  const [gs,gc,gt]=gapInterp(r.gap);
+  $("#detail").innerHTML=`
+    <div class="detail-head">
+      <div class="detail-top">
+        <div>
+          <div class="detail-name">${r.name}</div>
+          <div class="detail-cat">${r.cat} · <span class="stage ${r.stage}">${r.stage}</span></div>
+        </div>
+        <div class="x" id="closeDetail">✕</div>
+      </div>
+      <div class="detail-asof">${r.breadth} platforms · ${r.age} mo tracked · updated ${r.updated}m ago</div>
+    </div>
+    <div class="gauges">
+      <div class="gauge det">${ring(r.det,'var(--det)')}<div class="gv" style="margin-top:-50px">${r.det}</div>
+        <div class="gl" style="margin-top:30px">Detection</div><div class="gf">~22% false positive · speed</div></div>
+      <div class="gauge conf">${ring(r.conf,'var(--conf)')}<div class="gv" style="margin-top:-50px">${r.conf}</div>
+        <div class="gl" style="margin-top:30px">Confidence</div><div class="gf">&lt;9% false positive · precision</div></div>
+    </div>
+    <div class="sect">
+      <h4>Detection–Confidence Gap</h4>
+      <div class="gapband ${gs==='ALIGNED'||gs==='LAGGING'?'tight':''}">
+        <div class="gbs">${gs}</div>
+        <div class="gbv">${r.gap>0?'+':''}${r.gap} pts</div>
+        <div class="gbt">${gt}</div>
+      </div>
+    </div>
+    <div class="sect">
+      <h4>Component Breakdown</h4>
+      ${Object.entries(r.comps).map(([k,v])=>`
+        <div class="comp-row"><span class="cl">${k}</span>
+          <span class="comp-bar"><i style="width:${v}%;background:${compColor(k)}"></i></span>
+          <span class="cv">${v}</span></div>`).join("")}
+    </div>
+    <div class="sect">
+      <h4>Scoring History · 12 cycles</h4>
+      <div class="chart">
+        <div class="legend"><span><i style="background:var(--det)"></i>Detection</span><span><i style="background:var(--conf)"></i>Confidence</span></div>
+        ${histChart(r.hist)}
+      </div>
+    </div>
+    <div class="sect">
+      <h4>Signal Read</h4>
+      <div class="narr">${narrative(r)}</div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn">★ Watchlist</button>
+      <button class="btn">⚑ Set Alert</button>
+      <button class="btn">↧ Export</button>
+    </div>`;
+  $("#detail").classList.remove("hidden");
+  $("#rail").classList.add("hidden");
+  $("#closeDetail").onclick=closeDetail;
+  renderGrid();
+}
+function narrative(r){
+  const v=r.vel.toLowerCase();
+  if(r.gap>=20) return `${r.name} shows a wide ${r.gap}-point gap — leading indicators are well ahead of confirmation. Concentrated in expert communities with limited mainstream corroboration so far, and ${v}. This is the early-mover window: detected, not yet confirmed. Watch for breadth expansion across general-audience platforms as the confirmation signal.`;
+  if(r.gap<0) return `${r.name} now reads with confidence above detection — the hard signal has arrived after the early window. Activity is ${v}; the early-mover edge has largely passed and the topic is maturing.`;
+  return `${r.name} is ${v} with detection and confidence closely aligned (${r.gap>0?'+':''}${r.gap}). Both rule-sets agree on where this sits — a high-conviction read at the ${r.stage} level rather than a speculative early call.`;
+}
+function closeDetail(){selId=null; $("#detail").classList.add("hidden"); $("#rail").classList.remove("hidden"); renderGrid();}
+
+// ---------- Events ----------
+$("#tbody").addEventListener("click",e=>{const tr=e.target.closest("tr"); if(tr) showDetail(+tr.dataset.id);});
+$("#moving").addEventListener("click",e=>{const row=e.target.closest("[data-id]"); if(row) showDetail(+row.dataset.id);});
+$$("th[data-sort]").forEach(th=>th.addEventListener("click",()=>{
+  const k=th.dataset.sort;
+  if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=(k==="name")?1:-1;}
+  renderGrid();
+}));
+$("#chips").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return;
+  $$(".chip").forEach(x=>x.classList.remove("active")); c.classList.add("active");
+  filter=c.dataset.filter;
+  $("#screenlabel").textContent = filter==="all"?"all categories":c.textContent.replace(/\d+|⟡/g,"").trim();
+  if(filter==="early"){sortKey="gap"; sortDir=-1;}
+  renderGrid();
+});
+$$("[data-screen]").forEach(el=>el.addEventListener("click",()=>{
+  const m={early:"early",breakout:"breakout",ai:"AI Infra",watch:"all"}[el.dataset.screen];
+  $$(".chip").forEach(x=>x.classList.toggle("active",x.dataset.filter===m));
+  filter=m; if(m==="early"){sortKey="gap";sortDir=-1;} 
+  $("#screenlabel").textContent=el.textContent.replace(/[—\d]/g,"").trim();
+  renderGrid();
+}));
+$$("[data-nav]").forEach(el=>el.addEventListener("click",()=>{
+  $$(".nav-item").forEach(x=>x.classList.remove("active")); el.classList.add("active");
+}));
+$("#search").addEventListener("input",e=>{search=e.target.value; renderGrid();});
+document.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault(); $("#search").focus();}
+  if(e.key==="Escape"){ if(selId!==null) closeDetail(); else {$("#search").value="";search="";renderGrid();} }
+});
+
+// ---------- Clock ----------
+function tick(){
+  const t=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",second:"2-digit",hour12:true,timeZone:"America/New_York"})+" ET";
+  $("#clock").textContent=t; $("#clock2").textContent=t;
+}
+setInterval(tick,1000); tick();
+
+// ---------- Init ----------
+counts(); renderMoving(); renderGrid();
+</script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Now TrendIn — Sign in</title>
+<style>
+  :root{
+    --ink:#0c1626; --ink-2:#13233a; --ink-3:#1b2d45; --ink-line:#22354e;
+    --ink-text:#c4d0de; --ink-text-2:#8095ab; --ink-text-3:#5e718a;
+    --canvas:#f4f6f8; --surface:#ffffff; --line:#e3e7ed; --line-2:#eef1f5;
+    --text:#15202e; --text-2:#5c6a7d; --text-3:#8a97a7;
+    --det:#2f6fed; --det-soft:#e8effd;
+    --conf:#0d9f6e; --conf-soft:#e2f4ec;
+    --early:#df7a36; --early-soft:#fbecdc;
+    --up:#15a34a; --down:#d83a3a;
+    --bk-t:#c2410c; --bk-b:#fdeadc;
+    --st-t:#1d4ed8; --st-b:#e8effd;
+    --em-t:#0d9f6e; --em-b:#e2f4ec;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--sans); color:var(--text); background:var(--ink);
+    font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .eyebrow{font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600}
+
+  /* ---------- Split shell ---------- */
+  .split{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); min-height:100vh}
+
+  /* ---------- Left: sign-in ---------- */
+  .pane-auth{
+    background:var(--canvas); display:flex; flex-direction:column;
+    padding:40px clamp(28px,5vw,72px);
+  }
+  .brand{display:flex; align-items:center; gap:10px}
+  .mark{width:30px;height:30px;flex:0 0 auto}
+  .brand .name{font-weight:700; letter-spacing:.01em; font-size:17px; color:var(--text)}
+  .brand .name b{color:var(--early); font-weight:700}
+  .brand .tag{font-size:8.5px; letter-spacing:.18em; color:var(--text-3); text-transform:uppercase; margin-top:2px}
+
+  .auth-body{flex:1; display:flex; flex-direction:column; justify-content:center; max-width:380px; width:100%; margin:0 auto; padding:36px 0}
+  .auth-body h1{font-size:23px; font-weight:700; letter-spacing:-.01em; margin-bottom:5px}
+  .auth-body .sub{color:var(--text-2); font-size:13px; margin-bottom:26px}
+
+  .field{margin-bottom:14px}
+  .field label{display:block; font-size:11.5px; font-weight:600; color:var(--text-2); margin-bottom:6px; letter-spacing:.01em}
+  .input-wrap{position:relative}
+  .field input{
+    width:100%; height:42px; background:var(--surface); border:1px solid var(--line);
+    border-radius:9px; color:var(--text); padding:0 14px; font-size:14px; font-family:var(--sans);
+    transition:border-color .12s, box-shadow .12s;
+  }
+  .field input::placeholder{color:var(--text-3)}
+  .field input:focus{outline:none; border-color:var(--early); box-shadow:0 0 0 3px var(--early-soft)}
+  .field.err input{border-color:var(--down)}
+  .field.err input:focus{box-shadow:0 0 0 3px #fbe3e3}
+  .field .pw-toggle{
+    position:absolute; right:6px; top:5px; height:32px; width:34px; border:0; background:transparent;
+    color:var(--text-3); cursor:pointer; display:grid; place-items:center; border-radius:7px;
+  }
+  .field .pw-toggle:hover{color:var(--text-2); background:var(--line-2)}
+  .field-msg{font-size:11.5px; color:var(--down); margin-top:5px; min-height:0; display:none}
+  .field.err .field-msg{display:block}
+
+  .row-between{display:flex; align-items:center; justify-content:space-between; margin:4px 0 22px}
+  .remember{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2); cursor:pointer; user-select:none}
+  .remember input{position:absolute; opacity:0; width:0; height:0}
+  .check{width:16px; height:16px; border:1.5px solid var(--line); border-radius:5px; background:var(--surface); display:grid; place-items:center; transition:.12s}
+  .remember input:checked + .check{background:var(--early); border-color:var(--early)}
+  .remember input:checked + .check svg{opacity:1}
+  .remember input:focus-visible + .check{box-shadow:0 0 0 3px var(--early-soft)}
+  .check svg{opacity:0; color:#fff; transition:.12s}
+  .link{color:var(--det); font-size:12.5px; font-weight:600; text-decoration:none}
+  .link:hover{text-decoration:underline}
+
+  .btn{
+    width:100%; height:46px; border:0; border-radius:10px; font-size:14px; font-weight:600;
+    font-family:var(--sans); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px;
+    transition:background .12s, box-shadow .12s, transform .04s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--ink); color:#fff}
+  .btn-primary:hover{background:var(--ink-3)}
+  .btn-primary:focus-visible{outline:none; box-shadow:0 0 0 3px var(--early-soft)}
+  .btn-primary:disabled{opacity:.7; cursor:default}
+  .btn-primary.ok{background:var(--conf)}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .divider{display:flex; align-items:center; gap:12px; margin:18px 0; color:var(--text-3); font-size:11px; letter-spacing:.04em}
+  .divider::before,.divider::after{content:""; height:1px; background:var(--line); flex:1}
+
+  .btn-secondary{
+    background:var(--surface); border:1px solid var(--line); color:var(--text); height:44px; margin-bottom:10px;
+  }
+  .btn-secondary:hover{background:var(--line-2); border-color:#d8dde4}
+  .btn-secondary:focus-visible{outline:none; box-shadow:0 0 0 3px var(--early-soft)}
+  .btn-secondary svg{flex:0 0 auto}
+
+  .auth-foot{max-width:380px; width:100%; margin:0 auto; font-size:12px; color:var(--text-3)}
+  .auth-foot .req{color:var(--text-2)}
+  .auth-foot .legal{margin-top:14px; line-height:1.5; font-size:11px}
+  .auth-foot .legal a{color:var(--text-2); text-decoration:underline}
+
+  /* ---------- Right: value panel (the instrument) ---------- */
+  .pane-value{
+    background:var(--ink); color:var(--ink-text); position:relative; overflow:hidden;
+    display:flex; flex-direction:column; padding:48px clamp(32px,4.4vw,68px);
+  }
+  .pane-value::before{
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(900px 520px at 78% -8%, rgba(47,111,237,.16), transparent 60%),
+               radial-gradient(680px 480px at 12% 108%, rgba(13,159,110,.12), transparent 62%);
+    pointer-events:none;
+  }
+  .pv-inner{position:relative; flex:1; display:flex; flex-direction:column; justify-content:center; max-width:520px}
+  .pv-eyebrow{color:var(--early); margin-bottom:18px}
+  .pv-head{font-size:clamp(22px,2.6vw,30px); line-height:1.22; font-weight:700; letter-spacing:-.015em; color:#fff}
+  .pv-head em{font-style:normal; color:var(--early)}
+  .pv-sub{color:var(--ink-text-2); font-size:13.5px; margin-top:14px; max-width:430px; line-height:1.55}
+
+  /* live signal demo card */
+  .demo{
+    margin-top:30px; background:rgba(255,255,255,.025); border:1px solid var(--ink-line);
+    border-radius:14px; padding:6px 16px 12px;
+  }
+  .demo-head{display:flex; align-items:center; justify-content:space-between; padding:12px 0 10px; border-bottom:1px solid var(--ink-line)}
+  .demo-head .t{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-text-2); font-weight:600}
+  .demo-head .live{font-size:11px; color:var(--ink-text-2); display:flex; align-items:center; gap:7px; font-family:var(--mono)}
+  .demo-head .live i{width:6px;height:6px;border-radius:50%;background:var(--conf); box-shadow:0 0 0 0 rgba(13,159,110,.5); animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(13,159,110,.45)}70%{box-shadow:0 0 0 7px rgba(13,159,110,0)}100%{box-shadow:0 0 0 0 rgba(13,159,110,0)}}
+
+  .srow{display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:14px; padding:11px 0; border-bottom:1px solid rgba(34,53,78,.55)}
+  .srow:last-child{border-bottom:0}
+  .srow .name{font-size:13px; color:#e7edf4; font-weight:500}
+  .srow .cat{font-size:10.5px; color:var(--ink-text-3); margin-top:1px; letter-spacing:.02em}
+  .gapviz{display:flex; align-items:center; gap:9px; justify-content:flex-end}
+  .gapnum{font-family:var(--mono); font-size:12.5px; font-weight:600; min-width:26px; text-align:right; color:var(--ink-text-2)}
+  .gapnum.wide{color:var(--early)}
+  .stage{font-size:9.5px; font-weight:700; letter-spacing:.05em; padding:3px 8px; border-radius:5px; text-transform:uppercase; min-width:74px; text-align:center}
+  .stage.early{background:rgba(223,122,54,.14); color:var(--early)}
+  .stage.aligned{background:rgba(47,111,237,.14); color:#7aa6f5}
+  .stage.maturing{background:rgba(94,113,138,.18); color:var(--ink-text-2)}
+
+  .legend{display:flex; align-items:center; gap:18px; margin-top:13px; font-size:11px; color:var(--ink-text-2)}
+  .legend span{display:flex; align-items:center; gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .dot.det{background:var(--det)} .dot.conf{background:var(--conf)}
+  .legend .gapk{margin-left:auto; color:var(--ink-text-3); font-family:var(--mono); font-size:10.5px}
+
+  /* proof strip */
+  .proof{display:flex; gap:30px; margin-top:26px}
+  .proof .stat .v{font-family:var(--mono); font-size:24px; font-weight:600; color:#fff; letter-spacing:-.01em}
+  .proof .stat .v .pct{font-size:15px; color:var(--ink-text-2)}
+  .proof .stat .k{font-size:11px; color:var(--ink-text-2); margin-top:3px; letter-spacing:.02em}
+
+  .pv-foot{position:relative; color:var(--ink-text-3); font-size:11px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:30px}
+  .pv-foot .sep{color:var(--ink-line)}
+  .pv-foot .src{font-family:var(--mono)}
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:880px){
+    .split{grid-template-columns:1fr}
+    .pane-value{order:-1; padding:30px clamp(24px,6vw,40px) 26px}
+    .pv-inner{justify-content:flex-start}
+    .pv-head{font-size:21px}
+    .demo,.proof{display:none}
+    .pane-auth{padding:32px clamp(22px,7vw,40px) 40px}
+    .auth-body{padding:26px 0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important; transition:none!important}
+  }
+</style>
+</head>
+<body>
+  <main class="split">
+
+    <!-- ============ LEFT: SIGN-IN ============ -->
+    <section class="pane-auth">
+      <a class="brand" href="#" aria-label="Now TrendIn home">
+        <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#13233a"/>
+          <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#df7a36"/>
+          <path d="M19 9l4-3-1 5z" fill="#2f6fed"/>
+        </svg>
+        <div>
+          <div class="name">Now<b>TrendIn</b></div>
+          <div class="tag">Attention Intelligence</div>
+        </div>
+      </a>
+
+      <form class="auth-body" id="form" novalidate>
+        <h1>Sign in to your terminal</h1>
+        <p class="sub">Institutional access to the Gradient Score engine.</p>
+
+        <div class="field" id="f-email">
+          <label for="email">Work email</label>
+          <div class="input-wrap">
+            <input id="email" name="email" type="email" inputmode="email" autocomplete="username"
+                   placeholder="you@firm.com" aria-describedby="email-msg">
+          </div>
+          <div class="field-msg" id="email-msg"></div>
+        </div>
+
+        <div class="field" id="f-pw">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input id="password" name="password" type="password" autocomplete="current-password"
+                   placeholder="••••••••••" aria-describedby="pw-msg">
+            <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password">
+              <svg id="eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="field-msg" id="pw-msg"></div>
+        </div>
+
+        <div class="row-between">
+          <label class="remember">
+            <input type="checkbox" id="remember">
+            <span class="check"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></span>
+            Remember this device
+          </label>
+          <a class="link" href="#" id="forgot">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submit">
+          <span id="submit-label">Sign in</span>
+        </button>
+
+        <div class="divider">or continue with</div>
+
+        <button type="button" class="btn btn-secondary" id="google">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.3 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.3 6.1 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.1-11.3-7.5l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.4 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+          Continue with Google
+        </button>
+
+        <button type="button" class="btn btn-secondary" id="sso">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Enterprise SSO (SAML)
+        </button>
+      </form>
+
+      <div class="auth-foot">
+        <span class="req">New to the terminal?</span> <a class="link" href="#" id="request">Request access</a>
+        <div class="legal">
+          By signing in you agree that all Gradient Scores, analyses, and signal data are
+          proprietary to Now TrendIn LLC. <a href="#">Terms</a> · <a href="#">Privacy</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ RIGHT: THE INSTRUMENT ============ -->
+    <section class="pane-value">
+      <div class="pv-inner">
+        <div class="pv-eyebrow eyebrow">The Gradient Score</div>
+        <h2 class="pv-head">The first instrument that measures where human attention is moving <em>before it arrives.</em></h2>
+        <p class="pv-sub">Two scores per topic. Detection reads the early signal; Confidence reads the confirmation. The gap between them is how early you are.</p>
+
+        <div class="demo" aria-label="Live signal sample">
+          <div class="demo-head">
+            <span class="t">Early Signals · widest gap</span>
+            <span class="live"><i></i> Live</span>
+          </div>
+          <div id="rows"></div>
+          <div class="legend">
+            <span><span class="dot det"></span> Detection</span>
+            <span><span class="dot conf"></span> Confidence</span>
+            <span class="gapk">gap = lead time</span>
+          </div>
+        </div>
+
+        <div class="proof">
+          <div class="stat">
+            <div class="v">73<span class="pct">%</span></div>
+            <div class="k">Directional accuracy · trailing 90d</div>
+          </div>
+          <div class="stat">
+            <div class="v">11<span class="pct">d</span></div>
+            <div class="k">Median lead before mainstream</div>
+          </div>
+          <div class="stat">
+            <div class="v">2,840</div>
+            <div class="k">Topics under measurement</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-foot">
+        <span>Measurement, not investment advice.</span>
+        <span class="sep">|</span>
+        <span class="src">Sources: GitHub · HackerNews · DEV.to · Reddit · GDELT · Finnhub</span>
+        <span class="sep">|</span>
+        <span class="src">Engine v2.4</span>
+      </div>
+    </section>
+  </main>
+
+<script>
+  const $ = s => document.querySelector(s);
+
+  /* ---- gap micro-viz (same semantics as the terminal grid) ---- */
+  function gapMicro(det, conf){
+    const lo=Math.min(det,conf), hi=Math.max(det,conf), W=78, x=v=>4+(v/100)*(W-8);
+    const wide=Math.abs(det-conf)>=20, col=wide?"#df7a36":"#5e718a";
+    return `<svg width="${W}" height="16" viewBox="0 0 ${W} 16" aria-hidden="true">
+      <line x1="${x(lo)}" y1="8" x2="${x(hi)}" y2="8" stroke="${col}" stroke-width="${wide?2.5:1.5}"/>
+      <circle cx="${x(det)}" cy="8" r="3.2" fill="#2f6fed"/>
+      <circle cx="${x(conf)}" cy="8" r="3.2" fill="#0d9f6e"/>
+    </svg>`;
+  }
+
+  /* real scoring semantics from the engine mock — widest gaps first */
+  const SAMPLE = [
+    {name:"neuromorphic inference", cat:"ML Research", det:69, conf:31, stage:"early",    label:"Early signal"},
+    {name:"world models",          cat:"ML Research", det:72, conf:41, stage:"early",    label:"Early signal"},
+    {name:"RISC-V datacenter",     cat:"AI Infra",    det:66, conf:44, stage:"early",    label:"Early signal"},
+    {name:"agentic coding",        cat:"Dev Tools",   det:95, conf:93, stage:"aligned",  label:"Aligned"},
+  ];
+
+  $("#rows").innerHTML = SAMPLE.map(r=>{
+    const gap=r.det-r.conf, wide=Math.abs(gap)>=20;
+    return `<div class="srow">
+      <div><div class="name">${r.name}</div><div class="cat">${r.cat}</div></div>
+      <div class="gapviz">${gapMicro(r.det,r.conf)}<span class="gapnum ${wide?'wide':''}">${gap>0?'+':''}${gap}</span></div>
+      <span class="stage ${r.stage}">${r.label}</span>
+    </div>`;
+  }).join("");
+
+  /* ---- password show/hide ---- */
+  const pw=$("#password"), eyeBtn=$("#pwToggle");
+  eyeBtn.addEventListener("click",()=>{
+    const show = pw.type==="password";
+    pw.type = show ? "text" : "password";
+    eyeBtn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    $("#eye").innerHTML = show
+      ? '<path d="M2 2l20 20"/><path d="M6.7 6.7C3.6 8.6 1 12 1 12s4 7 11 7c2 0 3.8-.5 5.3-1.3"/><path d="M9.9 5.2A11 11 0 0 1 12 5c7 0 11 7 11 7a18 18 0 0 1-3.2 4"/>'
+      : '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>';
+  });
+
+  /* ---- validation helpers ---- */
+  function setErr(field, msg){
+    const f=$("#f-"+field); f.classList.add("err"); $("#"+field+"-msg").textContent=msg;
+  }
+  function clearErr(field){ $("#f-"+field).classList.remove("err"); }
+  $("#email").addEventListener("input",()=>clearErr("email"));
+  $("#password").addEventListener("input",()=>clearErr("pw"));
+
+  /* ---- submit (mock auth) ---------------------------------------
+     Real flow: POST credentials to the Django JWT endpoint, store the
+     access/refresh tokens (web: httpOnly cookie or secure storage),
+     then route to the terminal. Swap mockAuth() for that fetch.
+  ----------------------------------------------------------------- */
+  async function mockAuth(/* email, password */){
+    return new Promise(res => setTimeout(()=>res({ok:true}), 950));
+  }
+
+  const form=$("#form"), btn=$("#submit"), label=$("#submit-label");
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    let bad=false;
+    const email=$("#email").value.trim(), pass=$("#password").value;
+    const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    if(!email){ setErr("email","Enter your work email."); bad=true; }
+    else if(!emailOk){ setErr("email","Enter a valid email address."); bad=true; }
+    if(!pass){ setErr("pw","Enter your password."); bad=true; }
+    if(bad){ (!email||!emailOk ? $("#email") : $("#password")).focus(); return; }
+
+    btn.disabled=true;
+    label.textContent="Authenticating";
+    btn.insertAdjacentHTML("afterbegin",'<span class="spinner" id="spin"></span>');
+
+    const r = await mockAuth(email, pass);
+    document.getElementById("spin")?.remove();
+
+    if(r.ok){
+      btn.classList.add("ok");
+      label.textContent="Verified — opening terminal";
+      // window.location.href = "/terminal";  // route after token is stored
+    }else{
+      btn.disabled=false; label.textContent="Sign in";
+      setErr("pw","Those credentials didn't match. Try again.");
+    }
+  });
+
+  /* secondary actions — stubs for the prototype */
+  ["google","sso","forgot","request"].forEach(id=>{
+    $("#"+id).addEventListener("click",ev=>{ if(id!=="google"&&id!=="sso") ev.preventDefault(); });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,971 @@
+{
+ "synth": null,
+ "maps": [
+  {
+   "subsystem": "Trend Gradient Score (gravitational_anomaly_detector.score_topic \u2192 signal_calibration_integration.apply_calibration \u2192 dual-pathway blend \u2192 velocity_scores store \u2192 serve_payload/_calibrate_score_fields serve path)",
+   "has_documented_guideline": "PARTIAL. Each component HAS a docstring formula (e.g. compute_nowtrendin_score documents \"0-70 volume + 0-30 recency\", calibration_engine documents the maturity multipliers, score_topic documents the 6-component external weights). The COMPOSITE weights are stated inline in three places (score_topic lines 3909-3936; apply_calibration lines 1122-1140; calibration_engine.apply lines 1354-1359) \u2014 but these THREE copies DISAGREE (see boundary_risks), and there is NO single declared input-contract document listing, per field: type, unit (0-1 vs 0-100), key name, JSON-vs-scalar, and which producer writes it. CLAUDE.md \u00a713/\u00a714 document the date model and monitoring agents but NOT the per-field scoring-input format contract. So: documented per-method formulas YES; declared cross-agent FORMAT contract NO.",
+   "inputs": [
+    {
+     "field": "gradient_strength (G)",
+     "produced_by": "score_topic via compute_gradient_strength, capped 0-100 at line 3890",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration: raw_result.get('gradient_strength_detection', 0) or 0 \u2014 NOTE it reads *_detection NOT 'gradient_strength'; falls back via _calibrate_score_fields line 7990-7993 which copies gradient_strength into gradient_strength_detection if absent",
+     "contract_declared": false,
+     "silent_misread_risk": "KEY DRIFT (masked): score_topic emits 'gradient_strength' but apply_calibration reads 'gradient_strength_detection'/'_confidence'. At SCORING time these keys do NOT exist on the row, so 'x or 0' would zero G \u2014 but _calibrate_score_fields back-fills them before serve. At SCORING time apply_calibration runs on the raw dict WITHOUT the backfill, so cal_gradient_d is computed from gradient_strength_detection=MISSING\u21920. The stored detection_score is then OVERWRITTEN by the dual-pathway blend for mainstream, and for expert topics relies on this G=0 path \u2014 confirm expert G actually flows. This is the highest-risk silent-misread in the subsystem."
+    },
+    {
+     "field": "inertia_score (I)",
+     "produced_by": "score_topic via compute_inertia / momentum_engine (overrides I when >=2 cycles)",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration: .get('inertia_score',0) or 0; also .get('inertia_detection', inertia) / .get('inertia_confidence', inertia) \u2014 those mode-specific keys are never produced, so always fall back to the single value (benign)",
+     "contract_declared": false,
+     "silent_misread_risk": "NULL-COALESCE: 'or 0' turns a genuinely-missing I into 0, which silently lowers detection/confidence rather than erroring. Low risk because I is always produced, but the 'or 0' pattern hides any future producer rename."
+    },
+    {
+     "field": "platform_diversity (M)",
+     "produced_by": "score_topic via compute_platform_diversity",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration reads platform_diversity_detection/_confidence then falls back to 'platform_diversity' (lines 1109-1113). calibration_engine.apply reads 'platform_diversity' directly",
+     "contract_declared": false,
+     "silent_misread_risk": "The CLAUDE.md memory note (serve_payload cache gotcha) flags exactly this: mode-specific *_detection/_confidence columns don't exist so Platform/Dark/Decay were being silently zeroed in the serve recompute. Fixed via fallback to the stored column, but the fix is a defensive .get-chain, not a declared contract \u2014 a new consumer that reads only *_detection re-introduces the zero."
+    },
+    {
+     "field": "dark_matter_score (D)",
+     "produced_by": "score_topic via compute_dark_matter",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration: dark_d = .get('dark_matter_detection', _dark) or 0 where _dark = .get('dark_matter_score',0) or 0",
+     "contract_declared": false,
+     "silent_misread_risk": "Same *_detection/_confidence non-existent-key pattern as M; masked by fallback. 'or 0' coalesce hides missing D."
+    },
+    {
+     "field": "confidence_decay (C)",
+     "produced_by": "score_topic via compute_confidence_decay",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration: decay_d = .get('confidence_decay_detection', _decay) or 0",
+     "contract_declared": false,
+     "silent_misread_risk": "Same masked *_detection fallback + 'or 0' coalesce as M/D."
+    },
+    {
+     "field": "persistence_score (P)",
+     "produced_by": "score_topic via compute_persistence + momentum_engine override; stored to velocity_scores",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "apply_calibration: _persist = .get('persistence_score',0) or 0. BUT calibration_engine.CalibrationEngine.apply (line 1410) hardcodes 'persistence':0 in build_component_groups",
+     "contract_declared": false,
+     "silent_misread_risk": "INCONSISTENT PRODUCER: the live apply_calibration uses real persistence_score, but the older calibration_engine.apply path passes persistence=0 into component_groups AND its composite (lines 1354-1359) OMITS P entirely. If any caller uses CalibrationEngine.apply instead of apply_calibration, P silently drops to 0 and the Momentum bucket shows 'PENDING/first collection' on a multi-cycle topic \u2014 the exact 'looks fine, computed on missing data' disease."
+    },
+    {
+     "field": "nowtrendin_score (N)",
+     "produced_by": "score_topic via compute_nowtrendin_score; stored as column nowtrendin_score",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "build_component_groups expects key 'nowtrend_internal'; apply_calibration bridges via .get('nowtrendin_score', .get('nowtrend_internal',0)) line 1230-1231. _now_trending_gradient reads s.get('nowtrendin_score')",
+     "contract_declared": false,
+     "silent_misread_risk": "KEY DRIFT (the documented sibling exemplar): producer key is 'nowtrendin_score', consumer build_component_groups internal key is 'nowtrend_internal'. apply_calibration patches it, but calibration_engine.apply line 1413 still passes 'nowtrend_internal':0 hardcoded \u2014 so via that path N is silently 0 in the breakdown. Comment at lines 1227-1229 confirms reading the wrong key left N at 0/pending."
+    },
+    {
+     "field": "gradient_ratio",
+     "produced_by": "score_topic (returned from compute_gradient_strength)",
+     "expected_type_format": "scalar float (a RATIO, e.g. 4.0 = 4x)",
+     "expected_unit_range": "ratio, ~1.0 to 10+, NOT 0-100",
+     "how_consumer_reads": "apply_calibration: .get('gradient_ratio', 1.0) or 1.0; passed to evaluate_anomaly_gate (threshold 4.0) and compute_calibrated_gradient",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT mismatch hazard: gradient_ratio is a multiple (1-10x) while every sibling input is 0-100. Any code that accidentally treats it as a 0-100 score (or vice-versa feeds G where ratio is expected) silently mis-gates anomalies. The 'or 1.0' default also masks a missing ratio as a benign 1.0 (no anomaly) rather than flagging."
+    },
+    {
+     "field": "first_timer_ratio (ft_ratio)",
+     "produced_by": "score_topic via compute_dark_matter",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0.0-1.0 (FRACTION, not percent)",
+     "how_consumer_reads": "evaluate_anomaly_gate: has_first_timer = ft_ratio >= 0.35; multiplied *100 for display",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT mismatch: ft_ratio is 0-1 but nearly every other component is 0-100. Threshold 0.35 is correct for a fraction; if a producer ever emitted it as a percent (35.0) the gate would ALWAYS fire (35 >= 0.35). No declared unit contract guards this. 'or 0.0' masks missing."
+    },
+    {
+     "field": "engagement_asymmetry",
+     "produced_by": "score_topic stores int 1/0 (line 4044: '1 if asymmetry else 0')",
+     "expected_type_format": "stored as INT 1/0, consumed as BOOL",
+     "expected_unit_range": "0 or 1",
+     "how_consumer_reads": "apply_calibration reads 'engagement_asymmetry_detected' (a DIFFERENT key) line 1067; _calibrate_score_fields line 7997-7998 back-fills engagement_asymmetry_detected = bool(s.get('engagement_asymmetry')). calibration_engine.apply reads bool(.get('engagement_asymmetry',0))",
+     "contract_declared": false,
+     "silent_misread_risk": "TYPE+KEY drift: column is int 'engagement_asymmetry'; live calibrator wants bool 'engagement_asymmetry_detected'. At scoring time that key is absent \u2192 asymmetry defaults False \u2192 anomaly evidence undercounts. Backfilled only on serve path. Bool-as-int."
+    },
+    {
+     "field": "platforms_active / platform_count",
+     "produced_by": "score_topic: json.dumps(platform_list) \u2014 stored as JSON STRING",
+     "expected_type_format": "JSON-encoded list (string) at store; parsed list at serve",
+     "expected_unit_range": "list of platform-name strings; platform_count = len()",
+     "how_consumer_reads": "calibration_engine.apply: json.loads(raw_result.get('platforms_active','[]')). apply_calibration reads .get('platform_count',0) which only exists AFTER _calibrate_score_fields line 7994-7996 sets it from len(platforms_active) \u2014 but only if platforms_active is already a list",
+     "contract_declared": false,
+     "silent_misread_risk": "JSON-not-parsed: platforms_active is a JSON string in the DB. _parse_json_fields decodes it ONLY for the field 'platforms_active'. If apply_calibration runs before that parse (scoring time), platform_count default 0 \u2192 anomaly cross-platform gate fails silently. Swallowed json.loads (try/except \u2192 []) means a malformed blob silently yields zero platforms, dropping M and the anomaly gate to a real-looking 0."
+    },
+    {
+     "field": "detection_score / confidence_score / overall_score (composite outputs, re-consumed)",
+     "produced_by": "score_topic computes; apply_calibration RECOMPUTES (lines 1122-1140); dual-pathway blend OVERWRITES for mainstream; _calibrate_score_fields recomputes again at serve",
+     "expected_type_format": "scalar float",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "Read back by apply_calibration's pathway-gate (lines 1151-1155), by _now_trending_gradient, by AI floor, and re-clamped serve-side",
+     "contract_declared": false,
+     "silent_misread_risk": "STALE-DERIVED + WEIGHT DRIFT: detection/confidence are recomputed in 3 places with DIFFERENT weight vectors (score_topic 0.375/0.216/...; apply_calibration 0.375/0.216/... matches; calibration_engine.apply uses OLD 0.40/0.25/0.20/0.10/0.05 incl. no P and no renormalization). heisenberg_gap is recomputed 4+ times; the code comments (lines 8057-8062) admit it went STALE when calibration moved det/conf without the floor firing \u2014 the documented sibling exemplar. Any consumer reading the stored heisenberg_gap rather than recomputing gets a stale gap."
+    },
+    {
+     "field": "calibration dict / maturity (times_scored, days_in_system, maturity_class, gradient_velocity)",
+     "produced_by": "get_topic_maturity_state from topic_maturity / topic_lifecycle / KNOWN_TOPICS / default",
+     "expected_type_format": "dict; maturity_class is ENUM string, gradient_velocity float-or-None",
+     "expected_unit_range": "maturity_class in {NEW,EMERGING,ESTABLISHED,RESURGENT,MONITORING}; UPPERCASE",
+     "how_consumer_reads": "apply_calibration + calibration_engine compare maturity_class == 'ESTABLISHED' etc (case-sensitive); times_scored taken as max() across 4 different keys (lines 1072-1078)",
+     "contract_declared": false,
+     "silent_misread_risk": "ENUM/CASE: maturity_class compared with exact UPPERCASE literals everywhere \u2014 a lowercase value would silently miss every branch and fall through to default multipliers. gradient_velocity is None for lifecycle-derived topics; '(velocity or 0) >= 15' coalesces None\u21920 (benign) but velocity-None vs velocity-0 are different truths. times_scored AGGREGATION-KEY risk: pulled from times_scored OR total_scoring_cycles OR momentum_cycle_count OR persistence_cycles \u2014 if these disagree (the documented lag bug) the max() is a band-aid, not a contract."
+    },
+    {
+     "field": "serve_payload",
+     "produced_by": "_precompute_serve_payloads: json.dumps(_calibrate_score_fields(row)) stored in velocity_scores.serve_payload",
+     "expected_type_format": "JSON string of the fully-calibrated row",
+     "expected_unit_range": "n/a (serialized dict)",
+     "how_consumer_reads": "_format_score_rows: json.loads(serve_payload); on exception silently falls through to live calibration",
+     "contract_declared": false,
+     "silent_misread_risk": "STALE-DERIVED: serve_payload is a frozen snapshot. The memory note 'serve_payload cache gotcha' documents that after ANY scoring/calibration change the payload must be regenerated or /scores serves stale values. The try/except around json.loads (line 8092) SWALLOWS a corrupt payload and silently serves a live-recomputed row instead \u2014 so a corrupted payload is invisible, not alarmed. first_scored_at is injected post-hoc (lines 8087-8089) because the payload omits it \u2014 a partial-contract patch."
+    }
+   ],
+   "boundary_risks": [
+    "WEIGHT-VECTOR DRIFT across three composite implementations: score_topic (6-component, P included, renormalized to 1.0), apply_calibration (matches score_topic), and calibration_engine.CalibrationEngine.apply (OLD 5-component G0.30/I0.25/M0.20/D0.15/C0.10 \u2014 NO persistence, NO renormalization). Whichever path a caller uses changes the number silently. The LIVE path is apply_calibration; calibration_engine.apply appears legacy but is still importable and its build_component_groups call hardcodes persistence=0 and nowtrend_internal=0.",
+    "*_detection / *_confidence MODE KEYS are read by the calibrator but NEVER produced by score_topic (the engine stores one value per component). Every read is a .get(mode_key, stored_key) fallback chained to 'or 0'. This is the single recurring silent-misread surface: a future consumer that trusts the mode key without the fallback zeroes Platform/Dark/Decay/Gradient \u2014 exactly the bug the 'serve_payload cache gotcha' memo says already happened.",
+    "nowtrendin_score vs nowtrend_internal KEY DRIFT (confirmed documented exemplar) \u2014 bridged in apply_calibration but NOT in calibration_engine.apply (hardcoded 0).",
+    "UNIT heterogeneity with NO declared contract: gradient_ratio is a 1-10x MULTIPLE, first_timer_ratio is a 0-1 FRACTION, every other component is 0-100. Nothing enforces these units at the boundary; a producer-side unit change (fraction\u2192percent) passes silently and mis-gates anomalies.",
+    "PERVASIVE 'x or 0' / .get(k,0) NULL-COALESCE: ~20 reads in apply_calibration convert MISSING to a real-looking 0 that enters the weighted sum. A genuinely-absent component is indistinguishable from a true-zero component, so a dropped input lowers the score instead of raising an error.",
+    "heisenberg_gap STALE-DERIVED: recomputed 4+ times; comments admit it served stale (mcp det74.5/conf73.0 but gap -23) when calibration moved det/conf without the AI floor firing. The stored gap is authoritative ONLY if every downstream recomputes it; any reader trusting the column risks staleness.",
+    "SWALLOWED parse failures: try/except:pass around json.loads(serve_payload), around platforms_active parse, around apply_calibration in _calibrate_score_fields, and around momentum_engine \u2014 each silently substitutes a default/empty on failure, so a format break degrades to a plausible wrong number with no log alarm.",
+    "AGGREGATION-KEY on cycle count: times_scored is max() over times_scored/total_scoring_cycles/momentum_cycle_count/persistence_cycles because these four disagree (the documented lag). The max() masks the disagreement rather than reconciling the source of truth."
+   ],
+   "detail": "Producer = score_topic (gravitational_anomaly_detector.py:3825). LIVE consumer = apply_calibration (signal_calibration_integration.py:1029), invoked at scoring time (score_all_topics:4286) AND serve time (_calibrate_score_fields:7999). A SECOND, divergent consumer exists: calibration_engine.CalibrationEngine.apply (calibration_engine.py:1290) with older 5-component weights and hardcoded persistence=0 / nowtrend_internal=0 \u2014 appears unused by the live path but is importable and is the clearest format-mismatch landmine. After calibration, the dual-pathway blend (score_all_topics:4316) OVERWRITES detection/confidence/overall/stage for mainstream topics; expert topics keep the calibrated values. Then the row is stored to velocity_scores with explicit columns (G/I/M/D/C/P/N all present). Serve path reads serve_payload (a frozen json.dumps of _calibrate_score_fields output) and falls back to live calibration on any json error. The disease pattern from the brief is present and partially mitigated by defensive fallbacks, but the mitigations ARE the evidence of fragility \u2014 every input is read through a .get(mode_key, stored_key) or 'x or 0' chain rather than a declared, validated contract, so a missing/renamed/re-unit'd input degrades to a real-looking number instead of raising. Answering the 5 questions: (1) per-method docstrings YES, single cross-agent contract NO; (2) declared per-field type/unit/key/enum FORMAT NO \u2014 only inferable from code; (3) producer formatting is internally consistent for score_topic but the mode-key convention the consumer expects is NOT produced; (4) population is masked by 'or 0' so silent-0 is the default failure; (5) the three scoring implementations are NOT instructed in the same format (divergent weights + hardcoded zeros in the legacy engine), so transfer is NOT guaranteed consistent. Highest-priority fixes: collapse the three composite-weight copies to one shared constant; replace 'x or 0' coalesce on scoring inputs with an explicit 'missing\u2192raise/quarantine' gate (mirroring ingestion_gate for dates); declare a per-field contract (key, type, unit, range, enum-case) and assert it at the calibration boundary; and either delete or align calibration_engine.CalibrationEngine.apply with apply_calibration so the legacy path can't silently zero P and N."
+  },
+  {
+   "subsystem": "Market Signal / Risk Gradient (financial_risk_gradient.py + market_signal_engine.py)",
+   "has_documented_guideline": "PARTIAL. Each scoring method has a prose docstring describing intent (compute_risk_gradient, compute_market_signal, compute_market_gradient, compute_positioning_score, compute_sustainability, assemble_market_components) and CLAUDE.md \u00a713/\u00a714 document data-quality + canonical-date rules. BUT there is NO machine-checkable per-field input contract: no declared type/unit/range/enum spec per scoring input, and \u2014 critically \u2014 no single authority declaring the output-enum vocabulary for the risk_scores.risk_stage column, which is written from THREE different scoring engines (market tier, risk gradient risk_stage, positioning classification) that each use a DIFFERENT vocabulary. The canonical-date model (\u00a714) is the ONLY input class with a hard, centrally-enforced, auto-audited contract (ingestion_gate + Canonical Date Auditor). Every NUMERIC scoring input (z-scores, change_pct, cycle_inflection, etc.) is governed only by an implicit unit assumption living in the consumer's arithmetic, undeclared at the producer.",
+   "inputs": [
+    {
+     "field": "risk_scores.risk_stage (OUTPUT enum \u2014 the headline finding)",
+     "produced_by": "score_all_risks line 2434: `_stage = mkt['tier'] if mkt else score['risk_stage']` \u2014 value comes from market_signal_engine tier when a market score exists, else risk-gradient risk_stage",
+     "expected_type_format": "TEXT enum",
+     "expected_unit_range": "NO SINGLE VOCABULARY. Three disjoint enum sets land in this one column: (a) market tier = {ELEVATED, ACTIVE, BUILDING, ROUTINE, DORMANT} (market_signal_engine MARKET_LEVELS / compute_market_gradient MARKET_TIERS); (b) risk-gradient risk_stage = {ACUTE, ELEVATED, EMERGING, WATCH, BACKGROUND} (compute_risk_gradient); (c) positioning classification = {CALIBRATING, ROUTINE, WATCH, ELEVATED, UNUSUAL} (compute_positioning_score). All UPPERCASE but otherwise non-overlapping except the coincidental shared tokens ELEVATED/ROUTINE/WATCH which mean DIFFERENT things in each.",
+     "how_consumer_reads": "get_risk_scores/_format_risk_row returns risk_stage AND (via d.update(positioning_json)) classification into the SAME row dict; the frontend/feed reads both. ELEVATED from the market tier (avg detection+confidence>=60) is not the same condition as ELEVATED from positioning (z-score score 50-72) nor ELEVATED from risk gradient (avg>=60 of a different scale).",
+     "contract_declared": false,
+     "silent_misread_risk": "ENUM/AGGREGATION mismatch: identical to the founder's exemplar (c) tier/risk_stage/classification disagree on the same row. A row can show risk_stage=ROUTINE (market tier) while classification=UNUSUAL (positioning) \u2014 the SAME entity contradicting itself. Whichever engine happened to populate _stage decides the label; a consumer that filters or color-codes on risk_stage silently mixes three scales. No code asserts they agree."
+    },
+    {
+     "field": "detection_score / confidence_score (OUTPUT)",
+     "produced_by": "line 2432-2433: mkt['detection']/['confidence'] (0-100, market engine) when mkt present, ELSE score['detection_score']/['confidence_score'] (0-100, risk gradient \u2014 a DIFFERENT formula/weights)",
+     "expected_type_format": "REAL",
+     "expected_unit_range": "0-100 both paths, but produced by two different weighting models (RISK_WEIGHTS vs DETECTION_WEIGHTS/CONFIDENCE_WEIGHTS)",
+     "how_consumer_reads": "stored to risk_scores.detection_score; get_risk_scores sorts on positioning_score or detection_score; frontend shows as the headline number",
+     "contract_declared": false,
+     "silent_misread_risk": "Same column silently carries numbers from two different scales/formulas depending on whether a ticker resolved. A macro theme (no ticker) gets risk-gradient detection; a company gets market-engine detection. Cross-row comparison/sorting mixes the two \u2014 not a null, but a real-looking number from the wrong model."
+    },
+    {
+     "field": "short_interest.change_pct (FINRA)",
+     "produced_by": "finra_data.short_interest -> change_pct = _num(r0['changePercent']) (FINRA CSV, PERCENT units e.g. 25.0 = 25%)",
+     "expected_type_format": "float or None",
+     "expected_unit_range": "PERCENT (0..hundreds). Consumer assumes ~0-30 meaningful: assemble_market_components min(si_chg,30)/30; compute_market_gradient si_chg*4",
+     "how_consumer_reads": "abs(si.get('change_pct') or 0.0) in BOTH market_signal_engine (\u00f730 cap) and compute_market_gradient (\u00d74 cap at 100)",
+     "contract_declared": false,
+     "silent_misread_risk": "NULL-COALESCE masking: `si.get('change_pct') or 0.0` turns BOTH missing AND a legitimate 0% change into 0 that enters the formula as 'no positioning' \u2014 a real-looking zero. UNIT assumption (percent, cap 30) is undeclared at producer; if FINRA ever returns a fraction (0.25) it silently reads as ~0. Two consumers use DIFFERENT scaling of the same field (\u00f730 vs \u00d74)."
+    },
+    {
+     "field": "institutional_holdings.shares_change_pct (WhaleWisdom 13F)",
+     "produced_by": "whalewisdom_data.institutional_holdings -> shares_change_pct (avg_change, percent)",
+     "expected_type_format": "float; gated by available:bool",
+     "expected_unit_range": "PERCENT; consumer caps at 40 (\u00f740) or \u00d74",
+     "how_consumer_reads": "abs(iw.get('shares_change_pct') or 0.0); has_pp gate = bool(si or (iw and iw.get('available')))",
+     "contract_declared": false,
+     "silent_misread_risk": "NULL-COALESCE: `or 0.0` collapses missing 13F into a 0 contribution. If iw.available is False the whole institutional term silently drops to 0 with no flag in the score \u2014 a missing-data zero indistinguishable from a measured 'no change'."
+    },
+    {
+     "field": "beneficiary.components.cycle_inflection",
+     "produced_by": "trend_beneficiary.compute_cycle_inflection -> 0-1 score (fractional)",
+     "expected_type_format": "float 0-1",
+     "expected_unit_range": "0.0-1.0",
+     "how_consumer_reads": "TWO consumers, DIFFERENT unit handling: market_signal_engine line 258 `_norm(comps['cycle_inflection'])` (keeps 0-1); compute_market_gradient line 2051 `float(comps['cycle_inflection'])*100` (scales to 0-100)",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT divergence on the SAME producer field: one path treats it as 0-1, the other as a 0-100 percent. Both are internally consistent so no error fires, but the two market scores (Market Signal vs Market Gradient) weight fundamentals on different scales \u2014 they can disagree on the same company with no detectable fault."
+    },
+    {
+     "field": "beneficiary.live_inputs.valuation_rerating / price_return_12m",
+     "produced_by": "trend_beneficiary_wire.fetch_valuation_rerating (0-1) / fetch_price_return_12m (FRACTIONAL return, 4.0 = +400%)",
+     "expected_type_format": "float",
+     "expected_unit_range": "valuation_rerating 0-1; price_return_12m fractional (unbounded, e.g. 4.0)",
+     "how_consumer_reads": "market_signal_engine: min(abs(price_return_12m),2.0)/2.0 (caps at 200%); compute_market_gradient: abs(price_return_12m)*40 (different scaling). valuation_rerating: _norm vs *100",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT/scale mismatch across the two market engines again; price_return_12m is fractional but a naive reader could treat 4.0 as 4% \u2014 the *40 and /2.0 caps are undeclared magic constants encoding the unit assumption. None is declared at the producer."
+    },
+    {
+     "field": "fmp.score_normalized",
+     "produced_by": "fmp_data.fundamental_score line 134: round(score/100.0, 4) => 0-1",
+     "expected_type_format": "float 0-1",
+     "expected_unit_range": "0.0-1.0",
+     "how_consumer_reads": "market_signal_engine line 255-256 _norm(fmp_d['score_normalized']) \u2014 only read by market_signal_engine, NOT by compute_market_gradient (which uses cycle_inflection instead)",
+     "contract_declared": false,
+     "silent_misread_risk": "KEY/PATHWAY divergence: the two market scorers read DIFFERENT fundamental inputs (FMP vs beneficiary cycle_inflection) for the 'same' fundamental component \u2014 fundamental_confirmation is not computed from the same definition across the two engines."
+    },
+    {
+     "field": "macro_leverage.funding_stress.label (OFR)",
+     "produced_by": "ofr_stfm.leverage_snapshot -> funding_stress.label (free-text string e.g. 'High'/'Moderate'/'Mild')",
+     "expected_type_format": "string",
+     "expected_unit_range": "matched by substring .lower() containing high/severe/moderate/mild",
+     "how_consumer_reads": "assemble_market_components & compute_market_gradient: `('high' in stress or 'severe' in stress) else 'moderate' ... else 'mild' ... else default`",
+     "contract_declared": false,
+     "silent_misread_risk": "ENUM-by-substring with a silent default: any label the producer emits that is NOT one of those exact substrings (casing handled, but a new label like 'Stressed' or 'Critical') silently falls to the LOWEST bucket (0.2 / 30) \u2014 a real stress reading misread as benign with no error. No declared enum couples producer to consumer."
+    },
+    {
+     "field": "alpha_vantage.article_count / avg_sentiment",
+     "produced_by": "alpha_vantage_coverage -> article_count(int), avg_sentiment(float -1..1 or None)",
+     "expected_type_format": "int / float|None",
+     "expected_unit_range": "count>=0; sentiment -1..1",
+     "how_consumer_reads": "`av.get('article_count') or 0`; `abs(av.get('avg_sentiment') or 0.0)`",
+     "contract_declared": false,
+     "silent_misread_risk": "NULL-COALESCE: `or 0` makes a missing Alpha Vantage pull (key absent / transient error returns None payload) indistinguishable from a measured zero-coverage; analyst_signal silently drops without flagging the input as missing vs absent."
+    },
+    {
+     "field": "positioning classification 'sufficient_baseline' vs market 'calibrating'",
+     "produced_by": "compute_positioning_score: sufficient_baseline=bool (cycles>=MIN_BASELINE_CYCLES=3). market_signal_engine score_component: calibrating=bool (samples<MIN_BASELINE_TRUSTWORTHY=10, gate at MIN_BASELINE_CYCLES=3)",
+     "expected_type_format": "bool",
+     "expected_unit_range": "two DIFFERENT thresholds: positioning 'sufficient' at 3 cycles; market 'not calibrating' at 10 cycles",
+     "how_consumer_reads": "get_risk_scores sorts CALIBRATING-positioning below scored; market CALIBRATING set by any component <10 samples; both surface as 'CALIBRATING' text to the user",
+     "contract_declared": false,
+     "silent_misread_risk": "DEFINITION mismatch: 'calibrating'/'sufficient baseline' is NOT computed from the same definition across the two engines (3 cycles vs 10 cycles). A row can be 'sufficient_baseline:true' (positioning, 4 cycles) yet the market score reads CALIBRATING (needs 10). The same entity is simultaneously calibrated and calibrating depending on which engine's flag the UI reads."
+    },
+    {
+     "field": "current_by_stage keys (diffusion_stage) \u2014 aggregation key",
+     "produced_by": "score_all_risks builds current_by_stage from sig_rows diffusion_stage (int 1-5); per-signal stages set at collect time",
+     "expected_type_format": "int 1-5",
+     "expected_unit_range": "1..5; compute_risk_gradient groups with .get('diffusion_stage',3) default; positioning STAGE_WEIGHTS keys 1-5",
+     "how_consumer_reads": "compute_risk_gradient stages[stage]; compute_positioning_score current_by_stage[stage] vs profile keyed by stage",
+     "contract_declared": false,
+     "silent_misread_risk": "AGGREGATION-KEY/TYPE risk: if a stage arrives as a string '1' vs int 1 (DB round-trip), the dict key won't match STAGE_WEIGHTS/profile int keys and that stage silently contributes 0 weight. The default `.get('diffusion_stage',3)` also silently dumps any unlabeled signal into Consumer-Concern stage 3."
+    },
+    {
+     "field": "watchlist instruments resolution (WATCHLIST_TICKERS.get(display))",
+     "produced_by": "score_all_risks line 2315 ticker=WATCHLIST_TICKERS.get(display); display is risk_display (free text / topic name)",
+     "expected_type_format": "str ticker or None",
+     "expected_unit_range": "exact dict-key match on display name",
+     "how_consumer_reads": "if ticker: run sustainability/finra/whalewisdom/beneficiary; else SKIP all company financials",
+     "contract_declared": false,
+     "silent_misread_risk": "KEY-DRIFT / silent-zero: resolution is an exact display-string match. If risk_display differs from the WATCHLIST_TICKERS key (casing, 'Alphabet' vs 'Google', a GDELT-extracted variant), ticker is None and ALL positioning inputs (short_interest, 13F, sustainability, beneficiary) silently drop \u2014 the market score is computed on missing data while looking complete. This is the founder's exact disease class: a real instrument scored on absent data with no flag."
+    }
+   ],
+   "boundary_risks": [
+    "HEADLINE: risk_scores.risk_stage column is populated from THREE engines with THREE disjoint enum vocabularies (market tier ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT; risk-gradient ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND; positioning CALIBRATING/ROUTINE/WATCH/ELEVATED/UNUSUAL). _format_risk_row d.update(positioning_json) drops 'classification' into the SAME row as risk_stage, so a single row can show contradictory labels (e.g. risk_stage=ROUTINE while classification=UNUSUAL). This IS the founder's exemplar (c) generalized. No code asserts cross-engine agreement.",
+    "detection_score/confidence_score in one column come from two different formulas (market engine vs risk gradient) depending on ticker resolution \u2014 cross-row sorting/comparison silently mixes scales.",
+    "Pervasive `x.get(k) or 0.0` / `.get(k,0)` null-coalescing across every numeric market input (change_pct, shares_change_pct, article_count, avg_sentiment) collapses MISSING data into a real-looking 0 that enters the weighted score \u2014 missing 13F/FINRA/Alpha-Vantage is indistinguishable from a measured zero.",
+    "WATCHLIST_TICKERS.get(display) exact-string match: any display-name drift yields ticker=None and silently drops ALL company financial inputs while the market score still computes \u2014 a real instrument scored on absent data (the founder's core disease).",
+    "Same producer fields (cycle_inflection 0-1, valuation_rerating 0-1, price_return_12m fractional) are unit-handled DIFFERENTLY by market_signal_engine vs compute_market_gradient (_norm/\u00f7 vs \u00d7100/\u00d740) \u2014 the two market scores can diverge on the same company with no error.",
+    "funding_stress.label matched by substring with a silent lowest-bucket default \u2014 a new/unmatched OFR label downgrades real stress to benign.",
+    "'calibrating' vs 'sufficient_baseline' use different cycle thresholds (10 vs 3), so the same entity is simultaneously calibrating and calibrated depending on which flag the UI reads.",
+    "diffusion_stage aggregation key relies on int identity; a str/int drift from the DB round-trip silently zero-weights that stage, and .get('diffusion_stage',3) buries unlabeled signals into stage 3.",
+    "Only the canonical-date inputs have a hard, auto-audited producer/consumer contract (ingestion_gate + Canonical Date Auditor). Every numeric/enum scoring input lacks an equivalent \u2014 answering audit Q2/Q5 NO for the numeric+enum surface."
+   ],
+   "detail": "Files: C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/financial_risk_gradient.py and .../transfer/market_signal_engine.py (producers verified in finra_data.py, whalewisdom_data.py, trend_beneficiary.py/_wire.py, fmp_data.py).\n\nANSWERS TO THE 5 AUDIT QUESTIONS for this subsystem:\nQ1 (documented guideline per method): PARTIAL \u2014 prose docstrings exist on every scorer; no machine-checkable spec.\nQ2 (declared format per input field): NO for all numeric + enum inputs. Units/ranges live only inside consumer arithmetic (magic caps: /30, *4, *100, *40, /2.0). Only the date inputs are declared+enforced (\u00a714).\nQ3 (data formatted to requirement by producer): MOSTLY YES by convention, but producers declare nothing \u2014 FINRA change_pct is percent, WhaleWisdom shares_change_pct is percent, cycle_inflection/valuation_rerating are 0-1, price_return_12m is fractional \u2014 all undeclared, enforced only by the consumer guessing right.\nQ4 (populates without silent null/0): NO \u2014 systematic `or 0.0` / `.get(k,0)` masks missing FINRA/13F/AlphaVantage/beneficiary inputs as real zeros; WATCHLIST_TICKERS.get(display)=None silently drops every company financial input.\nQ5 (other agents instructed in the SAME format): NO \u2014 the SAME producer field (cycle_inflection, valuation_rerating, price_return_12m) is unit-handled differently by market_signal_engine vs compute_market_gradient; fundamental_confirmation reads FMP in one engine and beneficiary cycle_inflection in the other; and the risk_stage output column carries three disjoint enum vocabularies.\n\nSPECIFIC CONFIRMATIONS REQUESTED:\n- tier vs risk_stage vs classification SAME vocabulary/casing? NO. All UPPERCASE but three disjoint sets; the shared tokens ELEVATED/ROUTINE/WATCH denote different conditions. They are written into the same risk_scores.risk_stage column + merged classification field with no agreement check (financial_risk_gradient.py:2434 and _format_risk_row line ~2489).\n- z-scores 0-1 or 0-100? Components are 0-1 internally (score_component returns 0-1; _z_to_unit maps z->0.05..1.0); detection/confidence are then \u00d7100 to 0-100. The stdev floor is deliberately 0.05 (small) precisely because components are 0-1 \u2014 a count-scale floor would crush z (noted in code). Positioning engine z->score is a SEPARATE 5-100 scale (_pos_z_to_score). So 'z-score' means two different output scales in the two engines.\n- FINRA/OFR/WhaleWisdom parsed from JSON or raw? FINRA = CSV via csv.DictReader (finra_data, _num coercion). WhaleWisdom = parsed dict (available-gated). OFR = parsed dict, but funding_stress.label consumed as free TEXT by substring match (not an enum) with a silent default. AlphaVantage = JSON parsed, but ticker_sentiment_score float-coerced inside try/except that silently passes on failure (swallowed-parse). None of these declare a contract to the consumer.\n- calibrating vs sufficient_baseline same definition? NO \u2014 market engine 'calibrating' = component samples<10 (MIN_BASELINE_TRUSTWORTHY); positioning 'sufficient_baseline' = cycles>=3 (MIN_BASELINE_CYCLES). Different thresholds, can disagree on the same row.\n- missing watchlist instruments silently zeroed? YES \u2014 both via WATCHLIST_TICKERS.get(display)=None (drops all financials) AND via `or 0.0` on each component when its source payload is absent.\n\nHIGHEST-PRIORITY FIX TARGETS (same disease as the canonical-date fix): (1) declare ONE risk_stage enum and map each engine into it explicitly, or keep three SEPARATE columns (market_tier, risk_stage, positioning_classification) so they never overwrite/contradict; (2) replace `.get(k) or 0` on scoring inputs with an explicit present/absent sentinel so missing data is flagged, not zeroed; (3) centralize the unit contract for cycle_inflection/valuation_rerating/price_return_12m/change_pct so both market engines scale identically; (4) make WATCHLIST_TICKERS resolution failure for a watchlist display name a loud condition, not a silent skip."
+  },
+  {
+   "subsystem": "AI-dependent scoring inputs (ai_grade.py Perplexity+Claude grade, ai_topic_intelligence.py taxonomy tier override, apply_ai_floor) \u2192 detection/confidence/heisenberg_gap that enter serving",
+   "has_documented_guideline": "PARTIAL. The expected LLM return format IS documented inside the prompt strings themselves (ai_grade._SCORE_SYSTEM enumerates the 6 components 0-100, stage enum, classification enum, optional holistic_detection/confidence; the explainer/movement prompts say \"Return ONLY valid JSON\"). The component\u2192letter\u2192weight mapping is documented in code (_DET_W/_CONF_W with a comment \"must match velocity_scores schema\"). ai_topic_intelligence has a long module docstring describing tiers/floors/ceilings. BUT there is NO single declared contract doc stating, per field, the type+unit+range+key-name+enum-casing the CONSUMER requires, and nothing ties the AI grade's component names to the engine's component names in one place. CLAUDE.md \u00a714 covers canonical DATES only \u2014 it does not cover these AI scalar/enum/JSON scoring inputs. So guideline exists as scattered prompt prose, not as an enforced per-field contract.",
+   "inputs": [
+    {
+     "field": "ai_grade Claude JSON object (whole payload)",
+     "produced_by": "propose_score() \u2014 Anthropic Claude, free-text completion concatenated from content[].text",
+     "expected_type_format": "JSON object; parsed by _extract_json (ai_grade.py L393). Expected per _SCORE_SYSTEM: keys niche_concentration/platform_diversity/momentum/dark_matter/persistence/freshness as numbers 0-100, plus stage/classification enums, reasoning/action/reach_note strings, optional holistic_detection/holistic_confidence",
+     "expected_unit_range": "component numbers 0-100 (same scale as engine components)",
+     "how_consumer_reads": "grade_topic() L451-464: comps={'G':_num(score.get('niche_concentration')), ...}; detection=_composite(comps,_DET_W); confidence=_composite(comps,_CONF_W)",
+     "contract_declared": true,
+     "silent_misread_risk": "MED. _extract_json is robust (strips ```json fence \u2014 the documented sibling bug (b) is FIXED here; tolerates newlines + truncation). But on TOTAL parse failure propose_score returns {available:False}, and grade_topic L440 then returns proposed:False WITHOUT a score \u2014 fails LOUD, good. The real risk is PARTIAL parse: if Claude omits a component key, score.get('niche_concentration')\u2192None\u2192_num(None,)=0.0 (L503-507 default), so a MISSING component silently enters _composite as a real 0 and DEFLATES detection/confidence with no flag. This is the exact NULL-COALESCE-masking failure class."
+    },
+    {
+     "field": "niche_concentration / platform_diversity / momentum / dark_matter / persistence / freshness (the 6 AI components)",
+     "produced_by": "Claude inside the grade JSON",
+     "expected_type_format": "number 0-100",
+     "expected_unit_range": "0-100; freshness(C) has default 50.0, all others default 0.0",
+     "how_consumer_reads": "_num(v, default) \u2192 round(float(v),1) on success, else default. Fed straight into _composite weighted sum.",
+     "contract_declared": true,
+     "silent_misread_risk": "HIGH. NO clamp to [0,100] anywhere. _num accepts any float \u2014 if Claude returns 150 or -20 or '95%' (string with % \u2192 float() raises \u2192 silent default 0.0), it is NOT validated. A value of 0 is indistinguishable from 'missing' or 'unparseable'. detection/confidence are therefore computed from possibly out-of-range or silently-zeroed components and never bounds-checked before display. UNIT risk: prompt says 0-100 but nothing enforces it; a model returning a 0-1 ratio would silently produce a ~0 component."
+    },
+    {
+     "field": "stage (AI grade)",
+     "produced_by": "Claude JSON",
+     "expected_type_format": "string enum one of BREAKOUT/STRONG/EMERGING/WATCHING/MONITORING (UPPERCASE per prompt)",
+     "expected_unit_range": "5 enum values",
+     "how_consumer_reads": "grade_topic L484 score.get('stage','MONITORING'); grade_agent L239 (result.get('stage') or '').upper()",
+     "contract_declared": true,
+     "silent_misread_risk": "LOW-MED. Consumer .upper()-normalizes so casing drift is absorbed in one path, but grade_topic's default 'MONITORING' silently masks a missing/invalid stage, and there is no membership check against the 5 allowed values \u2014 an off-enum string (e.g. 'PEAKING') passes through untouched to the UI/stage colouring."
+    },
+    {
+     "field": "classification (AI grade mainstream/niche)",
+     "produced_by": "Claude JSON",
+     "expected_type_format": "string enum: mainstream/emerging/niche/fading",
+     "expected_unit_range": "4 enum values, lowercased by consumer",
+     "how_consumer_reads": "grade_topic L488 str(score.get('classification') or '').lower() or None; grade_agent _ai_mainstream L66-71 checks membership, else falls back to gradient_strength(G) threshold",
+     "contract_declared": true,
+     "silent_misread_risk": "LOW. This one is handled WELL \u2014 lowercased + explicit membership check with a documented numeric fallback. Good template for the others."
+    },
+    {
+     "field": "holistic_detection / holistic_confidence (Claude's own direct read)",
+     "produced_by": "Claude JSON (optional)",
+     "expected_type_format": "number 0-100",
+     "expected_unit_range": "0-100",
+     "how_consumer_reads": "grade_topic L482-483 _num(score.get('holistic_detection'), detection) \u2014 defaults to the COMPUTED detection when absent",
+     "contract_declared": true,
+     "silent_misread_risk": "MED. Unclamped like the components. Sensible default (falls back to computed score) so absence is masked rather than flagged, but an out-of-range AI value (e.g. 130) passes straight through as a displayed 'AI estimate' with no bounds check."
+    },
+    {
+     "field": "signal_count / total_signals / total_mentions (gate for taxonomy floor + apply_ai_floor)",
+     "produced_by": "engine score row (raw_result.get('total_signals') or get('total_mentions'))",
+     "expected_type_format": "int count",
+     "expected_unit_range": "\u22650; AI taxonomy gate _AI_MIN_SIGNALS default 5; per-term mins in AI_TOPIC_FLOOR",
+     "how_consumer_reads": "ai_topic_intelligence apply_ai_intelligence L1111 signals = raw_result.get('total_signals',0) or raw_result.get('total_mentions',0) or 0; compute_tier_aware_scores gate L581; apply_ai_floor L439 signal_count>=min_sigs",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH (KEY-DRIFT/AGGREGATION). apply_ai_intelligence reads total_signals/total_mentions, but in gravitational_anomaly_detector L7639 apply_ai_floor is called with h.get('total_mentions',0) while L8021 path may pass a different key. If the producing row names the count 'total_signals' in one path and 'total_mentions' in another, the `or` chain masks it as 0 \u2192 topic silently drops below the evidence gate / floor min and the VIRAL tier floor is silently NOT applied (a real signal scored as raw-low) OR the reverse. This is the same producer/consumer key-mismatch disease as the nowtrend_internal/nowtrendin_score drift. The `or 0` makes a missing/mis-keyed count look like a legitimate zero."
+    },
+    {
+     "field": "heisenberg_gap (AI grade + served)",
+     "produced_by": "DERIVED: ai_grade L473 round(detection-confidence,1); re-derived in detector after apply_ai_floor (L7644, L7654, L7716, L7981, L8063)",
+     "expected_type_format": "REAL, signed (detection - confidence)",
+     "expected_unit_range": "-100..100, sign is load-bearing",
+     "how_consumer_reads": "grade_agent L104 _num(s.get('heisenberg_gap')); UI GradientScoreDashboard L2381",
+     "contract_declared": true,
+     "silent_misread_risk": "MED (STALE-DERIVED \u2014 the exact documented sibling (d)). heisenberg_gap is a derived field that MUST be recomputed after EVERY det/conf mutation (taxonomy override, then apply_ai_floor, then calibration). The detector now recomputes it at multiple points (L7654 explicit 'recompute after all adjustments', L8063), and a comment notes a prior abs() bug that inverted the sign. Risk remains that any NEW code path mutating detection_score/confidence_score without re-deriving gap leaves a stale gap \u2014 there is no single choke-point that guarantees gap == served(det-conf)."
+    },
+    {
+     "field": "detection_score / confidence_score (taxonomy-overwritten)",
+     "produced_by": "ai_topic_intelligence compute_tier_aware_scores \u2192 apply_ai_intelligence OVERWRITES raw_result['detection_score']/['confidence_score'] (L1153-1154)",
+     "expected_type_format": "float 0-100 (clamped to tier ceiling/floor)",
+     "expected_unit_range": "tier floor..ceiling (e.g. tier_1 88..100)",
+     "how_consumer_reads": "persisted to velocity_scores then read by serve/grade paths; overall_score re-derived L1158 (det+conf)/2",
+     "contract_declared": false,
+     "silent_misread_risk": "MED. This path IS internally clamped (min ceiling / max floor) so it stays in-range \u2014 better than the AI-grade path. But it silently OVERWRITES the measured engine score with a taxonomy-table constant; the evidence gate (\u22655 signals) is the only guard, and it depends on the mis-keyable signal_count above. If signal_count silently reads 0 via key drift, a genuinely viral topic reverts to raw scores with NO tier \u2014 a silent downgrade with no error."
+    }
+   ],
+   "boundary_risks": [
+    "NO numeric clamp on ANY AI-returned scalar. ai_grade._num (L503) and grade_agent._num (L31) both convert-or-default but never bound to [0,100]. Claude can return 150, -20, or a 0-1 ratio and it flows unvalidated into _composite \u2192 detection/confidence \u2192 display. The founder's explicit ask 'Confirm whether AI numeric outputs are validated/clamped before entering the score' = ANSWER: NO. This is the top gap.",
+    "NULL-COALESCE MASKING is systemic in the AI grade: every missing component key becomes _num(None)=0.0 (or 50.0 for freshness), so a partial JSON (model omits 'dark_matter') silently DEFLATES the score with no flag. 0 is indistinguishable from missing/unparseable. A real-value-belongs-here position is silently filled with a formula-valid 0 \u2014 the exact disease class described.",
+    "KEY-DRIFT / AGGREGATION-KEY on the signal count: apply_ai_intelligence reads `total_signals or total_mentions or 0`; apply_ai_floor is called with `total_mentions` in one detector path. Same-entity-different-key \u2192 the evidence gate and floor can silently see 0 and (a) drop the VIRAL tier floor for a real signal, or (b) admit/deny incorrectly. No assertion that the producing row's count key matches what each consumer reads.",
+    "ENUM not validated against allowed set: ai_grade `stage` defaults to 'MONITORING' on miss and is never membership-checked (off-enum like 'PEAKING' passes through). `classification` IS membership-checked (good) \u2014 inconsistent rigor between two sibling enum fields in the SAME payload.",
+    "STALE-DERIVED heisenberg_gap: correct only because the detector manually re-derives it after each of several det/conf mutations; there is no single choke-point guaranteeing gap==served(det-conf), so any future mutation path that forgets to recompute reintroduces sibling-bug (d). Comment history shows an abs() inversion already happened once.",
+    "SWALLOWED parse/exception defaults: the taxonomy + floor integration in detector L7619-7646 wraps each stage in try/except: pass \u2014 an exception inside apply_ai_intelligence or apply_ai_floor silently leaves the row un-floored/un-tiered with no log, so a broken AI override looks identical to 'topic not in taxonomy'.",
+    "UNIT ambiguity: prompts say components are 0-100 but nothing enforces the unit; the engine's own components (read via grade_agent comp() from components[k].score) and the AI-estimated components share field names but there is no shared validator confirming both are on the same 0-100 scale before they are displayed side by side as comparable."
+   ],
+   "detail": "Files: C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/ai_grade.py (Perplexity research + Claude synthesis \u2192 proposed score; _extract_json L393; grade_topic component mapping L451-500; _num L503), .../ai_topic_intelligence.py (taxonomy tier floors/ceilings; compute_tier_aware_scores L534; apply_ai_intelligence overwrite L1085-1179; signal_count read L1111), .../calibration_parameter_corrections.py (AI_TOPIC_FLOOR + apply_ai_floor L401-448), .../grade_agent.py (_num L31, _ai_mainstream L63-73, _measured_from_row L76-136), .../gravitational_anomaly_detector.py (integration L7619-7654, L8021; heisenberg_gap recompute points).\n\nWHERE FREE-TEXT/LLM ENTERS SCORING \u2014 the contract:\n1) Perplexity research (research_topic L273) returns PROSE only \u2014 it never injects a number; it is fed as text into Claude's prompt. The explainer/movement calls (explain_topic, analyze_movement) return {short,full} JSON for DISPLAY only, not scoring \u2014 on parse miss they fall back to raw prose passthrough (available:True), so a parse miss degrades to readable text, never a silent scoring default. Low risk.\n2) Claude synthesis (propose_score) is the ONLY place an LLM injects NUMBERS into the score. It returns the 6 components 0-100; grade_topic maps them to engine letters G/M/I/D/P/C (N hardcoded 0.0, correct \u2014 never queried) and computes detection=_composite(comps,_DET_W), confidence=_composite(comps,_CONF_W) using the engine's exact weights so the AI estimate lands on the same scale as collected signals. On TOTAL parse failure \u2192 {available:False} \u2192 grade_topic returns proposed:False with NO score (fails loud \u2014 good). The ```json fence bug (sibling c/b) is explicitly FIXED in _extract_json L401-403.\n\nTHE GAP the founder is hunting: it is NOT total parse failure (handled). It is (i) PARTIAL parse \u2014 a missing component key silently becomes 0.0/50.0 and deflates the composite with no flag, and (ii) NO RANGE CLAMP \u2014 out-of-range or wrong-unit AI numbers (150, -20, a 0-1 ratio, '95%'\u2192default 0) enter _composite unvalidated. detection/confidence are never bounds-checked before display. Plus the signal-count KEY DRIFT (total_signals vs total_mentions) that can silently disable the taxonomy tier floor.\n\nRECOMMENDED CONTROLS (same spirit as the canonical-date gate): (a) a single clamp+validate step on every AI numeric \u2014 reject/quarantine out-of-[0,100], and DISTINGUISH missing from 0 (use a sentinel/None and refuse to score, rather than default 0.0 into the formula); (b) validate stage against the 5-value enum like classification already is; (c) one choke-point that recomputes heisenberg_gap from the FINAL served det/conf; (d) assert one canonical signal-count key across producer and all consumers; (e) replace the try/except:pass around the AI overrides with logging so a broken override is not indistinguishable from 'not in taxonomy'."
+  },
+  {
+   "subsystem": "Accuracy Ledger + N (nowtrendin_score) + Dark Matter (D) \u2014 producer/consumer format contract",
+   "has_documented_guideline": "PARTIAL. Strong central guideline exists for the DATE half of the contract (CLAUDE.md \u00a714 canonical date/time model + date_utils.py + ingestion_gate.gate_date), and each scoring method has a docstring describing its formula and 0-100 output range (compute_nowtrendin_score, compute_dark_matter, detect_breakout_date, compute_lead_time). What is NOT documented anywhere as a declared, enforced contract: (1) the UNIT of detection_score across the ledger boundary (raw pre-calibration vs serve-time-rescaled), (2) the verdict enum domain + casing, (3) the Trends curve dict-key shape, (4) the cross-module key-name agreement for N. These are described only in scattered code comments, not in a single declared per-field format spec. There is a Canonical Date Auditor (Agent 16) that enforces the date columns, but NO equivalent auditor for non-date scoring inputs (units/enums/keys).",
+   "inputs": [
+    {
+     "field": "accuracy_ledger.detection_score",
+     "produced_by": "validate_recent_detections() in google_trends_validation.py \u2014 reads velocity_scores.detection_score (the RAW pre-calibration column) and passes it straight to validate_topic()/record_validation()",
+     "expected_type_format": "REAL (Python float), stored in SQLite/PG REAL column",
+     "expected_unit_range": "DECLARED nowhere. The producing module's own comment (google_trends_validation.py ~line 588-592) states this is the *raw* pre-calibration score and that serve-time calibration in /scores rescales it UPWARD but that scaling is NOT persisted. So the ledger stores a number on a DIFFERENT scale than the Detection score shown to users/clients.",
+     "how_consumer_reads": "Stored verbatim; used only for ranking candidates (DETECTION_FLOOR>=10) and displayed in proof reports / best[] lists. Never re-derived.",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT/SCALE MISMATCH (not a null-coalesce). The ledger's detection_score is the raw scale while the institutional proof asset implies it is the headline Detection score. A client cross-referencing a ledger row's detection_score against the live /scores Detection for the same topic will see two different numbers for 'the score we detected at'. Not silently-zero, but a silent scale divergence in the moat's proof artifact. Recommend either persisting the calibrated score alongside, or labeling the column raw_detection_score."
+    },
+    {
+     "field": "accuracy_ledger.verdict",
+     "produced_by": "compute_lead_time() (LED/SAME_DAY/LAGGED) + sweep_pending()/validate_topic() (FALSE_POSITIVE, LATE_REDETECTION)",
+     "expected_type_format": "TEXT enum, UPPERCASE",
+     "expected_unit_range": "Domain = {LED, SAME_DAY, LAGGED, FALSE_POSITIVE, LATE_REDETECTION}. Honest denominator = LED+SAME_DAY+LAGGED+FALSE_POSITIVE; LATE_REDETECTION explicitly excluded.",
+     "how_consumer_reads": "generate_honest_report() filters with EXACT string equality r['verdict']=='LED' etc. across all five literals.",
+     "contract_declared": false,
+     "silent_misread_risk": "ENUM/CASE \u2014 currently SAFE: all producers and the report consumer use the same UPPERCASE literals, set by code constants (not external data), so no casing drift today. The latent risk is that the enum domain is enforced only by convention (string literals scattered across two files); a new verdict literal added in one place but not added to the report's filter set would silently fall out of BOTH numerator and denominator (vanish from the hit-rate) rather than error. No single declared enum.{LED,...} authority."
+    },
+    {
+     "field": "accuracy_ledger.detection_date / breakout_date",
+     "produced_by": "detection_date: validate_recent_detections via to_iso_date(first_at) + record_detection sink-hardens with to_iso_date; breakout_date: detect_breakout_date via _iso_curve_date()->to_iso_date at the fetch chokepoint",
+     "expected_type_format": "TEXT, canonical ISO 'YYYY-MM-DD'",
+     "expected_unit_range": "\u00a714 canonical primary key; whole-string parse first, never raw [:10]",
+     "how_consumer_reads": "_parse()/_parse_date() with whole-string format list; compute_lead_time subtracts to days; same-surge floor compares ISO strings lexicographically (since_iso)",
+     "contract_declared": true,
+     "silent_misread_risk": "DATE half is now POST-FIX and consistent: to_iso_date is applied at BOTH the fetch chokepoint (_iso_curve_date) and the write sink (record_detection), the old 'May 22, 2026'->'May' split bug is gone, and lexicographic ISO comparison in the same-surge floor is only valid BECAUSE every value is guaranteed YYYY-MM-DD. Residual: the date contract is enforced by opt-in helper calls in this module, not by ingestion_gate.gate_date \u2014 the Canonical Date Auditor (Agent 16) is what backstops bypasses. Low risk while both call sites keep using to_iso_date."
+    },
+    {
+     "field": "Google Trends curve point: {date,value} (also Apify {time}) ",
+     "produced_by": "_fetch_apify/_fetch_serpapi/_fetch_official/import_manual_curve in google_trends_validation.py",
+     "expected_type_format": "list[dict] with keys 'date' (ISO str) and 'value' (numeric 0-100). Apify path adds 'time' (epoch-seconds STRING).",
+     "expected_unit_range": "value = 0-100 relative interest. Apify wraps value as a LIST like [88]; SerpApi nests under values[0].extracted_value; official uses scalar value.",
+     "how_consumer_reads": "detect_breakout_date does values=[p['value'] for p in curve] then numeric comparisons (>= threshold). Relies on _point_value() having already unwrapped the [88]->88 list shape and defaulted None->0.",
+     "contract_declared": false,
+     "silent_misread_risk": "TYPE/SHAPE + NULL-COALESCE. The provider value shapes genuinely differ (scalar vs [88] vs nested extracted_value). _point_value() defends the Apify list shape and coalesces missing->0 \u2014 but ONLY on the Apify path; _fetch_official uses p.get('value',0) and _fetch_serpapi uses extracted_value default 0. A provider point that arrives as a numeric STRING ('88') would pass straight into detect_breakout_date's >= comparison and raise/compare wrong (str vs float) \u2014 there is NO central int()/float() coercion on value. A missing value silently becomes 0, which lowers the baseline-relative breakout and can suppress a real breakout (counted as still-pending). 'date' missing -> _iso_curve_date('') -> '' which the since-floor and _parse handle, but a '' breakout_date would corrupt lead-time. Recommend a single coerce-to-float + drop-or-quarantine on value at the curve boundary, mirroring the date gate."
+    },
+    {
+     "field": "N \u2014 velocity_scores.nowtrendin_score (the 'N' / Now TrendIn internal-demand score)",
+     "produced_by": "compute_nowtrendin_score() in gravitational_anomaly_detector.py; persisted by persist_velocity_score as column nowtrendin_score",
+     "expected_type_format": "REAL float 0-100",
+     "expected_unit_range": "0-100; vol_score 0-70 (log of topic_queries 30d) + recency 0-30",
+     "how_consumer_reads": "TWO consumers with DIFFERENT key names: (a) gravitational_anomaly_detector + grade_agent read s.get('nowtrendin_score') directly; (b) calibration_engine.build_component_groups reads components.get('nowtrend_internal',0) \u2014 a DIFFERENT key. The bridge in signal_calibration_integration.py:1230 maps raw_result.get('nowtrendin_score', raw_result.get('nowtrend_internal',0)) into the 'nowtrend_internal' key the calibration consumer expects.",
+     "contract_declared": false,
+     "silent_misread_risk": "KEY DRIFT \u2014 this is exemplar (a) from the brief and it is NOW BRIDGED but the bridge is the ONLY thing preventing N from reading 0. calibration_engine.py:918 still consumes the legacy key 'nowtrend_internal'; if any future caller invokes build_component_groups WITHOUT routing through the signal_calibration_integration bridge (e.g. a new endpoint that builds the components dict directly with the canonical 'nowtrendin_score' key), build_component_groups' .get('nowtrend_internal',0) silently returns 0 and N shows pending/0 in the breakdown again \u2014 the exact regression the code comment at line 1227-1231 documents. The two key names should be unified, or build_component_groups should .get('nowtrend_internal', components.get('nowtrendin_score',0))."
+    },
+    {
+     "field": "D \u2014 dark_matter_score + first_timer_ratio + engagement_asymmetry",
+     "produced_by": "compute_dark_matter() returns (score 0-100 float, ft_ratio 0-1 float, asymmetry bool); persisted by persist_velocity_score as dark_matter_score REAL, first_timer_ratio REAL, engagement_asymmetry INTEGER(0/1)",
+     "expected_type_format": "dark_matter_score float 0-100; first_timer_ratio float 0-1 (RATIO not percent); engagement_asymmetry int 0/1 representing a bool",
+     "expected_unit_range": "UNIT TRAP: first_timer_ratio is 0-1 at the producer (first_timers/len(signals)) but is rendered as a PERCENT downstream (explainers do round(ft_ratio*100); thresholds compare ft_ratio>=0.35). dark_matter_score is 0-100.",
+     "how_consumer_reads": "Serve layer: bool(s.get('engagement_asymmetry')) and s.get('first_timer_ratio') passed to _explain_d. Calibration: dark_matter routed by platform_tier (lowercase 'mainstream'/'expert'/'niche', consistent producer+consumer) not is_organic, per \u00a715.",
+     "contract_declared": false,
+     "silent_misread_risk": "UNIT (0-1 vs 0-100/percent) on first_timer_ratio is the live exposure: it is stored as a 0-1 ratio but the dashboard/alert layer multiplies by 100. Any consumer that treats it as already-a-percent (or compares it against a 0-100 threshold) would be off by 100x and silently mis-gate dark matter. engagement_asymmetry round-trips bool->int(0/1)->bool() cleanly. first_timer_ratio when len(signals)<MIN_FT_SAMPLE(3) is forced to 0.0 \u2014 a legitimate-looking 0 that means 'insufficient sample', indistinguishable downstream from a true 0% first-timer (a benign but real NULL-as-0 masking). No declared unit annotation on the column."
+    }
+   ],
+   "boundary_risks": [
+    "DATE contract (detection_date/breakout_date): POST-FIX and internally consistent \u2014 to_iso_date applied at both the fetch chokepoint and the write sink, whole-string parse, ISO lexicographic same-surge floor. This sibling is closed; Canonical Date Auditor (Agent 16) backstops bypasses.",
+    "KEY DRIFT on N is the highest-residual structural risk: producer writes nowtrendin_score, calibration_engine.build_component_groups consumes nowtrend_internal. It works TODAY only because signal_calibration_integration.py:1230 bridges the two with a fallback .get chain. The bridge is a single point of failure \u2014 any new caller of build_component_groups that passes the canonical key silently regresses N to 0/pending. FIX: unify the key name or make build_component_groups accept both.",
+    "Google Trends curve 'value' has NO central numeric coercion. _point_value() defends only the Apify list shape; a numeric-string value or a missing value silently becomes 0, which lowers the baseline-relative breakout multiple and can suppress a real breakout (mislabeled still-pending or FALSE_POSITIVE at timeout). FIX: coerce value to float (drop/quarantine on failure) at the curve boundary, mirroring gate_date for dates.",
+    "detection_score UNIT/SCALE divergence in the ledger: the column stores the RAW pre-calibration score while the institutional proof asset implies the headline Detection. A client cross-referencing ledger.detection_score vs live /scores Detection sees two scales. FIX: persist the calibrated score too, or rename the column raw_detection_score and document it.",
+    "first_timer_ratio UNIT ambiguity: stored 0-1 ratio, rendered as percent (\u00d7100) downstream and compared against 0-1 thresholds. A consumer treating it as percent is off by 100\u00d7. Also len(signals)<3 forces ft_ratio=0.0 \u2014 a sentinel 0 indistinguishable from a true 0% (NULL-as-0 masking). FIX: annotate the column unit; consider a sentinel/None for insufficient-sample.",
+    "verdict enum is enforced only by matching UPPERCASE string literals across two files (no declared domain). Safe today (all code-set), but a new verdict literal added in the producer but not the report's filter set would silently vanish from BOTH numerator and denominator. FIX: declare a single VERDICT enum constant both modules import.",
+    "STRUCTURAL GAP: there is a Canonical Date Auditor for date columns but NO equivalent auditor for non-date scoring inputs (units, enum casing, cross-module key names). The same disease (producer/consumer format mismatch -> silent misread) is currently unguarded for detection_score scale, first_timer_ratio unit, the curve value type, and the N key name. RECOMMEND a 'Scoring Input Contract Auditor' that asserts each scoring input's declared type/unit/range/key at the producer/consumer boundary, the way Agent 16 does for dates."
+   ],
+   "detail": "Files read: transfer/accuracy_ledger_enhanced.py (record_detection sink-hardens detection_date via to_iso_date; sweep_pending TIMEOUT-FIRST + oldest-checked rotation; generate_honest_report verdict-literal filters), transfer/google_trends_validation.py (fetch_trends_curve provider shapes; _iso_curve_date/_point_value/_clean_time_str; detect_breakout_date baseline+since floor; compute_lead_time verdict logic; validate_recent_detections reads RAW velocity_scores.detection_score), transfer/nowtrend_integration.py (gradient pipeline bridge \u2014 heisenberg_gap computed at serve via .get(...) or 0), transfer/gravitational_anomaly_detector.py (compute_nowtrendin_score L3637, compute_dark_matter L3453, persist_velocity_score L3035 column order, serve-layer heisenberg_gap recompute from CALIBRATED det/conf at L8057-8066/5260/7716/7981, platform_tier lowercase enum), transfer/calibration_engine.py L918 (consumes legacy key nowtrend_internal), transfer/signal_calibration_integration.py L1227-1231 (the nowtrendin_score->nowtrend_internal bridge).\\n\\nVERDICT on the four named sibling exemplars: (a) N KEY DRIFT \u2014 REAL and currently mitigated ONLY by the L1230 bridge; unify the key to fully close it. (d) heisenberg_gap STALE-DERIVED \u2014 APPEARS CLOSED: the gap is now authoritatively recomputed from the FINAL post-calibration/post-clamp Detection-Confidence at serve time (L8063-8066, with explicit invariant comment), so /scores, /scores/{key}, serve_payload, and history agree. (b) raw ```json fence and (c) market tier/risk_stage/classification disagreement live in ai_grade.py and the market-signal modules \u2014 OUT OF SCOPE for the ledger/N/D files I was asked to map, but they are the same disease class and should be on the same Scoring-Input-Contract-Auditor backlog.\\n\\nNet: the DATE half of the ledger contract is now sound. The UNDEFENDED non-date exposures are (1) detection_score raw-vs-calibrated scale in the proof asset, (2) the curve 'value' type/null coercion gap, (3) first_timer_ratio 0-1-vs-percent unit + insufficient-sample-0 sentinel, and (4) the N key-name drift held together by one bridge. None throws; all four can silently feed a wrong-but-plausible number into the moat. The single highest-leverage fix is a non-date analogue of Agent 16 that declares and asserts type/unit/range/key per scoring input at every producer/consumer boundary."
+  },
+  {
+   "subsystem": "Contract/format layer \u2014 declared-format guarantees for scoring inputs (date contract vs. every other scoring field)",
+   "has_documented_guideline": "PARTIAL \u2014 and only for ONE axis (dates). There is exactly ONE formal, centrally-enforced format contract in the engine: the canonical date/time model. It is declared in three coupled places: (1) date_utils.py (the single normalizer: to_iso_date / to_iso_dt / iso_time_of / canonical_date_of, with whole-string parse order and explicit tolerated-input list), (2) ingestion_gate.py with the DATE_SEMANTIC registry \u2014 a literal dict mapping {table: [date columns]} that is the ONLY machine-readable per-column format registry in the system, plus gate_date() as the condition-precedent write filter that quarantines unparseable values to format_review_queue instead of guessing, and (3) CLAUDE.md \u00a714 + the Canonical Date Auditor (Agent 16, /monitor/datecanon) which audits the live data by column and discovers new *_date columns. This is a genuinely good contract \u2014 but its REACH IS DATES ONLY. For every NON-date scoring input there is NO declared guideline: no type/unit/range/enum/JSON-vs-scalar contract, no enforcement gate, no registry, no auditor. The DB_DATA_DICTIONARY.md declares per-column only (a) SQLite type (text/real/integer), (b) nullability, and (c) a date-format bucket for date-ish TEXT columns. It declares ZERO units, ranges, value-domains/enums, key-name contracts, or JSON-vs-scalar semantics for any of the ~100 real/integer/text scoring columns. So Q1 answer: documented guideline exists for dates, is ABSENT for all other scoring inputs.",
+   "inputs": [
+    {
+     "field": "ingestion_gate.DATE_SEMANTIC (the ONLY format registry)",
+     "produced_by": "ingestion_gate.py \u2014 hand-maintained dict {accuracy_ledger:[detection_date,breakout_date], pending_detections:[detection_date], risk_signals:[signal_date], market_signal_history:[signal_date], pull_history:[snapshot_date], score_archive:[snapshot_date], topic_baselines:[snapshot_date]}",
+     "expected_type_format": "ISO 'YYYY-MM-DD' primary; secondary 'HH:MM:SS' time cols (risk_signals.signal_time, market_signal_history.signal_time); operational *_at via to_iso_dt",
+     "expected_unit_range": "calendar date; declared + enforced",
+     "how_consumer_reads": "gate_date() before write; date_utils on read/sort/match; Canonical Date Auditor audits live",
+     "contract_declared": true,
+     "silent_misread_risk": "LOW for the listed columns \u2014 this is the formalized contract. BUT the registry is opt-in and date-only; it provides NO coverage for any non-date field. Data dictionary still shows MIXED date formats persisted historically (market_signal_history.cycle_at iso_date:180 + iso_dt:57750; risk_signals.signal_date iso_date:1829 + iso_dt:52 + compactZ:66) \u2014 pre-gate rows the forward-only contract does not rewrite."
+    },
+    {
+     "field": "velocity_scores.serve_payload (JSON-as-TEXT)",
+     "produced_by": "scorer writes json.dumps of the full served score object into a TEXT column",
+     "expected_type_format": "JSON object string; consumed by json.loads on read (lines ~7087/7378/8081)",
+     "expected_unit_range": "n/a \u2014 structured blob holding detection/confidence/N/gap/components",
+     "how_consumer_reads": "read paths json.loads(serve_payload) then index keys; the serve_payload cache gotcha (MEMORY) means it can serve STALE values after a scoring change if not regenerated",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 STALE-DERIVED: serve_payload is a denormalized snapshot; any scoring/calibration change that does not regenerate it serves old detection/confidence/gap while looking fine (the exact disease class). No contract declares it must be regenerated; enforced only by tribal knowledge."
+    },
+    {
+     "field": "velocity_scores.heisenberg_gap (REAL)",
+     "produced_by": "scorer: round(detection_score - confidence_score) \u2014 a DERIVED field persisted alongside its own inputs",
+     "expected_type_format": "REAL, signed, 0-100 scale (det - conf)",
+     "expected_unit_range": "-100..100 (same 0-100 unit as det/conf); units NOT declared anywhere",
+     "how_consumer_reads": "s.get('heisenberg_gap', 0) or 0 (line ~7092); recomputed in some read paths (7644/7654/7716/7981/8063) but NOT all",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 STALE-DERIVED (a known sibling exemplar): gap is persisted from det/conf at score time; when det/conf are recalibrated on read, gap is recomputed in SOME paths and read raw in others. Divergent recompute coverage = the stored gap silently disagrees with current det/conf. No contract pins 'gap MUST equal served_detection - served_confidence everywhere'."
+    },
+    {
+     "field": "velocity_scores.nowtrendin_score (N, REAL)",
+     "produced_by": "compute_nowtrendin_score() writes key 'nowtrendin_score'",
+     "expected_type_format": "REAL, 0-100",
+     "expected_unit_range": "0..100; not declared",
+     "how_consumer_reads": "s.get('nowtrendin_score', 0) or 0; one read does .get('nowtrendin_score') or 0 (line ~7392 'n')",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 KEY DRIFT (the originating sibling exemplar): code comment notes reading the WRONG key (nowtrend_internal vs nowtrendin_score) left N at 0/pending. The 'or 0' null-coalesce then MASKS the miss as a real-looking 0 that enters ranking. No declared key-name contract; any consumer that .get()s a typo'd key silently scores on 0."
+    },
+    {
+     "field": "risk_scores.components / diffusion / positioning_json / source_provenance (JSON-as-TEXT, 4 columns)",
+     "produced_by": "financial_risk_gradient.py writes json.dumps(...) into TEXT columns components/diffusion; positioning_json + source_provenance similar",
+     "expected_type_format": "JSON object string",
+     "expected_unit_range": "n/a structured",
+     "how_consumer_reads": "_parse_json_fields() ONLY parses ['platforms_active'] \u2014 these four risk JSON columns are NOT in its list, so any consumer using _parse_json_fields receives them as RAW STRINGS",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 JSON-NOT-PARSED: _parse_json_fields (line 8195) parses exactly one field. Every other JSON-bearing TEXT column (risk components/diffusion/positioning_json/source_provenance, research_history_cache.result_json, calibration_epochs.payload, topic_registry.platforms_seen, themes_extension.keywords/sectors) is parsed ad-hoc by individual call sites or read as text. A consumer that treats components as a string sees a JSON blob, not a dict \u2014 silent misread with no error."
+    },
+    {
+     "field": "JSON-bearing read sites with swallowed parse failures",
+     "produced_by": "various read paths: json.loads(x) wrapped in try/except that defaults to [] or {}",
+     "expected_type_format": "valid JSON",
+     "expected_unit_range": "n/a",
+     "how_consumer_reads": "_parse_json_fields except->[]; line 4437 platforms_list=json.loads(...); line 7308 json.loads(pa or '[]'); the AI-explainer raw ```json fence bug (sibling exemplar c)",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 SWALLOWED PARSE FAILURE: try/except around json.loads silently substitutes an empty default on any malformed value (e.g., a markdown ```json fence, a single-quoted dict, a truncated blob). The score is then computed on empty structure that looks valid. No gate analogous to gate_date() exists for JSON columns to quarantine-not-guess."
+    },
+    {
+     "field": "risk_scores tier triplet: risk_stage / risk_action / maturity_class / baseline_status (TEXT enums)",
+     "produced_by": "financial_risk_gradient.py + risk scorer write free-text enum-like strings; tier/risk_stage/classification can DISAGREE on one row (sibling exemplar c)",
+     "expected_type_format": "TEXT enum (e.g., stage labels, maturity NEW/EMERGING/ESTABLISHED)",
+     "expected_unit_range": "a fixed value-domain that is NOT declared or validated anywhere",
+     "how_consumer_reads": "string compares / stageOf mapping; no canonical casing enforced",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 ENUM/CASE mismatch + cross-field disagreement: no declared value-domain or casing contract for any TEXT enum (signal_stage, risk_stage, maturity_class, velocity_trend, detection_pathway, baseline_status, current_stage). 'EMERGING' vs 'emerging' or three tier fields disagreeing on the same row passes silently because nothing validates the enum set."
+    },
+    {
+     "field": "Unit-ambiguous REAL scoring columns (0-1 vs 0-100)",
+     "produced_by": "scorer writes gradient_strength, dark_matter_score, confidence_decay, first_timer_ratio, gradient_ratio, mainstream_ratio, mainstream_breadth, persistence_rate, abnormality, calibration_multiplier",
+     "expected_type_format": "REAL",
+     "expected_unit_range": "AMBIGUOUS \u2014 some are ratios (0-1: first_timer_ratio, mainstream_ratio, persistence_rate), some are 0-100 scores (detection/confidence/overall/N), some are open-ended (attention_magnitude, gradient_strength). Units declared NOWHERE",
+     "how_consumer_reads": "consumed directly into formulas and blends with no unit assertion",
+     "contract_declared": false,
+     "silent_misread_risk": "HIGH \u2014 UNIT mismatch: a 0-1 ratio fed where a 0-100 is expected (or vice-versa) produces a wrong-but-plausible number with no error. The data dictionary's 'real' type tells a consumer nothing about scale. This is the largest un-contracted surface: ~25 REAL scoring columns on velocity_scores alone, none with a declared unit/range."
+    }
+   ],
+   "boundary_risks": [
+    "NO single registry of scoring-field formats exists. ingestion_gate.DATE_SEMANTIC is the ONLY machine-readable per-column format registry, and it covers dates exclusively (8 date columns across 7 tables). Grep for SCORING_FIELD/FIELD_CONTRACT/FIELD_SPEC/FORMAT_REGISTRY/UNIT_/_RANGE across transfer/ returns ZERO files. There is no non-date analogue of DATE_SEMANTIC.",
+    "The gap between the date contract and every other scoring input is total in KIND, not degree: dates have (declared registry + central normalizer + write-time quarantine gate + live data auditor); every other scoring input has NONE of the four. The disease the founder is worried about (producer/consumer format mismatch -> silent misread) is GATED for dates and UNGATED everywhere else.",
+    "JSON columns parsed vs read raw: PARSED centrally = exactly ONE (velocity_scores.platforms_active, via _parse_json_fields line 8195). PARSED ad-hoc at individual call sites = serve_payload, positioning_history-adjacent, a few platforms_active/platforms_seen sites. READ RAW / no central parse = risk_scores.components, risk_scores.diffusion, risk_scores.positioning_json, risk_scores.source_provenance, research_history_cache.result_json, calibration_epochs.payload, topic_registry.platforms_seen, themes_extension.keywords, themes_extension.sectors. _parse_json_fields is a one-field allowlist masquerading as a JSON contract.",
+    "NULL-COALESCE masking is systemic: the dominant read idiom is s.get(key, 0) or 0 (lines ~7092, ~7094, ~7392, and throughout). This converts BOTH a missing key (key drift) AND a genuine null into an indistinguishable real-looking 0 that enters formulas and ranking. There is no contract that says 'a missing scoring input must FAIL/quarantine, not default to 0' \u2014 the opposite of the gate_date() quarantine philosophy.",
+    "STALE-DERIVED fields have no recompute contract: heisenberg_gap and serve_payload are denormalized from det/conf/N at score time, recomputed in SOME read paths and read raw in others. The serve_payload cache gotcha (in user MEMORY) confirms this already bit the team. No declared invariant pins derived fields to their current inputs across ALL read paths.",
+    "Scoring columns with NO format guarantee (no unit/range/enum/key/JSON contract, beyond bare SQLite type): on velocity_scores \u2014 gradient_strength, inertia_score, platform_diversity, dark_matter_score, confidence_decay, persistence_score, nowtrendin_score, overall_score, detection_score, confidence_score, heisenberg_gap, first_timer_ratio, engagement_asymmetry, gradient_ratio, signal_stage(enum), is_gravitational_anomaly(bool-as-int), serve_payload(JSON), attention_magnitude, mainstream_ratio, mainstream_breadth, detection_pathway(enum), tier_migration, mainstream_confirmed; on risk_scores \u2014 detection_score, confidence_score, risk_stage(enum), risk_action(enum), components(JSON), diffusion(JSON), maturity(enum), baseline_signals, baseline_cycles, abnormality, baseline_status(enum), positioning_json(JSON), source_provenance(JSON); on pull_history/score_archive \u2014 detection_score, confidence_score, overall_score, signal_stage(enum); on topic_lifecycle/topic_maturity \u2014 persistence_rate, peak_*_score, baseline_*, gradient_velocity, score_velocity, velocity_trend(enum), calibration_multiplier, maturity_class(enum). That is ~70+ scoring columns with type-only declaration and no format guarantee.",
+    "ASYMMETRY across agents (Q5): the date contract is the only thing ALL agents are instructed in the same way (date_utils is the one normalizer). For non-date inputs there is no shared format instruction \u2014 financial_risk_gradient.py, the gravitational/velocity scorer, and the grade/research paths each define and read their own JSON/enum/scale conventions independently, which is exactly how the tier-triplet disagreement (sibling exemplar c) arose."
+   ],
+   "detail": "Files read: ingestion_gate.py (lines 1-172, full), date_utils.py (1-127, full), gravitational_anomaly_detector.py (_parse_json_fields at 8195-8202; read-path grep for heisenberg_gap/nowtrendin_score at lines 3043-3055, 4025-4036, 4334, 7066-7116, 7299-7392, 7521-7773, 7981-8094), DB_DATA_DICTIONARY.md (full, 32 tables). Grep across transfer/ confirmed NO scoring-field format registry (SCORING_FIELD/FIELD_CONTRACT/FORMAT_REGISTRY/UNIT_/_RANGE = 0 hits).\\n\\nDIRECT ANSWERS TO THE 5 QUESTIONS (system level):\\nQ1 (documented guideline per scoring method): YES for dates (CLAUDE.md \u00a714 + date_utils docstring + ingestion_gate docstring + Agent 16). NO for every other scoring formula \u2014 no per-method format guideline.\\nQ2 (declared FORMAT requirement per input field \u2014 type/unit/range/key/JSON-vs-scalar/enum): YES for the 8 date-semantic columns (declared in DATE_SEMANTIC + \u00a714). NO for all ~70 non-date scoring columns. DB_DATA_DICTIONARY declares type + null + date-bucket ONLY \u2014 no unit, range, enum value-domain, key-name, or JSON-vs-scalar semantics.\\nQ3 (data actually formatted to requirement by producer): YES going-forward for dates (gate_date enforces; historical MIXED rows remain \u2014 cycle_at and signal_date show \u26a0MIXED buckets). UNVERIFIED/UNENFORCED for non-date \u2014 no write-time gate exists, so producers are free to write any scale/casing/JSON-as-text.\\nQ4 (data populates in the indicated format, no silent null/0/missing): NO guarantee outside dates. The dominant read idiom .get(k,0) or 0 actively MASKS missing/misread inputs as real 0s. No quarantine-not-guess path for non-date fields.\\nQ5 (other agents instructed in the SAME format for cross-agent consistency): YES only for dates (one normalizer, all agents). NO for non-date \u2014 each scorer defines its own JSON/enum/scale conventions independently; this asymmetry is the root cause of the four sibling exemplars (key drift, json-fence parse break, tier-triplet disagreement, stale heisenberg_gap).\\n\\nRECOMMENDED CLOSE-THE-GAP DIRECTION (mirrors the date contract that already works): build a non-date analogue of DATE_SEMANTIC \u2014 a single SCORING_FIELD registry declaring per scoring column {type, unit/scale (0-1 vs 0-100), range, enum value-domain+casing, json|scalar, canonical key-name, derived-from (for stale detection)}; add a write-time gate analogous to gate_date() that quarantines out-of-contract values instead of defaulting; replace .get(k,0) or 0 on scoring inputs with a contract-checked read that raises/quarantines on missing; extend _parse_json_fields into a registry-driven parser covering ALL JSON columns; and add a 17th monitoring agent (Format/Contract Auditor) that audits live data against the registry exactly as Agent 16 does for dates. Highest-priority columns by silent-misread risk: serve_payload (stale), heisenberg_gap (stale-derived), nowtrendin_score (key drift), the 4 risk_scores JSON columns (not parsed), and the unit-ambiguous REAL ratios (0-1 vs 0-100)."
+  }
+ ],
+ "confirmed_issues": [
+  {
+   "finding": "AI-grade scores are NOT on the same scale as engine scores: ai_grade.py uses the OLD pre-renormalization component weights (with N still present), then hardcodes the N input to 0.0 \u2014 leaving 0.12 of \"dead\" detection weight and 0.10 of dead confidence weight. The remaining six weights sum to 0.88 (detection) / 0.90 (confidence) instead of 1.0, so every AI-graded Detection is ~12% low and every AI-graded Confidence ~10% low relative to the engine \u2014 despite the in-code comment claiming they \"land on the SAME scale as engine-collected signals.\" This silently pushes AI-graded topics toward lower stages (BREAKOUT/STRONG -> EMERGING/WATCHING).\n\nThe candidate's HEADLINE (real cross-agent scale mismatch on N) is confirmed, but its stated MECHANISM is wrong and is corrected here: (1) N is NOT misread into the engine composite \u2014 the engine and serve payload correctly exclude N (in_composite=False, weight \"\u2014\"), verified live; the docstring at gravitational_anomaly_detector.py:3641 (\"10% of Overall, 12% of Detection, 10% of Confidence\") is a STALE artifact only, not on a scoring path. (2) N is NOT actively scored in the AI path either \u2014 ai_grade.py:459 hardcodes comps[\"N\"]=0.0, so N contributes 0. The true defect is the un-renormalized weight vector, not a live N term.",
+   "is_real": true,
+   "evidence": "CODE:\n- transfer/ai_grade.py:314-315 \u2014 _DET_W = {G:0.33, D:0.19, I:0.16, M:0.09, C:0.05, P:0.06, N:0.12}; _CONF_W = {I:0.25, P:0.24, M:0.20, G:0.11, C:0.06, D:0.04, N:0.10}. These are the OLD weights (sum to 1.0 WITH N).\n- ai_grade.py:348-349 \u2014 _composite() is a plain weighted sum with NO renormalization.\n- ai_grade.py:459 \u2014 comps[\"N\"] = 0.0 hardcoded; :463-464 detection/confidence = _composite(comps, _DET_W/_CONF_W). With N=0, effective weight sums are 0.88 / 0.90.\n- ai_grade.py:310-312 comment falsely claims \"same scale as engine-collected signals.\"\n- transfer/gravitational_anomaly_detector.py:3918-3936 \u2014 engine Detection/Confidence with comments \"was incl. N\u00d70.12\" / \"was incl. N\u00d70.10\": weights RENORMALIZED to sum to exactly 1.000 (Det: 0.375+0.216+0.182+0.102+0.057+0.068=1.000; Conf: 0.278+0.267+0.222+0.122+0.067+0.044=1.000).\n- signal_calibration_integration.py:1119-1138 \u2014 serve recompute uses the SAME renormalized 6-component weights (N excluded by design, renormalized to 1.0). Consistent with the engine.\n- gravitational_anomaly_detector.py:7177-7194 (serve_row) \u2014 N_nowtrendin: weight \"\u2014\", in_composite=False. Engine path is internally consistent; only the docstring at :3641 disagrees.\n\nNUMERIC PROOF (identical components G60/D50/I55/M40/C50/P45): AI Detection=46.9 vs Engine=53.3 (6.4 pts, 12.0% low); AI Confidence=44.1 vs Engine=49.1 (5.0 pts, 10.2% low). The gaps exactly equal the dead N weights.\n\nLIVE ENGINE (nowtrendin-v2-engine): /scores/africa -> detection=86.5, confidence=90.2, N score=89.07 with in_composite=False, weight_overall=None. Confirms the engine excludes N from the composite in production (so the docstring is the only stale piece, and it is cosmetic).",
+   "severity": "medium",
+   "fix": "In transfer/ai_grade.py, make the AI-grade path use the SAME renormalized 6-component weights as the engine (gravitational_anomaly_detector.py:3919-3936), so AI scores land on the engine scale.\n\nPreferred (drop N entirely, mirror the engine exactly):\n  _DET_W  = {\"G\":0.375, \"D\":0.216, \"I\":0.182, \"M\":0.102, \"C\":0.057, \"P\":0.068}\n  _CONF_W = {\"I\":0.278, \"P\":0.267, \"M\":0.222, \"G\":0.122, \"C\":0.067, \"D\":0.044}\nand remove the \"N\": 0.0 entry from comps (ai_grade.py:459) and the misleading N comment.\n\nMinimal alternative (keep current vectors but renormalize at use): in _composite, divide by sum(weights) over the keys actually present in c, i.e. return round(sum(c.get(k,0)*w for k,w in weights.items() if k in c) / sum(w for k,w in weights.items() if k in c), 1). Since N is never in comps, this auto-rescales 0.88->1.0 and 0.90->1.0.\n\nSeparately (cosmetic but a Q1/Q5 hazard): fix the stale docstring at gravitational_anomaly_detector.py:3641 \u2014 change \"N \u2014 NowTrendIn Score (10% of Overall, 12% of Detection, 10% of Confidence)\" to reflect that N is a DISPLAY-ONLY signal excluded from the composite (in_composite=False), matching the serve payload and calibration recompute. This is the only \"documented guideline\" for N and it currently contradicts every consumer.\n\nGUARDRAIL TEST to add: assert sum(engine_det_weights)==1.0 and sum(effective_ai_det_weights)==1.0, and assert that identical synthetic components produce equal Detection/Confidence on both the engine formula and the ai_grade path (tolerance 0.1). This locks the \"same scale\" contract the comment promises."
+  },
+  {
+   "finding": "AI-grade detection/confidence (and the derived heisenberg_gap) are computed with LEGACY 7-component weights that include N (det 0.12, conf 0.10) while N is hardcoded to 0.0 and NEVER renormalized out \u2014 so every AI-graded topic is silently penalized by N's weight-share vs the engine's authoritative 6-component renormalized score. This is a producer/consumer scale mismatch: the engine excludes N and renormalizes the other six to sum to 1.0; AI-grade does not.",
+   "is_real": true,
+   "evidence": "transfer/ai_grade.py:314-315 defines _DET_W={G0.33,D0.19,I0.16,M0.09,C0.05,P0.06,N0.12} and _CONF_W={I0.25,P0.24,M0.20,G0.11,C0.06,D0.04,N0.10}. Both sum to exactly 1.0 INCLUDING the N share. At line 459 comps[\"N\"]=0.0 (comment \"never queried before\"); lines 463-464 detection=_composite(comps,_DET_W), confidence=_composite(comps,_CONF_W); _composite (line 348-349) is a plain weighted sum with no renormalization. Because the weights sum to 1.0 with N in them, zeroing N subtracts its full share rather than redistributing it. The authoritative engine does the opposite: signal_calibration_integration.py:1119 \"6-component external weights (N excluded by design; renormalized to 1.0)\" with det weights 0.375+0.216+0.182+0.102+0.057+0.068=1.000 and conf 0.278+0.267+0.222+0.122+0.067+0.044=1.000; gravitational_anomaly_detector.py:3906 confirms \"components below are renormalized to sum to 1.0 (was 7-component w/ N)\". Worked example (all six real components = 70): AI detection = 70*(1-0.12)=61.6 vs engine 70.0 (8.4-pt / 12% penalty); AI confidence = 70*(1-0.10)=63.0 vs engine 70.0 (7.0-pt penalty). heisenberg_gap=detection-confidence (ai_grade.py:473) inherits both biases plus a directional skew because N's det weight 0.12 != conf weight 0.10. provenance string line 493 \"(engine-weighted)\" and the comment line 461-462 \"same scale as collected signals\" are both FALSE \u2014 the scales differ by the N share. grade_agent.py:85,102-104,213,237 passes detection_score/confidence_score/heisenberg_gap straight through with no renormalization, so the biased values reach the consumer who compares AI-grade vs in-pool MEASURED scores, producing an artificial gap with no error flag.",
+   "severity": "high",
+   "fix": "Renormalize the six AI-grade components to 1.0 by dropping N entirely, matching the engine. Either (a) define 6-component weight dicts in ai_grade.py identical to the engine's serve weights (det: G0.375,D0.216,I0.182,M0.102,C0.057,P0.068; conf: I0.278,P0.267,M0.222,G0.122,C0.067,D0.044) and remove \"N\" from comps and from _DET_W/_CONF_W; or (b) keep the dicts but divide each composite by the sum of the non-N weights actually present (i.e. _composite renormalizes over the keys with non-zero comps). Option (a) is preferred because it makes AI-grade and engine use the literally same numbers, so heisenberg_gap and the AI-vs-measured comparison are apples-to-apples. After the fix, an all-70 topic should yield detection 70.0 / confidence 70.0 and gap 0.0, not 61.6/63.0. Also correct the provenance/comment text only after the weights actually match."
+  },
+  {
+   "finding": "CONFIRMED silent-misread: the Positioning Concentration market component silently collapses to a flat, non-informative baseline value (z=0.0 / score 30.0) for 100% of risk topics because its positioning inputs (FINRA short_interest change_pct, WhaleWisdom 13F shares_change_pct, and the insider/stage-1 count) are absent on the live scoring path and are masked by `or 0.0` / `or 0` into a confident zero that enters the weighted detection score (weight 0.25). The candidate's mechanism is real, but the live code path is `market_signal_engine.assemble_market_components` + `compute_market_signal` (transfer/market_signal_engine.py:230-247, 145-180) \u2014 NOT the `compute_market_gradient` function the candidate cited as the gated reference (financial_risk_gradient.py:2020-2108), which is DEAD CODE (defined, never called). So the protective `has_analyst`/`has_pp`/`is not None` gates the candidate pointed to do not actually run; the live path has NO presence gate on ANY component \u2014 the problem is broader than framed, and positioning is its worst victim.",
+   "is_real": true,
+   "evidence": "CODE: transfer/market_signal_engine.py:236-240 \u2014 `si_chg = abs(si.get(\"change_pct\") or 0.0)`, `inst_chg = abs(iw.get(\"shares_change_pct\") or 0.0)`, `insider = stages.get(1, 0)`, then `pos_conc = _norm(...)`. The `or 0.0` turns missing positioning data into 0. Worse, on the risk-scoring entry (financial_risk_gradient.py:2234) `sig_summary` is hardcoded `{\"stage_counts\": {}, \"venue_count\": 0, \"newest_age_hours\": None}`, so `insider = stages.get(1,0) = 0` ALWAYS \u2014 every term of pos_conc is 0 \u2192 a CONSTANT 0 each cycle. A constant feeds score_component (market_signal_engine.py:117-137): baseline mean=0, current=0 \u2192 `z=(0-0)/0.05=0` \u2192 `_z_to_unit(0)=0.30` \u2192 score 30.0, flagged `baseline_relative:true` (a real-looking, baseline-validated value built on missing data). LIVE DATA (https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com/risk/scores?limit=88): 'Positioning Concentration' = 30.0 with z=0.0 on ALL 88 topics \u2014 including Tesla, JPMorgan, Citigroup, Morgan Stanley, Alphabet, SpaceX, which unquestionably have FINRA short-interest and 13F data; 37/50 sampled carry `baseline_relative:true`. Analyst Signal is also 30.0 on 74/88. By contrast Dark Positioning (macro_leverage, a shared OFR source) varies (47.6/45.4/39.2\u2026), proving the engine CAN separate topics when the input populates \u2014 positioning simply never does. The cited 'gates' (financial_risk_gradient.py:2038 has_analyst, 2044 has_pp, 2074-2076, 2082-2084) live in `compute_market_gradient`, which `grep 'compute_market_gradient('` shows is never invoked \u2014 dead code, so it provides no protection.",
+   "severity": "high",
+   "fix": "Two coupled fixes. (1) STOP masking missing-as-zero on the positioning path: in market_signal_engine.assemble_market_components, distinguish \"input absent\" from \"input genuinely 0\". Only build positioning_concentration (and analyst_signal) when at least one underlying source actually populated; otherwise OMIT the component from the dual-score weighting (renormalize the remaining DETECTION_WEIGHTS over present components, the same omission pattern the dead compute_market_gradient intended). Concretely: gate on `si.get(\"change_pct\") is not None or iw.get(\"shares_change_pct\") is not None or stages` rather than `or 0.0`, and have score_component / compute_market_signal skip None components and reweight. (2) Fix the root cause of the absence: on the risk-scoring entry (financial_risk_gradient.py:2234) `sig_summary` is stubbed empty AND the positioning payload's short_interest/institutional_holdings are evidently not being assembled for these topics \u2014 populate them (or, if a topic legitimately has no ticker, omit positioning rather than scoring it 30.0). (3) Add a monitoring guard (extend the Scorer/Pipeline-Integrity agents): alert when any market component is degenerate \u2014 identical value across >N% of scored topics (here 100% at 30.0) \u2014 which is the universal silent-misread fingerprint. (4) Delete or wire up the dead compute_market_gradient so the gated and live logic don't diverge. Net effect of the masking today: a flat 0.25\u00d730 = 7.5 detection points added uniformly to every instrument, carrying zero discriminating signal \u2014 the SpaceX cold-start artifact mechanism, now confirmed engine-wide."
+  },
+  {
+   "finding": "KEY DRIFT silent misread confirmed on the SCORING path. The producer (gravitational_anomaly_detector.py:4044) writes engagement-asymmetry evidence under the key \"engagement_asymmetry\" (int 1/0). The active scoring-time consumer, signal_calibration_integration.py:1067 (apply_calibration, called at detector line 4286), reads raw_result.get(\"engagement_asymmetry_detected\", False). That \"_detected\" key does NOT exist on the scoring-time result dict, so .get masks the missing value as a real-looking False with no error. The resulting asymmetry=False is passed to evaluate_anomaly_gate(asymmetry_detected=...) at line 1175, where has_asymmetry (calibration_engine.py:566) becomes permanently dead. For NEW-pathway topics the gate is evidence_count = sum([has_first_timer, has_asymmetry, has_inertia]) with anomaly requiring has_xplatform AND evidence_count>=1 (calibration_engine.py:644-647); for EMERGING it is one of six evidence points (line 632-636). Genuine engagement-asymmetry evidence therefore never contributes to is_gravitational_anomaly at scoring time. The serve path was already silently patched for this exact bug (detector 7997-7998 synthesizes engagement_asymmetry_detected from engagement_asymmetry BEFORE apply_calibration), proving the alias is required and the scoring path was simply missed.",
+   "is_real": true,
+   "evidence": "Code (all confirmed by reading): PRODUCER gravitational_anomaly_detector.py:4044 writes \"engagement_asymmetry\": 1 if asymmetry else 0 (no \"_detected\" key on the result dict). CONSUMER signal_calibration_integration.py:1067 reads asymmetry = raw_result.get(\"engagement_asymmetry_detected\", False), then line 1175 passes asymmetry_detected=asymmetry into evaluate_anomaly_gate. The gate's NEW branch (calibration_engine.py:644-647) and EMERGING branch (632-636) both fold has_asymmetry into the anomaly decision. SCORING call site: detector line 4286 calls apply_calibration(result) on the score_topic dict that only carries \"engagement_asymmetry\". SERVE patch proving intent: detector 7997-7998 creates engagement_asymmetry_detected from engagement_asymmetry only at serve time, before its apply_calibration call (7999). SMOKING GUN \u2014 same-engine key disagreement: the ORIGINAL apply_calibration in calibration_engine.py reads the CORRECT key (line 1341 and 1398: bool(raw_result.get(\"engagement_asymmetry\", 0))); only the active signal_calibration_integration.py copy uses the non-existent \"_detected\" alias. LIVE engine (/scores?limit=200): 8 rows carry engagement_asymmetry==1; their scoring-time anomaly_reason (built separately in score_topic, line 4050) literally contains \"Engagement asymmetry detected\", proving the evidence is real and IS used on other paths \u2014 yet the calibration gate at scoring time silently drops it. The serve feed shows engagement_asymmetry_detected==True and populated anomaly_label (e.g. \"staggering\" blended->NEW SIGNAL ANOMALY, plus EMERGING ANOMALY rows) ONLY because the serve alias patch restored the value; at scoring time those same gate inputs were missing one evidence point.",
+   "severity": "medium",
+   "fix": "In signal_calibration_integration.py:1067 read the producer's actual key with the serve alias as fallback: asymmetry = raw_result.get(\"engagement_asymmetry_detected\", raw_result.get(\"engagement_asymmetry\", False)). Coerce to bool so the stored int 1/0 evaluates correctly (engagement_asymmetry is an int, so bool(...) is appropriate). This matches what calibration_engine.py:1341/1398 already do and what the serve path synthesizes at detector 7997-7998. Net effect: engagement-asymmetry evidence becomes live again in the scoring-time anomaly gate, so a NEW cross-platform topic whose only secondary evidence is asymmetry can correctly flip is_gravitational_anomaly, and EMERGING topics regain the missing evidence point. Lower-impact than the canonical-date bug because (a) the headline detection/confidence scores are unaffected \u2014 only the boolean anomaly gate and its label/evidence list; (b) for mainstream-pathway topics (194/200 live rows) the pathway gate at line 1152 overrides the recompute anyway, so real-world surface impact today is confined to expert/niche/blended/NEW topics; (c) the stored is_gravitational_anomaly is also written independently at score_topic time (detector 4049). After patching, regenerate serve_payload per the known cache gotcha so the corrected gate propagates. Recommend the founder also add a guard test asserting the scoring-path apply_calibration and calibration_engine apply_calibration read the SAME producer keys, to catch future drift between the two copies."
+  },
+  {
+   "finding": "CONFIRMED silent misread (bounded to display/explainability, NOT the composite score). The N-component \"Community demand\" detail fields served at /scores/{key} \u2014 total_queries_30d, queries_24h, daily_rate_7d \u2014 are structurally always 0. They are computed at scoring time and written into the result dict (gravitational_anomaly_detector.py:4028-4030), but velocity_scores has NO columns for them (schema 723-766; ALTERs 919-966 add only nowtrendin_score and unrelated columns), and BOTH INSERTs (persist_velocity_score 3039-3060 and the main scoring INSERT 4362-4415) omit them \u2014 so the written values are silently dropped at the DB layer. The detail endpoint then reads them back from the SELECT * row via s.get(\"nowtrendin_queries_30d\", 0) etc. (7184-7191), which always returns the .get default 0. serve_payload cannot rescue it: _precompute_serve_payloads builds from SELECT v.* (8156-8172), the same column-less row. This is the producer/consumer FORMAT MISMATCH disease (a structurally-missing column null-coalesced to a real-looking 0). IMPORTANT REFUTATION OF SCORE IMPACT: the N score itself (nowtrendin_score) is computed LIVE from the topic_queries table (compute_nowtrendin_score 3670-3708) and persisted to the real nowtrendin_score column, so N is NOT corrupted; and N is explicitly EXCLUDED from the Gradient composite (in_composite:False at 7182; schema comment line 739). Therefore no Gradient/Detection/Confidence/heisenberg score is affected. The only consumer of the always-0 detail values is _explain_n (8293-8316), so it is bounded to the demand-side detail + plain-English text. Secondary symptom (the (c) sibling pattern): because queries_30d is always 0, _explain_n always hits the first branch and prints \"No internal query history yet\" even on topics whose served N is 70-100 \u2014 a visible self-contradiction on the same row.",
+   "is_real": true,
+   "evidence": "CODE: write transfer/gravitational_anomaly_detector.py:4028-4030 sets nowtrendin_queries_30d/24h + nowtrendin_daily_rate from nowtrendin_data. Schema 723-766 has only `nowtrendin_score REAL` (736); grep of ALTER TABLE velocity_scores (919,936,950-966) confirms NO *_queries_* / *_daily_rate column is ever added. INSERT #1 persist_velocity_score (3039-3060) and INSERT #2 main scoring path (4362-4415) both list columns explicitly and OMIT all three \u2014 values dropped silently. Read 7184-7191 uses s.get(\"nowtrendin_queries_30d\",0)/...24h/...daily_rate, where s is `SELECT * FROM velocity_scores` (7053-7057) or the serve_payload built from `SELECT v.*` (8156-8172) \u2014 both lack the columns, so default 0 always. _explain_n(8293-8303) first branch triggers on queries_30d==0. LIVE ENGINE (4 topics, /scores/{key}): fifa_world N=100.0 -> total_queries_30d=0, queries_24h=0, daily_rate_7d=0, plain_english=\"No internal query history yet...\"; africa N=89.07 -> all 0; iran N=85.36 -> all 0; asi N=76.56 -> all 0. The N=100 + \"no query history\" pair on the SAME row is the format-disagreement symptom. CONTRAST (proves score is safe): compute_nowtrendin_score (3670-3708) queries the live topic_queries table to compute N and returns the real counts; that N is persisted to the real nowtrendin_score column (4366/4390) and is the value used everywhere. The always-0 detail is a parallel, unread copy.",
+   "severity": "medium",
+   "fix": "Add the three missing columns and write them, so the served N-detail reflects the same numbers N was computed from. (1) Schema: add to velocity_scores (723-766) `nowtrendin_queries_30d INTEGER DEFAULT 0`, `nowtrendin_queries_24h INTEGER DEFAULT 0`, `nowtrendin_daily_rate REAL DEFAULT 0`, plus idempotent ALTER TABLE ... ADD COLUMN entries in the migration block (near 950-966) for existing DBs. (2) INSERTs: extend both the persist path (3039-3060) and the main scoring INSERT (4362-4415) column lists + value tuples to include result[\"nowtrendin_queries_30d\"], result[\"nowtrendin_queries_24h\"], result[\"nowtrendin_daily_rate\"] (use `or 0` guards consistent with the surrounding fields). Then the read at 7184-7191 and _explain_n will surface the real counts and the \"No internal query history yet\" string will stop contradicting a high N. ALTERNATIVE (lower-effort, avoids a schema migration since N is recomputed live anyway): in the detail endpoint, drop the s.get(...) reads and call self.compute_nowtrendin_score(topic_key) (or read topic_queries directly) to obtain fresh total_queries_30d/queries_24h/daily_rate at serve time, feeding both the N_nowtrendin detail block and _explain_n. GUARDRAIL: do NOT route any of these query counts into the composite \u2014 N stays in_composite:False per schema line 739 (demand feedback-loop guard). Also add a monitoring assertion (e.g. in the Canonical/Pipeline auditor): for any served row with nowtrendin_score >= 40, total_queries_30d must be > 0, to catch this producer/consumer column-drift class going forward."
+  },
+  {
+   "finding": "CONFIRMED (real, latent): The single `risk_scores.risk_stage` column is populated from TWO producers with DISJOINT enum vocabularies, and the downstream consumer is built for only ONE of them. At transfer/financial_risk_gradient.py:2434 the write is `_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]`. (A) `mkt[\"tier\"]` comes from market_signal_engine.py:163 -> `_level(...)` -> MARKET_LEVELS (market_signal_engine.py:86-87 = ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT). (B) `score[\"risk_stage\"]` comes from financial_risk_gradient.py:605-621 = ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND. The two share only the literal 'ELEVATED', which means opposite things (market avg level vs risk-avg>=60). The web-terminal consumer expects ONLY the MARKET vocabulary: api.ts:44 documents it explicitly, Dashboard.tsx:80 and MarketSignal.tsx:75 read `risk_stage` as a direct fallback for `mg.tier`, the tier filter chips are MARKET-only (Dashboard.tsx:232, MarketSignal.tsx:24), and styles.css:132-137 defines `.tier.*` CSS classes ONLY for ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT(+WATCH). So when the risk-stage branch fires (an item with NO market data, mkt is None), ACUTE/EMERGING/BACKGROUND silently match no tier filter and render with no CSS styling. No error ever fires because both branches write a valid-looking uppercase string. This is the same producer/consumer FORMAT-MISMATCH disease as the canonical-date and N-key-drift exemplars: one column, two incompatible enum vocabularies under one key. NOTE: the candidate's framing of exemplar (c) as 'tier/risk_stage/classification disagree on the same row' is partly a separate matter \u2014 `classification` is a DIFFERENT semantic field (positioning classification, _format_risk_row line 2489) using the RISK vocabulary by design; the genuine single-field misread is the dual-sourced `risk_stage` column itself.",
+   "is_real": true,
+   "evidence": "CODE: financial_risk_gradient.py:2434 `_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]` writes one column from two producers. Producer A vocab: market_signal_engine.py:86-87 `MARKET_LEVELS=[(80,'ELEVATED'),(60,'ACTIVE'),(40,'BUILDING'),(25,'ROUTINE'),(0,'DORMANT')]` consumed via :105-106 `_level` and emitted as `tier` at :163. Producer B vocab: financial_risk_gradient.py:607-620 emits risk_stage in {ACUTE,ELEVATED,EMERGING,WATCH,BACKGROUND}. CONSUMER built for MARKET-only: web-terminal/src/lib/api.ts:44 `// ELEVATED / ACTIVE / BUILDING / ROUTINE / DORMANT (NOT BREAKOUT/STRONG)`; Dashboard.tsx:80 `tier:(mg.tier || r.risk_stage || '\u2014')`; MarketSignal.tsx:75 `tier:(mg.tier || r.risk_stage || 'ROUTINE').toUpperCase()`; tier filter chips MarketSignal.tsx:24 / Dashboard.tsx:232 = MARKET vocab; styles.css:132-137 `.tier.ELEVATED/.ACTIVE/.BUILDING/.ROUTINE/.DORMANT(+.WATCH)` only -> ACUTE/EMERGING/BACKGROUND get NO class. Consumer market_signal_diagnostic.py:133 also does `mg.get('tier') or match.get('risk_stage') or 'ROUTINE'`, treating risk_stage as a market tier. LIVE DATA (/risk/scores?limit=60, 2026-06-23): risk_stage distribution = {ROUTINE:59, BUILDING:1} \u2014 100% MARKET vocab, 60/60 rows have market_gradient.tier present, so the risk-stage fallback branch was taken 0 times in the current universe. Same-row disagreement IS visible (cre: risk_stage=ROUTINE vs classification=ELEVATED; recession/SpaceX/JPMorgan: risk_stage=ROUTINE vs classification=WATCH) but across two distinct fields. Net: the dual-vocabulary column write is real and the consumer mishandles the off-vocab branch, but current live incidence of the off-vocab value is ~0 (mkt is truthy for essentially all items, including macro topics).",
+   "severity": "MEDIUM \u2014 Real latent silent-misread on a served/display path: one column, two incompatible enum vocabularies, consumer built for only one. When the `score[\"risk_stage\"]` branch fires (item with no market data), values ACUTE/EMERGING/BACKGROUND silently match no tier filter and render unstyled \u2014 a silent UI mishandle, not a wrong number into a downstream FORMULA (risk_stage is a label, not a scoring input, so no Gradient/Market score is corrupted). Current live incidence is ~0 (60/60 rows take the market-tier branch), so impact today is negligible, but it is a real landmine and a genuine instance of the founder's format-mismatch disease class. Not HIGH because: (1) it corrupts a display label, not a score/gap; (2) it is currently dormant in production data.",
+   "fix": "Stop overloading one column with two enum vocabularies. Preferred: at financial_risk_gradient.py:2434, do NOT fall back across vocabularies \u2014 when `mkt` is present write the market tier, when it is absent MAP the risk-stage value into the MARKET vocabulary the consumer declares, instead of leaking a foreign enum. Concretely add a tiny normalizer, e.g. `_RISK_TO_MARKET = {\"ACUTE\":\"ELEVATED\",\"ELEVATED\":\"ACTIVE\",\"EMERGING\":\"BUILDING\",\"WATCH\":\"ROUTINE\",\"BACKGROUND\":\"DORMANT\"}` and write `_stage = mkt[\"tier\"] if mkt else _RISK_TO_MARKET.get(score[\"risk_stage\"], \"ROUTINE\")`, so the column ALWAYS holds the single MARKET vocabulary the terminal (api.ts:44, tier chips, .tier CSS) is built for. Better long-term (addresses audit Q2/Q5): DECLARE the format of `risk_stage` in one place (it is the MARKET tier vocabulary), keep the raw risk-stage classification in a SEPARATE explicitly-named column (e.g. `signal_risk_stage`) if both reads are wanted, and make every consumer (Dashboard.tsx:80, MarketSignal.tsx:75, market_signal_diagnostic.py:133) reference the same declared enum. Also add a guard to the Canonical Date Auditor's sibling concept \u2014 an ENUM auditor that asserts served `risk_stage` values are a subset of the declared MARKET vocabulary, alerting if any ACUTE/EMERGING/BACKGROUND ever appears (catching the latent branch the moment it fires). Add the column's allowed enum to a central registry so audit Q2 (declared format per field) is satisfiable."
+  },
+  {
+   "finding": "risk_scores.risk_stage is one column populated from TWO disjoint enum vocabularies depending on a branch at write time: financial_risk_gradient.py:2434 writes `_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]`. When a market gradient exists the column holds the MARKET vocabulary {ELEVATED, ACTIVE, BUILDING, ROUTINE, DORMANT} (market_signal_engine.py:86/:163, _level over MARKET_LEVELS); when it does not, it holds the RISK vocabulary {ACUTE, ELEVATED, EMERGING, WATCH, BACKGROUND} (financial_risk_gradient.py:607-621). The consumer market_signal_diagnostic.py:133 reads `tier = (mg.get(\"tier\") or match.get(\"risk_stage\") or \"ROUTINE\").upper()` and the fallback arm is precisely the no-market-gradient case that carries the risk vocabulary. The diagnostic's core verdict logic keys on QUIET_TIERS = {\"ROUTINE\",\"DORMANT\"} (line 39, used in the CONTRADICTION test at line 202). Those are MARKET-only tokens. The risk-vocabulary quiet states WATCH and BACKGROUND are NOT in QUIET_TIERS, and 'ELEVATED' collides lexically across the two families while meaning different intensity bands (market top-band score>=80 vs risk band-2 avg 60-80). So a genuinely-quiet risk-vocabulary row flagged unusual would silently never raise the CONTRADICTION verdict the diagnostic exists to catch, and an 'ELEVATED' risk row would be treated as a market top-band row. This is the same producer/consumer format-mismatch disease as the canonical-date and key-drift exemplars.",
+   "is_real": true,
+   "evidence": "Code confirmed verbatim at all three sites. Write: financial_risk_gradient.py:2434 `_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]`. Market vocab: market_signal_engine.py:86 `MARKET_LEVELS = [(80,\"ELEVATED\"),(60,\"ACTIVE\"),(40,\"BUILDING\"),(25,\"ROUTINE\"),(0,\"DORMANT\")]` and :163 `\"tier\": _level((detection+confidence)/2)`. Risk vocab: financial_risk_gradient.py:607-621 sets risk_stage to ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND. Consumer: market_signal_diagnostic.py:133 `tier = (mg.get(\"tier\") or match.get(\"risk_stage\") or \"ROUTINE\").upper()`; QUIET_TIERS={\"ROUTINE\",\"DORMANT\"} at line 39 drives the CONTRADICTION verdict at lines 202/216-217. Only 'ELEVATED' overlaps the two vocabularies and it denotes opposite intensity bands. Live probe of GET /risk/scores?limit=200 returned 88 rows, all 88 carrying a market_gradient; stored risk_stage equals market_gradient.tier on all 88 (distribution ROUTINE 87, BUILDING 1); 0 rows carried a risk-only token and 0 rows lacked a market_gradient. So today the collision is MASKED (every row happens to use the market vocabulary), but the else-branch at :2434 is the explicit, reachable path that writes the risk vocabulary for any risk topic scored without a market gradient (non-company / market-gradient-absent rows), at which point the QUIET_TIERS mismatch (WATCH/BACKGROUND not recognized) and the ELEVATED double-meaning take effect with no error. Both vocab strings are non-empty uppercase so nothing raises.",
+   "severity": "medium",
+   "fix": "Make risk_stage a single declared vocabulary, or namespace the two. Concretely: (1) In financial_risk_gradient.py at line 2434, do not store raw `mkt[\"tier\"]` into the risk_stage column under a different vocabulary. Either map the market tier into the risk vocabulary via an explicit lookup before writing, or add a separate `stage_vocab`/`market_tier` column so the two are never conflated in one field. (2) In market_signal_diagnostic.py, stop silently falling back across vocabularies: when reading `match.get(\"risk_stage\")` as `reported_tier`, normalize through an explicit map and widen QUIET_TIERS to include the risk-vocabulary quiet states (WATCH, BACKGROUND) so the CONTRADICTION detector cannot be blinded; and disambiguate 'ELEVATED' by also checking which vocabulary the value came from (presence of market_gradient). (3) Add a unit/format declaration + assert: a single function `canonical_stage(value, has_market_gradient) -> {market|risk vocab}` that both producer and consumer call, mirroring the date_utils/ingestion_gate pattern, so the enum is centrally enforced and any out-of-vocabulary token is quarantined rather than silently bucketed to the default 'ROUTINE'."
+  },
+  {
+   "finding": "Real but LATENT silent-downgrade hole, not an active live misread. In transfer/gravitational_anomaly_detector.py the serve-time calibration transform _calibrate_score_fields (lines 7977-8067) wraps each of the three score-mutating steps \u2014 apply_calibration (7999-8001), _apply_ai_intelligence (8013-8015), apply_ai_floor (8021-8033) \u2014 in a bare `except Exception: pass # non-fatal`. The same pattern is mirrored in the score-history path (_calibrate_history_row, 7612-7644). These transforms produce the SERVED detection_score / confidence_score / signal_stage / heisenberg_gap (the entire calibrated headline). apply_calibration in signal_calibration_integration.py only sets calibration[\"applied\"]=True at line 1274, after all work is done; any raise before that (e.g. get_topic_maturity_state DB hiccup, a None into compute_calibrated_gradient, schema drift) propagates to the bare except, is swallowed, and _calibrate_score_fields returns the row with its RAW pre-calibration scores and NO calibration key. The row is then served (or written to serve_payload by _precompute_serve_payloads at 8174-8178) as a plausible-looking but uncalibrated score, with no error, no log, and no flag \u2014 exactly the \"stale /scores\" state the serve_payload memory warns must never happen, and the same producer/consumer silent-default disease as the canonical-date bug. This is a genuine instance of the SWALLOWED-parse-fail class.",
+   "is_real": true,
+   "evidence": "CODE: gravitational_anomaly_detector.py:7999-8033 confirmed verbatim \u2014 three `try: <transform> / except Exception: pass # non-fatal` blocks around apply_calibration, _apply_ai_intelligence, apply_ai_floor; mirrored at 7612-7644 for history. apply_calibration (signal_calibration_integration.py:1029-1274) sets \"applied\": True only at the final return (line 1274), so a mid-function raise leaves the row with zero calibration footprint. The outer _precompute_serve_payloads (8174-8178) cannot catch the failure because the inner bare-except already swallowed it, so _calibrate_score_fields never raises \u2014 it silently returns raw values. There is NO observability: nothing logs or records a skipped transform anywhere. LIVE PROBE (refutation attempt): GET /scores?limit=50 and ?limit=400 (450 rows total) \u2014 100% of rows carry calibration.applied=True with real source (lifecycle 382, database 14, knowledge_base 4); zero missing/empty calibration; signal_stage and det/conf consistent (e.g. asi 94.7/94.3 BREAKOUT). So the failure path is NOT currently firing in production \u2014 the hole is latent, triggered only when a transform actually raises (DB contention, schema drift, an unexpected None), which the live data does not currently exhibit.",
+   "severity": "medium",
+   "fix": "Make the swallow observable and fail-visible without removing the legitimate module-absent fallback (the _CAL_AVAILABLE / _AI_INTEL_AVAILABLE / _CORRECTIONS_AVAILABLE guards already handle a missing module gracefully; the bug is swallowing RUNTIME exceptions when the module IS present). Concretely, in _calibrate_score_fields (and the mirror in _calibrate_history_row): (1) replace each `except Exception: pass` with `except Exception as e: logging.exception(\"serve-calibration step <name> failed for topic_key=%s\", s.get(\"topic_key\")); s.setdefault(\"calibration_errors\", []).append(\"<name>\")` so a thrown transform is logged AND leaves a machine-readable marker on the served row. (2) When apply_calibration is swallowed, explicitly stamp s[\"calibration\"] = {\"applied\": False, \"error\": str(e)} so downstream/consumers and the live /scores probe can DETECT an uncalibrated row instead of it masquerading as raw-with-no-calibration-key (today an exception and a genuinely uncalibrated long-tail row are indistinguishable). (3) In _precompute_serve_payloads, skip writing serve_payload for a row whose calibration.applied is False (let it fall back to live recalibration next cycle) rather than caching the uncalibrated downgrade for the whole cycle. (4) Add a monitoring-agent assertion (Scorer Watchdog / Pipeline Integrity) that flags any served row with applied=False or a non-empty calibration_errors \u2014 turning this latent hole into a caught, alerted event. This preserves the before-it-arrives graceful degradation while ending the silent misread."
+  },
+  {
+   "finding": "Partial verification of the candidate. The CITED FIELD and SYMPTOM are real (AI-proposed components silently default to 0.0 and still produce a \"real\" proposed detection/confidence score on the user-facing Grade tool), but the candidate's STATED MECHANISM is wrong. The actual silent-misread is missing/omitted component keys in otherwise-valid JSON being null-coalesced to 0.0 with no required-key validation \u2014 not the _extract_json short/full regex fallback the candidate describes.",
+   "is_real": true,
+   "evidence": "Code path confirmed in transfer/ai_grade.py:\n\nREFUTES the candidate's stated mechanism: _extract_json's last-resort regex (lines 414-419) searches only for \"short\"/\"full\" keys. The SCORE response schema (system prompt lines 334-344) emits niche_concentration/platform_diversity/momentum/dark_matter/persistence/freshness/stage/classification \u2014 it NEVER contains short/full (those belong to the separate explainer response). So on the score path the regex yields out={} -> `return out or None` -> None, and propose_score line 383 handles None correctly (`{\"available\": False, \"error\": \"Could not parse model output\"}`), computing NO score and charging NO token. The candidate's claim that the fallback returns a component-less dict treated as valid is therefore false.\n\nCONFIRMS a real sibling bug on the SAME field/path (the brief's NULL-COALESCE-masking class): there is NO required-key validation anywhere (grep for required/validate/missing finds none on the component keys). If Claude returns VALID JSON that omits or renames/nests any component key, json.loads succeeds, propose_score sets parsed[\"available\"]=True and returns it (lines 382-387). Then grade_topic (lines 452-460) builds comps via `_num(score.get(\"momentum\"))` etc.; _num (lines 503-507) is `try: return round(float(v),1) except: return default(0.0)`, so _num(None) -> 0.0 silently. _composite (line 348-349) `c.get(k,0.0)*w` then computes detection/confidence over the partially-zeroed vector. grade_topic returns detection_score/confidence_score/heisenberg_gap with proposed=True (lines 466-473). grade_agent.py:234 sets charge_token = available and proposed -> a grade credit IS charged, and grade_agent.py:236-240 surfaces detection/confidence directly to the user as the Gradient Score. No guard detects the all-or-partial-zero component vector.\n\nLive probing not applicable: Grade runs AI synthesis on demand (metered, costs ~$0.012/grade) rather than persisting to /scores, so the symptom cannot be observed in the stored /scores or /risk/scores feeds.",
+   "severity": "medium",
+   "fix": "In grade_topic (transfer/ai_grade.py ~line 451, before building comps), validate that the required component keys are PRESENT and numeric in the score dict. Treat a missing/non-numeric component as a hard failure, not a 0.0 default:\n\nREQUIRED = (\"niche_concentration\",\"platform_diversity\",\"momentum\",\"dark_matter\",\"persistence\",\"freshness\")\nmissing = [k for k in REQUIRED if not isinstance(score.get(k), (int, float))]\nif missing:\n    return {\"available\": bool(research.get(\"available\")), \"topic\": topic, \"proposed\": False,\n            \"research\": research.get(\"summary\",\"\"), \"citations\": all_citations,\n            \"web_result_count\": fc.get(\"result_count\",0),\n            \"detail\": f\"Scoring synthesis incomplete (missing components: {', '.join(missing)})\"}\n\nThis makes a partial/omitted-component response fail closed (no proposed score, no grade credit charged at grade_agent.py:234) instead of computing a real-looking Detection/Confidence from a silently-zeroed vector. Optionally also range-check each to 0-100 and quarantine the raw response for review, mirroring the \u00a714 ingestion_gate condition-precedent pattern. The candidate's described _extract_json short/full-regex path does NOT need changing for the score path (it already returns None correctly there)."
+  }
+ ],
+ "all_candidates": [
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1058-1066",
+   "scoring_field": "Detection/Confidence/Overall recompute inputs (raw_gradient, inertia, platform_count, detection_score, confidence_score, overall_score, ft_ratio)",
+   "failure_mode": "NULL-COALESCE masking missing inputs",
+   "snippet": "raw_gradient = raw_result.get(\"gradient_strength_detection\", 0) or 0\n... detection_score = raw_result.get(\"detection_score\", 0) or 0\n... overall_score = raw_result.get(\"overall_score\", 0) or 0\n... ft_ratio = raw_result.get(\"first_timer_ratio\", 0.0) or 0.0",
+   "why_silent": "Every scoring input is coerced with `.get(k,0) or 0`. If the producer renames a key, fails to emit it, or stores None (e.g. a component that genuinely failed to collect), the value silently becomes a real-looking 0 and flows straight into new_detection/new_confidence/new_overall (lines 1122-1140). A 0 here is indistinguishable from a true zero, so a topic scored on partially-MISSING components looks fully scored \u2014 the exact 'computed on missing data while looking fine' failure. No quarantine, no log, no NaN.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1109-1117",
+   "scoring_field": "platform_diversity / dark_matter / confidence_decay (mode-specific _detection/_confidence variants)",
+   "failure_mode": "KEY DRIFT + NULL-COALESCE masking",
+   "snippet": "platform_d = raw_result.get(\"platform_diversity_detection\", _platform) or 0\ndark_d = raw_result.get(\"dark_matter_detection\", _dark) or 0\ndecay_d = raw_result.get(\"confidence_decay_detection\", _decay) or 0",
+   "why_silent": "The comment above (1106-1108) admits these `..._detection/..._confidence` columns 'are not stored as separate columns' \u2014 so the primary .get() key NEVER hits and silently relies on the fallback. This is a documented near-miss of the exact key-drift class: if the fallback key (`platform_diversity`/`dark_matter_score`/`confidence_decay`) is also renamed, all three collapse to 0 and silently zero three of the six Detection components. The producer (detector) and consumer (serve recompute) disagree on key naming; only the `or 0` hides it.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1227-1233 / calibration_engine.py:918,1413",
+   "scoring_field": "N (nowtrendin_score) in the component-breakdown display",
+   "failure_mode": "KEY DRIFT (producer writes `nowtrendin_score`, consumer read `nowtrend_internal`)",
+   "snippet": "\"nowtrend_internal\": raw_result.get(\"nowtrendin_score\", raw_result.get(\"nowtrend_internal\", 0)) or 0,  # signal_calibration (FIXED)\n... \"nowtrend_internal\": 0,  # calibration_engine.py:1413 (STILL hardcoded 0)",
+   "why_silent": "This is the founder's known exemplar (a). signal_calibration_integration.py was patched to read `nowtrendin_score` first, but calibration_engine.py:1413 STILL passes `nowtrend_internal: 0` hardcoded into build_component_groups \u2014 so when CalibrationEngine.apply() runs (the scoring-time path), N is silently 0 in the breakdown regardless of the real value. The two calibration paths disagree on the key, and the engine path always shows N=0/pending.",
+   "severity": "medium",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:3641 vs signal_calibration_integration.py:1119,952-954 vs gravitational_anomaly_detector.py:7119,7181-7182",
+   "scoring_field": "N (nowtrendin_score) weight in the composite \u2014 documented format requirement contradicts implementation",
+   "failure_mode": "Cross-agent FORMAT/GUIDELINE contradiction (audit Q1/Q5: not the same rule everywhere)",
+   "snippet": "compute_nowtrendin_score docstring: \"N \u2014 NowTrendIn Score (10% of Overall, 12% of Detection, 10% of Confidence)\"\n--- but ---\nsignal_calibration:1119: \"6-component external weights (N excluded by design; renormalized to 1.0)\"\nserve_row:7181-7182: \"weight_overall\": \"\u2014\" ... \"in_composite\": False",
+   "why_silent": "The producer's own docstring (the only 'documented guideline' for N) declares N contributes 10-12% to the score, but every consumer (calibration recompute, serve payload, component groups) treats N as in_composite=False / excluded. A reader trusting the docstring would believe N is scored; it is not. ai_grade.py:314-315 ALSO carries N weights (`N: 0.12` / `N: 0.10`) in _DET_W/_CONF_W and computes detection/confidence WITH them \u2014 so the AI-grade path scores N into the composite while the engine path excludes it. Same field, three different format/weight contracts \u2192 AI-graded scores are not on the same scale as engine scores despite the comment claiming they are.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:463-464,472-473",
+   "scoring_field": "AI-grade detection_score / confidence_score / heisenberg_gap (N component forced to 0)",
+   "failure_mode": "NULL-COALESCE / hardcoded-0 entering a formula + STALE-DERIVED gap",
+   "snippet": "comps = { ... \"N\": 0.0 }  # never queried before\ndetection = _composite(comps, _DET_W)   # _DET_W has \"N\":0.12\nconfidence = _composite(comps, _CONF_W)  # _CONF_W has \"N\":0.10\nheisenberg_gap: round(detection - confidence, 1)",
+   "why_silent": "N is hardcoded 0 then multiplied by a 0.12/0.10 weight that is NOT renormalized out \u2014 so every AI-graded topic is silently penalized ~10-12% on detection/confidence vs an in-pool engine score (which excludes N entirely and renormalizes the other six to 1.0). The provenance string claims 'engine-weighted ... same scale as engine-collected signals' but the scales differ. heisenberg_gap is derived from these two and inherits the bias. A consumer comparing AI-grade vs measured score sees an artificial gap with no error flag.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/market_signal_engine.py:230-247 (mirrored financial_risk_gradient.py:2032-2047)",
+   "scoring_field": "Market Gradient inputs: article_count, avg_sentiment, short_interest change_pct, 13F shares_change_pct, repo_volume_change_pct, baseline score",
+   "failure_mode": "NULL-COALESCE masking missing inputs (paid-API miss looks like a real 0)",
+   "snippet": "art = av.get(\"article_count\") or 0\nsent = abs(av.get(\"avg_sentiment\") or 0.0)\nsi_chg = abs(si.get(\"change_pct\") or 0.0)\ninst_chg = abs(iw.get(\"shares_change_pct\") or 0.0)\nrepo_chg = abs(((macro.get(\"leverage\") or {}).get(\"repo_volume_change_pct\")) or 0.0)\nba = _mclamp(baseline_pos.get(\"score\") or 0)",
+   "why_silent": "These feed the Analyst/Positioning/Dark/Baseline market components. When AlphaVantage, FINRA, WhaleWisdom, or OFR fails to populate (rate-limit, key missing, schema change), the key is absent/None and `or 0` turns a MISSING positioning input into a confident 0 that enters the weighted detection/confidence. A ticker with no short-interest data scores identically to one with genuinely flat short interest. Unlike analyst/fundamentals (which use `has_analyst`/`is not None` gates at 2038/2044/2082-2083 to EXCLUDE missing parts), positioning_pressure and baseline_abnormality have NO such guard \u2014 so missing data silently dilutes the score rather than being omitted. This is the SpaceX cold-start artifact mechanism.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/market_signal_engine.py:2092-2094",
+   "scoring_field": "Market confidence fallback (diffusion confirmation proxy)",
+   "failure_mode": "KEY DRIFT + NULL-COALESCE producing a real 0 confidence",
+   "snippet": "confidence = round(_mclamp((diffusion_score.get(\"components\", {}) or {}).get(\"confidence_decay\") or diffusion_score.get(\"confidence_score\") or 0), 1)",
+   "why_silent": "When a macro theme has no ticker fundamentals, confidence is derived from the base engine's diffusion score by reading `components.confidence_decay` then `confidence_score`. If the diffusion producer renames either key (the same component naming that already drifted in signal_calibration), BOTH .get() miss and `or 0` yields confidence=0 \u2192 tier drops to the bottom and gap inflates, with confidence_basis still labeled 'diffusion confirmation' as if it succeeded. No signal that the proxy read failed.",
+   "severity": "medium",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:2051,2058,2060,2087",
+   "scoring_field": "Fundamentals (cycle_inflection), Price Action (valuation_rerating, price_return_12m), confidence composite",
+   "failure_mode": "TYPE/PARSE mismatch via unguarded float() \u2014 swallowed by _mclamp default",
+   "snippet": "fu = _mclamp(float(comps[\"cycle_inflection\"]) * 100) if \"cycle_inflection\" in comps else None\nparts.append(_mclamp(float(li[\"valuation_rerating\"]) * 100))\nparts.append(_mclamp(abs(float(li[\"price_return_12m\"])) * 40))",
+   "why_silent": "_mclamp (2013-2017) catches TypeError/ValueError and returns `lo` (0.0). If the beneficiary producer emits cycle_inflection / valuation_rerating / price_return_12m as a string, a dict, or a percent-vs-ratio unit mismatch, float() fails and the value silently becomes 0.0 inside the fundamentals/price composite \u2014 a hard-data confirmation input reads as 'zero confirmation' rather than 'unparseable / quarantine'. Mirrors the canonical-date `[:10]` silent-drop, now in the financial composite. (Unit risk too: *100 assumes a 0-1 ratio; if the producer ever switches to 0-100, the value is clamped to 100.)",
+   "severity": "medium",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/calibration_engine.py:1200,1337 / 1405",
+   "scoring_field": "platform_count (anomaly gate), gradient_conf component, persistence",
+   "failure_mode": "SWALLOWED parse / hardcoded-0 + JSON-as-text assumption",
+   "snippet": "len(json.loads(raw_result.get(\"platforms_active\", \"[]\")))  # 1200,1337\n\"gradient_conf\": round(raw_G * 0.5, 2)  # 1405 approximation, not the real conf gradient\n\"persistence\": 0,  # 1410 'populated after multiple cycles'\n\"nowtrend_internal\": 0  # 1413",
+   "why_silent": "json.loads assumes platforms_active is a JSON STRING; if an upstream change stores it as an already-parsed list (the JSON-not-parsed / double-parse class), json.loads raises and the whole apply() can fail or platform_count silently defaults \u2014 and platform_count drives the anomaly gate (NEW topics need >=2 platforms). Separately, gradient_conf is faked as raw_G*0.5 and persistence/nowtrend_internal are hardcoded 0 in this engine path, so the component breakdown served from CalibrationEngine.apply() disagrees with the one served from signal_calibration_integration.apply() \u2014 two consumers, two different formats for the same fields.",
+   "severity": "medium",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/nowtrend_integration.py:556-557,579,738,744-745",
+   "scoring_field": "heisenberg gap = detection_score - confidence_score (served + history)",
+   "failure_mode": "NULL-COALESCE masking missing inputs into a derived gap",
+   "snippet": "(row.get(\"detection_score\", 0) or 0) - (row.get(\"confidence_score\", 0) or 0)\n... gap = (current.get(\"detection_score\") or 0) - (current.get(\"confidence_score\") or 0)",
+   "why_silent": "If either detection_score or confidence_score is missing/None on a served row (key drift from the producer, or an un-calibrated long-tail row), `or 0` substitutes 0 and the heisenberg gap becomes the full magnitude of the other score \u2014 a large fake gap that reads as 'very early / maximum lead time' (the gap interpretation at 984-991). This is the founder's exemplar (d) STALE/derived-gap pattern: the gap is computed from inputs that may be silently zero, with no check that both scores are actually present.",
+   "severity": "medium",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/google_trends_validation.py:132,253",
+   "scoring_field": "Google Trends accuracy-ledger validation value (extracted_value / point value)",
+   "failure_mode": "NULL-COALESCE + nested-index masking on the accuracy-ledger ground truth",
+   "snippet": "\"value\": point.get(\"values\", [{}])[0].get(\"extracted_value\", 0)\n... \"value\": p.get(\"value\", 0)",
+   "why_silent": "The accuracy ledger is the moat \u2014 it grades our detections against Google Trends. `point.get('values',[{}])[0].get('extracted_value',0)` silently yields 0 if the SerpApi/Trends response shape changes (e.g. 'values' empty or 'extracted_value' renamed). A 0 here is read as 'Google Trends shows no interest', which would mislabel a real breakout as a false positive (or vice versa) and silently corrupt the hit-rate the whole moat depends on. No distinction between 'Trends returned 0' and 'we failed to read Trends'.",
+   "severity": "high",
+   "lens": "NULL-COALESCE masking missing inputs + producer/consumer FORMAT MISMATCH across the scoring chain (the canonical-date silent-misread disease applied to the Gradient/Market score inputs)"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:1067 (signal_calibration_integration.py) + producer gravitational_anomaly_detector.py:4044",
+   "scoring_field": "anomaly gate evidence: engagement_asymmetry (D-component / is_gravitational_anomaly decision)",
+   "failure_mode": "KEY DRIFT producer/consumer. Producer (score_topic result dict) writes the boolean under key 'engagement_asymmetry' (1/0 int, line 4044). Consumer apply_calibration reads raw_result.get('engagement_asymmetry_detected', False) (signal_calibration_integration.py:1067). The '_detected' key does NOT exist on the scoring-time result dict, so it always resolves to the default False.",
+   "snippet": "# producer (4044):  \"engagement_asymmetry\": 1 if asymmetry else 0\n# consumer (sig_calib 1067):  asymmetry = raw_result.get(\"engagement_asymmetry_detected\", False)\n# -> evaluate_anomaly_gate(asymmetry_detected=asymmetry, ...)  always gets False at scoring time",
+   "why_silent": "apply_calibration runs at scoring time (detector line 4286) on the result dict that only has 'engagement_asymmetry'. .get(..., False) masks the missing key as a real-looking False \u2014 no error. For NEW topics the gate fires on has_xplatform AND (has_first_timer OR has_asymmetry OR has_inertia) (calibration_engine.py:565-568, 546-547); has_asymmetry is therefore permanently dead, so genuine engagement-asymmetry evidence never contributes to is_gravitational_anomaly. PROOF the alias is required: the SERVE path was already patched (detector 7997-7998 creates engagement_asymmetry_detected from engagement_asymmetry BEFORE calibration) but the SCORING path was not.",
+   "severity": "high",
+   "lens": "TYPE / JSON-parse mismatch"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:4028-4030 (write) + 7184-7191 (read) + schema 723-766",
+   "scoring_field": "N component detail served fields: nowtrendin_queries_30d / nowtrendin_queries_24h / nowtrendin_daily_rate",
+   "failure_mode": "NULL-COALESCE masking via missing column. The three N-query detail values are computed at scoring time and placed in the result dict (4028-4030) but the velocity_scores schema (723-766) has NO columns for them and BOTH INSERTs (3040-3060 and 4362-4415) omit them. The detail endpoint reads them back from the DB row via s.get('nowtrendin_queries_30d', 0) etc. (7184-7191), which always returns the default 0.",
+   "snippet": "# write (4028): \"nowtrendin_queries_30d\": nowtrendin_data[\"total_queries_30d\"]\n# schema: only `nowtrendin_score REAL` exists (line 736; ALTER 919) \u2014 no *_queries_* / *_daily_rate columns\n# read  (7184): \"total_queries_30d\": s.get(\"nowtrendin_queries_30d\", 0)  -> always 0",
+   "why_silent": ".get(k, 0) turns the structurally-missing column into a real-looking 0. serve_payload doesn't rescue it either: _precompute_serve_payloads builds the payload from a velocity_scores DB row (8172) which also lacks the columns. So the N-component 'Community demand' detail (30d/24h/daily query counts and _explain_n text) is silently always 0 in both the list fast-path and the /scores/{key} detail.",
+   "severity": "high",
+   "lens": "TYPE / JSON-parse mismatch"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:2434 (+ enum defs 605-620 and 2009-2010)",
+   "scoring_field": "risk_scores.risk_stage (the served market/risk stage enum)",
+   "failure_mode": "ENUM/vocabulary mismatch \u2014 two different enum sets written into ONE column. _stage = mkt['tier'] if mkt else score['risk_stage']. When the market gradient succeeds, the value comes from MARKET_TIERS = ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT (2009-2010); when it fails, from risk_stage = ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND (605-620). The column silently holds two incompatible vocabularies row-to-row.",
+   "snippet": "_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]\n# MARKET_TIERS:  ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT\n# risk_stage:    ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND  (\"ELEVATED\" collides w/ different meaning)",
+   "why_silent": "Both are valid TEXT, so the INSERT never errors. Any consumer that filters, colors, or orders by risk_stage maps the same column through two enum dictionaries; unknown values fall through to a default label/color (no exception). 'ELEVATED' even exists in both sets but means different things (avg>=80 market vs a risk-stage band), so it silently aliases. This is the founder's known sibling (c) tier/risk_stage/classification disagreement, now pinned to file:line.",
+   "severity": "medium",
+   "lens": "TYPE / JSON-parse mismatch"
+  },
+  {
+   "file_line": "transfer/google_trends_validation.py:317 + 336 (value type) and 132/161 (producers)",
+   "scoring_field": "Google Trends breakout curve `value` -> detect_breakout_date (accuracy-ledger breakout match, the moat)",
+   "failure_mode": "TYPE mismatch: number-as-string. The curve `value` is consumed numerically (values=[p['value'] ...] at 317; compared values[i] >= threshold_value at 336) but producers do not coerce to a number. _fetch_apify uses _point_value (161) which returns the raw list element unchanged \u2014 Apify can return [\"88\"] (string); SerpApi (132) trusts extracted_value; official API (253) trusts p['value'].",
+   "snippet": "values = [p[\"value\"] for p in curve]          # 317\n...\nif values[i] >= threshold_value:             # 336  str >= float -> TypeError in Py3\n# _point_value (161): return v[0] if v else 0   # no int()/float() coercion",
+   "why_silent": "detect_breakout_date is wrapped by the outer per-topic try/except in the fetch/validate path; a str-vs-float comparison raises TypeError that is swallowed, yielding None ('no breakout yet') instead of a real breakout match. A silently-missed breakout looks identical to a topic that simply hasn't broken out \u2014 it just suppresses an accuracy-ledger LED/hit, weakening the moat without any error surfaced.",
+   "severity": "medium",
+   "lens": "TYPE / JSON-parse mismatch"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:8196 (_parse_json_fields) vs json columns written",
+   "scoring_field": "served JSON columns parsed back to objects (platforms_active and any future JSON column)",
+   "failure_mode": "INCOMPLETE json.loads coverage. _parse_json_fields only loops over ['platforms_active']. momentum_signal_read is json.dumps'd on write (4057) and any other TEXT-JSON column added later will be served as a RAW STRING, not parsed. Today only platforms_active is read back as an object, so this is latent, but the helper is the single chokepoint and silently under-covers.",
+   "snippet": "def _parse_json_fields(s: dict) -> dict:\n    for field in [\"platforms_active\"]:   # only ONE field\n        if isinstance(s.get(field), str):\n            try: s[field] = json.loads(s[field])\n            except Exception: s[field] = []",
+   "why_silent": "A JSON column not in the list passes through as its raw string; consumers doing len()/indexing/.get() on it get character-level results or AttributeErrors that may be caught elsewhere. momentum_signal_read is currently json.dumps'd into the result dict but never persisted to a column and never read back (dead field) \u2014 so no live impact today, but the parser is the exact spot where the next JSON scoring input will be silently mis-served. Forward-risk, not a current score corruption.",
+   "severity": "low",
+   "lens": "TYPE / JSON-parse mismatch"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:2434 (written), :626 + market_signal_engine.py:163 (producers)",
+   "scoring_field": "risk_scores.risk_stage (the served risk tier/stage)",
+   "failure_mode": "ENUM/VOCABULARY DRIFT \u2014 one column populated from two disjoint producers under one key",
+   "snippet": "_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]  # mkt['tier'] from MARKET_LEVELS: ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT ; score['risk_stage'] from ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND",
+   "why_silent": "Both code paths write a valid-looking uppercase string into the SAME risk_stage column, so no error ever fires. But the two producers use INCOMPATIBLE enum vocabularies: a company with market data gets a MARKET_LEVELS value (e.g. 'ACTIVE','ROUTINE','DORMANT') while one without gets a risk-stage value (e.g. 'ACUTE','EMERGING','WATCH','BACKGROUND'). 'ELEVATED' exists in both but means different things (avg>=60 risk vs market level). Any consumer that maps risk_stage to a colour/label/filter is built for ONE vocabulary and silently mishandles the other \u2014 same-entity rows split across two enums. This is the founder's exemplar (c): tier/risk_stage/classification disagree on the same row.",
+   "severity": "HIGH",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/calibration_engine.py:1413 (producer) -> :918 + :1039-1044 (consumer)",
+   "scoring_field": "N component / community_demand block (nowtrendin_score) in the score breakdown",
+   "failure_mode": "KEY DRIFT + NULL-COALESCE masking \u2014 producer key nowtrendin_score, consumer reads nowtrend_internal with hardcoded 0",
+   "snippet": "component_groups = build_component_groups({ ... \"nowtrend_internal\": 0, })  # build_component_groups reads components.get(\"nowtrend_internal\", 0)",
+   "why_silent": "The detector PRODUCES the N value under the key `nowtrendin_score` (gravitational_anomaly_detector.py:4025). calibration_engine.apply() builds component_groups passing literally `\"nowtrend_internal\": 0` (wrong key name AND hardcoded 0), and build_component_groups() reads `components.get(\"nowtrend_internal\")`. So the Community-Demand block in this path always renders N=0/pending even when the row has a real nowtrendin_score. No exception \u2014 a real value is silently replaced by 0. Exact `nowtrend_internal` vs `nowtrendin_score` drift the founder cited as exemplar (a). signal_calibration_integration.py:1230 was already fixed to read nowtrendin_score with nowtrend_internal as fallback; this sibling in calibration_engine.py was NOT.",
+   "severity": "HIGH",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/calibration_engine.py:1410 (producer) -> :916 + :1002-1006 (consumer)",
+   "scoring_field": "Persistence (P) component shown in Signal Momentum group",
+   "failure_mode": "KEY DRIFT + NULL-COALESCE masking \u2014 real persistence_score ignored, hardcoded 0 enters the momentum average",
+   "snippet": "component_groups = build_component_groups({ ... \"persistence\": 0,  # populated after multiple cycles ... })",
+   "why_silent": "The authoritative scorer emits persistence under `persistence_score` (detector :4024). In CalibrationEngine.apply() the persistence passed into build_component_groups is hardcoded `0` (the raw_result's real persistence_score is never read here). build_component_groups then averages momentum=(inertia+persistence)/2 and can mislabel a topic with real persistence as 'Pending \u2014 first collection run' / 'Low'. Value silently dropped to 0 with no error; momentum group status computed on missing P. signal_calibration_integration.py:1224 reads persistence_score correctly \u2014 the two calibration paths disagree.",
+   "severity": "MEDIUM",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:475-480 (producer) vs gravitational_anomaly_detector.py:3041-3054 / 4019-4025 (DB schema + consumer keys)",
+   "scoring_field": "AI-graded component scores (inertia, dark_matter, persistence, freshness) feeding detection/confidence",
+   "failure_mode": "KEY DRIFT \u2014 producer omits the _score/_decay suffixes every consumer .get()s, falling back to 0",
+   "snippet": "grade_topic returns: \"inertia\": comps[\"I\"], \"dark_matter\": comps[\"D\"], \"persistence\": comps[\"P\"], \"freshness\": comps[\"C\"]  # engine consumers read inertia_score / dark_matter_score / persistence_score / confidence_decay",
+   "why_silent": "ai_grade.grade_topic emits component keys WITHOUT the engine's `_score`/`_decay` suffixes (inertia, dark_matter, persistence, freshness). The engine's persist + serve + breakdown everywhere read inertia_score, dark_matter_score, persistence_score, confidence_decay (persist_velocity_score :3052-3053, breakdown :7129-7159). If an AI-grade result is ever passed into persist_velocity_score or _calibrate_score_fields/build_component_groups, every component .get('inertia_score',0)/.get('confidence_decay',0) returns 0 and the recompute runs on missing data while detection/confidence still look populated. Producer/consumer key mismatch with a 0 default \u2014 the canonical silent-misread class.",
+   "severity": "MEDIUM",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:314-315 vs signal_calibration_integration.py:1122-1139 vs calibration_engine.py:1355-1359",
+   "scoring_field": "Detection/Confidence component WEIGHTS (the formula itself)",
+   "failure_mode": "FORMAT INCONSISTENCY ACROSS AGENTS \u2014 three local copies of the weight vector that disagree (no single source of truth)",
+   "snippet": "ai_grade _DET_W={G:0.33,D:0.19,I:0.16,M:0.09,C:0.05,P:0.06,N:0.12} ; signal_calibration_integration new_detection = cal_gradient_d*0.375 + dark_d*0.216 + inertia_d*0.182 + platform_d*0.102 + decay_d*0.057 + _persist*0.068 ; calibration_engine detection_cal = cal_G*0.40 + D*0.25 + I*0.20 + M*0.10 + C*0.05",
+   "why_silent": "Three modules each hardcode their OWN Detection/Confidence weight vector and they DISAGREE: ai_grade includes N at 0.12 in detection; signal_calibration_integration excludes N and uses 0.375/0.216/0.182/...; calibration_engine uses 0.40/0.25/0.20/0.10/0.05. No single declared source of truth. An AI-graded topic and an engine-scored topic land on DIFFERENT scales for the same components, and a serve-time recompute can silently re-weight a stored score. No error fires because each set sums ~1.0 \u2014 invisible until two topics scored by different paths are compared. Directly answers audit Q5: agents are NOT instructed in the same format.",
+   "severity": "MEDIUM",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/market_signal_engine.py:479",
+   "scoring_field": "fundamental_confirmation baseline (market_signal_history.signal_date)",
+   "failure_mode": "STALE/CORRUPT DATE \u2014 raw [:10] slice (\u00a714-forbidden) corrupts a non-ISO date, then falls back to today",
+   "snippet": "record_market_cycle(item_key, {\"fundamental_confirmation\": ...}, signal_ts=str(period)[:10], conn=conn)",
+   "why_silent": "Raw `[:10]` date slicing \u2014 the exact pattern \u00a714 forbids ('NEVER reintroduce raw [:10] date slicing'). `period` is Finnhub endDate/filedDate; if it is not already 'YYYY-MM-DD...' (e.g. 'May 22, 2026'), [:10] yields a corrupt key ('May 22, 20'). record_market_cycle then runs to_iso_date on it and falls back to today's date on failure, silently mis-dating the baseline point. Every other date sink in this engine goes through to_iso_date/ingestion_gate; this backfill seed bypasses it. Mis-dated baseline rows corrupt the z-score baseline the entire market Detection/Confidence is computed against.",
+   "severity": "MEDIUM",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1103-1117",
+   "scoring_field": "Detection/Confidence serve-time recompute (platform_diversity, dark_matter, confidence_decay)",
+   "failure_mode": "ALIAS-FALLBACK PAPERING OVER DRIFT \u2014 consumer reads mode-specific keys the producer never writes",
+   "snippet": "_platform = raw_result.get(\"platform_diversity\",0); platform_d = raw_result.get(\"platform_diversity_detection\", _platform); dark_d = raw_result.get(\"dark_matter_detection\", _dark); decay_d = raw_result.get(\"confidence_decay_detection\", _decay)",
+   "why_silent": "The recompute first tries mode-specific keys (platform_diversity_detection, dark_matter_detection, confidence_decay_detection) the engine NEVER persists (only one value per component is stored). The code DOES fall back to the real stored column via the second arg \u2014 but ONLY because each fallback default is wired correctly. Near-miss of the same class: consumer reads keys the producer never writes; the comment at :1105-1108 confirms this was a live bug ('aren't silently zeroed in the serve recompute'). Flagged as a fragile alias-fallback \u2014 if a future edit drops the fallback default, the components silently zero.",
+   "severity": "LOW",
+   "lens": "KEY DRIFT (producer key != consumer key)"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:2434 (write) + transfer/market_signal_diagnostic.py:133 (read)",
+   "scoring_field": "risk_scores.risk_stage (the SERVED stage/tier of a risk-or-market row)",
+   "failure_mode": "ENUM mismatch \u2014 ONE column, TWO disjoint vocabularies. The exact exemplar (c). `_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]` writes the market tier vocabulary {ELEVATED, ACTIVE, BUILDING, ROUTINE, DORMANT} (market_signal_engine MARKET_LEVELS, line 86) for rows that got a market gradient, but the risk vocabulary {ACUTE, ELEVATED, EMERGING, WATCH, BACKGROUND} (compute_risk_gradient, lines 607-621) for rows that did NOT \u2014 both stored in the same `risk_stage` column.",
+   "snippet": "_stage = mkt[\"tier\"] if mkt else score[\"risk_stage\"]   # market tier OR risk stage, same column\n... and at the consumer:\ntier = (mg.get(\"tier\") or match.get(\"risk_stage\") or \"ROUTINE\").upper()",
+   "why_silent": "Both are non-empty UPPERCASE strings, so nothing errors. The token 'ELEVATED' exists in BOTH vocabularies but means different things (market ACTIVE-band vs risk stage-2). Any consumer that branches/filters/colors on risk_stage (frontend stage filter, market_signal_diagnostic's `unusual` test which keys on 'ELEVATED' at line 137) treats an 'ELEVATED' market row and an 'ELEVATED' risk row identically, and silently has no branch for the market-only tokens BUILDING/DORMANT/ROUTINE or the risk-only tokens ACUTE/WATCH/BACKGROUND when read from the wrong family. A row falls through to the default bucket with no error.",
+   "severity": "high",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:484-488 + transfer/grade_agent.py:66 + transfer/financial_risk_gradient.py:1263,1286",
+   "scoring_field": "served `stage` / `classification` enum on a graded vs measured vs positioning score",
+   "failure_mode": "ENUM/CASE mismatch across producers writing the SAME logical field name with different vocabularies/casing. ai_grade emits stage in the ATTENTION enum {BREAKOUT, STRONG, EMERGING, WATCHING, MONITORING} (uppercase) and classification LOWERCASED to {mainstream, emerging, niche, fading} (line 488 `.lower()`). The positioning engine emits classification UPPERCASE {CALIBRATING, ROUTINE, WATCH, ELEVATED, UNUSUAL} (lines 1263, 1286). grade_agent.py:66 does `(result.get(\"classification\") or \"\").lower()`.",
+   "snippet": "ai_grade.py:488  \"classification\": str(score.get(\"classification\") or \"\").lower() or None,   # mainstream/emerging/niche\nfinancial_risk_gradient.py:1286  cls = \"ROUTINE\" if score<25 else \"WATCH\" ... \"UNUSUAL\"   # UPPERCASE, different vocabulary\nmarket_signal_diagnostic.py:135-137  cls=(match.get(\"classification\") or \"\").upper(); unusual = cls in (\"UNUSUAL\",\"ELEVATED\")",
+   "why_silent": "`classification` is a free-form string in every producer; the value 'emerging' (ai_grade) and 'EMERGING' / 'ELEVATED' (positioning) coexist. A consumer that lowercases (grade_agent:66) and one that uppercases (diagnostic:135) will each only match HALF the vocabulary. The `unusual` test `cls in (\"UNUSUAL\",\"ELEVATED\")` silently returns False for any ai_grade classification (which is never those tokens) \u2014 no error, just a never-true branch.",
+   "severity": "high",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1159-1168 vs transfer/calibration_engine.py:1363-1367 vs transfer/market_signal_engine.py:86",
+   "scoring_field": "signal_stage / new_stage (the served Gradient-Score stage band)",
+   "failure_mode": "ENUM + cutoff (UNIT-of-threshold) mismatch between two code paths that both produce `signal_stage`. signal_calibration_integration recomputes stage from `avg` with cutoffs 85/70/55/35 (lines 1159-1168) and so does calibration_engine (1363-1367) \u2014 these agree. BUT market_signal_engine uses a THIRD vocabulary {ELEVATED/ACTIVE/BUILDING/ROUTINE/DORMANT} with cutoffs 80/60/40/25/0 (line 86-87) for `tier`/`detection_level`. A frontend that maps stage\u2192color/label using the attention bands will mis-bucket any market 'tier' string fed through a shared stage renderer.",
+   "snippet": "signal_calibration_integration.py:1159  if avg >= 85: new_stage=\"BREAKOUT\" ... >=35 \"WATCHING\" else \"MONITORING\"\nmarket_signal_engine.py:86  MARKET_LEVELS = [(80,\"ELEVATED\"),(60,\"ACTIVE\"),(40,\"BUILDING\"),(25,\"ROUTINE\"),(0,\"DORMANT\")]",
+   "why_silent": "Both paths output a string into a stage-shaped field; no schema enforces which vocabulary. The numeric cutoffs also differ (35-vs-40 boundary, 55-vs-60), so the SAME detection number maps to a different band depending on which engine produced it \u2014 a row reads 'WATCHING' from one path and 'BUILDING' from the other with no contradiction surfaced.",
+   "severity": "medium",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:1435-1471 (compute_sustainability)",
+   "scoring_field": "fundamental_confirmation / leverage_health / profitability sub-scores (Market Signal 'fundamental_confirmation' component input)",
+   "failure_mode": "UNIT assumption mismatch (percent vs ratio). `_pos_scale(npm, 0, 25, 0, 100)` and `_pos_scale(roe, 0, 25, 0, 100)` assume Finnhub netProfitMargin/ROE arrive as PERCENT (25 == 25%). If any of the fallback keys (netProfitMarginAnnual, roeRfy) or a future provider returns a RATIO (0.25 for 25%), the value scales to ~1/100th of intended and profitability silently collapses to ~1.0 instead of ~100. The D/E scale `_pos_scale(de, 2.0, 0.3,...)` likewise assumes D/E as a ratio not a percent.",
+   "snippet": "npm = _first_num(m, \"netProfitMarginTTM\", \"netProfitMarginAnnual\")  # %\n...\nprof_parts.append(_pos_scale(npm, 0, 25, 0, 100))   # treats 25 as 25% full-credit",
+   "why_silent": "_first_num just float()s whatever the key holds; there is no unit guard. A ratio-valued field (0.25) is a perfectly valid float, scales to ~1, and feeds the composite as a real-looking low number \u2014 so a profitable company reads 'Strained' and the market 'fundamental_confirmation' component (market_signal_engine.py:259-260 normalizes sus.score/100) silently under-reads with no null and no error.",
+   "severity": "medium",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/market_signal_engine.py:259-261",
+   "scoring_field": "fundamental_confirmation (Market Signal CONFIDENCE component, weight 0.35)",
+   "failure_mode": "UNIT mismatch (0-100 vs 0-1) at a cross-engine boundary. sustainability['score'] is a 1-100 composite (financial_risk_gradient.py:1482 `min(100.0, ...)`), and this consumer divides by 100 to renormalize \u2014 correct HERE. But `comps[\"cycle_inflection\"]` (line 257) and `fmp_d[\"score_normalized\"]` (line 255) are fed through `_norm` (clamp 0-1) with NO /100, so if the beneficiary engine ever emits cycle_inflection on a 0-100 scale it clamps to 1.0 (saturated) silently. The three fu_parts mix conventions and rely on each upstream matching by luck.",
+   "snippet": "if fmp_d.get(\"score_normalized\") is not None: fu_parts.append(_norm(fmp_d[\"score_normalized\"]))   # expects 0-1\nif \"cycle_inflection\" in comps: fu_parts.append(_norm(comps[\"cycle_inflection\"]))                # expects 0-1\nif sus.get(\"score\") is not None: fu_parts.append(_norm(float(sus[\"score\"]) / 100))                # expects 0-100, /100",
+   "why_silent": "_norm clamps to [0,1] and never raises. A 0-100 value arriving where 0-1 is expected just pegs to 1.0; a 0-1 value where 0-100 is expected divides to ~0.0. Either way fundamental_confirmation absorbs a wrong-scale input as a valid-looking component with no missing-value signal.",
+   "severity": "medium",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:2426 vs 1500 (compute_sustainability result['score'])",
+   "scoring_field": "market_gradient.leverage_health (served Leverage Health filter value)",
+   "failure_mode": "UNIT/representation mismatch on a served field: leverage_health is rounded to 0 decimals as an integer-looking 1-100 score (`round(float(_lh), 0)`), but the SOURCE composite is a 1-100 float where HIGH = healthier. The diagnostic consumer (market_signal_diagnostic.py:138) reads `mg.get(\"leverage_health\")` raw with no scale check. If a caller ever confuses it with debt_to_equity (a ratio ~0.3-12, line 1514) the directions are INVERTED (high leverage_health = low debt) with no guard.",
+   "snippet": "mkt[\"leverage_health\"] = round(float(_lh), 0)   # 0-100, HIGH=healthy\n... metrics: \"debt_to_equity\": round(de, 2)         # ratio, HIGH=worse \u2014 opposite direction",
+   "why_silent": "Both are plain floats in the same payload; nothing distinguishes the 0-100 health score from the raw D/E ratio. A consumer comparing/sorting on the wrong one inverts the ranking silently \u2014 no type or null error.",
+   "severity": "low",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/google_trends_validation.py:325,344 + accuracy_ledger_enhanced.py:53",
+   "scoring_field": "accuracy_ledger.breakout_multiple (the moat's hit-rate evidence field)",
+   "failure_mode": "UNIT convention is a RAW multiple (value/baseline_mean, e.g. 2.5x), gated against BREAKOUT_THRESHOLD_MULT=2.5 (line 75). This is self-consistent here, but the field is stored as bare REAL `breakout_multiple` with no unit tag and re-upserted across TWO modules (google_trends_validation and accuracy_ledger_enhanced) \u2014 a divergence in either module's baseline definition (lowest-40% mean here) would silently shift what 'multiple' means without any consumer detecting it.",
+   "snippet": "threshold_value = baseline_mean * breakout_threshold\n\"multiple\": round(values[i] / baseline_mean, 1),   # raw x-multiple, not a percent",
+   "why_silent": "It is a float with no unit metadata; a consumer expecting a percent (250) vs a multiple (2.5) cannot tell them apart, and the two writer modules could drift their baseline math independently \u2014 the ledger would keep accepting plausible-looking numbers. Flagged as a watch-point, not a confirmed live bug (current math is consistent).",
+   "severity": "low",
+   "lens": "ENUM / CASE / UNIT mismatch \u2014 stage/tier/classification vocabularies and 0-1 vs 0-100 unit conventions across scoring inputs and served score fields"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:7999-8033",
+   "scoring_field": "detection_score / confidence_score / overall_score / signal_stage (the entire SERVED calibrated headline)",
+   "failure_mode": "SWALLOWED parse-fail (except: pass around the scoring transform)",
+   "snippet": "s = apply_calibration(s, db_path=DB_PATH)\\n        except Exception:\\n            pass  # non-fatal\\n ... s = _apply_ai_intelligence(s)\\n        except Exception:\\n            pass  # non-fatal\\n ... new_det,new_conf,floored = apply_ai_floor(...)\\n        except Exception:\\n            pass  # non-fatal",
+   "why_silent": "Each of the three serve-time score transforms (calibration, AI-taxonomy, AI-floor) is wrapped in its own bare `except Exception: pass`. If apply_calibration raises (e.g. a DB hiccup reading topic_maturity, a None in compute_calibrated_gradient, a schema drift), the row is served with the RAW pre-calibration detection/confidence/stage and NO error surfaces. The CLAUDE.md serve_payload memory says calibration MUST run or /scores serves stale values \u2014 but here a thrown exception silently downgrades to exactly that uncalibrated state. The user sees a plausible-looking score, never knowing it skipped calibration. This is the canonical-date disease applied to the whole headline score.",
+   "severity": "HIGH",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/gravitational_anomaly_detector.py:8132-8192 (write) + 8078-8093 (read)",
+   "scoring_field": "served detection_score/confidence_score/overall_score/heisenberg_gap (via serve_payload cache)",
+   "failure_mode": "STALE-DERIVED (precomputed cache can diverge from live det/conf)",
+   "snippet": "payload = s.get(\"serve_payload\")\\n if payload:\\n   try:\\n     p = json.loads(payload)\\n     ... results.append(p); continue\\n   except Exception: pass  # corrupt/absent -> fall through",
+   "why_silent": "_precompute_serve_payloads writes a fully-calibrated JSON snapshot per topic each worker cycle; _format_score_rows serves that snapshot verbatim (only re-injecting first_scored_at). The payload is keyed by (topic_key, scored_at) but its CONTENTS embed det/conf/gap/stage computed at precompute time. If calibration logic, AI-taxonomy tiers, KNOWN_TOPICS, or topic_maturity change between precompute and serve \u2014 or if a row gets a NEW scored_at but precompute hasn't re-run \u2014 /scores serves the stale cached numbers while /scores/{key} or the live path compute fresh ones. The exact heisenberg_gap staleness class the brief flags: a cached composite that silently diverges from its inputs, with no recompute trigger and no staleness check beyond cycle cadence.",
+   "severity": "HIGH",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1342-1358",
+   "scoring_field": "topic_score_history / topic_baselines (the baseline that feeds gradient_velocity -> maturity -> calibration_multiplier)",
+   "failure_mode": "SWALLOWED parse-fail (except: pass around the history write that builds the scoring baseline)",
+   "snippet": "try:\\n   record_score_history(... calibrated_gradient=cal_gradient_d, overall_score=new_overall ...)\\n except Exception:\\n   pass  # Never let history recording crash the main scoring flow",
+   "why_silent": "record_score_history is what populates topic_baselines, and topic_baselines IS the baseline that recompute_velocities and TopicMaturityClassifier.get_baseline read to compute gradient_velocity. If this write silently fails (schema drift, locked DB, type error on a None score), the baseline never accumulates for that topic, so get_baseline keeps returning avg_gradient=None -> velocity=None -> the topic is permanently mis-classified (stuck NEW/lifecycle-fallback, never EMERGING/RESURGENT) and its calibration_multiplier is wrong. The misread is invisible because scoring keeps returning a number; only the calibration QUALITY silently degrades.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/signal_calibration_integration.py:1103-1117",
+   "scoring_field": "platform_diversity / dark_matter / confidence_decay (det+conf recompute inputs)",
+   "failure_mode": "NULL-COALESCE masking (.get(...,_x) or 0 turns a missing mode-specific column into a real-looking 0 inside the weighted formula)",
+   "snippet": "platform_d = raw_result.get(\"platform_diversity_detection\", _platform) or 0\\n dark_d     = raw_result.get(\"dark_matter_detection\", _dark) or 0\\n decay_d    = raw_result.get(\"confidence_decay_detection\", _decay) or 0\\n new_detection = round(cal_gradient_d*0.375 + dark_d*0.216 + inertia_d*0.182 + platform_d*0.102 + decay_d*0.057 + _persist*0.068, 1)",
+   "why_silent": "The comment acknowledges this exact bug class ('aren't silently zeroed') and adds a fallback to the base column, but the final `or 0` still means: if BOTH the _detection variant AND the base column are absent/None, the component enters the weighted sum as 0 rather than raising. A genuinely-missing dark_matter or persistence silently contributes 0 to detection/confidence, depressing the headline score with no signal that an input was dropped. This is the producer/consumer key-mismatch the founder is hunting \u2014 the consumer guesses a fallback key, then coalesces a miss to 0.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/calibration_engine.py:1402-1413",
+   "scoring_field": "component_groups.signal_momentum.persistence + nowtrend_internal (Score Breakdown display)",
+   "failure_mode": "KEY DRIFT / hardcoded-zero (persistence and N passed as literal 0 in the class-based path)",
+   "snippet": "component_groups = build_component_groups({ ... \"persistence\": 0,  # populated after multiple cycles ... \"nowtrend_internal\": 0, })",
+   "why_silent": "In CalibrationEngine.apply (the class path), persistence and nowtrend_internal are hardcoded to 0 when building component_groups, while the function path in signal_calibration_integration.py:1230 reads the REAL nowtrendin_score. So which path runs determines whether the breakdown shows real persistence/N or a flat 0. build_component_groups then renders momentum 'Pending' or N 'pending: n==0' from that fake 0 \u2014 the same 'nowtrend_internal vs nowtrendin_score' key-drift exemplar the brief cites, here frozen to 0 in one of two code paths. Silent because the breakdown still renders, just with a wrong PENDING/0 state.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/calibration_engine.py:1200, 1337",
+   "scoring_field": "platform_count (anomaly gate + history platform_count) via json.loads(platforms_active)",
+   "failure_mode": "TYPE/JSON-not-parsed assumption (json.loads on a column assumed to be a JSON string)",
+   "snippet": "len(json.loads(raw_result.get(\"platforms_active\", \"[]\")))  ... platforms = json.loads(raw_result.get(\"platforms_active\", \"[]\"))",
+   "why_silent": "platforms_active is json.loads'd with a default of the STRING \"[]\". Elsewhere in the codebase (gravitational_anomaly_detector _parse_json_fields, ai_topic_intelligence) platforms_active is already parsed to a Python LIST before reaching calibration. If a list (not a str) arrives here, json.loads(list) raises TypeError \u2014 and in CalibrationEngine.apply this is NOT wrapped in try/except, so it would crash; but if the value is an unexpected non-JSON string it silently yields wrong platform_count=0, feeding evaluate_anomaly_gate (has_xplatform=False) and suppressing the anomaly. Producer sometimes emits list, sometimes JSON-string; consumer assumes only one \u2014 the classic format mismatch.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:393-420",
+   "scoring_field": "AI-proposed components (niche_concentration/momentum/...) -> detection_score/confidence_score",
+   "failure_mode": "SWALLOWED parse-fail + partial-extract fallback that returns a component-LESS dict treated as valid",
+   "snippet": "for attempt in (blob, blob.replace(...)): try: return json.loads(attempt) except Exception: pass\\n ... out = {}; sm = re.search('\"short\"...'); fm = re.search('\"full\"...'); return out or None",
+   "why_silent": "_extract_json silently swallows every JSON parse failure, then the last-resort regex only pulls 'short'/'full' \u2014 NOT the scoring component keys. propose_score calls _extract_json on the SCORE response; if Claude's JSON is malformed, _extract_json returns either None (handled) OR a dict containing only short/full and none of niche_concentration/momentum/etc. grade_topic then does comps={'G':_num(score.get('niche_concentration')), ...} where every _num(None) -> 0.0 (default), so detection/confidence are computed from an all-zero component vector and returned as a real PROPOSED score with no error. A scoring read silently defaulting to 0 \u2014 exactly the brief's failure class, on the user-facing Grade tool.",
+   "severity": "HIGH",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/ai_grade.py:503-507 + 456-460",
+   "scoring_field": "freshness (C) and all component values feeding _composite",
+   "failure_mode": "NULL-COALESCE masking (_num default turns a missing/unparseable component into a real number in the weighted score)",
+   "snippet": "def _num(v, default=0.0): try: return round(float(v),1) except Exception: return default\\n ... \"C\": _num(score.get(\"freshness\"), 50.0),  \"G\": _num(score.get(\"niche_concentration\")), ...",
+   "why_silent": "Each component is coerced with _num and a silent default (0.0 for G/M/I/D/P, 50.0 for C). If the model omits niche_concentration, the EARLINESS-defining component silently enters _composite as 0 with no flag \u2014 a topic that is actually early reads as not-early. freshness defaulting to 50 injects a fabricated mid value. The composite is then presented as engine-weighted and 'on the SAME scale as collected signals', masking that one or more inputs were never actually estimated.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/market_signal_engine.py:255-270 + 117-137",
+   "scoring_field": "fundamental_confirmation / market_momentum (Market Signal detection+confidence components)",
+   "failure_mode": "NULL-COALESCE masking \u2192 a missing data source collapses a component to 0.0 which then defines the z-score baseline",
+   "snippet": "fundamental = _norm(sum(fu_parts)/len(fu_parts)) if fu_parts else 0.0\\n momentum = _norm(sum(mm_parts)/len(mm_parts)) if mm_parts else 0.0",
+   "why_silent": "When FMP/sustainability/beneficiary inputs are all absent (a degraded upstream pull), fundamental_confirmation and market_momentum are set to a real-looking 0.0 \u2014 indistinguishable from a genuinely-measured-zero fundamental. That 0.0 is then recorded into market_signal_history (record_market_cycle) and becomes part of the item's OWN baseline mean/stdev (get_market_baselines), so a transient source outage permanently depresses the baseline and skews every future z-score. A missing input silently enters the scoring formula AND poisons the persisted baseline, with no 'data absent' marker distinct from a true zero.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/financial_risk_gradient.py:944-963 (write) vs 808-823 + 1058-1068 (key build)",
+   "scoring_field": "risk maturity/baseline classification (risk_topic key used to look up the topic's own baseline)",
+   "failure_mode": "AGGREGATION-KEY mismatch (same entity stored under divergent risk_topic keys -> split history -> baseline can't accumulate)",
+   "snippet": "key = _risk_key(risk_display)  # e.g. 'apple' for SEC name 'Apple', but finnhub path passes display 'Apple' while gdelt/extract_financial_topics passes lowercase vocab terms like 'recession'",
+   "why_silent": "_persist_risk_signal derives risk_topic via _risk_key(display). SEC/Finnhub use the watchlist display ('Apple'->'apple'); GDELT/Reddit/YouTube persist by extracted vocabulary topic ('recession','$AAPL'). The SAME underlying risk can land under different keys ('apple' vs '$aapl'), splitting its signal history. _compute_baseline keys on risk_topic, so a name whose signals fragment across keys never reaches _BASELINE_MIN_CYCLES on any single key and is stuck INSUFFICIENT_HISTORY / mis-scored, even after many cycles. The misread is silent: each fragment scores fine in isolation while the aggregate baseline never forms.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/nowtrend_integration.py:609-611",
+   "scoring_field": "M_medium_sequence.platforms (served component detail)",
+   "failure_mode": "JSON-not-parsed / SWALLOWED via conditional (active_platforms consumed as text when not a str)",
+   "snippet": "\"platforms\": json.loads(s.get(\"active_platforms\", \"[]\")) if isinstance(s.get(\"active_platforms\"), str) else s.get(\"active_platforms\", [])",
+   "why_silent": "active_platforms is only json.loads'd when it is a str; otherwise it's passed through. If the DB returns a non-str/non-list (None, or a Postgres array adapter object), the else-branch returns it raw or an empty list, so the platform list silently shows empty \u2014 under-representing M (medium sequence / platform diffusion) in the explainability payload. A producer/consumer format assumption (always a JSON string) that silently yields empty when violated.",
+   "severity": "LOW",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  },
+  {
+   "file_line": "transfer/google_trends_validation.py:212, 1342-style (calibration_engine 1496-1497)",
+   "scoring_field": "ledger lead_time_days/breakout (the moat accuracy metric) \u2014 gradient_velocity falsy check in report",
+   "failure_mode": "NULL/zero-coalesce (falsy 0 treated as 'no data' in display, but core: detect_breakout_date returns None silently on any curve glitch)",
+   "snippet": "detect_breakout_date: if not curve or len(curve) < 5: return None  ... _fetch_apify/_fetch_serpapi: except Exception: return None",
+   "why_silent": "Every Trends provider fetch (_fetch_apify/_fetch_serpapi/_fetch_official) wraps the whole call in except->return None, and detect_breakout_date returns None for any short/edgy curve. validate_recent_detections/sweep_pending then count a silent None as 'pre_breakout' (topic still ahead) rather than 'fetch failed'. A systematically failing provider (auth expiry, shape change) is indistinguishable from genuine pre-breakout, so the Accuracy Ledger silently stops recording LED wins and the hit-rate quietly drifts \u2014 the moat metric degrades with no error. Note: calibration_engine analyse uses `if r['gradient_velocity']` which also treats a real 0.0 velocity as 'N/A'.",
+   "severity": "MEDIUM",
+   "lens": "SWALLOWED parse-fail + STALE-DERIVED: try/except-around-scoring-reads and precomputed/served fields that diverge from their live inputs"
+  }
+ ],
+ "counts": {
+  "mapped": 5,
+  "candidates": 42,
+  "high_verified": 15,
+  "confirmed": 9
+ }
+}

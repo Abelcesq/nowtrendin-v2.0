@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>NowTrendIn — Institutional Terminal (Concept)</title>
+<style>
+  :root{
+    --ink:#0B1626; --ink2:#1C2A3A; --steel:#5A6B7E; --steel2:#8593A3;
+    --line:#E4E9F0; --line2:#EEF2F7; --bg:#F4F6F9; --panel:#FFFFFF;
+    --det:#2563EB; --det-soft:#EAF1FE;
+    --conf:#0BA37F; --conf-soft:#E4F6F0;
+    --amber:#E8732A; --warn:#C9821F; --red:#C24034;
+    --pill:#F0F3F7;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:var(--sans); color:var(--ink); background:var(--bg);
+    font-size:13px; line-height:1.45; -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  .num{font-variant-numeric:tabular-nums; font-family:var(--mono)}
+  button{font-family:inherit; cursor:pointer}
+  ::selection{background:#cfe0ff}
+
+  /* ---------- TOP GLOBAL NAV ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:18px; height:52px; padding:0 16px;
+    background:var(--ink); color:#E8EDF3; border-bottom:1px solid #04386b00;
+    flex:0 0 auto;
+  }
+  .brand{display:flex; align-items:center; gap:9px; font-weight:700; letter-spacing:.2px}
+  .flame{width:22px;height:22px;border-radius:6px;
+    background:linear-gradient(150deg,var(--amber),#F2A03D);
+    display:flex;align-items:center;justify-content:center;font-size:13px}
+  .brand .nt{color:#fff}.brand .tn{color:var(--amber)}
+  .brand small{display:block;font-size:9px;letter-spacing:2px;color:#7C8DA3;font-weight:600;margin-top:-2px}
+  nav.primary{display:flex; gap:2px; margin-left:6px}
+  nav.primary a{
+    color:#AEBBCB; text-decoration:none; padding:7px 12px; border-radius:7px;
+    font-weight:600; font-size:12.5px;
+  }
+  nav.primary a.active{color:#fff; background:#21344a}
+  nav.primary a:hover{color:#fff}
+  .cmd{flex:1; max-width:430px; margin:0 auto; position:relative}
+  .cmd input{
+    width:100%; height:32px; border-radius:8px; border:1px solid #2A3D54;
+    background:#152334; color:#E8EDF3; padding:0 12px 0 32px; font-size:12.5px;
+    font-family:var(--sans);
+  }
+  .cmd input::placeholder{color:#73849A}
+  .cmd .ic{position:absolute;left:10px;top:8px;color:#73849A}
+  .cmd .kbd{position:absolute;right:8px;top:7px;font-size:10px;color:#6F8098;
+    border:1px solid #2E4257;border-radius:4px;padding:1px 5px;font-family:var(--mono)}
+  .topright{display:flex;align-items:center;gap:14px;margin-left:auto;font-size:12px}
+  .live{display:flex;align-items:center;gap:6px;color:#9FB0C2}
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--conf);
+    box-shadow:0 0 0 3px rgba(11,163,127,.2)}
+  .live .num{color:#CFD9E4;font-size:12px}
+  .ent{background:#21344a;color:#CDE0FF;border:1px solid #2E4666;border-radius:6px;
+    padding:3px 8px;font-size:10.5px;font-weight:700;letter-spacing:.4px}
+  .iconbtn{color:#AEBBCB;background:none;border:none;font-size:15px;padding:4px;position:relative}
+  .iconbtn .badge{position:absolute;top:-1px;right:-2px;background:var(--amber);
+    color:#fff;font-size:8.5px;border-radius:8px;padding:0 4px;font-weight:700;font-family:var(--mono)}
+  .avatar{width:26px;height:26px;border-radius:50%;background:#35506f;color:#cfe0ff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+
+  /* ---------- SUB NAV ---------- */
+  .subnav{
+    display:flex; align-items:center; gap:2px; height:38px; padding:0 16px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .subnav a{color:var(--steel);text-decoration:none;padding:9px 11px;font-size:12px;
+    font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subnav a.active{color:var(--det);border-bottom-color:var(--det)}
+  .subnav a:hover{color:var(--ink)}
+  .subnav .right{margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--steel2);font-size:11px}
+  .ghostbtn{border:1px solid var(--line);background:var(--panel);border-radius:7px;
+    padding:5px 10px;font-size:11.5px;font-weight:600;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
+  .ghostbtn:hover{border-color:#C9D4E0;background:#FBFCFD}
+
+  /* ---------- BODY: 3 columns ---------- */
+  .body{flex:1; display:grid; grid-template-columns:212px 1fr 320px; min-height:0}
+  .col{min-height:0; overflow:auto}
+
+  /* sidebar */
+  .side{background:var(--panel); border-right:1px solid var(--line); padding:14px 10px}
+  .side h4{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--steel2);
+    margin:16px 8px 6px;font-weight:700}
+  .side h4:first-child{margin-top:0}
+  .side .item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
+    color:var(--ink2);font-size:12.5px;cursor:pointer;font-weight:500}
+  .side .item:hover{background:var(--line2)}
+  .side .item.on{background:var(--det-soft);color:var(--det);font-weight:600}
+  .side .item .ct{margin-left:auto;font-size:11px;color:var(--steel2);font-family:var(--mono)}
+  .side .item.on .ct{color:var(--det)}
+  .swatch{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+
+  /* main */
+  .main{padding:14px 16px;background:var(--bg)}
+  .stripwrap{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  .tile .lab{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--steel2);font-weight:700}
+  .tile .big{font-size:22px;font-weight:700;margin-top:3px;letter-spacing:-.5px}
+  .tile .sub{font-size:11px;color:var(--steel);margin-top:1px}
+  .tile .up{color:var(--conf)} .tile .dn{color:var(--red)}
+  .tile.accent{background:linear-gradient(180deg,#0B1626,#16273b);border-color:#16273b}
+  .tile.accent .lab{color:#8aa0ba}.tile.accent .big{color:#fff}
+  .tile.accent .sub{color:#9bb6cf}
+
+  .gridhead{display:flex;align-items:center;margin:4px 2px 8px}
+  .gridhead h3{font-size:13.5px;font-weight:700;margin:0;letter-spacing:-.2px}
+  .gridhead .cnt{font-family:var(--mono);color:var(--steel2);font-size:12px;margin-left:7px}
+  .gridhead .tools{margin-left:auto;display:flex;gap:7px}
+
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  thead th{
+    text-align:right;font-size:10px;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--steel2);font-weight:700;padding:9px 10px;background:#FAFBFD;
+    border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+  thead th.l{text-align:left}
+  thead th .ar{color:var(--det);font-size:9px}
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--line2);text-align:right;white-space:nowrap}
+  tbody td.l{text-align:left}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#F8FAFD}
+  tbody tr.sel{background:var(--det-soft)}
+  tbody tr:last-child td{border-bottom:none}
+  .topic{font-weight:600;color:var(--ink);font-size:12.5px}
+  .ticker{font-family:var(--mono);font-size:10.5px;color:var(--steel2);margin-top:1px}
+  .det{color:var(--det);font-weight:700} .conf{color:var(--conf);font-weight:700}
+  .gapcell{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end}
+  .gapbar{width:34px;height:5px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}
+  .gapbar i{position:absolute;left:0;top:0;bottom:0;background:var(--warn);border-radius:3px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.2px}
+  .p-viral{background:#FDECE3;color:#C24034}
+  .p-strong{background:#E7EEFC;color:#2455C7}
+  .p-emerg{background:#FCF3E0;color:#9A6A12}
+  .p-routine{background:#EEF1F5;color:#5A6B7E}
+  .vel{display:inline-flex;align-items:center;gap:5px;justify-content:flex-end;font-weight:600;font-size:11.5px}
+  .vel.acc{color:var(--conf)} .vel.norm{color:var(--steel)} .vel.fade{color:var(--red)}
+  .tiers{display:inline-flex;gap:3px;justify-content:flex-end}
+  .tiers .t{width:7px;height:7px;border-radius:50%}
+  .tiers .ex{background:#7C5BD6} .tiers .mn{background:#C9D4E0}
+  .age,.src,.upd{color:var(--steel);font-size:11.5px}
+
+  /* detail rail */
+  .rail{background:var(--panel);border-left:1px solid var(--line);padding:0}
+  .rail .rhead{padding:13px 15px 11px;border-bottom:1px solid var(--line)}
+  .rail .rhead .t{font-size:15px;font-weight:700;letter-spacing:-.3px}
+  .rail .rhead .m{font-size:11px;color:var(--steel);margin-top:2px;font-family:var(--mono)}
+  .gauges{display:flex;gap:12px;padding:15px}
+  .gz{flex:1;text-align:center;border:1px solid var(--line);border-radius:10px;padding:11px 6px}
+  .gz .gv{font-size:30px;font-weight:700;font-family:var(--mono);letter-spacing:-1px;line-height:1}
+  .gz.d .gv{color:var(--det)} .gz.c .gv{color:var(--conf)}
+  .gz .gl{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--steel2);font-weight:700;margin-top:6px}
+  .gz .gf{font-size:9.5px;color:var(--steel2);margin-top:2px}
+  .gapnote{margin:0 15px 6px;background:var(--conf-soft);border:1px solid #BFE8DA;border-radius:8px;
+    padding:8px 11px;font-size:11.5px;color:#0A6B52;font-weight:600}
+  .sect{padding:12px 15px;border-top:1px solid var(--line2)}
+  .sect h5{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--steel2);
+    font-weight:700;margin:0 0 9px}
+  .comp{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+  .comp .cn{font-size:11.5px;color:var(--ink2);width:108px;flex:0 0 auto}
+  .comp .ct{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+  .comp .ct i{display:block;height:100%;border-radius:3px}
+  .comp .cv{font-family:var(--mono);font-size:11px;color:var(--steel);width:30px;text-align:right}
+  .spark{width:100%;height:46px}
+  .prov{font-size:11px;color:var(--steel);line-height:1.5}
+  .prov b{color:var(--ink2);font-weight:600}
+  .disc{font-size:10px;color:var(--steel2);padding:10px 15px;border-top:1px solid var(--line2);line-height:1.5}
+
+  /* footer */
+  footer{flex:0 0 auto;background:var(--ink);color:#8294A8;font-size:10.5px;
+    padding:7px 16px;display:flex;gap:18px;align-items:center}
+  footer .num{color:#A9BACB}
+  footer .sep{color:#33485f}
+  footer a{color:#9FB6CF;text-decoration:none}
+
+  @media (max-width:1180px){ .body{grid-template-columns:0 1fr 300px} .side{display:none} }
+</style>
+</head>
+<body>
+
+  <!-- TOP GLOBAL NAV -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="flame">🔥</div>
+      <div><span class="nt">Now</span><span class="tn">TrendIn</span>
+        <small>ATTENTION INTELLIGENCE</small></div>
+    </div>
+    <nav class="primary">
+      <a class="active" href="#">Market Signal</a>
+      <a href="#">Trends</a>
+      <a href="#">Grade</a>
+      <a href="#">Ledger</a>
+      <a href="#">Research</a>
+    </nav>
+    <div class="cmd">
+      <span class="ic">⌕</span>
+      <input placeholder="Search topic, ticker, theme — or type a command"/>
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="topright">
+      <div class="live"><span class="dot"></span>LIVE <span class="num" id="clock">14:32:07 ET</span></div>
+      <span class="ent">ENTERPRISE</span>
+      <button class="iconbtn">⌗<span class="badge">3</span></button>
+      <button class="iconbtn">🔔<span class="badge">5</span></button>
+      <div class="avatar">A</div>
+    </div>
+  </header>
+
+  <!-- SUB NAV -->
+  <div class="subnav">
+    <a class="active" href="#">Monitor</a>
+    <a href="#">Movers</a>
+    <a href="#">Early-Gap</a>
+    <a href="#">Watchlists</a>
+    <a href="#">Cross-Trend Correlation</a>
+    <a href="#">Methodology</a>
+    <div class="right">
+      <button class="ghostbtn">⤓ Export</button>
+      <button class="ghostbtn">⚙ Columns</button>
+      <button class="ghostbtn">＋ Save screen</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="body">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="col side">
+      <h4>Watchlists</h4>
+      <div class="item on">AI Infrastructure <span class="ct">12</span></div>
+      <div class="item">My Coverage <span class="ct">28</span></div>
+      <div class="item">Crypto &amp; DeFi <span class="ct">9</span></div>
+      <div class="item">＋ New watchlist</div>
+
+      <h4>Saved Screens</h4>
+      <div class="item">Early-gap · rising vel <span class="ct">8</span></div>
+      <div class="item">Breakout ≥ 85 <span class="ct">3</span></div>
+      <div class="item">Expert-only (dark) <span class="ct">6</span></div>
+
+      <h4>Categories</h4>
+      <div class="item"><span class="swatch" style="background:#2563EB"></span>Technology <span class="ct">31</span></div>
+      <div class="item"><span class="swatch" style="background:#0BA37F"></span>Business <span class="ct">9</span></div>
+      <div class="item"><span class="swatch" style="background:#9A6A12"></span>Economy <span class="ct">6</span></div>
+      <div class="item"><span class="swatch" style="background:#7C5BD6"></span>Crypto <span class="ct">7</span></div>
+      <div class="item"><span class="swatch" style="background:#C24034"></span>Sports <span class="ct">2</span></div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="col main">
+      <div class="stripwrap">
+        <div class="tile"><div class="lab">Active Signals</div><div class="big num">50</div><div class="sub">across 6 sources</div></div>
+        <div class="tile"><div class="lab">Breakout ≥85</div><div class="big num">3</div><div class="sub up">▲ 2 today</div></div>
+        <div class="tile"><div class="lab">Strong ≥70</div><div class="big num">14</div><div class="sub up">▲ 1 today</div></div>
+        <div class="tile"><div class="lab">Early-Gap</div><div class="big num">8</div><div class="sub">Det ≫ Conf</div></div>
+        <div class="tile accent"><div class="lab">Median Lead Time</div><div class="big num">11<span style="font-size:13px"> d</span></div><div class="sub">ledger · 142 validated</div></div>
+        <div class="tile"><div class="lab">Honest Hit Rate</div><div class="big num">34%</div><div class="sub">vs Google Trends</div></div>
+      </div>
+
+      <div class="gridhead">
+        <h3>Signal Monitor</h3><span class="cnt">50 topics · AI Infrastructure</span>
+        <div class="tools">
+          <button class="ghostbtn">Detection ≥70</button>
+          <button class="ghostbtn">All stages ▾</button>
+        </div>
+      </div>
+
+      <table id="grid">
+        <thead><tr>
+          <th class="l">Topic</th>
+          <th>Det <span class="ar">▼</span></th>
+          <th>Conf</th>
+          <th>Gap</th>
+          <th class="l" style="text-align:left">Stage</th>
+          <th>Velocity</th>
+          <th>Breadth</th>
+          <th>Age</th>
+          <th>Src</th>
+          <th>Updated</th>
+        </tr></thead>
+        <tbody>
+          <!-- rows: data-key drives detail pane -->
+          <tr data-key="agentmem">
+            <td class="l"><div class="topic">agent memory</div><div class="ticker">AI-INFRA · new category</div></td>
+            <td class="det num">95</td><td class="conf num">93</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:6%"></i></span><span class="num">2</span></span></td>
+            <td class="l"><span class="pill p-viral">VIRAL</span></td>
+            <td><span class="vel acc">▲ accel</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span><span class="t mn"></span><span class="t mn"></span></span></td>
+            <td class="age">4 mo</td><td class="src num">5</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="agcode">
+            <td class="l"><div class="topic">agentic coding</div><div class="ticker">AI-INFRA · 10% of commits</div></td>
+            <td class="det num">95</td><td class="conf num">93</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:6%"></i></span><span class="num">2</span></span></td>
+            <td class="l"><span class="pill p-viral">VIRAL</span></td>
+            <td><span class="vel acc">▲ accel</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span><span class="t mn"></span><span class="t mn"></span></span></td>
+            <td class="age">8 mo</td><td class="src num">6</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="mcp" class="sel">
+            <td class="l"><div class="topic">model context protocol</div><div class="ticker">MCP · window open</div></td>
+            <td class="det num">74</td><td class="conf num">73</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:3%"></i></span><span class="num">1</span></span></td>
+            <td class="l"><span class="pill p-strong">STRONG</span></td>
+            <td><span class="vel norm">→ normalising</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span><span class="t mn"></span><span class="t mn"></span></span></td>
+            <td class="age">19 mo</td><td class="src num">4</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="multiagent">
+            <td class="l"><div class="topic">multi-agent systems</div><div class="ticker">AI-INFRA · Codex subagents GA</div></td>
+            <td class="det num">77</td><td class="conf num">72</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:14%"></i></span><span class="num">5</span></span></td>
+            <td class="l"><span class="pill p-strong">STRONG</span></td>
+            <td><span class="vel acc">▲ accel</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span><span class="t ex"></span><span class="t mn"></span></span></td>
+            <td class="age">11 mo</td><td class="src num">5</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="a2a">
+            <td class="l"><div class="topic">A2A — agent-to-agent protocol</div><div class="ticker">AI-INFRA · MCP companion</div></td>
+            <td class="det num">77</td><td class="conf num">72</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:14%"></i></span><span class="num">5</span></span></td>
+            <td class="l"><span class="pill p-strong">STRONG</span></td>
+            <td><span class="vel acc">▲ building</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span><span class="t mn"></span><span class="t mn"></span></span></td>
+            <td class="age">7 mo</td><td class="src num">3</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="darkearly">
+            <td class="l"><div class="topic">deterministic agent eval</div><div class="ticker">DARK · expert-only</div></td>
+            <td class="det num">68</td><td class="conf num">31</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:100%;background:var(--red)"></i></span><span class="num">37</span></span></td>
+            <td class="l"><span class="pill p-emerg">EMERGING</span></td>
+            <td><span class="vel acc">▲ accel</span></td>
+            <td><span class="tiers"><span class="t ex"></span><span class="t ex"></span></span></td>
+            <td class="age">6 wk</td><td class="src num">2</td><td class="upd">25m</td>
+          </tr>
+          <tr data-key="recession">
+            <td class="l"><div class="topic">recession</div><div class="ticker">MACRO · positioning</div></td>
+            <td class="det num">22</td><td class="conf num">21</td>
+            <td><span class="gapcell"><span class="gapbar"><i style="width:3%"></i></span><span class="num">1</span></span></td>
+            <td class="l"><span class="pill p-routine">ROUTINE</span></td>
+            <td><span class="vel norm">→ flat</span></td>
+            <td><span class="tiers"><span class="t mn"></span><span class="t mn"></span></span></td>
+            <td class="age">—</td><td class="src num">13</td><td class="upd">1h</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:10.5px;color:var(--steel2);margin:9px 2px">
+        Blue lifts Detection (earliness) · Green lifts Confidence (confirmation). Breadth dots:
+        <span style="color:#7C5BD6">●</span> expert-tier &nbsp;<span style="color:#C9D4E0">●</span> mainstream-tier.
+        Click a row to inspect.
+      </div>
+    </main>
+
+    <!-- DETAIL RAIL -->
+    <aside class="col rail" id="rail">
+      <div class="rhead">
+        <div class="t" id="r-title">model context protocol</div>
+        <div class="m" id="r-meta">MCP · 32 signals · devto · 4 platforms · 25m ago</div>
+      </div>
+      <div class="gauges">
+        <div class="gz d"><div class="gv" id="r-det">74</div><div class="gl">Detection</div><div class="gf">~22% FP · speed</div></div>
+        <div class="gz c"><div class="gv" id="r-conf">73</div><div class="gl">Confidence</div><div class="gf">&lt;9% FP · precision</div></div>
+      </div>
+      <div class="gapnote" id="r-gap">1-pt gap — early-edge and confirmation aligned. Both agree this is building.</div>
+
+      <div class="sect">
+        <h5>Component breakdown</h5>
+        <div class="comp"><span class="cn">Gradient Strength</span><span class="ct"><i style="width:100%;background:var(--det)"></i></span><span class="cv">48</span></div>
+        <div class="comp"><span class="cn">Inertia</span><span class="ct"><i style="width:62%;background:var(--conf)"></i></span><span class="cv">62</span></div>
+        <div class="comp"><span class="cn">Medium / Platform</span><span class="ct"><i style="width:90%;background:var(--conf)"></i></span><span class="cv">90</span></div>
+        <div class="comp"><span class="cn">Dark Matter</span><span class="ct"><i style="width:53%;background:var(--det)"></i></span><span class="cv">53</span></div>
+        <div class="comp"><span class="cn">Confidence Decay</span><span class="ct"><i style="width:40%;background:#8593A3"></i></span><span class="cv">40</span></div>
+      </div>
+
+      <div class="sect">
+        <h5>Scoring history · 24h</h5>
+        <svg class="spark" viewBox="0 0 300 46" preserveAspectRatio="none">
+          <polyline fill="none" stroke="#2563EB" stroke-width="2"
+            points="0,16 25,16 50,16 75,16 100,16 125,16 150,16 175,16 200,16 225,16 250,16 275,16 300,16"/>
+          <polyline fill="none" stroke="#0BA37F" stroke-width="2"
+            points="0,20 25,14 50,20 75,18 100,20 125,14 150,18 175,20 200,16 225,18 250,20 275,18 300,18"/>
+        </svg>
+        <div style="font-size:10.5px;color:var(--steel2)">Detection flat at 74 · Confidence 72–76 · gap ≤2 all cycles</div>
+      </div>
+
+      <div class="sect">
+        <h5>Source provenance</h5>
+        <div class="prov"><b>DEV.to</b> · <b>GitHub</b> · <b>WordPress</b> · <b>YouTube</b> — detected independently on 4 platforms. 75% first-timer ratio → dark-social inflow inferred. <b>Captured 14:07 ET, Jun 15 2026.</b></div>
+      </div>
+
+      <div class="disc">
+        Methodology v2.3 · Signal analysis only — not financial, investment, or legal advice. Internal demand (N) reported separately and never blended into the score.
+      </div>
+    </aside>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>Engine <span class="num">v2.3.1</span></span><span class="sep">|</span>
+    <span>Sources: GDELT · Finnhub · SEC EDGAR · GitHub · Reddit · YouTube</span><span class="sep">|</span>
+    <span>Last collection <span class="num">14:07:00 ET</span></span><span class="sep">|</span>
+    <span>Next <span class="num">14:37</span></span>
+    <span style="margin-left:auto"><a href="#">Methodology</a> · <a href="#">API</a> · <a href="#">Disclosures</a> — measurement, not advice</span>
+  </footer>
+
+<script>
+  // live clock
+  function tick(){
+    const d=new Date();
+    const p=n=>String(n).padStart(2,'0');
+    document.getElementById('clock').textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} ET`;
+  }
+  setInterval(tick,1000); tick();
+
+  // master-detail
+  const DATA={
+    agentmem:{t:'agent memory',m:'AI-INFRA · 8 signals · github · 4 platforms · 25m ago',det:95,conf:93,gap:'2-pt gap — both scores aligned at VIRAL. Maximum lead time, accelerating.'},
+    agcode:{t:'agentic coding',m:'AI-INFRA · 11 signals · github · 4 platforms · 25m ago',det:95,conf:93,gap:'2-pt gap — aligned at VIRAL. The application driving the surge.'},
+    mcp:{t:'model context protocol',m:'MCP · 32 signals · devto · 4 platforms · 25m ago',det:74,conf:73,gap:'1-pt gap — early-edge and confirmation aligned. Both agree this is building.'},
+    multiagent:{t:'multi-agent systems',m:'AI-INFRA · 18 signals · github · 4 platforms · 25m ago',det:77,conf:72,gap:'5-pt gap — confirmation building, detection slightly ahead.'},
+    a2a:{t:'A2A — agent-to-agent protocol',m:'AI-INFRA · 9 signals · github · 3 platforms · 25m ago',det:77,conf:72,gap:'5-pt gap — confirmation building. MCP companion protocol.'},
+    darkearly:{t:'deterministic agent eval',m:'DARK · 4 signals · 2 expert platforms · 25m ago',det:68,conf:31,gap:'37-pt gap — VERY EARLY. Expert-only corroboration, not yet confirmed externally.'},
+    recession:{t:'recession',m:'MACRO · 13 signals · positioning · 1h ago',det:22,conf:21,gap:'1-pt gap — routine vs this topic\u2019s own baseline. Nothing unusual.'},
+  };
+  const rows=document.querySelectorAll('#grid tbody tr');
+  rows.forEach(r=>r.addEventListener('click',()=>{
+    rows.forEach(x=>x.classList.remove('sel')); r.classList.add('sel');
+    const d=DATA[r.dataset.key]; if(!d)return;
+    document.getElementById('r-title').textContent=d.t;
+    document.getElementById('r-meta').textContent=d.m;
+    document.getElementById('r-det').textContent=d.det;
+    document.getElementById('r-conf').textContent=d.conf;
+    document.getElementById('r-gap').textContent=d.gap;
+  }));
+</script>
+</body>
+</html>

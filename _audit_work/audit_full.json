@@ -1,0 +1,1831 @@
+{
+ "report": {
+  "executive_summary": "Bottom line: NowTrendIn's instrument partially reflects human attention today, but it FAILS the no-gap test on the data's most important live data point and on a systematic class of already-arrived topics. On 2026-06-22 Alan Greenspan died at 100 \u2014 the day's premier, globally wall-to-wall mainstream event \u2014 and the engine scored it Detection 91.8 / Confidence 75.6 / gap +16.2, the single largest positive gap in the 100-topic sample, landing a confirmed obituary in the \"very early, not-yet-confirmed\" Anomalies band. That is precisely the broken behavior the product's own no-gap principle says invalidates the gap metric. The failure is systemic, not a fluke: every mainstream nation and mega-cap outside a privileged top tier collapses to a near-identical ~45 Detection / ~67 Confidence signature badged EMERGING (china, india, russia, france, apple, openai, korea), with a uniform ~-22 LAGGING gap \u2014 Confidence systematically exceeding Detection on topics that have unambiguously already arrived, the inverse of the intended \"early = Detection leads\" design. The single biggest risk is therefore credibility at the already-arrived end of the curve: the dual-pathway anti-collapse gate demonstrably works at the very top (trump 94.6/94.2, FIFA 93.7/93.7, iran 86.1/90.1, election 94.7/94.3) but does not extend across the full mainstream band. Separately, a real data-integrity bug exists: the stored heisenberg_gap field contradicts its own Detection\u2212Confidence on the entire mcp family (det\u2212conf \u2248 +1.5 but stored gap \u221223), directly breaking the \"both scores explain each other\" test. The good news that must be weighed against this: the scores DO discriminate (monotonic stage ladder, 520/595 distinct values, gap converging to ~0 only for genuinely-arrived BREAKOUT topics), the engine does NOT fabricate confidence for niche topics (a one-directional failure mode), and the no-N-into-Gradient firewall \u2014 the core integrity rule \u2014 is correctly enforced in live code. The headline recommendation: do NOT make any public \"before it arrives\" lead claim until (a) a non-circular Wikipedia+GDELT no-gap anchor is wired as a held-out validator and the mainstream-collapse + gap-incoherence bugs are fixed, and (b) the accuracy ledger clears its product-success bar (the moat charter's own bar is currently CONTRADICTED at 0.0% honest hit rate). The instrument is promising and structurally honest in its design, but it is not yet a defensible, ledger-backed \"human attention\" instrument across the full diffusion curve. Caveat on scope: this audit rests on a 100-topic no-gap sample within a 2,103-topic snapshot and an 88-instrument market pull, all single-day (2026-06-22/23) \u2014 directionally decisive but not a multi-week out-of-sample validation.",
+  "what_it_is": "The Gradient Score is an \"attention intelligence\" instrument that emits TWO headline numbers from ONE measurement set, built on an explicit (not metaphorical) Heisenberg trade-off: a trend's POSITION on the diffusion curve (how early/niche it is) and its MOMENTUM (whether it will sustain) cannot both be measured at maximum precision at once, because waiting to confirm momentum is the act of measurement that destroys earliness. DETECTION is the earliness-optimized score (accepts ~22% false positives, audience: creators/marketers); CONFIDENCE is the precision-optimized score (target <9% FP, audience: institutional analysts/investors). The GAP = Detection \u2212 Confidence is treated as the single most precise read of where a topic sits on the curve: a large positive gap = detected early, not yet broadly confirmed; the gap closes UPWARD as a genuine trend matures (both converge HIGH = \"confirmed, act now\") and closes DOWNWARD as a false positive collapses (both fall LOW). Displayed STAGES are Detection-derived with exact cutoffs: BREAKOUT \u226585, STRONG 70\u201384, EMERGING 55\u201369 (shown to users as \"INDICATING\" \u2014 display-only rename, internal key stays EMERGING), MARGINAL/WATCHING 35\u201354, MONITORING <35; ANOMALY is an orthogonal flag, not a strength band, firing when Detection runs 16+ points ahead of Confidence. A THIRD score, N (nowtrendin_score), measures internal in-app query demand and is the ranking key for the \"Now TrendIn\" view (while \"All Signals\" ranks by Detection); critically, N is EXCLUDED from the Gradient Score itself to prevent a reflexive search\u2192score\u2192search feedback loop. DOC-vs-CODE reconciliation, with drift flagged: (1) the docs/CLAUDE.md and even in-code comments still cite headline weights of G 0.40 / D 0.25 / I 0.20 / M 0.10 / C 0.05 for Detection and an N weight of 10\u201312% \u2014 these are STALE; live code runs a six-component (G/I/M/D/C/P, plus Persistence) N-excluded set renormalized to 1.0, with N at 0.0 everywhere. (2) METHODOLOGY.md names the displayed bands \"BREAKOUT/STRONG/EMERGING/WATCHING/MONITORING\" while signals.ts uses MARGINAL as the primary 35\u201354 label and renames EMERGING\u2192INDICATING \u2014 a minor doc lag. (3) \"Overall\" is defined two different ways: weighted-six at scoring time vs (Detection+Confidence)/2 at serve/calibration time, so /scores and /detail can diverge. (4) The legacy five-component gradient_engine_backend.py (no P, no N) is NOT the serve path and must not be cited as authoritative; the canonical live scorer is gravitational_anomaly_detector.py.",
+  "factors_and_weighting": "The score is built from six external measurement components, each scored 0\u2013100. INTENT (May-2026 Heisenberg PDF, faithfully built in the legacy 5-component module): G \u2014 Gradient Strength (niche-to-mainstream engagement density ratio; fires instantly from ~8 signals); I \u2014 Inertia (consecutive 6h windows of accelerating signal count; highest-latency, best sustain predictor); M \u2014 Medium/Platform diversity (cross-platform diffusion pattern match); D \u2014 Dark Matter (probabilistic hidden-private-conversation inference from first-timer ratio, engagement asymmetry, vocabulary clustering); C \u2014 Confidence Decay (freshness/age, Heisenberg-exempt). The live canonical engine adds P \u2014 Persistence (cycles held above EMERGING). LIVE CODE WEIGHTS (renormalized six-component, N=0): Detection = G 0.375 + D 0.216 + I 0.182 + M 0.102 + C 0.057 + P 0.068; Confidence = I 0.278 + P 0.267 + M 0.222 + G 0.122 + C 0.067 + D 0.044; Overall = G 0.244 + I 0.222 + M 0.167 + D 0.133 + C 0.078 + P 0.156. The structure is faithful to intent (Detection leads on the earliest-firing G+D; Confidence leads on the slowest-to-confirm I+P+M), but WEIGHT DRIFT is real and material: published/comment weights (G 0.40, N 10\u201312%) do not match live constants, and the in-code comment block at apply_calibration lines 1100\u20131101 lists weights that match NEITHER the docs NOR the code below it. DUAL-PATHWAY: every topic is scored on the expert G\u00b7I\u00b7M\u00b7D\u00b7C\u00b7P composite by default, then a dual-pathway blend runs last with weight w = mainstream_ratio (baseline-relative deviation from the topic's OWN 12-cycle footprint). Mainstream-tier evidence lands in G's DENOMINATOR (suppresses the early read) and raises w; expert/niche tier keeps w\u22480 and preserves the expert gradient (the moat). This is the correct design \u2014 fame \u2260 movement \u2014 and it visibly protects the top tier (FIFA would otherwise collapse to 27.6). WHERE WEIGHTING IS SUSPECT: (1) the same-class ESTABLISHED discount has THREE different multipliers depending on maturity source (0.25 / 0.40 / 0.45) \u2014 a calibration inconsistency. (2) Overall and Stage are computed on different inputs at scoring vs serve time, so a topic can carry two different stages. (3) The mainstream-collapse evidence (see error analysis) shows the dual-pathway/calibration preservation is NOT firing for mid-mainstream rows. CIRCULARITY ASSESSMENT: the headline integrity rule is upheld \u2014 N (in-app demand) is verifiably excluded from all three composites, so there is NO forbidden internal-feedback leak; ranking-by-N is a display choice that does not contaminate the score. Dark Matter uses external-platform (Reddit) first-timer/asymmetry signals, NOT NowTrendIn's own users \u2014 acceptable. The ONE real concern: PERSISTENCE is self-referential \u2014 it is derived from topic_lifecycle counters built from the engine's own prior OVERALL scores crossing the EMERGING threshold, and P then feeds Overall (0.156) and Confidence (0.267). Inputs G/I/M/D/C are independent, so it is feedback rather than pure circularity, but P is NOT an input independent of what it validates \u2014 the classic violation of the project's own \"validator must use independent inputs\" standard, and a standing item to watch.",
+  "error_analysis": "This is where the instrument is weakest. THE DECISIVE FAILURE (basis: WebSearch-confirmed against the Federal Reserve official statement + CBS/NBC/ABC): Alan Greenspan died 2026-06-22 at 100 \u2014 the day's #1 confirmed mainstream story \u2014 and scored Detection 91.8 / Confidence 75.6 / gap +16.2, the sole large positive gap in the sample and squarely in the Anomalies band. The no-gap principle explicitly defines this exact case (an obviously-mainstream, fully-confirmed topic read as early/uncertain) as the broken state that invalidates the gap metric. The likely mechanism: Detection is correctly high, but Persistence has not accrued for a one-day-old event, depressing Confidence \u2014 the documented \"gap closes as P rises\" lifecycle \u2014 but for a wall-to-wall confirmed obituary the instrument must not read it as a speculative lead. This needs a same-surge/breaking-news check. THE SYSTEMATIC FAILURE (basis: internal distribution + footprint counts): seven mainstream nations/mega-caps collapse to a near-identical signature \u2014 china 45.6/67.5 (219 mentions/11 platforms), india 45.6/67.5, russia 45.5/67.3, france 45.3/67.5, apple 45.2/67.2, openai 45.4/67.1, korea 45.4/67.1 \u2014 all badged EMERGING with a uniform ~-22 LAGGING gap; obama is worse (24.3/56.7, WATCHING, gap -32.4). Confidence systematically exceeds Detection on already-arrived topics, the inverse of the intended design, indicating Detection is being clamped below what the footprint justifies and that the dual-pathway preservation gate is not firing for mid-mainstream rows. CONFIRMED ERROR (adversarially verified, severity medium): \"strait of hormuz\" reads Detection 23.9 / WATCHING while the shorter \"hormuz\" token reads STRONG 72.3/83.2 \u2014 the SAME story (the dominant 2026 oil/geopolitics flashpoint, IEA-described as the largest supply disruption in oil-market history). Root cause verified in code: normalize_topic() only lowercases/strips punctuation and there is no alias-consolidation layer for non-AI topics, so surface-form variants are scored as independent topics; the canonical full phrase accumulates fewer hits and collapses. CONFIRMED ERROR (verified, severity low): \"belgium vs iran\" (a real 6/21 World Cup fixture) reads 10.2/17.7 MONITORING \u2014 under-weight but explainable by a known, DOCUMENTED, fix-pending mechanism (CLAUDE.md sec 15 M/D reweighting names this exact case as IN DESIGN). Note: the auditor's proposed \"wide positive gap\" expectation here is wrong \u2014 a fully-arrived mainstream event should read HIGH on both axes, not with a wide gap; the auditor conflated mainstream with early-emerging. DATA-INTEGRITY BUG (basis: arithmetic): the stored heisenberg_gap contradicts Detection\u2212Confidence on the entire mcp family (mcp 74.5\u221273.0 = +1.5 but stored gap \u221223; same on claude code, claude-code, model-context-protocol, mcp server) \u2014 a ~24pt internal contradiction breaking the \"both scores explain each other\" test, independent of the mainstream question. ACCURATE EXAMPLES (the engine genuinely works here): trump 94.6/94.2/+0.3, FIFA 93.7/93.7/0.0, iran 86.1/90.1/-4, election 94.7/94.3/+0.4, canada 90/91.7/-1.7, claude 77.8/86.2 STRONG \u2014 all high+high+aligned, the correct already-arrived read. NEGATIVE CONTROLS also pass: SpaceX IPO 2026 (24.9/25.4, n=0) and obscure dev-tool slugs (fastapi 46.2/48.6, langchain 45.5/47.9) sit LOW on BOTH axes \u2014 the engine does NOT fabricate confidence for niche topics, so the failure is ONE-DIRECTIONAL (it strips score from mid-mainstream topics; it does not invent it for niche ones). SATURATION/SEPARATION (basis: 2,103-topic distribution): the instrument is NOT collapsed \u2014 stage medians ladder monotonically (Detection 90.5/74.1/46.0/32.8/17.3), 520/595 distinct Detection/Confidence values exist, and the gap converges to ~0 only for genuinely-arrived BREAKOUT topics (median -0.8). Real caveats: heavy near-duplicate string variants score identically (inflating apparent compression and the catch-all), some single-platform GitHub slugs carry mid-range Detection on one source, and a few thin BREAKOUT/anomaly rows (\"bonkers\", 5 mentions/4 platforms, 86\u201391 Detection) warrant a corroboration check. HONEST SAMPLE/AGE CAVEAT: all of the above is a single-day snapshot (2026-06-22) over a 100-topic hand-checked sample within 2,103 topics; it is directionally decisive (it fails on the day's #1 event plus a reproducible 7-topic pattern) but is not a multi-week out-of-sample false-positive measurement, and the stated 22%/<9% FP rates remain design targets, not ledger-confirmed.",
+  "market_signal_analysis": "The Market Signal tier ladder (ELEVATED \u226580 / ACTIVE 60\u201380 / BUILDING 40\u201360 / ROUTINE 25\u201340 / DORMANT <25, on the Detection+Confidence average, with CALIBRATING overriding) is conceptually sound and the engine's baseline-relative design is genuinely strong: every component is scored as a z-score against the item's OWN history (z=0\u21920.30, z=2\u2192~0.74), which correctly fixes the size-bias bug where mega-caps auto-scored ELEVATED on coverage volume alone. The CALIBRATING short-circuit is well-implemented and hard to bypass (a fresh IPO like SPCX trips all components and is honestly flagged \"snapshot, not a confirmed signal\"), which is exactly the cold-start honesty an institutional buyer should want. BUT as surfaced today the tier system does NOT track or separate instruments coherently. From the live 88-instrument pull (all fresh, scored within 0.7h \u2014 staleness is NOT the problem): the headline tier (market_gradient.tier / risk_stage) is ROUTINE for 87/88 (98.9%) \u2014 only alphabet is BUILDING \u2014 so the user-facing tier carries essentially ZERO information. THREE tier fields disagree on the same row: tier vs risk_stage vs classification (e.g. cre = ROUTINE tier but ELEVATED classification; recession, spacex, jpmorgan = ROUTINE tier but WATCH classification). There is no single source of truth. COLD-START CONTRADICTION: 28.4% of instruments are flagged calibrating=true, yet 0% have sufficient_baseline=false \u2014 every calibrating row simultaneously reports \"enough baseline.\" The two gates are computed on different inputs (calibrating \u2248 thin total_signals 1\u20136; sufficient_baseline \u2248 cycle count) and are never reconciled. VALUE QUANTIZATION: Detection snaps to a few discrete buckets (20 instruments at 34.6, 16 at 32.2, 9 at 33.9), and calibrating rows collapse to floor pairs (29.9/29.9, sig=1) presented in the same shape as measured reads. ABNORMALITY IS NOISE-DOMINATED on thin coverage: the nine \"highest abnormality\" instruments (abn 4.8, delta 5.3%) are all 2-signal micro-cap floats (Lakewood Amedex, Boxlight, Utime) classed ROUTINE, while jpmorgan (abn 2.4, sig 125) is WATCH \u2014 so the \"biggest movers\" sort surfaces illiquid noise above real macro movers (recession, spacex). STRUCTURAL COVERAGE GAP: the tradable universe is a hardcoded ~16-name watchlist (15 mega-caps + SpaceX); anything off it silently zeroes positioning/fundamentals/momentum \u2014 the \"SpaceX problem.\" PARITY RISK: two divergent market formulas coexist (the z-score engine that is actually persisted vs an absolute-magnitude inline variant tied to the Grade tool), so the Market tab and Grade tool can disagree for the same ticker \u2014 a CLAUDE.md 3-platform-parity violation. Also flagged: a hardcoded identical interpretation string across all instruments and double-encoded UTF-8 mojibake in the payload (will render as garbage on the terminal). NET: the engine is directionally honest about a quiet tape and its baseline-relativity is real, but the tiers as surfaced are uninformative and internally contradictory; \"mostly ROUTINE\" is defensible for a quiet market but is not the same as a tier system that is tracked accurately and surfaced coherently.",
+  "benchmarks_and_calibration": "The no-gap test currently has no objective ground truth \u2014 it was scored by hand against WebSearch. The fix is a free, non-circular external anchor, and the clear winner is the WIKIPEDIA / WIKIMEDIA PAGEVIEWS API (AQS REST v1). It is the textbook attention ground-truth in published research, it is genuinely FREE, it is licensed CC0 1.0 (public domain \u2014 the cleanest possible position for a commercial product to ingest and even resurface), and it is FULLY non-circular: pageviews come from Wikimedia's own server logs, an independent population on a platform NowTrendIn does not collect from, sharing ZERO inputs with the Gradient Score (no RSS, no X scan, no blog feeds, no Detection/Confidence components). For the no-gap test it maps almost directly: an already-mainstream topic reliably has high, STABLE article traffic; a niche/pre-arrival topic has thin or no traffic. Pair it with GDELT DOC 2.0 (TimelineVol, free, percent-of-global-coverage) as an independent MEDIA-SUPPLY second axis \u2014 true mainstream should be HIGH on BOTH the demand axis (Wikipedia) and the supply axis (GDELT); disagreement is itself diagnostic (high GDELT + low Wikipedia = media-pushed, no public pull). Two critical exclusions on integrity grounds: X/Twitter is DISQUALIFIED as an anchor because it is already a scoring INPUT (the 6h scan) \u2014 using it as ground truth is the exact circular-metric failure the integrity standard forbids; and Google Trends must stay in its EXISTING lane as the breakout/arrival-timing anchor in the accuracy ledger \u2014 reusing it for no-gap would double-anchor to the same provider's attention definition and over-fit. Reddit (paid ~$12k/mo, opaque, and the wrong/early construct) and Google Ngram (annual, years-lagged, retrospective-only) are not live anchors. CONCRETE NON-CIRCULAR CALIBRATION LOOP (weekly, mirroring the accuracy-ledger cadence): STEP 0 \u2014 hard firewall: Wikipedia/GDELT data is written ONLY to a dedicated held-out table (attention_anchor) that NO Gradient-Score component, calibration weight, dual-pathway gate, or serve_payload ever reads. STEP 1 \u2014 resolve each scored topic to a canonical Wikipedia article (title-normalize + search; unresolved topics QUARANTINE to a review queue, never guessed \u2014 same condition-precedent discipline as the ingestion gate; this also directly attacks the surface-form fragmentation bug). STEP 2 \u2014 pull trailing ~90d daily pageviews + GDELT coverage-share; compute mainstream-LEVEL = log10(median daily views), STABILITY = low coefficient of variation, and coverage-share level. STEP 3 \u2014 label ALREADY-MAINSTREAM = pageviews above a high corpus percentile (~p80) AND stable AND high GDELT, EARLY = low+rising. STEP 4 \u2014 score the no-gap test as a confusion matrix; the key failure metric is FALSE-EARLY (we called something emerging that the anchors say is already mainstream \u2014 precisely the Greenspan/country-collapse failure). STEP 5 \u2014 calibrate DIRECTION only: a rising false-early rate prompts a HUMAN-reviewed adjustment of the SATURATION/ESTABLISHED-discount thresholds; the external number is never regressed into a weight. STEP 6 \u2014 a WORSENING drift alarm (like catchall_floor_log) trips when false-early climbs past a set delta. This stays permanently non-circular because the anchors live in a held-out table the score cannot read, share no inputs with the score, are never auto-fit, and are kept on a different external series from the breakout (Trends) job.",
+  "recommendations": "QUICK WINS (ship-able now, no research gate, each integrity-preserving): (1) FIX the heisenberg_gap data-integrity bug \u2014 the stored gap must equal Detection\u2212Confidence on every row; the mcp-family ~24pt contradiction is a flat arithmetic/storage bug and the easiest credibility win. Pin down whether the signed-vs-abs() divergence between scoring-time (signed) and apply_calibration (abs) is the culprit and standardize on signed. (2) ADD a surface-form alias/consolidation layer to normalize_topic()/extract_topics() so \"hormuz / strait of hormuz / strait hormuz\" and \"mcp / model-context-protocol / mcp server\" collapse to one canonical topic before scoring \u2014 fixes both the strait-of-Hormuz error and the duplicate-driven apparent saturation. (3) RECONCILE the three market tier fields to ONE surfaced source of truth, and reconcile the calibrating vs sufficient_baseline contradiction (gate both on the same definition). (4) GATE market abnormality on a minimum signal count so 2-signal micro-floats stop topping the mover ranking. (5) FIX the UTF-8 double-encoding mojibake in /risk/scores and replace the hardcoded identical interpretation string with a per-instrument read or remove it. (6) RECONCILE the stale weight comments (apply_calibration lines 1100\u20131101) and CLAUDE.md/docstrings to the actual live six-component weights, and align METHODOLOGY.md band names (MARGINAL/INDICATING) \u2014 documentation honesty. (7) RESOLVE the two divergent market formulas (z-engine vs absolute-magnitude inline) to a single persisted engine so the Market tab and Grade tool agree (parity rule). RESEARCH-GATED (require backtest-before-ship, must not bypass integrity): (8) BUILD the breaking-news / same-surge override for the no-gap top end so a high-Detection, confirmed, wall-to-wall event (Greenspan) is not read as a speculative lead \u2014 this likely means letting Detection-and-corroboration, not slow-accruing Persistence, drive Confidence for confirmed mega-events; validate it does not re-open false positives. (9) EXTEND the dual-pathway anti-collapse preservation across the full mainstream band so china/india/apple/openai stop collapsing to the ~45/67 EMERGING signature \u2014 diagnose whether their baseline-relative w is falling too low or the serve-time preservation gate is mis-firing; gate behind the new Wikipedia/GDELT no-gap precision report. (10) WIRE the Wikipedia+GDELT held-out no-gap calibration loop (Section above) BEFORE any public no-gap claim. (11) ADDRESS the Persistence self-reference: either down-weight P or add an independent persistence proxy, since it currently feeds on the engine's own past output (integrity-standard concern). (12) EXPAND the market universe beyond the 16-name watchlist via the market-coverage skill so trending real tickers aren't silently zeroed. (13) DO NOT publish any \"before it arrives\" lead figure until the accuracy ledger clears its own product-success bar (median lead \u2265+3d, LED \u226535%, FP \u226430%, \u2265100 matured events) \u2014 it is currently CONTRADICTED at 0.0% honest hit rate, and the moat charter itself requires printing FAIL until the denominator supports the claim.",
+  "verdict": "Not yet \u2014 NowTrendIn cannot today make an unqualified \"measures where human attention is moving before it arrives\" claim to an institutional buyer, because the instrument fails its own no-gap credibility floor on the day's single most important confirmed event (Greenspan, +16.2 anomaly gap) and on a systematic class of already-arrived mainstream topics that collapse to a ~45/67 EMERGING signature, while the moat's lead claim is currently UNPROVEN and at last ledger CONTRADICTED (0.0% honest hit rate). What the product CAN defend right now is real and not trivial: a structurally honest dual-score design faithfully implemented in code, a verified no-N-into-Gradient firewall (the core integrity rule), genuinely baseline-relative market scoring with disciplined cold-start honesty, clean monotonic separation across 2,103 topics, demonstrably correct already-arrived reads for the famous top tier (trump/FIFA/iran/election), and a one-directional failure mode that never fabricates confidence for niche topics. For this to become a defensible \"human attention\" instrument, the following must be true: the heisenberg_gap and surface-form-fragmentation bugs are fixed; the dual-pathway anti-collapse protection extends across the full mainstream band; a held-out, non-circular Wikipedia+GDELT no-gap anchor is wired and shows acceptable false-early precision; the market tier fields and cold-start flags are reconciled into a single coherent surface; and the accuracy ledger clears its own published success bar so the \"before it arrives\" lead is denominator-backed rather than a claim. Until then it is a promising, honestly-architected pre-validation instrument \u2014 sellable as a measurement tool with explicit caveats, but not yet as a proven attention-prediction moat."
+ },
+ "philosophy": {
+  "heisenberg_principle": "Applied exactly (not metaphorically): a trend has two simultaneously-desirable properties that cannot both be measured with maximum precision at once \u2014 POSITION on the diffusion curve (where the topic is, from private Discord/expert Reddit to mainstream) and MOMENTUM (whether it will sustain). The earlier you detect (high position certainty), the less time-window data exists to confirm momentum; the longer you wait to confirm momentum (high certainty), the later your detection. Waiting for confirmation IS the act of measurement that disturbs earliness. This is structural, not an engineering limit \u2014 \u2206x\u00b7\u2206p \u2265 \u0127/2 has a 'reduced Planck constant' analog: an irreducible minimum uncertainty no better instrument removes. The founders' core claim: any tool promising BOTH maximum earliness AND maximum certainty is either measuring something other than it claims, or lying. The engineering response is to emit TWO scores from ONE measurement set \u2014 Detection (optimized for earliness, ~22% FP) and Confidence (optimized for precision, <9% FP) \u2014 and to treat the GAP between them as the single most precise read of where the topic sits on the curve (large gap = very early; closing gap = confirming; small gap = high conviction either way). Genuine trends converge HIGH over ~24h; false positives converge LOW.",
+  "dark_matter_framing": "Dark Matter (D) is the framing that the attention exists but our direct instruments cannot yet observe it \u2014 most of the conversation that precedes a mainstream surge happens in PRIVATE/unseen channels (DMs, Discords, group chats) that no public scraper sees. The task is therefore not to wait for visible volume but to find the right METRICS that infer the unseen mass from its observable effects: first-timer ratio (new participants suddenly flowing into a niche = external traffic from invisible referral), engagement asymmetry (comments/upvote anomalies), and vocabulary clustering/compression artifacts. The PDF makes the epistemic point explicit: D 'fires early but reads probabilistically \u2014 not because of insufficient data, but because it measures the shadow of something invisible. More data cannot resolve this uncertainty.' This is why D is weighted HIGH in Detection (25%) and LOW in Confidence (5%). The Gravitational Anomaly Detector is the dedicated instrument for this: 'a gravitational anomaly, by definition, is something detected from its effects rather than its direct observation \u2014 that is a Heisenberg measurement. You know something is there. You cannot yet confirm its shape.' The v2.0 roadmap extension of this (CLAUDE.md sec 15) routes research/early-signal outlets to the D pathway via platform_tier, not is_organic.",
+  "gimdc_weights": "Five components, OVERALL weights: Gradient Strength (G) 30% \u00b7 Inertia (I) 25% \u00b7 Medium Sequence (M) 20% \u00b7 Dark Matter (D) 15% \u00b7 Confidence Decay (C) 10% (sums to 100). The same five measurements are re-weighted into the two Heisenberg modes by their trade-off profile. DETECTION (earliness-led, leads with the earliest-firing components): G 0.40 + D 0.25 + I 0.20 + M 0.10 + C 0.05. CONFIDENCE (precision-led, leads with the slowest-to-confirm components): I 0.35 + M 0.30 + G 0.20 + C 0.10 + D 0.05. Rationale per component: G fires immediately from 8 signals (instant position certainty \u2192 top Detection weight); I needs 18\u201324h / 4 windows of acceleration (highest-latency, best sustain predictor \u2192 top Confidence weight); M fires partial-match early but full Pattern A/B/C match needs time (Detection accepts partial 0.10, Confidence requires full 0.30); D fires early but probabilistic (high Detection 0.25, low Confidence 0.05); C is the only component exempt from the Heisenberg trade-off (it measures the measurement's freshness/age, a fact not a prediction \u2192 identical 0.05/0.10-ish behavior in both modes).",
+  "before_it_arrives_premise": "The product's entire premise and tagline: 'the first instrument that measures where human attention is moving before it arrives.' Competitors (Google Trends, Brandwatch/Meltwater, Exploding Topics) all sit at the SAME point \u2014 maximum certainty, minimum earliness \u2014 because they fire only when volume crosses statistical significance vs baseline, by which point the trend has been building for days and is downstream of awareness (search happens AFTER people already heard). NowTrendIn's differentiation is detecting the gradient at the niche/expert/private stage BEFORE mainstream volume exists, accepting quantified false-positive cost (Detection ~22%) as the price of earliness. The moat charter (nowtrendin_agent_SKILL_moat) states this bluntly: 'before it arrives' is a CLAIM until something measures it \u2014 the Nightly Audit Agent exists to turn the claim into a measured, auditable lead-vs-Google-Trends fact with receipts, and is required to print 0.0% / FAIL when the lead isn't there. The premise is only legitimate when denominator-backed; no public lead/accuracy claim may exceed what a current accuracy-ledger epoch supports.",
+  "no_gap_principle": "A true measurement instrument must NOT only catch early/niche signals \u2014 it must ALSO correctly peg topics that have ALREADY arrived in the mainstream, reading them with high Detection AND high Confidence (small gap, both converged HIGH = 'confirmed, act now' per the 0\u201315pt 'Both Agree \u2014 High Conviction' band). The convergence lifecycle encodes this: a genuine trend's gap closes UPWARD as both scores rise to agreement; a false positive's gap closes DOWNWARD as both collapse. An instrument that could only fire on the speculative dark-matter end (60+pt gap) but mis-read an obviously-mainstream, fully-confirmed topic as low/uncertain would be broken \u2014 it would fail the 'both scores explain each other' test that makes the score 'an instrument rather than an opinion.' The no-gap principle is thus the credibility floor: correct behavior is required at BOTH ends of the diffusion curve, and the Detection/Confidence/gap triple must remain coherent for already-arrived topics, not just emerging ones. This is mirrored in the engine's dual-pathway gate (which keeps mainstream topics from collapsing the score) and in the calibration auditor's directional-leak test (a score ABOVE what G/I/M/D/C justify is a leak; a score BELOW is the engine's own legitimate clamp).",
+  "intended_metrics": [
+   "G \u2014 Gradient Strength: niche-to-mainstream engagement density ratio (0\u2013100), where signal is concentrated; fires instantly from ~8 signals",
+   "I \u2014 Inertia Confirmation: consecutive 6-hour windows of accelerating signal count + vocabulary expansion (sustained-momentum score 0\u2013100); Detection fires at 2 windows, Confidence requires 4",
+   "M \u2014 Medium Sequence: cross-platform diffusion-pattern match (Builder\u2192Buyer / Enthusiast\u2192Mainstream / Research\u2192Commerce = Pattern A/B/C, 0\u2013100); Detection accepts partial match, Confidence requires full",
+   "D \u2014 Dark Matter Inference: probabilistic hidden-private-conversation score (0\u2013100) from first-timer ratio (\u226525% Detection / \u226540% Confidence), engagement asymmetry, vocabulary clustering / compression artifacts",
+   "C \u2014 Confidence Decay: signal freshness + score-trajectory direction (0\u2013100); the measurement-quality / age axis, Heisenberg-exempt",
+   "Detection Score (earliness-optimized, ~22% FP) and Confidence Score (precision-optimized, <9% FP) \u2014 the two headline outputs",
+   "Heisenberg Gap = |Detection \u2212 Confidence| with banded interpretation (0\u201315 high-conviction / 16\u201335 confirming / 36\u201360 very-early / 60+ speculative dark-matter-only)",
+   "Diffusion pattern label (A/B/C) and lead-time-estimate (days before mainstream / Google Trends)",
+   "First-timer ratio, engagement-asymmetry flag, false-positive risk (low/med/high), confidence_level \u2014 supporting dark-matter and reliability fields",
+   "Accuracy-Ledger lead vs Google Trends with literal receipts (the moat metric); Gravitational Anomaly Detector firing at widest-gap dark-matter signals"
+  ],
+  "gaps_between_intent_and_build": [
+   "INTENT FAITHFULLY BUILT (the core): transfer/gradient_engine_backend.py compute_gradient_score (lines 602\u2013665) implements the canonical model verbatim \u2014 overall = G*.30+I*.25+M*.20+D*.15+C*.10; detection = G*.40+D*.25+I*.20+M*.10+C*.05; confidence = I*.35+M*.30+G*.20+C*.10+D*.05. The dual-weight vectors are also frozen in calibration methodology (transfer/gradient_engine_extensions.py lines 48\u201350). This matches the May-2026 Heisenberg Analysis PDF exactly.",
+   "GAP \u2014 Dark Matter is partially instrumented vs the vision. compute_dark_matter_score (backend lines 550\u2013571) derives first_timer_ratio from REDDIT signals only (reddit_sigs), and D = first_timer*0.45 + asymmetry*0.35 + vocab*~0.20. The 'private conversation / invisible mass' framing and 'compression artifacts' named in the PDF are not yet fully realized as independent metrics \u2014 D currently leans on Reddit first-timer + a binary asymmetry flag. The richer dark-matter inference (cross-source first-timer, referral/external-traffic inference) is still roadmap (CLAUDE.md sec 15 platform_tier D-routing is IN DESIGN, not shipped).",
+   "GAP/EVOLUTION \u2014 A THIRD headline that the original dual-score doc did not contemplate: N (nowtrendin_score, internal query-demand). The build adds N as the ranking key for the 'Now TrendIn' view (CLAUDE.md sec 13), separate from Detection-ranked 'All Signals'. The intent doc framed the product as a DUAL score (Detection+Confidence+gap); N is a later addition. It is correctly quarantined (signal_calibration_integration.py line 1227\u20131230 stores it as nowtrend_internal; now_trending_direction.py line 21 explicitly states N 'is NOT used here \u2026 independent of the score'), and the diagnostics actively guard against N leaking into the G/I/M/D/C headline (trend-signal-diagnostic 'N-discipline reconcile' + 'what-if-N inversion'). So it is a deliberate, firewalled extension rather than a violation \u2014 but it is a divergence from the pure two-score vision and a standing leak risk the agents must police.",
+   "GAP \u2014 The 'before it arrives' premise is, per the moat charter, UNPROVEN and at last ledger CONTRADICTED (0.0% honest hit rate, resolved calls lagging Google Trends). The instrument to PROVE the lead exists (Nightly Audit Agent / accuracy ledger) is built and is correctly designed to print FAIL, but the product-success bar (median lead \u2265+3d, LED \u226535%, FP \u226430%, \u2265100 matured events) is not yet cleared. The build faithfully measures the claim; the claim is not yet validated.",
+   "GAP \u2014 Confidence-level / FP-risk thresholds in the build (backend lines 626\u2013631) are heuristic (confidence\u226570 & I\u226550 \u21d2 high) rather than the empirically-calibrated <9% / ~22% FP targets the PDF asserts. The stated false-positive rates are design targets, not yet ledger-confirmed out-of-sample.",
+   "ALIGNED \u2014 The Heisenberg GAP as primary information IS built: signal_calibration_integration.py computes gap = |detection\u2212confidence| and build_gap_interpretation gives a DIRECTIONAL (not size-only) label/meaning (lines 1215\u20131216, 1323\u20131324), matching the PDF's gap-band semantics and the convergence-lifecycle intent."
+  ],
+  "detail": "Canonical sources read: the original design intent lives in C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin/front end coding/updates 1/NowTrendIn_Heisenberg_Analysis.pdf (May 2026, 'Prepared by Claude with Abel, Founder' \u2014 the authoritative 8-section spec of the Heisenberg principle, the 5 components, both weight vectors, the gap-as-information, and the no-gap/convergence lifecycle) and its companion viz C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin/front end coding/HeisenbergDualScore.jsx. The 1.0 engine encoding is C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin/nowtrend_pipeline_architecture.py (Snowflake GRADIENT_SCORES schema lines 755\u2013776 carrying DETECTION_SCORE/CONFIDENCE_SCORE/GRADIENT_STRENGTH/INERTIA_SCORE/MEDIUM_SEQ_SCORE/DARK_MATTER_SCORE/CONFIDENCE_DECAY + FIRST_TIMER_RATIO/ASYMMETRY_DETECTED; Palantir/Snowflake pitches lines 662\u2013681). The moat/'before it arrives' charter is C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/nowtrendin_agent_SKILL_moat_06_21_26.md. The CURRENT BUILD that I verified against intent: C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/gradient_engine_backend.py (compute_gradient_score lines 602\u2013665 \u2014 canonical weights verbatim; compute_dark_matter_score lines 550\u2013571 \u2014 Reddit-only first-timer gap), C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/gradient_engine_extensions.py (frozen methodology weights lines 48\u201350, COMPONENT_EXPLANATIONS lines 291\u2013297, what-if scenarios 412\u2013456), C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/signal_calibration_integration.py (serve-time gap computation + N firewall lines 1215\u20131324), and C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/now_trending_direction.py (line 21 confirms N is independent of the score). Note: the PDF body text says Dark-Matter Detection threshold '\u226525% first-timer' in the two-score table (page 7) while Section 04 page 5 narrates the same as the Detection-mode cutoff \u2014 consistent. The build's overall/detection/confidence formulas match the PDF to the decimal."
+ },
+ "model_doc": {
+  "detection_definition": "DETECTION = \"earliness.\" Per METHODOLOGY.md: \"Weighted toward the components that fire first (Gradient Strength, Dark Matter). Optimized for speed; accepts more false alarms. Audience: creators, marketers, trend-forward brands.\" It is one of \"the two public scores (the Duality),\" produced from the same six external components (G/I/M/D/C/P) as Confidence but with different emphasis. Stored as velocity_scores.detection_score. The DISPLAYED stage band is derived from Detection in the app (stageFromScore in frontend/lib/signals.ts) \u2014 the same basis the category tiles use, so a topic's badge can't contradict its category tile. \"Now TrendIn\" view ranks by N; \"All Signals\" ranks by Detection.",
+  "confidence_definition": "CONFIDENCE = \"precision.\" Per METHODOLOGY.md: \"Weighted toward components that require sustained, repeated evidence (Inertia, Persistence, Platform Diversity). Audience: institutional analysts, investors, strategic planners.\" Same six external components as Detection, weighted differently. The doc explicitly states Confidence \"weights P [Persistence] heavily \u2014 it is one of the strongest precision drivers, and the gap closes as P rises.\" Stored as velocity_scores.confidence_score.",
+  "overall_formula": "OVERALL = \"a balanced blend, used for stage classification on the engine side\" (METHODOLOGY.md). All three public scores (Detection, Confidence, Overall) are composed by the canonical scorer gravitational_anomaly_detector.py from \"the six external components G/I/M/D/C/P only, renormalized to sum to 1.0\" \u2014 N is EXCLUDED. EXACT WEIGHTS ARE NOT PUBLISHED: the doc's governance/trade-secret rule states \"exact component weights, thresholds, and calibration constants live in code only (server-side, env-overridable). They are never published here, in the UI, or in any API response.\" So the docs give the STRUCTURE (six components, sum-to-1.0 renormalization, Detection leans G+D, Confidence leans I+P+M) but not the numeric blend coefficients. Engine stores an overall-based signal_stage (surfaced as engineStage); the app's displayed stage uses Detection instead.",
+  "gap_definition": "GAP = Detection \u2212 Confidence (a SIGNED lead, not an absolute gap). METHODOLOGY.md: \"The gap (Detection \u2212 Confidence) is the earliness signal: a large gap = detected early, not yet broadly confirmed; it closes as Persistence rises.\" Stored as velocity_scores.heisenberg_gap. The Anomalies category in signals.ts fires on (detection \u2212 confidence) >= 16 \u2014 i.e., Detection running 16+ points AHEAD of Confidence. Note explicitly: \"Lagging topics where Confidence exceeds Detection are NOT anomalies\" (the lead is signed/positive-only).",
+  "stage_thresholds": "Displayed stage band is Detection-based (stageFromScore in frontend/lib/signals.ts), with these exact numeric cutoffs and display ranges (STAGE_LEGEND): BREAKOUT = score >= 85 (range \"85\u2013100\", color #00C896 green, \"Strongest signal\"); STRONG = 70\u201384 (>=70 && <85, #2D7EEF blue, \"High signal strength\"); EMERGING = 55\u201369 (>=55 && <70, #D4A017 gold, \"Building signal\") \u2014 DISPLAYED to users as \"INDICATING\" (internal key/type/colors stay EMERGING; display-only rename via stageLabel which maps EMERGING\u2192INDICATING); MARGINAL = 35\u201354 (>=35 && <55, #E85A1E, \"Early / unconfirmed\"), with WATCHING kept as a legacy back-compat alias of MARGINAL; MONITORING = below 35 (the else/default, #9AA3B0 muted, \"Low-intensity background signal\"). ANOMALY is a separate ORTHOGONAL axis (not a strength band): \"Detection ahead of Confidence by 16+ pts,\" filter (detection \u2212 confidence) >= 16, color #8B5CF6 purple \u2014 \"an anomaly can sit at any stage; what defines it is the early-edge lead, not the level.\"",
+  "factors": [
+   {
+    "name": "G \u2014 Gradient Strength (a.k.a. Niche Concentration)",
+    "feeds": "Detection (named as a first-firing component, 'Weighted toward Gradient Strength, Dark Matter'); also a Confidence input. M-vs-D router: mainstream tier lands in G's DENOMINATOR (suppresses early read); expert/niche tier = G numerator.",
+    "weight": "NOT PUBLISHED \u2014 exact weight lives in code only (trade-secret rule). Relative emphasis: heavy in Detection. Stored as velocity_scores.gradient_strength + gradient_ratio.",
+    "source": "compute_gradient_strength (gravitational_anomaly_detector.py)"
+   },
+   {
+    "name": "I \u2014 Inertia / Momentum",
+    "feeds": "Confidence (named among 'Inertia, Persistence, Platform Diversity' that require sustained evidence).",
+    "weight": "NOT PUBLISHED (code only). Discrete fallback I = max_consecutive\u00b725 only affects <2-cycle topics; established (>=2 cycle) topics use continuous momentum_engine I. Stored as velocity_scores.inertia_score.",
+    "source": "compute_inertia / momentum_engine.compute_inertia"
+   },
+   {
+    "name": "M \u2014 Platform Diversity",
+    "feeds": "Confidence (sustained-evidence cluster). Also fed by mainstream-tier breadth/magnitude in the dual-pathway.",
+    "weight": "NOT PUBLISHED. Documented calibration note: previously pinned all 4+-platform topics at a flat M=90 (caused Detection freezing); fixed 2026-06-11 with a continuous curve anchored at 4\u219290 climbing toward 100 (env PLATFORM_DIVERSITY_CONTINUOUS). Stored as velocity_scores.platform_diversity.",
+    "source": "compute_platform_diversity"
+   },
+   {
+    "name": "D \u2014 Dark Matter",
+    "feeds": "Detection (named first-firing: 'Gradient Strength, Dark Matter'). D is the expert/niche-tier pathway (G numerator, w~0).",
+    "weight": "NOT PUBLISHED. Documented mechanics: concave first-timer curve 100\u00b7ratio^0.7; quality gate = 0.4 + 0.6\u00b7organic_ratio (is_organic scales D's quality gate only); is_first_timer is D's numerator. Stored as velocity_scores.dark_matter_score (+ first_timer_ratio, engagement_asymmetry).",
+    "source": "compute_dark_matter"
+   },
+   {
+    "name": "C \u2014 Confidence Decay",
+    "feeds": "Both scores (freshness + short-term directional trajectory).",
+    "weight": "NOT PUBLISHED (code only). Stored as velocity_scores.confidence_decay.",
+    "source": "compute_confidence_decay"
+   },
+   {
+    "name": "P \u2014 Persistence",
+    "feeds": "Confidence HEAVILY ('one of the strongest precision drivers'); Detection 'barely uses P (speed matters, not history)'. Gap closes as P rises.",
+    "weight": "NOT PUBLISHED numerically, but documented behavior: brand-new topic P=0 (no history, no penalty); a topic above EMERGING for ~7+ consecutive cycles (~3 days of hourly scoring) approaches P=100. Stored as velocity_scores.persistence_score.",
+    "source": "compute_persistence / momentum_engine.compute_persistence"
+   },
+   {
+    "name": "N \u2014 Now Trending (nowtrendin_score)",
+    "feeds": "NEITHER public Detection nor Confidence \u2014 EXCLUDED from the trend Gradient Score on the canonical serve path. Only feeds the separate 'Now Trending Gradient Score' what-if and the Grade tool.",
+    "weight": "Excluded from the six-component sum-to-1.0 blend. In the what-if only: score_with_n = score\u00b7(1\u2212w_eff) + N\u00b7w_eff, where w_eff is scaled down by external-evidence sufficiency. Stored as velocity_scores.nowtrendin_score.",
+    "source": "compute_nowtrendin_score"
+   }
+  ],
+  "dual_pathway": "DUAL-PATHWAY (dual_pathway.py; pipeline stage COLLECT\u2192\u2026\u2192SCORE\u2192CALIBRATE\u2192DUAL-PATHWAY). Two routes calibrated separately so fame \u2260 movement (scores are baseline-relative \u2014 deviation from a topic's own norm). The DECISIVE ROUTER is platform_tier, NOT is_organic: (1) tier='mainstream' feeds M (dual_pathway breadth/magnitude), lands in G's DENOMINATOR (suppresses the early read), and raises blend weight w \u2192 this is the mainstream/'arrived' pathway. (2) tier in {'expert','niche'} \u2192 the Dark-Matter / expert-gradient pathway: zero mainstream breadth, w~0, G numerator \u2192 the early/pre-viral pathway. is_organic only scales D's quality gate (quality = 0.4 + 0.6\u00b7organic_ratio); is_first_timer is D's numerator. News-outlet corroboration sets mainstream_confirmed; tier-migration is tracked. Hard rule: backtest_dual_pathway.py must pass ALL cases before any calibration ship (backtest-before-ship). IN DESIGN (not shipped): reputable source = \u00bd weight, FULL only on \u22652 DISTINCT reputable source_names; research/early-signal outlets (War on Rocks, Rest of World, Global Issues, Pew, RAND, NBER) routed to Dark Matter via GHOST_FEEDS at expert/niche tier rather than _news_write (which forces mainstream and would suppress them). Stored columns: detection_pathway, mainstream_ratio, mainstream_breadth, mainstream_confirmed, n_mainstream_platforms, tier_migration. The FIFA calibration analysis documents that scoring is tuned for expert\u2192mainstream TECH diffusion; consumer-origin already-mainstream events score near the bottom.",
+  "n_score_role": "N (nowtrendin_score) = \"Now Trending (internal demand)\" \u2014 how often Now TrendIn users query a topic (volume + recency spike). It is EXPLICITLY \"NOT a component of the public Gradient Score.\" Three documented placements: (1) Trend Gradient Score (the product sold to institutions, canonical gravitational_anomaly_detector.py \u2192 velocity_scores \u2192 /scores): N EXCLUDED \u2014 deliberate, to avoid a reflexive feedback loop (users search \u2192 score rises \u2192 they search more) and preserve external-world objectivity. (2) 'Now Trending Gradient Score' what-if (trend signal page only): shows what the score would be if N were folded in as score_with_n = score\u00b7(1\u2212w_eff) + N\u00b7w_eff; w_eff is scaled down by external-evidence sufficiency to prevent the thin-data trap, with a demand_driven transparency flag ('limited external confirmation'); clearly labeled separate/demand-inclusive and NEVER sold as the Gradient Score. (3) Grade tool (ai_grade.py): N INCLUDED intentionally (G/I/M/D/C/P + N) as a demand-aware estimate for data-thin topics \u2014 a different, labeled metric. Two open items flagged: verify graded topics actually have LOW N (likely the opposite), and the Grade tool should carry the same thin-data N down-weighting + flag. Also: in the app, the 'Now TrendIn' view RANKS by N (proprietary nowtrendin_score), while 'All Signals' ranks by Detection.",
+  "detail": "SOURCES & GOVERNANCE: METHODOLOGY.md is declared the single source of truth for which components each scorer uses; it explicitly withholds numeric weights/thresholds as trade secrets ('structure and relative emphasis, not the numbers'). So no concrete blend coefficient is documented \u2014 the only hard NUMBERS the docs give are: stage cutoffs (85/70/55/35) and ranges (85\u2013100, 70\u201384, 55\u201369, 35\u201354, <35); anomaly gap threshold 16; first-timer curve 100\u00b7ratio^0.7; D quality gate 0.4 + 0.6\u00b7organic_ratio; what-if formula score\u00b7(1\u2212w_eff)+N\u00b7w_eff; discrete I fallback max_consecutive\u00b725; the (fixed) M-saturation flat 90 at 4 platforms; FIFA-analysis 88\u2013100 AI-taxonomy floor (ai_topic_intelligence.py). THREE SCORER MODULES (only one canonical): gravitational_anomaly_detector.py = G/I/M/D/C/P, N excluded = CANONICAL live serve path (writes velocity_scores); ai_grade.py = G/I/M/D/C/P + N = Grade tool only; gradient_engine_backend.py = G/I/M/D/C (no P, no N) = LEGACY 5-component, NOT on serve path, 'do not cite as authoritative.' DISPLAY vs ENGINE: app displays Detection-based stage (stageFromScore); engine stores an overall_score-based signal_stage (engineStage) for reference. EMERGING is displayed as INDICATING (display-only rename; internal key stays EMERGING). WATCHING = legacy alias of MARGINAL. KEY FILES (absolute): C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/docs/METHODOLOGY.md; C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/CALIBRATION_FIFA_ANALYSIS.md; C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/DB_DATA_DICTIONARY.md (velocity_scores at line 398, 37 cols incl. gradient_strength, inertia_score, platform_diversity, dark_matter_score, confidence_decay, persistence_score, nowtrendin_score, overall_score, detection_score, confidence_score, heisenberg_gap, gradient_ratio, signal_stage, detection_pathway, mainstream_ratio/breadth/confirmed, tier_migration, is_gravitational_anomaly); C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/DATA_BUILDING_BLOCKS.md (Section 4 Scoring Completeness, Section 5 Calibration Accuracy + M-vs-D router); and the threshold authority C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/frontend/lib/signals.ts (stageFromScore lines 140\u2013145, STAGE_LEGEND lines 128\u2013131, anomaly filter line 282, stageLabel EMERGING\u2192INDICATING line 452). DOC-VS-DISPLAY NOTE for the audit: METHODOLOGY.md still names the displayed band 'BREAKOUT/STRONG/EMERGING/WATCHING/MONITORING' whereas signals.ts uses MARGINAL as the primary 35\u201354 label with WATCHING as a legacy alias, and renames EMERGING\u2192INDICATING for display \u2014 a minor doc lag worth flagging."
+ },
+ "model_code": {
+  "detection_formula": "CODE (gravitational_anomaly_detector.py score_topic, lines 3918-3926), 6 EXTERNAL components renormalized to 1.0, N EXCLUDED:\ndetection = min(100, G*0.375 + D*0.216 + I*0.182 + M*0.102 + C*0.057 + P*0.068)\nwhere G=gradient_strength, D=dark_matter, I=inertia, M=platform_diversity, C=confidence_decay, P=persistence. Then (for mainstream/blended topics only) overwritten by the dual-pathway blend in score_all_topics (line 4327): detection = (1-w)*expert_detection + w*md, where md=mainstream_detection(mag,M,I,P,breadth)=soft_cap(mag*0.55 + breadth*28.0 + M*0.10 + I*0.05) (dual_pathway.py:192-196), w=mainstream_ratio.",
+  "confidence_formula": "CODE (lines 3929-3936), N EXCLUDED, P weighted near-highest:\nconfidence = min(100, I*0.278 + P*0.267 + M*0.222 + G*0.122 + C*0.067 + D*0.044). For mainstream/blended topics overwritten (line 4333) by blend: confidence = (1-w)*expert_confidence + w*mc, where mc = soft_cap(mag*0.32 + abs_breadth*28.0 + P*0.25 + M*0.15) (dual_pathway.py:285).",
+  "overall_formula": "CODE (lines 3908-3916): overall = min(100, G*0.244 + I*0.222 + M*0.167 + D*0.133 + C*0.078 + P*0.156). For mainstream/blended overwritten (line 4328): overall=(1-w)*expert_overall + w*mo, mo=soft_cap(mag*0.45 + abs_breadth*28.0 + P*0.18 + M*0.15 + I*0.08) (dual_pathway.py:277). NOTE the SERVE-TIME recompute in signal_calibration_integration.apply_calibration uses DIFFERENT overall logic: new_overall=(new_detection+new_confidence)/2 (line 1140), NOT the weighted-6 formula \u2014 a structural divergence between scoring-time and serve/calibration-time overall.",
+  "gap_formula": "CODE: gap = round(detection - confidence, 1) at scoring time (line 3954, stored as heisenberg_gap). After dual-pathway blend recomputed: heisenberg_gap = round(blend.detection - confidence_score, 1) (line 4334-4335). In apply_calibration the gap used for the gap-interpretation label is abs(new_detection - new_confidence) (line 1215) \u2014 note ABS there vs signed at scoring time. Doc CLAUDE.md frames gap as 'D - C' conviction; code stores signed detection-minus-confidence.",
+  "stage_logic": "CODE thresholds (lines 485-488): BREAKOUT>=85, STRONG>=70, EMERGING>=55, WATCHING>=35, else MONITORING. Applied THREE places on different inputs: (1) score_topic on `overall` (lines 3987-3996); (2) dual-pathway post-blend on the blended `_ov`/overall (lines 4346-4351); (3) apply_calibration RE-DERIVES stage from avg=(new_detection+new_confidence)/2, NOT overall (lines 1158-1168) \u2014 so the calibration-layer stage can disagree with the scoring-layer/dual-pathway stage because one keys off overall and the other off the det/conf average. DISPLAY note: per CLAUDE.md the 'EMERGING' stage label is renamed to 'Indicating' at the frontend, and 'Now TrendIn' view ranks by N (nowtrendin_score) while 'All Signals' ranks by Detection \u2014 but stage itself is computed from Detection-derived scores, not N.",
+  "factors": [
+   {
+    "name": "G \u2014 Gradient Strength (niche/expert engagement density vs mainstream density)",
+    "weight": "Detection 0.375, Confidence 0.122, Overall 0.244 (doc CLAUDE.md/code comments say '30% / 0.40' \u2014 DRIFT)",
+    "how_computed": "compute_gradient_strength (3309-3358): niche_ratio = niche_eng/(niche_eng+mainstream_eng); score=min(100, niche_ratio*100*(0.65+0.35*count_bonus)), count_bonus=min(1,len(signals)/15). No mainstream signal => raw_ratio=10 ('perfect gradient'). Then apply_signal_count_modifier multiplies G (can exceed 100, re-capped 0-100 at line 3890). For ESTABLISHED topics G is discounted by calibration multiplier (x0.25-0.45).",
+    "data_source": "raw_signals/topic_signals engagement_raw + platform_tier (niche|expert|mainstream)"
+   },
+   {
+    "name": "I \u2014 Inertia (acceleration across 6h windows)",
+    "weight": "Detection 0.182, Confidence 0.278, Overall 0.222",
+    "how_computed": "compute_inertia (3360-3407): bins signals into 6h windows, counts consecutive growing windows (15% tolerance, counts[i]>=counts[i-1]*0.85), growth_score=min(100, max_consecutive*25). OVERRIDDEN by momentum_engine.compute_inertia when >=2 cycles of stored history exist (lines 3867-3871).",
+    "data_source": "signal extracted_at timestamps; momentum_engine reads stored velocity_scores history"
+   },
+   {
+    "name": "M \u2014 Platform Diversity (distinct platforms)",
+    "weight": "Detection 0.102, Confidence 0.222, Overall 0.167",
+    "how_computed": "compute_platform_diversity (3409-3451): continuous curve for 4+ platforms base=100-40/n_plat (env PLATFORM_DIVERSITY_CONTINUOUS=1), legacy map {1:20,2:50,3:80,4+:90} otherwise; +15 if spans niche AND mainstream; +10 for GitHub+HN+Reddit (Pattern A).",
+    "data_source": "signal platform + platform_tier sets"
+   },
+   {
+    "name": "D \u2014 Dark Matter (hidden activity inference)",
+    "weight": "Detection 0.216, Confidence 0.044, Overall 0.133",
+    "how_computed": "compute_dark_matter (3453-3519): evidence = ft_score*0.65 + asym_score*0.35, ft_score=100*(ft_ratio^0.7), asym_score=70 if asymmetry else 0; quality gate=0.4+0.6*organic_ratio; dark_score=evidence*quality. ft_ratio needs >=3-signal sample.",
+    "data_source": "is_first_timer, comments/upvotes (asymmetry), is_organic flags on signals"
+   },
+   {
+    "name": "C \u2014 Confidence Decay",
+    "weight": "Detection 0.057, Confidence 0.067, Overall 0.078",
+    "how_computed": "compute_confidence_decay (3521+). Lowest-weighted component across all three composites.",
+    "data_source": "signals + topic history"
+   },
+   {
+    "name": "P \u2014 Persistence (cycles held above EMERGING)",
+    "weight": "Detection 0.068, Confidence 0.267, Overall 0.156",
+    "how_computed": "compute_persistence (3565-3635): rate_score=(cycles_above_emerging/total_cycles)*60 + streak_score=min(40, current_streak*6.5). Reads topic_lifecycle counters that are themselves derived from prior OVERALL scores (>= EMERGING_THRESHOLD).",
+    "data_source": "topic_lifecycle table (total_scoring_cycles, cycles_above_emerging, current_streak) \u2014 built from prior overall_score history"
+   },
+   {
+    "name": "N \u2014 NowTrendIn Score (internal user query demand)",
+    "weight": "0.0 in all composites \u2014 DELIBERATELY EXCLUDED (lines 3900-3906). Code comment cites N\u00d70.10/0.12/0.10 as the OLD 7-component weights now removed.",
+    "how_computed": "compute_nowtrendin_score (3637-3715): vol_score=min(70, log1p(total_queries_30d)/log1p(100)*70) + recency_score(0-30) from 24h-vs-7d-baseline query spike. Computed and DISPLAYED separately, never folded into Detection/Confidence/Overall.",
+    "data_source": "topic_queries table (in-app user search counts) \u2014 INTERNAL/on-platform demand"
+   }
+  ],
+  "dual_pathway_gate": "The expert G\u00b7I\u00b7M\u00b7D\u00b7C\u00b7P composite is the DEFAULT. The dual-pathway blend (dual_pathway.blend) runs LAST in score_all_topics (lines 4296-4351) for EVERY topic, but its WEIGHT w=mainstream_ratio=max(breadth_factor, magnitude_factor) gates how much it applies. w is BASELINE-RELATIVE (deviation from the topic's OWN rolling median footprint over last 12 cycles), not absolute fame: breadth_factor=(cur_n - breadth_baseline)/_BREADTH_DELTA_FULL, magnitude_factor=(mag - magnitude_baseline)/_MAG_DELTA_FULL (35.0). Cold start (<MIN_BASELINE_CYCLES or no baseline): falls back to ABSOLUTE breadth/magnitude, flagged 'calibrating'. detection=(1-w)*expert_detection + w*md. pathway label: w>=0.6 mainstream, w<=0.2 expert, else blended. Expert-origin topics have mainstream breadth ~0 so w~0 and the expert gradient is preserved untouched (the moat). SEPARATELY, in apply_calibration the serve-time 6-component RECOMPUTE (lines 1122-1140) is GATED to expert/niche/'' pathway only (line 1151-1155): for stored mainstream/blended rows it PRESERVES the incoming dual-pathway detection/confidence/overall instead of recomputing \u2014 preventing the documented collapse of all mainstream topics to ~25-28 (FIFA 27.6, Trump 25.8).",
+  "doc_vs_code_drift": [
+   "WEIGHT DRIFT: Component docstrings/CLAUDE.md state G=30%/0.40, I=25%, M=20%, D=15%, P=15% (e.g. compute_gradient_strength docstring says '30% weight'; compute_nowtrendin_score docstring says 'N \u2014 10% of Overall, 12% of Detection, 10% of Confidence'). ACTUAL live code weights are the 6-component renormalized sets (Overall G0.244/I0.222/M0.167/D0.133/C0.078/P0.156; Detection G0.375/D0.216/I0.182/M0.102/C0.057/P0.068; Confidence I0.278/P0.267/M0.222/G0.122/C0.067/D0.044). N is 0 everywhere, contradicting the docstrings that still claim N is 10-12% of each.",
+   "apply_calibration comment block (lines 1100-1101) documents Detection as 'G(0.40)+D(0.25)+I(0.20)+M(0.10)+C(0.05)' and Confidence as 'I(0.35)+M(0.30)+G(0.20)+C(0.10)+D(0.05)' \u2014 these stale comment weights DO NOT match the actual code constants just below (G*0.375 etc) NOR include P. The comment is documentation drift inside the code itself.",
+   "OVERALL formula divergence: scoring-time overall = weighted-6 (line 3909); serve/calibration-time overall = (detection+confidence)/2 (line 1140). Same topic can carry two different overall definitions depending on path.",
+   "STAGE input divergence: scoring + dual-pathway derive stage from `overall`; apply_calibration derives stage from avg of detection+confidence. Can disagree.",
+   "calibration multiplier mismatch: seed_known_topics writes ESTABLISHED multiplier 0.40 (line 517) but get_topic_maturity_state knowledge_base path returns 0.25 (line 695) and lifecycle path returns 0.45 (line 756) for ESTABLISHED \u2014 three different discounts for the same class depending on source.",
+   "GAP sign: scoring stores signed detection-confidence; apply_calibration gap-label uses abs() \u2014 sign information lost for the directional label."
+  ],
+  "circularity_risks": [
+   "NO N-INTO-GRADIENT LEAK (good): N (nowtrendin_score, in-app query demand = on-platform engagement) is computed but EXPLICITLY excluded from Detection/Confidence/Overall (lines 3900-3906, all weights renormalized to 6 external components). This is the correct enforcement of the project's no-circular-metrics rule. Verified: no composite term references N/nowtrendin_score.",
+   "PERSISTENCE SELF-REFERENCE (medium): P (compute_persistence) is derived from topic_lifecycle counters (cycles_above_emerging, current_streak) which are themselves computed from prior OVERALL scores crossing EMERGING_THRESHOLD (_update_topic_lifecycle lines 3741, 3767-3776). Since overall includes P at weight 0.156 (and confidence at 0.267), the score partially validates itself across cycles: a topic scored high once is more likely to be counted 'above emerging', raising P, raising next cycle's overall/confidence. The inputs (G,I,M,D,C) are independent, so it is not pure circularity, but P is NOT an input independent of what it validates \u2014 it is a feedback term on the engine's own past output. This is the classic 'validator must use inputs independent of what it validates' concern from the project's integrity standard.",
+   "DARK MATTER uses on-platform engagement asymmetry (comments/upvotes) and is_first_timer \u2014 these are external-platform (Reddit/etc) engagement signals, NOT NowTrendIn's own users, so NOT the forbidden internal-feedback circularity. Acceptable.",
+   "DISPLAY-RANKING N exposure (low): the 'Now TrendIn' view ranks topics by N per CLAUDE.md. N never enters the Gradient Score itself, so ranking-by-N does not contaminate the score \u2014 but it does mean the default-sorted list a user sees is ordered by internal demand, which could create a perception loop even though the underlying scores stay objective."
+  ],
+  "detail": "CANONICAL FILE CONFIRMED. The LIVE apply_calibration is C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/signal_calibration_integration.py (imported as `apply_calibration` and called at gravitational_anomaly_detector.py line 4286). It IMPORTS helper functions from calibration_engine.py (compute_calibrated_gradient, evaluate_anomaly_gate, build_what_to_do, build_gap_interpretation, build_component_groups, init_calibration_db, INERTIA_ZERO_THRESHOLD) guarded by CAL_ENGINE_AVAILABLE \u2014 those calibration_engine functions ARE live. What is DEAD/unused in calibration_integration: the bottom-of-file INTEGRATION_CODE string, the --seed/--report/--analyse CLI main(), print_calibration_report, and recompute_velocities is only live if wired as a daily Heroku Scheduler job (no in-process caller). The KNOWN_TOPICS seed dict (48 topics) is only used via --seed and the _lookup_known_topic fallback in get_topic_maturity_state.\n\nPIPELINE ORDER (authoritative, per score_all_topics lines 4280-4351): (1) score_topic computes the 6-component expert composites + scoring-time stage from overall; (2) apply_calibration runs \u2014 discounts G by maturity multiplier, recomputes detection/confidence ONLY for expert/niche pathway rows (mainstream preserved), re-derives stage from det/conf average; (3) dual_pathway.blend runs LAST and overwrites detection/overall/confidence/stage for mainstream/blended topics by weight w. So for a mainstream topic the FINAL stored detection is the dual-pathway value, and apply_calibration's recompute was intentionally skipped for it.\n\nKEY CONSTANTS QUOTED FROM CODE: MIN_TOPIC_APPEARANCES=3; HIGH_MAGNITUDE_ENG=9.9; FIRST_TIMER_THRESHOLD=0.35; GRADIENT_RATIO_THRESHOLD=4.0; BREAKOUT=85/STRONG=70/EMERGING=55/WATCHING=35. dual_pathway: _MAG_DELTA_FULL=35.0, mainstream_detection = mag*0.55 + breadth*28.0 + M*0.10 + I*0.05.\n\nMOST IMPORTANT FINDINGS FOR THE AUDIT: (a) The headline weights in the docs (G 0.40 / N 0.10-0.12 etc.) are STALE \u2014 the live engine runs a 6-component N-excluded renormalized set, and even the in-code comment at lines 1100-1101 of apply_calibration lists wrong weights. (b) No forbidden N circularity \u2014 N exclusion is correctly enforced. (c) Persistence is a self-referential feedback term (built from the engine's own prior overall scores), the one place that technically violates 'validator inputs independent of what it validates'. (d) Three different ESTABLISHED calibration multipliers (0.25 / 0.40 / 0.45) depending on maturity source. (e) Overall and Stage are defined differently at scoring-time vs serve/calibration-time, so /scores and /detail can diverge from the scoring composite \u2014 this is the recurring serve_payload-staleness hazard noted in project memory."
+ },
+ "market_model": {
+  "detection_formula": "Two coexisting Detection formulas (the engine and a deployed inline variant); the engine's is authoritative because score_all_risks calls market_signal_engine.apply_market_signal (financial_risk_gradient.py:2417).\n\nCANONICAL ENGINE (market_signal_engine.py compute_market_signal, lines 145-180): Detection = round( \u03a3 DETECTION_WEIGHTS[c] * scored[c].score for c in DETECTION_WEIGHTS ) * 100. DETECTION_WEIGHTS = {dark_positioning 0.30, positioning_concentration 0.25, analyst_signal 0.25, cross_market_diffusion 0.10, signal_freshness 0.10}. Each scored[c].score is the BASELINE-RELATIVE unit value (0-1) from score_component \u2192 _z_to_unit(z), NOT the raw component. So 'analysts + positioning' enter as z-scores vs the item's own history, then weight-sum \u00d7 100.\n\nThe three Detection inputs are assembled (assemble_market_components, lines 216-288):\n- analyst_signal = norm( log1p(article_count)/log1p(50)*0.6 + |avg_sentiment|*0.3 + min(creator+broadcast cov,8)/8*0.1 ) [Alpha Vantage news vol+tone + creator/broadcast coverage]\n- positioning_concentration = norm( min(|short_interest change_pct|,30)/30*0.4 + min(|13F shares_change_pct|,40)/40*0.4 + log1p(stage1_insider_count)/log1p(20)*0.2 ) [FINRA shorts + WhaleWisdom 13F + SEC/Finnhub Form-4]\n- dark_positioning = norm( stress_v*0.6 + min(|repo_volume_change_pct|,20)/20*0.4 ) where stress_v = 0.85 high/severe, 0.6 moderate, 0.35 mild, 0.2 none [OFR funding stress + repo].\n\nDEPLOYED INLINE VARIANT (financial_risk_gradient.compute_market_gradient, lines 2020-2120) computes Detection DIFFERENTLY \u2014 on ABSOLUTE 0-100 magnitudes, NOT z-scores: analyst = mclamp(log1p(art)*18 + |sent|*35 + creators_cov*6 + min(broadcast,5)*4); pp (Positioning Pressure) = mclamp(|si_chg|*4 + |inst_chg|*4); ba (Baseline Abnormality) = the positioning-engine score. detection = weighted avg of present parts (analyst 0.40, pp 0.35, ba 0.25, re-normalized over present weights). This is the function tied to MARKET_TIERS, but it is NOT the one persisted in the live loop.",
+  "confidence_formula": "CANONICAL ENGINE (compute_market_signal): Confidence = round( \u03a3 CONFIDENCE_WEIGHTS[c] * scored[c].score ) * 100, with CONFIDENCE_WEIGHTS = {fundamental_confirmation 0.35, market_momentum 0.30, cross_market_diffusion 0.20, signal_freshness 0.15}. Again each input is the baseline-relative z-unit value.\n\nConfidence inputs (assemble_market_components):\n- fundamental_confirmation = norm(mean of present parts) over: FMP score_normalized (primary, real P&L), beneficiary cycle_inflection, Finnhub sustainability/100. If no parts \u2192 0.0.\n- market_momentum = norm(mean of present parts) over: valuation_rerating, min(|price_return_12m|,2.0)/2.0. If no parts \u2192 0.0.\n- cross_market_diffusion = norm(min(venue_count,6)/6) [shared with Detection].\n- signal_freshness = norm(1 - newest_age_hours/168), 1-week linear decay; defaults to 0.4 if age unknown [shared].\n\nDEPLOYED INLINE VARIANT (compute_market_gradient): fu = mclamp(cycle_inflection*100) or None; pr = mean of [valuation_rerating*100, |price_return_12m|*40]; ma = OFR stress mapped 85/60/35/30. confidence = weighted avg (fu 0.45, pr 0.40, ma 0.15) over present parts; if NONE present, falls back to the diffusion engine's confidence_decay/confidence_score ('diffusion confirmation, no ticker fundamentals'). NOTE the inline variant's fundamentals = cycle_inflection ONLY and ignores FMP/sustainability, unlike the engine.\n\nIn BOTH: gap = detection \u2212 confidence. Detection >> Confidence = early window; both high = confirmed; both low = routine.",
+  "tiers": [
+   {
+    "name": "ELEVATED",
+    "rule": "avg = (detection+confidence)/2 >= 80. Both MARKET_LEVELS (engine, market_signal_engine.py:86) and MARKET_TIERS (inline, financial_risk_gradient.py:2009) use identical cutoffs."
+   },
+   {
+    "name": "ACTIVE",
+    "rule": "60 <= avg < 80."
+   },
+   {
+    "name": "BUILDING",
+    "rule": "40 <= avg < 60."
+   },
+   {
+    "name": "ROUTINE",
+    "rule": "25 <= avg < 40."
+   },
+   {
+    "name": "DORMANT",
+    "rule": "avg < 25. The lowest tier. Note: tier is purely a function of the AVERAGE of detection+confidence; the gap_state (EARLY/CONFIRMING/CONFIRMED/LAGGING/MIXED) is a SEPARATE classification layered on top, not the tier."
+   },
+   {
+    "name": "CALIBRATING (overrides all)",
+    "rule": "any_calibrating = True (ANY of the 7 components has fewer than MIN_BASELINE_TRUSTWORTHY=10 cycles, or fewer than MIN_BASELINE_CYCLES=3 so no z at all). When set, gap_state is forced to CALIBRATING by _interpret_gap regardless of scores; the numeric tier (DORMANT..ELEVATED) is still emitted but the read is flagged 'baseline forming / snapshot, not a confirmed signal'. SPCX (fresh IPO) is the canonical case \u2014 thin 13F/short history."
+   },
+   {
+    "name": "WATCH / UNUSUAL (DIFFERENT engine \u2014 Positioning, not Market Signal)",
+    "rule": "These belong to the Positioning engine (revised_risk_positioning_gradient.py / inline positioning at fr_gradient.py:1286), NOT the Market Signal dual score. Per-item positioning_score: ROUTINE<25, WATCH<50, ELEVATED<72, UNUSUAL>=72, plus CALIBRATING when baseline_cycles<3 (score held to 12.0). The Market section ranks by this positioning_score (get_risk_scores sort key, line 2521), so the displayed market tier and the positioning classification are two distinct labels on the same card."
+   }
+  ],
+  "baseline_relative": "'Baseline-relative' is the core integrity principle: every component is scored against the ITEM'S OWN history as a z-score, never as an absolute magnitude \u2014 so a mega-cap doesn't auto-score high just because it always has heavy coverage/filings (the size-bias bug the design review fixed, where Nvidia/Meta/Alphabet all read ~77 ELEVATED on nothing but size).\n\nMechanism (score_component, market_signal_engine.py:117-137): for a component with samples >= MIN_BASELINE_CYCLES(3): z = (current - mean) / stdev where stdev = max(0.05, baseline.stdev). Then score = _z_to_unit(z): z<=0 \u2192 max(0.05, 0.30 + z*0.08) (below baseline floors low); z>0 \u2192 min(1.0, 0.30 + z*0.22), so z=0\u21920.30, z=2\u2192~0.74, z=3+\u2192~0.96. The result carries baseline_relative=True only if NOT calibrating. If samples<3, it returns a non-baseline fallback score = norm(current)*0.6 with baseline_relative=False, calibrating=True.\n\nBaselines are built per-item, per-component from market_signal_history (get_market_baselines, line 341): take all rows for the item, identify distinct cycles by (signal_date, signal_time), SKIP the most-recent cycle (compare 'now' vs 'normal-before-now'), take the next `lookback`=12 cycles, compute mean/stdev/samples per component. With <2 samples stdev defaults to max(0.08, mean*0.3); a 0.05 floor is applied. Seeds: backfill_from_finra (positioning_concentration from ~12 bi-monthly FINRA points) and backfill_from_finnhub (fundamental_confirmation from ~12 quarters) so a name isn't CALIBRATING for days on first sight.",
+  "calibrating_rule": "An instrument/component is flagged CALIBRATING in two stacked situations:\n1. NO usable baseline \u2014 fewer than MIN_BASELINE_CYCLES (3) cycles of history for that component. score_component returns the fallback norm(current)*0.6, calibrating=True, baseline_relative=False. The z-score is not even computed.\n2. THIN/UNTRUSTWORTHY baseline (the cold-start guard, Fix #1 from the market diagnostic) \u2014 the component has >=3 but < MIN_BASELINE_TRUSTWORTHY (10, env MARKET_MIN_BASELINE) cycles. A z IS computed and kept for transparency, but calibrating=True is set because with so few samples the 0.05 stdev floor dominates and FABRICATES the z (the SPCX case: 5 cycles, floor-bound on 6 of 7 components). baseline_relative is set to NOT calibrating, i.e. False here.\n\nRoll-up (compute_market_signal:151): any_calibrating = any component calibrating. Because every component is recorded every cycle, sample counts are uniform across an item, so a fresh IPO trips ALL components at once (reads CALIBRATING) while an established name's deep baseline never false-triggers. When any_calibrating, _interpret_gap forces gap_state='CALIBRATING' with text 'Building this item's baseline \u2026 treat as a snapshot, not a confirmed market signal' \u2014 this short-circuits BEFORE any ROUTINE/EARLY/CONFIRMED branch, so a fresh IPO can never be reported as a confident ROUTINE the data can't support.",
+  "factors": [
+   {
+    "name": "analyst_signal (Detection, weight 0.25)",
+    "feeds": "detection",
+    "how_computed": "norm(log1p(article_count)/log1p(50)*0.6 + |avg_sentiment|*0.3 + min(creators_covered+broadcast_channels,8)/8*0.1). Sources: Alpha Vantage news volume+tone, creator coverage (Meet Kevin/Andrei Jikh), broadcast coverage. Then scored baseline-relative."
+   },
+   {
+    "name": "positioning_concentration (Detection, weight 0.25)",
+    "feeds": "detection",
+    "how_computed": "norm(min(|FINRA short change_pct|,30)/30*0.4 + min(|13F shares_change_pct|,40)/40*0.4 + log1p(stage1 insider count)/log1p(20)*0.2). Sources: FINRA short interest, WhaleWisdom 13F, SEC Form-4 / Finnhub insider (stage-1). The 'smart-money' factor."
+   },
+   {
+    "name": "dark_positioning (Detection, weight 0.30 \u2014 highest)",
+    "feeds": "detection",
+    "how_computed": "norm(stress_v*0.6 + min(|repo_volume_change_pct|,20)/20*0.4); stress_v from OFR funding-stress label (0.85 high/severe \u2192 0.2 none). Macro/cross-market shifts via OFR STFM repo + stress."
+   },
+   {
+    "name": "fundamental_confirmation (Confidence, weight 0.35 \u2014 highest)",
+    "feeds": "confidence",
+    "how_computed": "norm(mean of present: FMP score_normalized [primary, real P&L], beneficiary cycle_inflection, Finnhub sustainability/100). 0.0 if none present. (Inline variant uses cycle_inflection ONLY \u2014 divergence.)"
+   },
+   {
+    "name": "market_momentum (Confidence, weight 0.30)",
+    "feeds": "confidence",
+    "how_computed": "norm(mean of present: valuation_rerating, min(|price_return_12m|,2.0)/2.0) from beneficiary live_inputs. 0.0 if none. Price/valuation trend."
+   },
+   {
+    "name": "cross_market_diffusion (Shared)",
+    "feeds": "both",
+    "how_computed": "norm(min(distinct venue_count,6)/6). Number of distinct sources/venues active on the item. Weight 0.10 detection / 0.20 confidence."
+   },
+   {
+    "name": "signal_freshness (Shared)",
+    "feeds": "both",
+    "how_computed": "norm(1 - newest_age_hours/168) [1-week linear decay]; defaults 0.4 when age unknown. Weight 0.10 detection / 0.15 confidence."
+   }
+  ],
+  "weaknesses": [
+   "COLD-START / thin-baseline is acknowledged but the floor itself fabricates z: the 0.05 stdev floor (max(0.05, raw_stdev)) means a component whose true variance is near-zero still produces a large z on any small absolute move. The MIN_BASELINE_TRUSTWORTHY=10 guard only FLAGS this (calibrating), it does not correct the score \u2014 so once an item crosses 10 cycles the floor-fabricated z silently becomes a 'trusted' baseline_relative read with no smoothness check.",
+   "STALE / NARROW UNIVERSE: the tradable universe is the hardcoded WATCHLIST_TICKERS (15 mega-caps + SpaceX). Any company not on the watchlist gets no FINRA/13F/FMP/sustainability/beneficiary enrichment in score_all_risks (the ticker = WATCHLIST_TICKERS.get(display) gate at 2315), so positioning_concentration/fundamentals/momentum silently collapse to 0 for everything else \u2014 a structural coverage gap (the 'SpaceX problem' the market-coverage skill exists to catch). New IPOs are only covered if manually added.",
+   "TWO DIVERGENT MARKET FORMULAS coexist: market_signal_engine.compute_market_signal (z-score based, the one actually persisted via apply_market_signal at 2417) and financial_risk_gradient.compute_market_gradient (absolute-magnitude, MARKET_TIERS, used by market_signal_for_company / Grade tool at 2237). They use different inputs (e.g. fundamentals = FMP+bene+sustainability vs cycle_inflection-only) and different math, so the Grade tool's market read can disagree with the Market tab read for the same ticker \u2014 contradicting the CLAUDE.md 3-platform parity requirement.",
+   "BASELINE WINDOW IS SHALLOW AND MIXED-CADENCE: lookback=12 cycles but FINRA seeds are bi-monthly, Finnhub quarterly, live cycles ~6-hourly. Mean/stdev are computed over whatever rows exist regardless of cadence, so a baseline can blend 12 quarters of fundamentals with 12 6-hour cycles of positioning \u2014 the 'cycle' is not time-normalized, distorting z for slow-moving components.",
+   "ZERO-AS-DATA ambiguity: missing fundamental_confirmation / market_momentum default to 0.0, which the baseline machinery then treats as a real low observation. A name with no FMP data looks identically 'fundamentally weak/quiet' to one with genuinely poor fundamentals \u2014 Confidence is depressed by absence of data, not by data showing absence of strength.",
+   "SIGNAL_FRESHNESS default 0.4 when age unknown injects a mid-value into BOTH scores for items where date parsing failed \u2014 a silent fabricated input rather than abstaining.",
+   "GAP THRESHOLDS DIVERGE between the two engines (engine: EARLY gap>=36 & det>=45; inline interpretation: gap>=18 early) so the same detection/confidence pair yields different narrative states depending on which path renders it.",
+   "POSITIONING vs MARKET SIGNAL conflation on the card: get_risk_scores ranks by positioning_score (a different engine/threshold set: WATCH/UNUSUAL) while the headline tier comes from the Market Signal average (DORMANT..ELEVATED). A user sees two scoring vocabularies on one instrument, which can contradict (e.g. positioning UNUSUAL but market tier ROUTINE)."
+  ],
+  "detail": "AUDITED FILES (all absolute):\n- C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/market_signal_engine.py \u2014 the CANONICAL Market Signal dual-score engine (compute_market_signal, assemble_market_components, score_component/_z_to_unit, get_market_baselines, backfill_*). This is the code actually persisted in production (called at financial_risk_gradient.py:2417 via apply_market_signal).\n- C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/transfer/financial_risk_gradient.py \u2014 the orchestrator. Holds (a) the diffusion-stage risk engine compute_risk_gradient (ACUTE/ELEVATED/EMERGING/WATCH/BACKGROUND \u2014 a SEPARATE legacy stage system), (b) the inline compute_market_gradient + MARKET_TIERS (lines 2009-2145, the DIVERGENT second market formula used by the Grade tool path market_signal_for_company), (c) score_all_risks (the live scoring loop, 2250-2469) which assembles the payload, records the cycle, and writes risk_scores, and (d) get_risk_scores / _format_risk_row (2472-2534) which merges positioning_json as the PRIMARY display fields and applies the data-aging waterfall via first_scored_at.\n- C:/Users/acinv/OneDrive/Desktop/CODING PROJECTS/NowTrendin v2.0/Gradient Score info/revised_risk_positioning_gradient.py \u2014 DESIGN REFERENCE for the baseline-relative Positioning engine (the four fixes: definition, baseline-relative z, conditional narratives, insufficient-baseline honesty). Its logic is reimplemented inline in financial_risk_gradient.py (compute_positioning_score at ~1240, positioning_narrative at 1293).\n\nKEY LOAD-BEARING CODE:\n- Tier cutoffs (identical in both engines): market_signal_engine.py:86 MARKET_LEVELS = [(80,ELEVATED),(60,ACTIVE),(40,BUILDING),(25,ROUTINE),(0,DORMANT)]; tier = _level((detection+confidence)/2).\n- Cold-start guard: market_signal_engine.py:56 MIN_BASELINE_TRUSTWORTHY = int(os.getenv('MARKET_MIN_BASELINE','10')); :131 calibrating = samples < MIN_BASELINE_TRUSTWORTHY.\n- z mapping: market_signal_engine.py:110-114 _z_to_unit (z=0\u21920.30, z=2\u2192~0.74).\n- stdev floor (the fabrication risk): market_signal_engine.py:124 stdev = max(0.05, raw_stdev).\n- CALIBRATING short-circuit: market_signal_engine.py:184-188 _interpret_gap returns CALIBRATING before any tier-narrative branch.\n- Universe gate: financial_risk_gradient.py:1059 WATCHLIST_TICKERS (15 names + SpaceX/SPCX); :2315 enrichment gated on ticker = WATCHLIST_TICKERS.get(display).\n- Persisted-engine vs Grade-engine split: live loop persists the z-engine (mse.apply_market_signal, :2417); market_signal_for_company also uses the z-engine (:2237) BUT compute_market_gradient (:2020, absolute-magnitude) is the standalone variant still present and tied to MARKET_TIERS/_market_interpretation \u2014 a latent inconsistency to reconcile or delete.\n\nOVERALL: the Market Signal scoring is genuinely baseline-relative and honest about cold-start (CALIBRATING is well-implemented and hard to bypass). The two material integrity risks are (1) the static 16-name universe silently zeroing components for anything off-watchlist, and (2) two divergent market formulas (z-score engine vs absolute-magnitude inline) that can produce different reads for the same instrument across the Market tab and the Grade tool \u2014 a parity violation worth resolving."
+ },
+ "trend_stats": {
+  "total_topics": 2103,
+  "per_stage": [
+   {
+    "stage": "BREAKOUT",
+    "count": 10,
+    "det_median": 90.5,
+    "conf_median": 91,
+    "gap_median": -0.8,
+    "det_range": "84.5 to 94.7",
+    "conf_range": "81.8 to 94.3"
+   },
+   {
+    "stage": "STRONG",
+    "count": 41,
+    "det_median": 74.1,
+    "conf_median": 80.3,
+    "gap_median": -8.2,
+    "det_range": "40.0 to 91.8",
+    "conf_range": "48.0 to 88.1"
+   },
+   {
+    "stage": "EMERGING",
+    "count": 106,
+    "det_median": 46,
+    "conf_median": 66.8,
+    "gap_median": -21.6,
+    "det_range": "40.0 to 74.5",
+    "conf_range": "48.0 to 76.9"
+   },
+   {
+    "stage": "WATCHING",
+    "count": 762,
+    "det_median": 32.8,
+    "conf_median": 51.7,
+    "gap_median": -22.4,
+    "det_range": "19.3 to 100.0",
+    "conf_range": "34.6 to 100.0"
+   },
+   {
+    "stage": "MONITORING",
+    "count": 1184,
+    "det_median": 17.3,
+    "conf_median": 25.3,
+    "gap_median": -7.9,
+    "det_range": "3.8 to 100.0",
+    "conf_range": "7.0 to 97.5"
+   },
+   {
+    "stage": "ANOMALY (is_gravitational_anomaly=1)",
+    "count": 291,
+    "det_median": 35.3,
+    "conf_median": 47.7,
+    "gap_median": -16.5,
+    "det_range": "14.0 to 100.0",
+    "conf_range": "15.5 to 100.0"
+   }
+  ],
+  "saturation": "PARTIAL saturation, but the scores DO separate. Across all 2103 topics: Detection median 23.5 (p25=16.1, p75=34.6, std 15.7, range 3.8-100); Confidence median 40.4 (p25=23.8, p75=52.3, std 18.0, range 7.0-100). 69% of topics have Detection in 15-45 and 35% sit in the 25-45 band, so the bulk IS compressed in the low-to-mid range \u2014 but this is expected for an \"early-signal\" instrument where most topics are genuinely not moving. The discriminating evidence: 520 distinct Detection values and 595 distinct Confidence values across the set, and the stage medians ladder cleanly and monotonically (Detection 90.5 BREAKOUT > 74.1 STRONG > 46.0 EMERGING > 32.8 WATCHING > 17.3 MONITORING). The top of the scale is NOT pinned: BREAKOUT topics reach 94.7 Det / 94.3 Conf, far above the median mass. Conclusion: not collapsed/saturated \u2014 the band is dense at the bottom because most topics are quiet, but the instrument cleanly elevates the ~12% that are actually surging (BREAKOUT+STRONG+EMERGING = 157 topics). One caveat: there is visible value-clustering \u2014 top Detection integer buckets are 24 (97 topics), 20 (93), 22 (90), 38 (76) \u2014 and many string-variant duplicates of the same concept (e.g. claude code / claude-code / mcp / mcp server / model-context-protocol) land on identical scores (74.5 Det / 67.8 Conf recurs), which inflates apparent compression.",
+  "gap": "heisenberg_gap is overwhelmingly NEGATIVE: 1983 of 2103 topics (94%) have gap<0, only 112 positive and 8 exactly zero. Distribution: median -11.4, p10=-27.7, p25=-22.2, p75=-6.3, p90=-2.9, min=-34.6, max=+17.6, std 10.0. Large gaps are common: 876 topics (42%) have |gap|>15 and 334 have |gap|>25. Gap behavior is stage-coherent: it is near-zero at BREAKOUT (median -0.8, i.e. Detection and Confidence have converged) and widens to its most negative at WATCHING (-22.4) and EMERGING (-21.6), where Confidence sits well above Detection \u2014 consistent with the documented 'gap reflects topics living in expert/niche communities or awaiting mainstream confirmation' semantics. The rare positive gaps (Detection > Confidence) flag thin/anomalous reads: e.g. 'bonkers' (gap +9.2, only 5 mentions, 4 platforms) and 'Alan Greenspan' (gap +16.2). Net: gap is a real second dimension, not noise, and it collapses toward zero exactly as topics mature to BREAKOUT.",
+  "separation": "The scores DO discriminate. Three independent signals confirm separation: (1) monotonic stage ladder on Detection (90.5/74.1/46.0/32.8/17.3) and Confidence (91.0/80.3/66.8/51.7/25.3) with no inversions; (2) wide spread \u2014 Detection spans 3.8-100 with std 15.7, Confidence 7.0-100 with std 18.0, and 520/595 distinct values respectively; (3) gap converges to ~0 only for the genuinely-arrived BREAKOUT cohort. Recognizable mainstream topics rank where you'd expect for late-June 2026 (Iran/Hormuz/Israel conflict, 2026 FIFA World Cup/Qatar, Trump, Keir Starmer/Andy Burnham UK politics, Claude/Anthropic/AGI/ASI). WEAKNESSES that downstream agents should note: (a) heavy near-duplicate string variants of the same concept score identically (claude code vs claude-code; mcp/mcp server/model-context-protocol all 74.5/67.8; ai agent/ai agents/ai-agent/agent ai), inflating the catch-all and the apparent compression; (b) several single-platform GitHub-topic-slug rows (developer-tools, ai-tools, vector-database, platforms=1) carry mid-range Detection on essentially one source; (c) some thin BREAKOUT/anomaly rows ('bonkers' 5 mentions/4 platforms) score 86-91 Detection, so very-low-mention high-score rows warrant a corroboration check. 291 gravitational anomalies (14% of set) and 857 is_anomaly=True rows exist as a separate flag layer."
+ },
+ "sample100": [
+  {
+   "topic": "trump",
+   "stage": "BREAKOUT",
+   "det": 94.6,
+   "conf": 94.2,
+   "gap": 0.3,
+   "overall": 94.4,
+   "mentions": 609,
+   "platforms": 13,
+   "n": 78.8
+  },
+  {
+   "topic": "iran",
+   "stage": "BREAKOUT",
+   "det": 86.1,
+   "conf": 90.1,
+   "gap": -4,
+   "overall": 88.1,
+   "mentions": 542,
+   "platforms": 12,
+   "n": 85.4
+  },
+  {
+   "topic": "asi",
+   "stage": "BREAKOUT",
+   "det": 94.7,
+   "conf": 94.3,
+   "gap": 0.4,
+   "overall": 94.5,
+   "mentions": 143,
+   "platforms": 12,
+   "n": 76.6
+  },
+  {
+   "topic": "election",
+   "stage": "BREAKOUT",
+   "det": 94.7,
+   "conf": 94.3,
+   "gap": 0.4,
+   "overall": 94.5,
+   "mentions": 85,
+   "platforms": 11,
+   "n": 76.8
+  },
+  {
+   "topic": "FIFA",
+   "stage": "BREAKOUT",
+   "det": 93.7,
+   "conf": 93.7,
+   "gap": 0,
+   "overall": 93.7,
+   "mentions": 62,
+   "platforms": 11,
+   "n": 72.4
+  },
+  {
+   "topic": "canada",
+   "stage": "BREAKOUT",
+   "det": 90,
+   "conf": 91.7,
+   "gap": -1.7,
+   "overall": 90.8,
+   "mentions": 62,
+   "platforms": 10,
+   "n": 78.3
+  },
+  {
+   "topic": "qatar",
+   "stage": "BREAKOUT",
+   "det": 85.6,
+   "conf": 89.5,
+   "gap": -3.9,
+   "overall": 87.5,
+   "mentions": 60,
+   "platforms": 11,
+   "n": 83.1
+  },
+  {
+   "topic": "africa",
+   "stage": "BREAKOUT",
+   "det": 86.5,
+   "conf": 90.2,
+   "gap": -3.8,
+   "overall": 88.3,
+   "mentions": 44,
+   "platforms": 9,
+   "n": 89.1
+  },
+  {
+   "topic": "fifa world",
+   "stage": "BREAKOUT",
+   "det": 84.5,
+   "conf": 89.3,
+   "gap": -4.8,
+   "overall": 86.9,
+   "mentions": 39,
+   "platforms": 8,
+   "n": 100
+  },
+  {
+   "topic": "bonkers",
+   "stage": "BREAKOUT",
+   "det": 91,
+   "conf": 81.8,
+   "gap": 9.2,
+   "overall": 86.4,
+   "mentions": 5,
+   "platforms": 4,
+   "n": 54.4
+  },
+  {
+   "topic": "Keir Starmer",
+   "stage": "STRONG",
+   "det": 77.6,
+   "conf": 84.3,
+   "gap": -6.7,
+   "overall": 80.9,
+   "mentions": 326,
+   "platforms": 12,
+   "n": 78.4
+  },
+  {
+   "topic": "rag",
+   "stage": "STRONG",
+   "det": 65,
+   "conf": 60,
+   "gap": -7.8,
+   "overall": 62.5,
+   "mentions": 316,
+   "platforms": 12,
+   "n": 72.8
+  },
+  {
+   "topic": "claude",
+   "stage": "STRONG",
+   "det": 77.8,
+   "conf": 86.2,
+   "gap": -8.5,
+   "overall": 82,
+   "mentions": 179,
+   "platforms": 11,
+   "n": 73.5
+  },
+  {
+   "topic": "israel",
+   "stage": "STRONG",
+   "det": 72,
+   "conf": 82.7,
+   "gap": -10.8,
+   "overall": 77.3,
+   "mentions": 169,
+   "platforms": 10,
+   "n": 81.7
+  },
+  {
+   "topic": "hormuz",
+   "stage": "STRONG",
+   "det": 72.3,
+   "conf": 83.2,
+   "gap": -10.9,
+   "overall": 77.8,
+   "mentions": 128,
+   "platforms": 11,
+   "n": 77.7
+  },
+  {
+   "topic": "japan",
+   "stage": "STRONG",
+   "det": 81.8,
+   "conf": 88.1,
+   "gap": -6.3,
+   "overall": 84.9,
+   "mentions": 111,
+   "platforms": 9,
+   "n": 78.7
+  },
+  {
+   "topic": "ukraine",
+   "stage": "STRONG",
+   "det": 79.1,
+   "conf": 86.8,
+   "gap": -7.8,
+   "overall": 82.9,
+   "mentions": 110,
+   "platforms": 11,
+   "n": 83.1
+  },
+  {
+   "topic": "australia",
+   "stage": "STRONG",
+   "det": 71.6,
+   "conf": 80.3,
+   "gap": -8.7,
+   "overall": 75.9,
+   "mentions": 110,
+   "platforms": 11,
+   "n": 83.8
+  },
+  {
+   "topic": "britain",
+   "stage": "STRONG",
+   "det": 70.7,
+   "conf": 81.9,
+   "gap": -11.3,
+   "overall": 76.3,
+   "mentions": 103,
+   "platforms": 9,
+   "n": 99.4
+  },
+  {
+   "topic": "america",
+   "stage": "STRONG",
+   "det": 80,
+   "conf": 87.3,
+   "gap": -7.2,
+   "overall": 83.7,
+   "mentions": 98,
+   "platforms": 10,
+   "n": 86.2
+  },
+  {
+   "topic": "anthropic",
+   "stage": "STRONG",
+   "det": 77.9,
+   "conf": 86.1,
+   "gap": -8.2,
+   "overall": 82,
+   "mentions": 98,
+   "platforms": 9,
+   "n": 73.6
+  },
+  {
+   "topic": "europe",
+   "stage": "STRONG",
+   "det": 80,
+   "conf": 87.2,
+   "gap": -7.2,
+   "overall": 83.6,
+   "mentions": 96,
+   "platforms": 9,
+   "n": 78.2
+  },
+  {
+   "topic": "agi",
+   "stage": "STRONG",
+   "det": 72.6,
+   "conf": 83.3,
+   "gap": -10.8,
+   "overall": 77.9,
+   "mentions": 75,
+   "platforms": 11,
+   "n": 78.3
+  },
+  {
+   "topic": "california",
+   "stage": "STRONG",
+   "det": 67.4,
+   "conf": 79.9,
+   "gap": -12.5,
+   "overall": 73.7,
+   "mentions": 74,
+   "platforms": 7,
+   "n": 76.5
+  },
+  {
+   "topic": "Alan Greenspan",
+   "stage": "STRONG",
+   "det": 91.8,
+   "conf": 75.6,
+   "gap": 16.2,
+   "overall": 83.7,
+   "mentions": 59,
+   "platforms": 7,
+   "n": 75.4
+  },
+  {
+   "topic": "llm",
+   "stage": "EMERGING",
+   "det": 50.7,
+   "conf": 60,
+   "gap": -24.4,
+   "overall": 55.4,
+   "mentions": 342,
+   "platforms": 7,
+   "n": 83.2
+  },
+  {
+   "topic": "china",
+   "stage": "EMERGING",
+   "det": 45.6,
+   "conf": 67.5,
+   "gap": -21.8,
+   "overall": 56.5,
+   "mentions": 219,
+   "platforms": 11,
+   "n": 72.4
+  },
+  {
+   "topic": "india",
+   "stage": "EMERGING",
+   "det": 45.6,
+   "conf": 67.5,
+   "gap": -21.8,
+   "overall": 56.5,
+   "mentions": 156,
+   "platforms": 11,
+   "n": 84.8
+  },
+  {
+   "topic": "ai agent",
+   "stage": "EMERGING",
+   "det": 48.8,
+   "conf": 60,
+   "gap": -25.6,
+   "overall": 54.4,
+   "mentions": 146,
+   "platforms": 6,
+   "n": 85
+  },
+  {
+   "topic": "spacex",
+   "stage": "EMERGING",
+   "det": 60.2,
+   "conf": 76.1,
+   "gap": -15.8,
+   "overall": 68.2,
+   "mentions": 132,
+   "platforms": 10,
+   "n": 84.5
+  },
+  {
+   "topic": "us-iran",
+   "stage": "EMERGING",
+   "det": 46,
+   "conf": 68.4,
+   "gap": -22.4,
+   "overall": 57.2,
+   "mentions": 116,
+   "platforms": 8,
+   "n": 88.9
+  },
+  {
+   "topic": "ai agents",
+   "stage": "EMERGING",
+   "det": 50.8,
+   "conf": 60,
+   "gap": -24.3,
+   "overall": 55.4,
+   "mentions": 113,
+   "platforms": 7,
+   "n": 85
+  },
+  {
+   "topic": "vance",
+   "stage": "EMERGING",
+   "det": 57.4,
+   "conf": 53.3,
+   "gap": 4.1,
+   "overall": 55.3,
+   "mentions": 105,
+   "platforms": 9,
+   "n": 73.7
+  },
+  {
+   "topic": "phi",
+   "stage": "EMERGING",
+   "det": 45.4,
+   "conf": 67.4,
+   "gap": -22,
+   "overall": 56.4,
+   "mentions": 103,
+   "platforms": 10,
+   "n": 80.3
+  },
+  {
+   "topic": "france",
+   "stage": "EMERGING",
+   "det": 45.3,
+   "conf": 67.5,
+   "gap": -22.1,
+   "overall": 56.4,
+   "mentions": 94,
+   "platforms": 11,
+   "n": 88.9
+  },
+  {
+   "topic": "strait",
+   "stage": "EMERGING",
+   "det": 57,
+   "conf": 74.8,
+   "gap": -17.8,
+   "overall": 65.9,
+   "mentions": 93,
+   "platforms": 11,
+   "n": 80.3
+  },
+  {
+   "topic": "germany",
+   "stage": "EMERGING",
+   "det": 62.4,
+   "conf": 76.9,
+   "gap": -14.4,
+   "overall": 69.7,
+   "mentions": 91,
+   "platforms": 10,
+   "n": 79.7
+  },
+  {
+   "topic": "russia",
+   "stage": "EMERGING",
+   "det": 45.5,
+   "conf": 67.3,
+   "gap": -21.8,
+   "overall": 56.4,
+   "mentions": 84,
+   "platforms": 9,
+   "n": 79
+  },
+  {
+   "topic": "england",
+   "stage": "EMERGING",
+   "det": 45.9,
+   "conf": 68,
+   "gap": -22.1,
+   "overall": 57,
+   "mentions": 82,
+   "platforms": 9,
+   "n": 74.3
+  },
+  {
+   "topic": "korea",
+   "stage": "EMERGING",
+   "det": 45.4,
+   "conf": 67.1,
+   "gap": -21.8,
+   "overall": 56.2,
+   "mentions": 79,
+   "platforms": 7,
+   "n": 80.8
+  },
+  {
+   "topic": "generative ai",
+   "stage": "EMERGING",
+   "det": 40,
+   "conf": 48,
+   "gap": -22.8,
+   "overall": 44,
+   "mentions": 78,
+   "platforms": 4,
+   "n": 79.7
+  },
+  {
+   "topic": "openai",
+   "stage": "EMERGING",
+   "det": 45.4,
+   "conf": 67.1,
+   "gap": -21.7,
+   "overall": 56.2,
+   "mentions": 77,
+   "platforms": 7,
+   "n": 72.8
+  },
+  {
+   "topic": "iran war",
+   "stage": "EMERGING",
+   "det": 60.2,
+   "conf": 75.8,
+   "gap": -15.6,
+   "overall": 68,
+   "mentions": 73,
+   "platforms": 8,
+   "n": 84.9
+  },
+  {
+   "topic": "apple",
+   "stage": "EMERGING",
+   "det": 45.2,
+   "conf": 67.2,
+   "gap": -22,
+   "overall": 56.2,
+   "mentions": 72,
+   "platforms": 8,
+   "n": 76.5
+  },
+  {
+   "topic": "mcp",
+   "stage": "EMERGING",
+   "det": 74.5,
+   "conf": 73,
+   "gap": -23,
+   "overall": 73.8,
+   "mentions": 70,
+   "platforms": 3,
+   "n": 81
+  },
+  {
+   "topic": "ipo",
+   "stage": "EMERGING",
+   "det": 58.6,
+   "conf": 60.2,
+   "gap": -1.5,
+   "overall": 59.4,
+   "mentions": 69,
+   "platforms": 7,
+   "n": 75.6
+  },
+  {
+   "topic": "world cup 2026",
+   "stage": "EMERGING",
+   "det": 46,
+   "conf": 68,
+   "gap": -22,
+   "overall": 57,
+   "mentions": 68,
+   "platforms": 8,
+   "n": 89.8
+  },
+  {
+   "topic": "agent",
+   "stage": "WATCHING",
+   "det": 38.3,
+   "conf": 63.4,
+   "gap": -25.1,
+   "overall": 50.8,
+   "mentions": 302,
+   "platforms": 6,
+   "n": 75.4
+  },
+  {
+   "topic": "burnham",
+   "stage": "WATCHING",
+   "det": 48.6,
+   "conf": 48.4,
+   "gap": 0.3,
+   "overall": 48.5,
+   "mentions": 142,
+   "platforms": 9,
+   "n": 78
+  },
+  {
+   "topic": "keir",
+   "stage": "WATCHING",
+   "det": 47.9,
+   "conf": 47.8,
+   "gap": 0.1,
+   "overall": 47.8,
+   "mentions": 140,
+   "platforms": 9,
+   "n": 58.1
+  },
+  {
+   "topic": "switzerland",
+   "stage": "WATCHING",
+   "det": 24.8,
+   "conf": 57.8,
+   "gap": -33,
+   "overall": 41.3,
+   "mentions": 104,
+   "platforms": 9,
+   "n": 82.8
+  },
+  {
+   "topic": "strait hormuz",
+   "stage": "WATCHING",
+   "det": 24.7,
+   "conf": 56.7,
+   "gap": -32,
+   "overall": 40.7,
+   "mentions": 92,
+   "platforms": 11,
+   "n": 76.2
+  },
+  {
+   "topic": "andy burnham",
+   "stage": "WATCHING",
+   "det": 47.7,
+   "conf": 47.7,
+   "gap": 0,
+   "overall": 47.7,
+   "mentions": 91,
+   "platforms": 8,
+   "n": 97.8
+  },
+  {
+   "topic": "prompt-engineering",
+   "stage": "WATCHING",
+   "det": 45.7,
+   "conf": 56.5,
+   "gap": -22,
+   "overall": 51.1,
+   "mentions": 89,
+   "platforms": 2,
+   "n": 66.4
+  },
+  {
+   "topic": "lebanon",
+   "stage": "WATCHING",
+   "det": 24.4,
+   "conf": 57.1,
+   "gap": -32.7,
+   "overall": 40.8,
+   "mentions": 88,
+   "platforms": 10,
+   "n": 79.2
+  },
+  {
+   "topic": "ai-agents",
+   "stage": "WATCHING",
+   "det": 35.8,
+   "conf": 47.3,
+   "gap": -22.7,
+   "overall": 41.5,
+   "mentions": 87,
+   "platforms": 1,
+   "n": 51
+  },
+  {
+   "topic": "claude code",
+   "stage": "WATCHING",
+   "det": 74.5,
+   "conf": 67.8,
+   "gap": -17.1,
+   "overall": 71.2,
+   "mentions": 86,
+   "platforms": 2,
+   "n": 78
+  },
+  {
+   "topic": "strait of hormuz",
+   "stage": "WATCHING",
+   "det": 23.9,
+   "conf": 54.3,
+   "gap": -30.4,
+   "overall": 39.1,
+   "mentions": 75,
+   "platforms": 11,
+   "n": 70.4
+  },
+  {
+   "topic": "colombia",
+   "stage": "WATCHING",
+   "det": 38.5,
+   "conf": 42.2,
+   "gap": -3.8,
+   "overall": 40.4,
+   "mentions": 69,
+   "platforms": 8,
+   "n": 72.8
+  },
+  {
+   "topic": "claude-code",
+   "stage": "WATCHING",
+   "det": 74.5,
+   "conf": 67.8,
+   "gap": -22.4,
+   "overall": 71.2,
+   "mentions": 68,
+   "platforms": 1,
+   "n": 51
+  },
+  {
+   "topic": "developer-tools",
+   "stage": "WATCHING",
+   "det": 35.7,
+   "conf": 45.7,
+   "gap": -21.4,
+   "overall": 40.7,
+   "mentions": 67,
+   "platforms": 1,
+   "n": 73
+  },
+  {
+   "topic": "ai-tools",
+   "stage": "WATCHING",
+   "det": 35.5,
+   "conf": 45.8,
+   "gap": -21.7,
+   "overall": 40.6,
+   "mentions": 67,
+   "platforms": 1,
+   "n": 51
+  },
+  {
+   "topic": "embedding",
+   "stage": "WATCHING",
+   "det": 32.2,
+   "conf": 44.7,
+   "gap": -22.6,
+   "overall": 38.5,
+   "mentions": 67,
+   "platforms": 1,
+   "n": 80
+  },
+  {
+   "topic": "embeddings",
+   "stage": "WATCHING",
+   "det": 43.2,
+   "conf": 47.4,
+   "gap": -14.3,
+   "overall": 45.3,
+   "mentions": 63,
+   "platforms": 1,
+   "n": 57.2
+  },
+  {
+   "topic": "ai tools",
+   "stage": "WATCHING",
+   "det": 45.7,
+   "conf": 48.5,
+   "gap": -14.2,
+   "overall": 47.1,
+   "mentions": 62,
+   "platforms": 1,
+   "n": 97
+  },
+  {
+   "topic": "ai safety",
+   "stage": "WATCHING",
+   "det": 41.6,
+   "conf": 58.2,
+   "gap": -21.8,
+   "overall": 49.9,
+   "mentions": 59,
+   "platforms": 3,
+   "n": 78
+  },
+  {
+   "topic": "llama",
+   "stage": "WATCHING",
+   "det": 32.6,
+   "conf": 57.1,
+   "gap": -24.5,
+   "overall": 44.9,
+   "mentions": 57,
+   "platforms": 4,
+   "n": 88.1
+  },
+  {
+   "topic": "ai-safety",
+   "stage": "WATCHING",
+   "det": 37.5,
+   "conf": 46.7,
+   "gap": -20.6,
+   "overall": 42.1,
+   "mentions": 56,
+   "platforms": 1,
+   "n": 76.2
+  },
+  {
+   "topic": "us open",
+   "stage": "WATCHING",
+   "det": 25.8,
+   "conf": 52.1,
+   "gap": -26.3,
+   "overall": 39,
+   "mentions": 56,
+   "platforms": 5,
+   "n": 78.5
+  },
+  {
+   "topic": "agentic",
+   "stage": "WATCHING",
+   "det": 43.5,
+   "conf": 60,
+   "gap": -29.1,
+   "overall": 51.8,
+   "mentions": 54,
+   "platforms": 4,
+   "n": 87.2
+  },
+  {
+   "topic": "vector-database",
+   "stage": "WATCHING",
+   "det": 36.8,
+   "conf": 46.6,
+   "gap": -21,
+   "overall": 41.7,
+   "mentions": 54,
+   "platforms": 1,
+   "n": 46.7
+  },
+  {
+   "topic": "fastapi",
+   "stage": "WATCHING",
+   "det": 46.2,
+   "conf": 48.6,
+   "gap": -13.8,
+   "overall": 47.4,
+   "mentions": 52,
+   "platforms": 1,
+   "n": 54.4
+  },
+  {
+   "topic": "obama",
+   "stage": "WATCHING",
+   "det": 24.3,
+   "conf": 56.7,
+   "gap": -32.4,
+   "overall": 40.5,
+   "mentions": 51,
+   "platforms": 9,
+   "n": 85
+  },
+  {
+   "topic": "ai-agent",
+   "stage": "MONITORING",
+   "det": 29,
+   "conf": 20.7,
+   "gap": -2.9,
+   "overall": 24.9,
+   "mentions": 92,
+   "platforms": 1,
+   "n": 66.4
+  },
+  {
+   "topic": "SpaceX IPO 2026",
+   "stage": "MONITORING",
+   "det": 24.9,
+   "conf": 25.4,
+   "gap": -10.5,
+   "overall": 25.1,
+   "mentions": 68,
+   "platforms": 3,
+   "n": 0
+  },
+  {
+   "topic": "generative-ai",
+   "stage": "MONITORING",
+   "det": 30.9,
+   "conf": 21.1,
+   "gap": -1.4,
+   "overall": 26,
+   "mentions": 67,
+   "platforms": 1,
+   "n": 46.7
+  },
+  {
+   "topic": "Deniz Undav",
+   "stage": "MONITORING",
+   "det": 13.5,
+   "conf": 25.5,
+   "gap": -12,
+   "overall": 19.5,
+   "mentions": 63,
+   "platforms": 7,
+   "n": 68.5
+  },
+  {
+   "topic": "belgium vs iran",
+   "stage": "MONITORING",
+   "det": 10.2,
+   "conf": 17.7,
+   "gap": -7.5,
+   "overall": 13.9,
+   "mentions": 63,
+   "platforms": 2,
+   "n": 49.5
+  },
+  {
+   "topic": "python rag",
+   "stage": "MONITORING",
+   "det": 25.6,
+   "conf": 43.6,
+   "gap": -24.2,
+   "overall": 34.6,
+   "mentions": 51,
+   "platforms": 1,
+   "n": 82.1
+  },
+  {
+   "topic": "agents ai",
+   "stage": "MONITORING",
+   "det": 28.6,
+   "conf": 19.7,
+   "gap": -2.4,
+   "overall": 24.1,
+   "mentions": 51,
+   "platforms": 1,
+   "n": 76.9
+  },
+  {
+   "topic": "Brian Brobbey",
+   "stage": "MONITORING",
+   "det": 8.8,
+   "conf": 16,
+   "gap": -7.2,
+   "overall": 12.4,
+   "mentions": 45,
+   "platforms": 2,
+   "n": 49.3
+  },
+  {
+   "topic": "warsh",
+   "stage": "MONITORING",
+   "det": 15.6,
+   "conf": 27.1,
+   "gap": -11.5,
+   "overall": 21.4,
+   "mentions": 38,
+   "platforms": 3,
+   "n": 57.1
+  },
+  {
+   "topic": "fine-tuning",
+   "stage": "MONITORING",
+   "det": 19.2,
+   "conf": 40.8,
+   "gap": -21.4,
+   "overall": 30,
+   "mentions": 34,
+   "platforms": 1,
+   "n": 99.1
+  },
+  {
+   "topic": "model-context-protocol",
+   "stage": "MONITORING",
+   "det": 74.5,
+   "conf": 67.8,
+   "gap": -2.8,
+   "overall": 71.2,
+   "mentions": 33,
+   "platforms": 1,
+   "n": 51
+  },
+  {
+   "topic": "agent ai",
+   "stage": "MONITORING",
+   "det": 29.8,
+   "conf": 19.6,
+   "gap": -1.2,
+   "overall": 24.7,
+   "mentions": 33,
+   "platforms": 1,
+   "n": 46.7
+  },
+  {
+   "topic": "wyndham",
+   "stage": "MONITORING",
+   "det": 14.7,
+   "conf": 26.5,
+   "gap": -11.8,
+   "overall": 20.6,
+   "mentions": 31,
+   "platforms": 4,
+   "n": 91.3
+  },
+  {
+   "topic": "the korea times",
+   "stage": "MONITORING",
+   "det": 12.4,
+   "conf": 20.3,
+   "gap": -7.9,
+   "overall": 16.4,
+   "mentions": 31,
+   "platforms": 2,
+   "n": 46.7
+  },
+  {
+   "topic": "zelensky",
+   "stage": "MONITORING",
+   "det": 23.6,
+   "conf": 33.8,
+   "gap": -10.1,
+   "overall": 28.7,
+   "mentions": 30,
+   "platforms": 9,
+   "n": 62.5
+  },
+  {
+   "topic": "agentic-ai",
+   "stage": "MONITORING",
+   "det": 20.9,
+   "conf": 18,
+   "gap": -3.3,
+   "overall": 19.4,
+   "mentions": 30,
+   "platforms": 1,
+   "n": 46.7
+  },
+  {
+   "topic": "meloni",
+   "stage": "MONITORING",
+   "det": 18.4,
+   "conf": 30.8,
+   "gap": -12.4,
+   "overall": 24.6,
+   "mentions": 29,
+   "platforms": 8,
+   "n": 84.5
+  },
+  {
+   "topic": "machine-learning",
+   "stage": "WATCHING",
+   "det": 36.5,
+   "conf": 48,
+   "gap": -27.6,
+   "overall": 42.2,
+   "mentions": 49,
+   "platforms": 2,
+   "n": 89.3
+  },
+  {
+   "topic": "gemini",
+   "stage": "WATCHING",
+   "det": 41.5,
+   "conf": 60.9,
+   "gap": -25.9,
+   "overall": 51.2,
+   "mentions": 43,
+   "platforms": 5,
+   "n": 85
+  },
+  {
+   "topic": "typescript",
+   "stage": "WATCHING",
+   "det": 47.1,
+   "conf": 54.5,
+   "gap": -17.5,
+   "overall": 50.8,
+   "mentions": 43,
+   "platforms": 2,
+   "n": 76.9
+  },
+  {
+   "topic": "langchain",
+   "stage": "WATCHING",
+   "det": 45.5,
+   "conf": 47.9,
+   "gap": -13.8,
+   "overall": 46.7,
+   "mentions": 40,
+   "platforms": 1,
+   "n": 57.2
+  },
+  {
+   "topic": "agentic ai",
+   "stage": "WATCHING",
+   "det": 44.2,
+   "conf": 60,
+   "gap": -23.5,
+   "overall": 52.1,
+   "mentions": 39,
+   "platforms": 4,
+   "n": 80.4
+  },
+  {
+   "topic": "codex",
+   "stage": "WATCHING",
+   "det": 45.6,
+   "conf": 48.3,
+   "gap": -14,
+   "overall": 47,
+   "mentions": 38,
+   "platforms": 1,
+   "n": 92.3
+  },
+  {
+   "topic": "cursor",
+   "stage": "WATCHING",
+   "det": 46.6,
+   "conf": 54.6,
+   "gap": -18.1,
+   "overall": 50.6,
+   "mentions": 34,
+   "platforms": 2,
+   "n": 78
+  },
+  {
+   "topic": "ollama",
+   "stage": "WATCHING",
+   "det": 43.7,
+   "conf": 47.8,
+   "gap": -14.2,
+   "overall": 45.8,
+   "mentions": 34,
+   "platforms": 1,
+   "n": 52.9
+  },
+  {
+   "topic": "mcp server",
+   "stage": "WATCHING",
+   "det": 74.5,
+   "conf": 67.8,
+   "gap": -23.5,
+   "overall": 71.2,
+   "mentions": 30,
+   "platforms": 2,
+   "n": 83.5
+  },
+  {
+   "topic": "fine tuning",
+   "stage": "WATCHING",
+   "det": 30.5,
+   "conf": 49,
+   "gap": -18.4,
+   "overall": 39.8,
+   "mentions": 27,
+   "platforms": 2,
+   "n": 75.4
+  }
+ ],
+ "no_gap": {
+  "candidate_errors": [
+   {
+    "topic": "Alan Greenspan",
+    "stage": "STRONG",
+    "det": 91.8,
+    "conf": 75.6,
+    "gap": 16.2,
+    "why_mainstream": "Died age 100 on 2026-06-22 (today) under 4 presidents as Fed Chair \u2014 a breaking, globally wall-to-wall news event confirmed via WebSearch (Federal Reserve official statement, CBS, NBC, ABC). As mainstream and 'already-arrived' as a topic can get on this date.",
+    "expected": "High Detection AND high Confidence, small/aligned gap. A confirmed mega-story should sit in the 'Both Agree \u2014 High Conviction' band (gap 0-15).",
+    "observed": "det 91.8 / conf 75.6 / gap +16.2 \u2014 Detection running 16.2pts AHEAD of Confidence. Crosses the Anomalies threshold (det-conf >= 16). The single largest positive gap in the whole 100-topic sample.",
+    "error_type": "mainstream_large_gap"
+   },
+   {
+    "topic": "trump",
+    "stage": "BREAKOUT",
+    "det": 94.6,
+    "conf": 94.2,
+    "gap": 0.3,
+    "why_mainstream": "Sitting US President / most-covered person on earth; 609 mentions across 13 platforms \u2014 the densest footprint in the sample.",
+    "expected": "This one is CORRECT \u2014 listing as a near-miss only to note conf is genuinely high. No error.",
+    "observed": "det 94.6 / conf 94.2 / gap 0.3 \u2014 perfectly aligned. NOT an error; included only as the positive control reference.",
+    "error_type": "none_control_passes"
+   },
+   {
+    "topic": "china",
+    "stage": "EMERGING",
+    "det": 45.6,
+    "conf": 67.5,
+    "gap": -21.8,
+    "why_mainstream": "One of two global superpowers, permanently mainstream; 219 mentions / 11 platforms. Cannot plausibly be 'EMERGING.'",
+    "expected": "High det + high conf, aligned, BREAKOUT/STRONG stage.",
+    "observed": "det 45.6 / conf 67.5 / gap -21.8 \u2014 Detection collapsed to mid-40s and badged EMERGING despite 219 mentions on 11 platforms. Confidence exceeds Detection by 22pts (a deep lagging read on a fully-arrived topic).",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "india",
+    "stage": "EMERGING",
+    "det": 45.6,
+    "conf": 67.5,
+    "gap": -21.8,
+    "why_mainstream": "World's most populous nation; 156 mentions / 11 platforms. Permanently mainstream, not emerging.",
+    "expected": "High det + high conf, aligned.",
+    "observed": "det 45.6 / conf 67.5 / gap -21.8 \u2014 identical collapsed signature to china. Badged EMERGING; Detection 45.6 on an 11-platform topic.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "russia",
+    "stage": "EMERGING",
+    "det": 45.5,
+    "conf": 67.3,
+    "gap": -21.8,
+    "why_mainstream": "Superpower at the center of the Ukraine war; 84 mentions / 9 platforms; permanently mainstream.",
+    "expected": "High det + high conf, aligned, BREAKOUT/STRONG.",
+    "observed": "det 45.5 / conf 67.3 / gap -21.8 \u2014 collapsed to the same ~45/67 country signature, badged EMERGING.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "france",
+    "stage": "EMERGING",
+    "det": 45.3,
+    "conf": 67.5,
+    "gap": -22.1,
+    "why_mainstream": "G7 nation, 94 mentions / 11 platforms; permanently mainstream.",
+    "expected": "High det + high conf, aligned.",
+    "observed": "det 45.3 / conf 67.5 / gap -22.1 \u2014 same collapsed country signature, EMERGING badge on an 11-platform topic.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "apple",
+    "stage": "EMERGING",
+    "det": 45.2,
+    "conf": 67.2,
+    "gap": -22,
+    "why_mainstream": "Largest-cap company on earth; 72 mentions / 8 platforms. The textbook 'already-arrived' mega-cap.",
+    "expected": "High det + high conf, aligned, BREAKOUT/STRONG.",
+    "observed": "det 45.2 / conf 67.2 / gap -22 \u2014 Detection 45.2, badged EMERGING. A trillion-dollar company read as an emerging signal with a -22 lagging gap.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "openai",
+    "stage": "EMERGING",
+    "det": 45.4,
+    "conf": 67.1,
+    "gap": -21.7,
+    "why_mainstream": "Maker of ChatGPT, one of the most-covered tech entities of the era; 77 mentions / 7 platforms.",
+    "expected": "High det + high conf, aligned, STRONG/BREAKOUT.",
+    "observed": "det 45.4 / conf 67.1 / gap -21.7 \u2014 collapsed to the ~45/67 country/company signature, EMERGING badge.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "korea",
+    "stage": "EMERGING",
+    "det": 45.4,
+    "conf": 67.1,
+    "gap": -21.8,
+    "why_mainstream": "Major nation (Korea), 79 mentions / 7 platforms; permanently mainstream.",
+    "expected": "High det + high conf, aligned.",
+    "observed": "det 45.4 / conf 67.1 / gap -21.8 \u2014 same collapsed signature, EMERGING.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "obama",
+    "stage": "WATCHING",
+    "det": 24.3,
+    "conf": 56.7,
+    "gap": -32.4,
+    "why_mainstream": "Former two-term US President, one of the most recognized people alive; 51 mentions / 9 platforms.",
+    "expected": "High det + high conf, aligned (if genuinely surging) \u2014 at minimum NOT bottom-tier WATCHING.",
+    "observed": "det 24.3 / conf 56.7 / gap -32.4 \u2014 Detection 24.3 (near floor) and badged WATCHING despite presence on 9 platforms. Confidence exceeds Detection by 32pts. Deep mainstream_underscored + large lagging gap.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "israel",
+    "stage": "STRONG",
+    "det": 72,
+    "conf": 82.7,
+    "gap": -10.8,
+    "why_mainstream": "Central party to an active Middle East conflict; 169 mentions / 10 platforms. Unambiguously already-arrived.",
+    "expected": "High det + high conf, small gap (the conflict topics trump/iran achieve gap ~0 to -4).",
+    "observed": "det 72 / conf 82.7 / gap -10.8 \u2014 acceptable magnitudes but Confidence leads Detection by ~11pts on a fully-confirmed war topic; reads as still-confirming when it has plainly arrived.",
+    "error_type": "mainstream_lagging_gap"
+   },
+   {
+    "topic": "strait of hormuz",
+    "stage": "WATCHING",
+    "det": 23.9,
+    "conf": 54.3,
+    "gap": -30.4,
+    "why_mainstream": "The Strait of Hormuz is the dominant geopolitical/oil flashpoint in the current Iran crisis (the 'hormuz' topic at the top of the sample is STRONG with 128 mentions). The full canonical phrase is the SAME story.",
+    "expected": "Should match 'hormuz' (det 72.3 / conf 83.2, STRONG).",
+    "observed": "det 23.9 / conf 54.3 / gap -30.4, WATCHING \u2014 the multi-word variant of an already-arrived crisis topic collapses to the floor. Fragmentation across surface forms (hormuz / strait / strait hormuz / strait of hormuz) splits one mainstream story into wildly divergent scores.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "Deniz Undav",
+    "stage": "MONITORING",
+    "det": 13.5,
+    "conf": 25.5,
+    "gap": -12,
+    "why_mainstream": "Confirmed via WebSearch as a breaking 2026 World Cup story \u2014 scored a double vs Ivory Coast, tied Roger Milla's record for sub goal contributions; covered by ESPN, Yahoo, The National. Genuinely arrived in sports news on this date.",
+    "expected": "For a same-day breaking sports hero, at least a credible Detection \u2014 not bottom-of-barrel MONITORING.",
+    "observed": "det 13.5 / conf 25.5 / gap -12, MONITORING \u2014 a real breaking-news figure pegged near the noise floor. Borderline: defensible if the engine's sources under-cover live sports, but it is NOT obscure as the score implies.",
+    "error_type": "mainstream_underscored"
+   },
+   {
+    "topic": "mcp",
+    "stage": "EMERGING",
+    "det": 74.5,
+    "conf": 73,
+    "gap": -23,
+    "why_mainstream": "Not a mainstream-status error \u2014 flagged for an INTERNAL INCOHERENCE: det 74.5 - conf 73.0 = +1.5, yet the stored gap is -23. The gap field contradicts its own det/conf on this row (and on every mcp-variant: claude-code, claude code, model-context-protocol, mcp server all show det-conf ~ +0 to +7 but gap -17 to -23.5).",
+    "expected": "gap == det - conf == +1.5 by the documented definition.",
+    "observed": "gap stored as -23 while det-conf = +1.5 \u2014 a ~24pt internal contradiction. The Detection/Confidence/gap triple is not coherent for these rows, violating the 'both scores explain each other' instrument test directly.",
+    "error_type": "gap_field_incoherent"
+   },
+   {
+    "topic": "belgium vs iran",
+    "stage": "MONITORING",
+    "det": 10.2,
+    "conf": 17.7,
+    "gap": -7.5,
+    "why_mainstream": "This is the exact corroboration case CLAUDE.md cites (M/D reweighting, 'Belgium vs Iran, 2026 World Cup'). A real fixture, but as scored it sits at the absolute floor.",
+    "expected": "If genuinely emerging-but-corroborated, a wide POSITIVE gap (early signal). Instead it is uniformly low on both axes.",
+    "observed": "det 10.2 / conf 17.7 / gap -7.5 \u2014 both near floor, MONITORING. Flagged as the borderline of whether the engine can catch a real-but-niche live event at all.",
+    "error_type": "mainstream_underscored"
+   }
+  ],
+  "accurate_examples": [
+   {
+    "topic": "trump",
+    "det": 94.6,
+    "conf": 94.2,
+    "gap": 0.3,
+    "why_correct": "The textbook PASS of the no-gap test: the single most-covered person on earth (609 mentions / 13 platforms) reads det 94.6 / conf 94.2 / gap +0.3 \u2014 both converged HIGH, perfectly aligned, BREAKOUT. This is exactly the 'confirmed, act now' behavior the no-gap principle demands."
+   },
+   {
+    "topic": "iran",
+    "det": 86.1,
+    "conf": 90.1,
+    "gap": -4,
+    "why_correct": "Central to the active war story; 542 mentions / 12 platforms. det 86.1 / conf 90.1 / gap -4 \u2014 both high, tightly aligned, BREAKOUT. Correctly pegs an already-arrived topic."
+   },
+   {
+    "topic": "FIFA",
+    "det": 93.7,
+    "conf": 93.7,
+    "gap": 0,
+    "why_correct": "World Cup is live and globally dominant; det 93.7 / conf 93.7 / gap 0.0 \u2014 exact convergence. The dual-pathway anti-collapse gate is visibly working here (the doc notes FIFA would otherwise collapse to 27.6). Model PASS."
+   },
+   {
+    "topic": "election",
+    "det": 94.7,
+    "conf": 94.3,
+    "gap": 0.4,
+    "why_correct": "det 94.7 / conf 94.3 / gap +0.4, BREAKOUT \u2014 high+high+aligned for a mainstream civic topic."
+   },
+   {
+    "topic": "Keir Starmer",
+    "det": 77.6,
+    "conf": 84.3,
+    "gap": -6.7,
+    "why_correct": "Sitting UK PM; 326 mentions / 12 platforms. det 77.6 / conf 84.3 / gap -6.7 \u2014 both high, modest lag, STRONG. Reasonable already-arrived read."
+   },
+   {
+    "topic": "canada",
+    "det": 90,
+    "conf": 91.7,
+    "gap": -1.7,
+    "why_correct": "det 90 / conf 91.7 / gap -1.7, BREAKOUT \u2014 mainstream nation read high+high+aligned. Correct."
+   },
+   {
+    "topic": "claude",
+    "det": 77.8,
+    "conf": 86.2,
+    "gap": -8.5,
+    "why_correct": "Major AI brand; det 77.8 / conf 86.2 / gap -8.5, STRONG \u2014 both high, coherent. Correct already-arrived read."
+   },
+   {
+    "topic": "SpaceX IPO 2026",
+    "det": 24.9,
+    "conf": 25.4,
+    "gap": -10.5,
+    "why_correct": "A genuinely speculative/forward-looking topic (n=0, no baseline). Low det + low conf + MONITORING is the CORRECT 'false-positive collapse' behavior \u2014 both scores low together, no false confidence. Correct negative control."
+   },
+   {
+    "topic": "generative ai",
+    "det": 40,
+    "conf": 48,
+    "gap": -22.8,
+    "why_correct": "A diffuse, saturated/mature category term; modest scores with a wide lagging gap is defensible \u2014 it is established, not breaking. Correct discounting of an ESTABLISHED topic."
+   }
+  ],
+  "overall_finding": "FAILS the no-gap test \u2014 and fails it on the single most important data point in the sample. On 2026-06-22 Alan Greenspan died at 100 (confirmed via WebSearch: Federal Reserve official statement + CBS/NBC/ABC wall-to-wall coverage). That is the day's premier already-arrived mainstream event, and the engine scored it det 91.8 / conf 75.6 / gap +16.2 \u2014 the LARGEST positive gap in the entire 100-topic sample, landing it in the Anomalies band (det-conf >= 16). The instrument flagged a confirmed, globally-saturated obituary as an 'early, not-yet-broadly-confirmed' speculative signal. That is precisely the broken behavior the no-gap principle says invalidates the gap metric. The failure is systemic, not a one-off: every mainstream NATION and MEGA-CAP collapses to a near-identical ~45/67 signature badged EMERGING (china 45.6/67.5, india 45.6/67.5, russia 45.5/67.3, france 45.3/67.5, apple 45.2/67.2, openai 45.4/67.1, korea 45.4/67.1) with a uniform ~-22 LAGGING gap \u2014 i.e. Confidence systematically exceeds Detection by ~22pts on topics that have unambiguously already arrived. obama collapses worse (24.3/56.7, WATCHING, gap -32.4). Surface-form fragmentation splits single mainstream stories into contradictory scores (hormuz STRONG 72.3/83.2 vs 'strait of hormuz' WATCHING 23.9/54.3). And the gap FIELD is internally incoherent on the mcp-family rows (det-conf = +1.5 but stored gap = -23, a ~24pt contradiction), directly breaking the 'both scores explain each other' instrument test. The pass cases are real and important \u2014 trump 94.6/94.2/+0.3, FIFA 93.7/93.7/0.0, iran 86.1/90.1/-4, election 94.7/94.3/+0.4 \u2014 proving the dual-pathway anti-collapse gate WORKS when it engages. But it engages only for a privileged top tier; the moment a mainstream topic falls below that tier it collapses to the ~45/67 EMERGING signature. Net verdict: the dual-pathway gate is necessary and demonstrably functioning at the very top, but its anti-collapse protection does not extend across the full mainstream band, and the Greenspan +16.2 anomaly shows it can mis-read even a high-Detection confirmed story as speculative. The gap metric is therefore NOT yet a reliable instrument at the already-arrived end of the curve \u2014 it passes for the famous handful and fails for the merely-mainstream majority. Severity: SEVERE (fails on the day's #1 confirmed event plus a systematic ~7-topic collapse pattern), though partially mitigated by genuine passes at the very top.",
+  "detail": "METHOD: I treated 'unambiguously mainstream' as globally-famous people, mega-cap companies, superpower nations, and confirmed major current events, and confirmed the two non-obvious cases via WebSearch. KEY EXTERNAL CONFIRMATIONS (June 2026): (1) Alan Greenspan died 2026-06-22 at age 100 \u2014 Federal Reserve official press release + CBS/NBC/ABC/OPB; this is THE breaking mainstream story on the data's date, which makes its +16.2 anomaly gap the decisive falsification. (2) Deniz Undav and Brian Brobbey are real, currently-trending 2026 World Cup figures (Undav tied Roger Milla's bench-scoring record; Brobbey scored the fastest WC brace since 2006) per ESPN/Yahoo/The National \u2014 so their floor-level MONITORING scores (13.5/25.5 and 8.8/16.0) understate genuinely-arrived sports news, though this is the most forgivable miss since live-sports source coverage may be thin.\\n\\nTHE TWO FAILURE SIGNATURES:\\n- POSITIVE-GAP anomaly on confirmed news: Alan Greenspan det 91.8 / conf 75.6 / gap +16.2 (sole large positive gap; in the Anomalies band). Per the no-gap principle this exact case \u2014 'obviously-mainstream, fully-confirmed topic read as uncertain/early' \u2014 is the defined broken state.\\n- NEGATIVE-GAP mainstream collapse: china/india/russia/france/apple/openai/korea all cluster at det ~45 / conf ~67 / gap ~-22, badged EMERGING despite 7-11 platforms and 70-219 mentions. obama is the extreme (24.3/56.7/-32.4, WATCHING). Confidence systematically exceeds Detection on already-arrived topics \u2014 the inverse of the intended 'early = Detection leads' design, and a sign Detection is being clamped below what the footprint justifies.\\n\\nINTERNAL INCOHERENCE: the mcp family (mcp, claude code, claude-code, model-context-protocol, mcp server) all show det-conf ~ 0 to +7 yet store gap = -17 to -23.5. The gap field does not equal Detection - Confidence on these rows (e.g. mcp: 74.5-73.0 = +1.5 vs stored -23). This is a data-integrity bug in heisenberg_gap independent of the mainstream question.\\n\\nINVERSE CHECK (niche topics with implausibly HIGH confidence / false-aligned): I found NO egregious false-aligned niche rows \u2014 the obscure dev-tool slugs (fastapi 46.2/48.6, langchain 45.5/47.9, ollama 43.7/47.8, vector-database 36.8/46.6, codex 45.6/48.3) all sit LOW on BOTH axes with small gaps, which is the CORRECT 'low conviction' read, not false confidence. SpaceX IPO 2026 (24.9/25.4) and the misc footballers collapse low-on-both \u2014 also correct (no false confidence manufactured). So the engine's failure mode is one-directional: it does NOT fabricate confidence for niche topics (good), but it DOES strip detection/confidence from already-arrived mainstream topics outside the top tier (bad). That asymmetry is consistent with the dual-pathway gate working only for the highest-footprint rows and the calibration clamp pulling everything else down.\\n\\nRELEVANT CODE (per provided context, for follow-up): dual_pathway.blend + the w=mainstream_ratio gate (score_all_topics ~4296-4351) is what protects trump/FIFA; the serve-time recompute gate (apply_calibration ~1122-1155) is what's meant to preserve mainstream rows from collapsing to ~25-28 \u2014 the ~45/67 cluster suggests that preservation is NOT firing for these mid-mainstream rows, OR their baseline-relative w fell low enough that the expert pathway dominated and clamped them. The Greenspan +16.2 case specifically needs a same-surge/breaking-news check because Detection (91.8) is correctly high but Confidence (75.6) lags \u2014 Persistence hasn't accrued for a 1-day-old event, which is the documented gap-closes-as-P-rises mechanism, but for a wall-to-wall confirmed obituary the instrument should not be reading it as a speculative lead.\\n\\nSources: Federal Reserve (federalreserve.gov press release), CBS News, NBC News, ABC/Good Morning America (Greenspan); ESPN, Yahoo Sports, The National (Undav/Brobbey World Cup)."
+ },
+ "confirmed_errors": [
+  {
+   "topic": "strait of hormuz",
+   "is_real_error": true,
+   "mainstream_confirmed": true,
+   "severity": "medium",
+   "reasoning": "CONFIRMED as a real error after adversarial verification.\n\n1) MAINSTREAM CHECK (passed): WebSearch confirms the Strait of Hormuz is unambiguously the dominant mainstream geopolitical/oil story right now \u2014 the central chokepoint of the active 2026 Iran war. Sources: Wikipedia \"2026 Strait of Hormuz crisis,\" CNN Business (2026-06-09), Bloomberg, Brookings, Congress.gov CRS, plus IEA characterizing it as the \"largest supply disruption in the history of the global oil market.\" It is the SAME story as the shorter \"hormuz\" topic, which the sample correctly shows STRONG (det 72.3, conf 83.2, 128 mentions). No basis for a niche/expert or genuine-early-emergence read.\n\n2) MECHANISM CHECK \u2014 is the low score explainable by a LEGITIMATE mechanism? No. I tried to refute via dual-pathway (expert/niche origin), data-aging (Enterprise-live vs aged), and thin/new-topic explanations \u2014 none apply to a fully-arrived mainstream crisis. The score IS produced by a mechanism, but a defective one. I verified in transfer/gradient_engine_backend.py that normalize_topic() (lines 272-296) only lowercases and strips punctuation; it does NOT canonicalize surface-form variants. There is no alias/consolidation layer in the scoring pipeline: the only alias map (transfer/ai_topic_intelligence.py, lines ~118-237) is a hardcoded AI-DOMAIN taxonomy (agentic coding, MCP, codex) \u2014 it does not cover geopolitical topics. Therefore \"hormuz\", \"strait\", \"strait hormuz\", and \"strait of hormuz\" are stored and scored as INDEPENDENT topics. The full canonical phrase accumulates fewer raw signal hits, so its Detection collapses (23.9) and it falls to the WATCHING floor (gap -30.4) while the shorter token reads STRONG. This is exactly the auditor's diagnosis: fragmentation across surface forms splits ONE mainstream story into divergent scores.\n\n3) MISREPRESENTATION: Attention on the Strait of Hormuz is breakout-level; the det=23.9 / WATCHING reading on the canonical full phrase materially understates it and directly contradicts the engine's own STRONG read on \"hormuz.\" Both conditions are met: clearly mainstream AND score clearly misrepresents attention. The auditor's expected match (~det 72.3, STRONG) is correct.\n\nSEVERITY = medium: the story is NOT missed (the shorter \"hormuz\" variant correctly carries it as STRONG, so the before-it-arrives thesis and data floor are intact), but the engine emits a stark, self-contradictory floor score on the canonical full phrase of the single biggest current world story \u2014 a credibility risk on the institutional surfaces and a systemic surface-form fragmentation issue affecting any multi-word mainstream topic. Not high (not a true miss), not low (dominant story, systemic). Relevant file: C:\\Users\\acinv\\OneDrive\\Desktop\\CODING PROJECTS\\NowTrendin v2.0\\transfer\\gradient_engine_backend.py (normalize_topic / extract_topics)."
+  },
+  {
+   "topic": "belgium vs iran",
+   "is_real_error": true,
+   "mainstream_confirmed": true,
+   "severity": "low",
+   "reasoning": "MAINSTREAM CONFIRMED via WebSearch: \"Belgium vs Iran\" is a real 2026 FIFA World Cup Group G fixture played June 21, 2026 (the day before today, 2026-06-22), 0-0 draw at LA Stadium, with extensive top-tier mainstream coverage (ESPN, Sky Sports, FOX Sports, FIFA.com, Sports Illustrated, Wikipedia). It is unambiguously a fully-arrived mainstream live event, not niche/expert/early-emerging.\n\nSCORE IS UNDER-WEIGHT BUT EXPLAINABLE BY A KNOWN, DOCUMENTED MECHANISM \u2014 not a hidden bug. In transfer/dual_pathway.py the mainstream pathway requires (a) magnitude from peak mainstream-tier engagement (news rows fall below the magnitude floor, _LOG_FLOOR) and (b) breadth = distinct mainstream communities/outlets, with NEWS_MAINSTREAM_MIN=3 distinct reputable outlets needed for mainstream-confirmed and _BREADTH_FULL=4. detection = (1-w)*expert_detection + w*md. For a sports topic expert_detection ~0 (niche ratio ~0); if the engine has only thin mainstream-tier ingestion at the snapshot, abs_breadth is low, md is low, and w (mainstreaming weight) is low, so BOTH detection (10.2) and confidence (17.7) collapse to the floor. overall<35 then mechanically yields MONITORING (calibration_engine.py:1367). gap = detection-confidence = -7.5 is just 10.2-17.7. So MONITORING and the low-low pair are the math working as written.\n\nCRITICALLY, CLAUDE.md names THIS EXACT topic \u2014 \"the 'Belgium vs Iran, 2026 World Cup' corroboration case\" \u2014 as the motivating example for the M/D provenance reweighting (reputable -> half weight, full only on >=2 distinct reputable; research outlets -> Dark Matter), which is explicitly \"IN DESIGN (next phase, NOT yet shipped; gated by backtest-before-ship).\" The low-low score is the CURRENT EXPECTED behavior that the deferred fix targets, i.e. a known acknowledged limitation, not a regression.\n\nREFUTATION OF THE AUDITOR'S \"EXPECTED\": the auditor claims the correct output should be \"a wide POSITIVE gap (early signal).\" That is internally inconsistent. A wide positive gap (det>>conf) is the signature of an EARLY EXPERT/NICHE signal. A fully-arrived MAINSTREAM live event should read HIGH on BOTH axes (magnitude + breadth = \"it has arrived\"), per dual_pathway.py archetype docs \u2014 never a wide gap. The auditor conflates mainstream with early-emerging, which are opposite archetypes in this engine, so its proposed-correct shape is wrong.\n\nNET: topic is mainstream and the score does under-represent its real attention, so is_real_error=true, but it is the precise already-tracked, fix-pending case at the floor (not a wild inversion or systemic misrank), so severity=low. Evidence: NowTrendin v2.0/transfer/dual_pathway.py (attention_magnitude, mainstream_breadth, mainstream_detection, blend lines 106-314), NowTrendin v2.0/transfer/calibration_engine.py:1356-1367 (component->stage), NowTrendin v2.0/CLAUDE.md section 15 lines 311-330 (M/D reweighting IN DESIGN, Belgium vs Iran named)."
+  }
+ ],
+ "market_stats": {
+  "total_instruments": 88,
+  "tier_distribution": [
+   {
+    "tier": "ROUTINE",
+    "count": 87
+   },
+   {
+    "tier": "BUILDING",
+    "count": 1
+   },
+   {
+    "tier": "ELEVATED",
+    "count": 0
+   },
+   {
+    "tier": "ACTIVE",
+    "count": 0
+   },
+   {
+    "tier": "DORMANT",
+    "count": 0
+   },
+   {
+    "tier": "WATCH",
+    "count": 0
+   }
+  ],
+  "pct_calibrating": 28.4,
+  "baseline_findings": "sufficient_baseline=false on 0 of 88 instruments (0%). baseline_cycles distribution: 4 cyc=4, 3 cyc=7, 2 cyc=8, 16 cyc=9, 1 cyc=10, 29 cyc=11, 33 cyc=12 \u2014 i.e. ~71% (62/88) have >=11 cycles, so the universe is NOT in genuine cold-start by the baseline metric. Yet 25/88 (28.4%) are flagged market_gradient.calibrating=true. CONTRADICTION: every single calibrating=true row also has sufficient_baseline=true and baseline_cycles 4-9. The two cold-start flags disagree \u2014 calibrating is gated on something else (almost certainly thin total_signals: every calibrating row has total_signals 1-6, mostly 1), while sufficient_baseline only looks at cycle count. So the platform reports 'enough baseline history' and 'still calibrating' simultaneously for the same instrument.",
+  "tier_sanity": "The tier categories do NOT make sense as currently surfaced, and they are not separating instruments. Three different 'tier' fields exist and disagree: market_gradient.tier and risk_stage are ROUTINE for 87/88 (98.9%) \u2014 only alphabet is BUILDING \u2014 so the headline tier is effectively a constant carrying ~zero information. The real signal lives in 'classification' (84 ROUTINE / 3 WATCH / 1 ELEVATED), but even that only escapes ROUTINE for 4 of 88 names. The categories ARE baseline-relative (baseline_status=AT_BASELINE on all sampled, abnormality=percent_delta z-style deviation), and the relativity is masking nothing big because there are no big movers in absolute terms (max percent_delta=5.3%, max abnormality=4.8). The deeper problem is value quantization: detection clusters hard (20 instruments share det=34.6, 16 share 32.2, 9 share 33.9), and the 9 'highest abnormality' instruments (abn=4.8, delta=5.3) are ALL 2-signal micro-floats (Lakewood Amedex, Boxlight, Utime, etc.) classed ROUTINE, while jpmorgan (abn=2.4, sig=125) is WATCH. So classification is non-monotonic in abnormality and the abnormality metric is noise-dominated for thin-coverage names. Universe is fresh, not stale: all scored_at within 0.7h (2026-06-23T05:01Z), 0 rows older than 24h.",
+  "sample": [
+   {
+    "instrument": "alphabet",
+    "tier": "BUILDING",
+    "det": 41.6,
+    "conf": 44.4,
+    "calibrating": false,
+    "note": "The ONLY non-ROUTINE market_gradient.tier in the whole universe. Deepest coverage (sig=137), highest det+conf, yet abnormality only 1.4 and classification=ROUTINE \u2014 so the one instrument the tier escalates is the one that is LEAST abnormal. Tier is tracking score level, not deviation."
+   },
+   {
+    "instrument": "cre",
+    "tier": "ROUTINE",
+    "det": 40.3,
+    "conf": 37.5,
+    "calibrating": false,
+    "note": "Only ELEVATED classification (sig=77, abn=2.3) but risk_stage and market_gradient.tier both say ROUTINE \u2014 headline tier contradicts the classification."
+   },
+   {
+    "instrument": "recession",
+    "tier": "ROUTINE",
+    "det": 36.9,
+    "conf": 32.4,
+    "calibrating": false,
+    "note": "classification=WATCH, abn=4.7 (2nd highest in universe), sig=30 \u2014 a real macro mover, but mg.tier/risk_stage flatten it to ROUTINE."
+   },
+   {
+    "instrument": "spacex",
+    "tier": "ROUTINE",
+    "det": 36.5,
+    "conf": 29.3,
+    "calibrating": false,
+    "note": "classification=WATCH, abn=4.2, sig=46 \u2014 the SpaceX-coverage case the market-coverage skill watches; flagged WATCH by classification but ROUTINE by tier."
+   },
+   {
+    "instrument": "jpmorgan",
+    "tier": "ROUTINE",
+    "det": 38.9,
+    "conf": 39,
+    "calibrating": false,
+    "note": "classification=WATCH at abn=2.4 with sig=125, while 9 micro-floats at abn=4.8 stay ROUTINE \u2014 proves classification fuses abnormality with signal depth, so it is NOT a pure deviation ranking."
+   },
+   {
+    "instrument": "lakewood_amedex_biothera_com_s_labt",
+    "tier": "ROUTINE",
+    "det": 33.9,
+    "conf": 28.9,
+    "calibrating": false,
+    "note": "Highest abnormality in the universe (4.8, delta=5.3%) on just 2 signals \u2014 one of 9 identical 2-signal micro-floats sharing det=33.9. Abnormality metric is noise on thin coverage; correctly NOT escalated, but it tops the 'biggest mover' sort, which is misleading."
+   },
+   {
+    "instrument": "triller_group_inc_warrant_illrw",
+    "tier": "ROUTINE",
+    "det": 29.9,
+    "conf": 29.9,
+    "calibrating": true,
+    "note": "calibrating=true with sufficient_baseline=true, baseline_cycles=4, sig=1. det==conf==29.9 is a floor/default, not a measured read. Representative of the 25 calibrating thin-coverage rows."
+   },
+   {
+    "instrument": "citigroup",
+    "tier": "ROUTINE",
+    "det": 38.9,
+    "conf": 39,
+    "calibrating": false,
+    "note": "abn=3.9, sig=136, deep coverage, but classification=ROUTINE while spacex/recession at similar/lower abn are WATCH \u2014 threshold behavior is inconsistent across the well-covered names."
+   }
+  ],
+  "errors": [
+   "TIER FIELD IS A CONSTANT: market_gradient.tier and risk_stage are ROUTINE for 87/88 (98.9%). The headline tier carries essentially no information and does not separate instruments \u2014 only alphabet differs (BUILDING).",
+   "THREE TIER FIELDS DISAGREE: market_gradient.tier vs risk_stage vs classification give different answers for the same row (e.g. cre = ROUTINE tier but ELEVATED classification; recession/spacex/jpmorgan = ROUTINE tier but WATCH classification). No single source of truth for the category surfaced to users.",
+   "COLD-START FLAG CONTRADICTION: 28.4% calibrating=true but 0% sufficient_baseline=false. Every calibrating row simultaneously reports sufficient_baseline=true. The two cold-start signals are computed on different inputs (calibrating ~ total_signals<~6; sufficient_baseline ~ cycle count) and are never reconciled.",
+   "VALUE QUANTIZATION / TEMPLATING: detection scores cluster on a few discrete values (20 instruments at 34.6, 16 at 32.2, 9 at 33.9). Many instruments are not getting an individuated read \u2014 they are snapping to signal-count buckets / floors. The 25 calibrating rows in particular collapse to a handful of det/conf pairs (32.2/29.2, 29.9/29.9, 29.7/29.5).",
+   "ABNORMALITY DOMINATED BY THIN-COVERAGE NOISE: the 9 highest-abnormality instruments (abn=4.8, delta=5.3%) are all 2-signal micro-cap floats. abnormality is a percent-delta z-score that blows up on 1-2 signal counts, so the 'biggest movers' sort surfaces illiquid noise above real movers (recession, spacex).",
+   "CLASSIFICATION NON-MONOTONIC IN ABNORMALITY: jpmorgan (abn=2.4) is WATCH while labt/boxlight/utime (abn=4.8) are ROUTINE \u2014 classification silently fuses deviation with signal depth, which is defensible but undocumented and produces a counterintuitive ranking.",
+   "HARDCODED INTERPRETATION STRING: market_gradient.interpretation is byte-for-byte identical ('Mixed \u2014 leading and hard indicators are partially aligned; direction is forming but not yet clear-cut.') across every instrument sampled (cre, recession, spacex, alphabet, citigroup). It is not a per-instrument read and adds no information.",
+   "MOJIBAKE IN PAYLOAD: detection_fp/confidence_fp/interpretation contain double-encoded UTF-8 (e.g. '\u00c2\u00b7' instead of '\u00b7', '\u00e2\u20ac\u201d' instead of '\u2014'). The /risk/scores response is being re-encoded latin1->utf8 somewhere; will render as garbage on the terminal/desktop.",
+   "FLOOR-VALUE READS PRESENTED AS REAL: calibrating instruments with det==conf (e.g. 29.9/29.9) and sig=1 are floor defaults, not measurements, yet are returned in the same shape as measured rows with no distinct visual/structural marker beyond the calibrating boolean."
+  ],
+  "detail": "LIVE PULL: GET /risk/scores?limit=300 returned 88 instruments (response 'total' field), all scored within the last 0.7h (scored_at ~2026-06-23T05:01:31Z). 523KB payload. Universe is FRESH (0 rows >24h old), so staleness is NOT a problem here.\n\nWHAT MAKES SENSE: baseline depth is real (62/88 have >=11 cycles, sufficient_baseline=true universally), the universe is current, and the categories are correctly baseline-relative (AT_BASELINE on all, deviation measured via abnormality/percent_delta). There genuinely are no large absolute movers right now (max percent_delta=5.3%), so 'mostly routine' is a defensible read of a quiet tape \u2014 this is NOT simply cold-start masking a big mover.\n\nWHAT DOES NOT: (1) The user-facing 'tier' (market_gradient.tier / risk_stage) is a near-constant ROUTINE (98.9%) and disagrees with the 'classification' field that actually moves (WATCH/ELEVATED). Pick one source of truth. (2) The two cold-start gates (calibrating vs sufficient_baseline) flatly contradict each other on 25 rows. (3) Detection is heavily quantized \u2014 dozens of instruments snap to identical values, and 9 'top movers' are 2-signal micro-floats whose abnormality is pure noise. (4) interpretation is a hardcoded identical string and the payload has double-encoded-UTF8 mojibake.\n\nNET JUDGMENT: The tier system is directionally honest about a quiet market but is NOT tracked accurately or surfaced coherently \u2014 the headline tier is uninformative, the cold-start flags are inconsistent, thin-coverage noise pollutes the mover ranking, and per-instrument 'reads' (interpretation, floor det/conf) are partly templated rather than measured. Fix priority: reconcile calibrating<->sufficient_baseline, collapse the three tier fields to one, gate abnormality on a minimum signal count, and fix the UTF-8 re-encoding.\n\nKey files (engine canonical in v2.0/transfer/): C:\\\\Users\\\\acinv\\\\OneDrive\\\\Desktop\\\\CODING PROJECTS\\\\NowTrendin v2.0\\\\market_signal_diagnostic_06_17_26.py and the engine's risk/market-gradient scorer that emits market_gradient + classification + risk_stage. The market-signal-diagnostic and market-coverage skills are the right tools to drill a single instrument (e.g. spacex, recession)."
+ },
+ "benchmarks": {
+  "benchmarks": [
+   {
+    "name": "Wikipedia / Wikimedia Pageviews API (AQS REST v1) \u2014 RECOMMENDED PRIMARY ANCHOR",
+    "measures": "Daily (and hourly/monthly) human pageviews to a specific Wikipedia article \u2014 i.e. how many real people actively looked up a named entity/topic. The most widely-cited academic proxy for 'public attention/concern' (used across sociology, epidemiology, politics, economics). For the no-gap test it is decisive: a genuinely mainstream topic almost always has a high-volume, stable Wikipedia article; a niche/pre-arrival topic has thin or no article traffic.",
+    "cost_licensing": "FREE. Data is licensed CC0 1.0 (public domain) \u2014 the strongest possible licensing position, fully usable commercially with zero restriction. No API key required. No fixed rate limit; the only ask is to serialize requests (wait for one to finish before the next) so you don't threaten service stability. Endpoint: GET https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/{wiki}/all-access/all-agents/{Article}/daily/{YYYYMMDD}/{YYYYMMDD}",
+    "non_circular": "FULLY non-circular. Pageviews come from Wikimedia's own server traffic logs \u2014 an entirely independent population (people typing/clicking on Wikipedia) and an independent platform NowTrendIn does not collect from. It shares NO inputs with the Gradient Score (no RSS feeds, no X volume scan, no blog GHOST_FEEDS, no Detection/Confidence components). It cannot leak into our own signals, so it can validate direction without contaminating the score.",
+    "how_to_use": "WIRE AS THE NO-GAP MAINSTREAM ANCHOR. (1) For each scored topic, resolve it to a canonical Wikipedia article (search/title-normalize; quarantine unresolved to a review queue like the ingestion gate does). (2) Pull trailing ~90d daily pageviews and compute a 'mainstream-attention level' = log10(median daily views) plus a stability metric (low coefficient of variation = established, not spiking). (3) Define the ground-truth label: a topic is ALREADY-MAINSTREAM if median daily pageviews exceed a high percentile of the corpus (e.g. >~p80 of all tracked articles) AND traffic is stable rather than freshly spiking. (4) The no-gap test passes when topics NowTrendIn classifies as mainstream/ESTABLISHED (in topic_lifecycle / the stage waterfall) line up with high+stable pageview level, and topics we call early/pre-arrival sit LOW on pageviews. (5) Store the pageview level in a separate calibration table (e.g. wiki_attention_anchor), NEVER as a Gradient-Score input \u2014 it is a held-out label only."
+   },
+   {
+    "name": "GDELT DOC 2.0 API (TimelineVol mode)",
+    "measures": "Share of WORLDWIDE news coverage (broadcast + print + web, 100+ languages) matching a query, by day/hour/15-min \u2014 expressed as a PERCENT of all global coverage GDELT monitors, not raw counts. A direct measure of mainstream MEDIA attention (vs Wikipedia's audience attention). Excellent complement: Wikipedia = demand-side (people looking it up), GDELT = supply-side (media talking about it).",
+    "cost_licensing": "FREE. DOC 2.0 API is open, no key, JSON/CSV/JSONP output, rolling 90-day window. Full historical archive (back to 1979) is free via Google BigQuery. Underlying GDELT data is openly licensed for analysis. No commercial paywall on the DOC API.",
+    "non_circular": "Largely non-circular but needs care. GDELT monitors a far broader, global, multilingual media universe than NowTrendIn's curated trusted-direct RSS roster (El Pais, TechCrunch, BBC, CNBC, etc.). The risk: a handful of our RSS sources also appear in GDELT's corpus, so it is not 100% independent. Mitigate by treating GDELT's percent-of-global-coverage as the signal \u2014 at global scale our ~15 feeds are negligible, so overlap is immaterial. Keep it as a directional cross-check, secondary to Wikipedia.",
+    "how_to_use": "SECONDARY MAINSTREAM CONFIRMATION. Use TimelineVol percent-coverage as a second independent axis on the no-gap test: a true mainstream topic should be HIGH on BOTH Wikipedia pageviews AND GDELT coverage-share. Disagreement is diagnostic \u2014 high GDELT + low Wikipedia = media-pushed but no public pull (often pre-arrival or astroturf); high Wikipedia + low GDELT = durable public interest without fresh news (established/evergreen). Log both in the calibration table; never feed into the score."
+   },
+   {
+    "name": "Google Trends API (alpha, July 2025) / relative search interest",
+    "measures": "Relative search interest for a term on a consistent 0-scaled index across requests (5 years of history in the alpha). Search demand is a strong attention proxy and the exact benchmark NowTrendIn's accuracy ledger already measures lead-time against.",
+    "cost_licensing": "Official API is FREE but ALPHA + gated \u2014 access opened on a rolling, very-limited-tester basis through 2025-2026; you must be approved. Terms reserve Google's right to set limits at sole discretion; pricing/rate-limits still TBD. Practical interim access is via paid scrapers (SerpApi/Apify/Scrapingdog) or the legacy Apify Google Trends path NowTrendIn already uses.",
+    "non_circular": "PARTIALLY circular for NowTrendIn \u2014 IMPORTANT CAVEAT. The accuracy ledger already uses Google Trends as the breakout ground-truth (LED lead-time vs Trends). If you ALSO use Trends to calibrate the no-gap mainstream test you are anchoring to the same external series twice, which over-fits to Google's notion of attention. Keep Trends as the BREAKOUT/arrival-timing anchor (its established role) and use Wikipedia+GDELT for the MAINSTREAM-level anchor, so the two calibration jobs stay independent of each other.",
+    "how_to_use": "KEEP IN ITS CURRENT LANE (breakout timing), do NOT reuse for no-gap. If you want a search-demand mainstream signal, derive it from Wikipedia/GDELT instead to avoid double-anchoring. If/when the official API graduates from alpha, swap the Apify scrape for it to de-risk ToS."
+   },
+   {
+    "name": "GoogleBooks / Ngram Viewer (arrival-lag anchor)",
+    "measures": "Frequency of a term across Google's scanned-books corpus by year \u2014 culturomics. Captures when a term entered the durable, edited written record. Useful specifically for the ARRIVAL-LAG concept: the gap between when NowTrendIn detects a topic and when it shows up in books = how early we were relative to the slowest, most-mainstream medium.",
+    "cost_licensing": "FREE. Dataset is CC BY 3.0 (attribution required, commercial OK). Bulk n-gram files downloadable; an unofficial JSON endpoint (books.google.com/ngrams/json) exists for ad-hoc pulls.",
+    "non_circular": "Non-circular (books corpus shares nothing with our feeds) BUT temporally useless for live calibration: the corpus is annual and lags by years, with infrequent rebuilds. It validates the THESIS retrospectively ('we were N months/years ahead of the book record') but cannot anchor an ongoing weekly loop.",
+    "how_to_use": "RETROSPECTIVE THESIS VALIDATION ONLY. For a basket of historical topics, measure detection-date vs first-meaningful-Ngram-year to demonstrate lead time for investor/marketing claims. Do not wire into the live calibration loop."
+   },
+   {
+    "name": "Reddit API (community attention)",
+    "measures": "Post/comment volume and subreddit activity for a topic \u2014 grassroots/community attention, often an early-signal layer that precedes mainstream.",
+    "cost_licensing": "PAID + opaque. Commercial access ~ $12,000/month for up to 50M calls, ~ $0.24 per 1,000 calls beyond; enterprise terms by negotiation, use-case review required. No free commercial tier at scale.",
+    "non_circular": "Non-circular IF NowTrendIn does not already ingest Reddit (it is not in the source roster), but it measures EARLY/niche attention \u2014 the wrong construct for the no-gap MAINSTREAM test. Better suited to validating the early-detection (Dark Matter) side than the already-mainstream side.",
+    "how_to_use": "OPTIONAL early-signal cross-check, not a mainstream anchor. Given cost + opacity and that it probes the niche end, deprioritize for the no-gap test. If used at all, treat as a Dark-Matter-pathway validator, held out from the score."
+   },
+   {
+    "name": "X / Twitter API (real-time social attention)",
+    "measures": "Real-time post volume/engagement for a topic \u2014 social-media attention velocity.",
+    "cost_licensing": "PAID + expensive. Pay-per-use default ($0.005/read, capped 2M reads/mo); Pro $5,000/mo; Enterprise $42,000-$50,000+/mo for full streams.",
+    "non_circular": "CIRCULAR for NowTrendIn \u2014 DISQUALIFIED as an anchor. The engine already scans X every 6h (volume scan + author-gradient pulls, X_MONTHLY_POST_BUDGET). X data is an INPUT to the Gradient Score, so using X to validate the score is exactly the circular-metric failure the integrity standard forbids (a validator must use inputs independent of what it validates).",
+    "how_to_use": "DO NOT USE as a calibration anchor \u2014 it would validate the score with the score's own inputs. Keep X strictly as a scoring input, never as ground truth."
+   },
+   {
+    "name": "Media-monitoring indices (MIT/Harvard Media Cloud; commercial vendors)",
+    "measures": "Media Cloud: open-source index of millions of news stories, story-count attention over time per topic \u2014 similar construct to GDELT but research-grade and curated. Commercial alternatives (Meltwater, Brandwatch, NewsWhip) sell proprietary 'media attention/buzz' indices.",
+    "cost_licensing": "Media Cloud = FREE / open (academic, API access). Commercial monitoring indices = PAID (enterprise contracts, often $10k-$100k+/yr) and frequently licensing-restricted for redistribution.",
+    "non_circular": "Media Cloud is non-circular and independent; its weakness is overlap with the same news universe as GDELT (pick one to avoid redundancy). Commercial 'buzz' indices are often BLACK-BOX and may themselves blend social+search signals \u2014 that opacity risks hidden circularity and fails the licensed-transparent-source standard. Prefer open Media Cloud or GDELT over black-box vendors.",
+    "how_to_use": "Use Media Cloud as a FREE swap-in/redundancy check for GDELT on the media-supply axis. Avoid black-box commercial indices as anchors (can't prove non-circularity; licensing blocks redistribution of the ground truth)."
+   }
+  ],
+  "no_gap_anchor": "BEST FREE, LICENSABLE ANCHOR FOR THE NO-GAP MAINSTREAM TEST = Wikipedia / Wikimedia Pageviews API (AQS REST v1). It is the textbook attention ground-truth in published research, it is genuinely free, and \u2014 critically \u2014 it is CC0 1.0 (public domain), the cleanest possible licensing for a commercial product to ingest and even resurface. It is fully non-circular: pageviews are Wikimedia's own server-traffic on a platform NowTrendIn does not collect from, sharing zero inputs with the Gradient Score (no RSS, no X scan, no blog feeds, no Detection/Confidence). For the no-gap test specifically, it is near-ideal: an already-mainstream topic reliably has a high-volume, STABLE Wikipedia article, while a niche or pre-arrival topic has thin or no article traffic \u2014 so 'did NowTrendIn correctly recognize this is already mainstream?' maps almost directly onto 'is trailing-90d median pageviews high and stable?'. Pair it with GDELT TimelineVol (free, percent-of-global-coverage) as the independent media-supply second axis: true mainstream should score HIGH on BOTH the demand axis (Wikipedia, audience) and the supply axis (GDELT, media). Reserve Google Trends for its EXISTING role as the breakout/arrival-timing anchor in the accuracy ledger \u2014 do NOT reuse it for no-gap, or you double-anchor to the same Google series. Disqualify X/Twitter outright: it is already a scoring INPUT, so using it as ground truth is the exact circular-metric failure the integrity standard forbids.",
+  "calibration_loop": "PROPOSED ONGOING, NON-CIRCULAR CALIBRATION LOOP (weekly, mirrors the existing accuracy-ledger cadence):\n\nSTEP 0 \u2014 Hard firewall (the rule that keeps it non-circular): the external anchors (Wikipedia pageviews, GDELT coverage-share) are written ONLY to a dedicated held-out table (e.g. attention_anchor) and are NEVER read by any Gradient-Score component, calibration weight, dual-pathway gate, or serve_payload. They label/validate direction; they are never folded in as an input the score then claims to predict. (Integrity standard: a validator must use inputs independent of what it validates.)\n\nSTEP 1 \u2014 Resolve: for each scored topic in the 90-day window, resolve a canonical Wikipedia article (title-normalize + search; unresolved topics go to a format_review_queue-style quarantine, never guessed \u2014 same condition-precedent discipline as the ingestion gate).\n\nSTEP 2 \u2014 Pull anchors (free): trailing ~90d daily pageviews per article (AQS REST), plus GDELT TimelineVol percent-coverage for the same span. Compute (a) mainstream-LEVEL = log10(median daily pageviews), (b) STABILITY = low coefficient of variation (established, not a fresh spike), (c) GDELT coverage-share level.\n\nSTEP 3 \u2014 Label: tag each topic ALREADY-MAINSTREAM if pageview level is above a high corpus percentile (e.g. >p80) AND stable AND GDELT-coverage high; tag EARLY/PRE-ARRIVAL if low+rising. These labels are derived purely from external data.\n\nSTEP 4 \u2014 Score the NO-GAP test: compare NowTrendIn's own mainstream/ESTABLISHED classification (topic_lifecycle + stage waterfall + saturation) against the external ALREADY-MAINSTREAM label. Compute a confusion matrix: the key failure is FALSE-EARLY (we called something an emerging signal when Wikipedia+GDELT say it's already mainstream \u2014 a no-gap miss). Report no-gap precision/recall, exactly like the accuracy ledger reports breakout hit-rate.\n\nSTEP 5 \u2014 Calibrate DIRECTION only: if false-early rate is rising, that is a signal to adjust the SATURATION / ESTABLISHED-discount thresholds inside the engine \u2014 but the adjustment is made by a human (or the calibration auditor) reading the report and tuning internal parameters; the external number is NOT regressed into the score. The anchor moves the threshold; it never becomes a feature.\n\nSTEP 6 \u2014 Drift alarm: like catchall_floor_log's IMPROVING/STABLE/WORSENING, store each weekly no-gap precision row and alert on WORSENING (false-early climbing > a set delta) \u2014 early warning that the engine is starting to mislabel mainstream topics as emerging.\n\nWHY IT STAYS NON-CIRCULAR PERMANENTLY: (1) anchors live in a held-out table the score can't read; (2) the chosen anchors (Wikipedia, GDELT) share no inputs with the score, unlike X (an input) or Google Trends (already used for breakout); (3) the loop adjusts internal thresholds via human-reviewed reports, never auto-regresses the external series into the model; (4) the two calibration jobs are kept on different external series (Trends=breakout timing, Wikipedia/GDELT=mainstream level) so neither over-fits one provider's attention definition.",
+  "detail": "SOURCES (markdown links):\n- Wikimedia Pageviews / AQS REST API: https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/reference/page-views.html ; getting started https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/documentation/getting-started.html ; access policy https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/documentation/access-policy.html (CC0 data, no fixed rate limit, serialize requests)\n- Wikipedia pageviews as attention ground-truth (research): https://meta.wikimedia.org/wiki/Research:Quantifying_the_global_attention_to_public_health_threats_through_Wikipedia_pageview_data\n- GDELT DOC 2.0 API (TimelineVol, free, JSON/CSV, 90d window): https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/ ; project https://www.gdeltproject.org/ ; free-data context https://dataresearchtools.com/gdelt-project-for-news-data-2026-free-alternative-to-newsapi/\n- Google Trends API alpha (July 2025, gated, relative interest): https://developers.google.com/search/blog/2025/07/trends-api ; docs https://developers.google.com/search/apis/trends\n- Google Ngram (CC BY 3.0, annual corpus, JSON endpoint): https://books.google.com/ngrams/ ; API note https://jameshfisher.com/2018/11/25/google-ngram-api/\n- Reddit API pricing (~$12k/mo, ~$0.24/1k calls, negotiated): https://sellbery.com/blog/how-much-does-the-reddit-api-cost-in-2025/ ; https://data365.co/blog/reddit-api-pricing\n- X/Twitter API pricing (pay-per-use; Pro $5k/mo; Enterprise $42k-$50k+/mo): https://www.xpoz.ai/blog/guides/understanding-twitter-api-pricing-tiers-and-alternatives/ ; https://twitterapi.io/blog/twitter-api-pricing-2025\n\nKEY DECISION SUMMARY:\n1) PRIMARY no-gap anchor = Wikipedia Pageviews API (free, CC0, fully non-circular, the standard attention ground-truth; mainstream topics = high+stable pageviews).\n2) SECONDARY axis = GDELT TimelineVol (free, percent-of-global-coverage, independent media-supply view). Mainstream = high on BOTH.\n3) Google Trends stays as the BREAKOUT-timing anchor it already is in the accuracy ledger \u2014 do not reuse for no-gap (double-anchoring/over-fit to one provider).\n4) X/Twitter DISQUALIFIED as anchor \u2014 it is already a scoring INPUT (6h scan), so using it as ground truth is the forbidden circular-metric pattern.\n5) Reddit (paid, opaque) and Ngram (annual lag) are NOT live anchors: Reddit is the wrong construct (niche/early) + costly; Ngram is retrospective thesis-proof only.\n6) Media-monitoring: prefer FREE open Media Cloud over black-box commercial 'buzz' indices (the latter can't prove non-circularity and block redistribution).\n\nINTEGRITY GUARDRAIL (matches the project's no-circular-metrics + integrity standard): external anchors are written to a HELD-OUT calibration table (e.g. attention_anchor), never read by the score, never regressed into a weight or dual-pathway gate. They validate DIRECTION (precision/recall of the no-gap classification) and trip a WORSENING drift alarm; threshold tuning is human-reviewed, never auto-fit. This preserves the before-it-arrives thesis while finally giving the no-gap mainstream test an objective, free, licensable ground truth.\n\nNO new code was written or files modified \u2014 this is research only."
+ },
+ "counts": {
+  "candidates": 15,
+  "confirmed": 2
+ }
+}
