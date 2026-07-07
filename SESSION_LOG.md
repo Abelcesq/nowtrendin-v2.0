@@ -1334,3 +1334,20 @@ live search probe 200. github collector confirms at the next 6h collect slot.
   bundle BEFORE push; live checks pass (PIN page w/o cookie, 401 wrong PIN, app +
   TRACKED-RACE served with cookie). Parity: web gh-pages ✓ · desktop (inherits web) ✓ ·
   mobile preview ✓ — §12/§17 satisfied for the ledger.
+
+### Addendum 2026-07-07 — Ledger Entry Analysis panel (per-row information panel, 3 platforms)
+- Engine (9687133): signal_analysis.py gains kind='ledger' (_ledger_entry) — deterministic,
+  formula-confidential analysis of ONE ledger row: what the entry records · HOW the tracking
+  method works (canonical detection date, Trends curve detection→now, sustained-surge breakout
+  vs own baseline [thresholds proprietary], asymmetric match window, 365d patience, independent
+  wiki referee) · what THIS verdict means (honest per-verdict copy incl. PRE-BROKEN + excluded
+  LATE_REDETECTION) · match validity (broad-term + referee; pre-metadata rows say so) · track-
+  record context. POST /analysis/ledger; reads snake_case AND camelCase rows. Live-tested.
+- Web (e5f6886 → gh-pages 9126262): click any attention-ledger row → SignalAnalysisPanel
+  (kind widened) expands beneath it. Preview-verified: all 5 sections render w/ real facts,
+  0 console errors (auth stub reverted before build — 0 traces).
+- Mobile (cf26d4e → preview d4539a6): tap a ledger row → same panel; 'Tap for the full entry
+  analysis' affordance. Bundle checks (gate/DB/new-string) passed pre-push; PIN gate verified.
+- NOTE: deterministic composition per the enterprise standard (reproducible, no model
+  inference, no per-view AI cost) — the "AI prompt" ask is satisfied by feeding the tracking
+  method into the same held-out analysis engine that powers the trend/market/crypto panels.
