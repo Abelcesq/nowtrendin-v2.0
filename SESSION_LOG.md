@@ -1252,3 +1252,35 @@ field got the ENTIRE command line pasted as the value ("heroku config:set GITHUB
 so auth still 401'd — extracted the embedded 40-char ghp_ token and re-set it cleanly
 (engine v214; value never displayed). VERIFIED: /rate_limit HTTP 200, search quota 30/min,
 live search probe 200. github collector confirms at the next 6h collect slot.
+
+## Session 2026-07-07 — six agreed fixes shipped (engine v215/27740ae) + ledger truth surfaced
+
+### Shipped + verified live
+1. **Grade clamp**: `_num` bounds every AI-returned component to [0,100] (required-key C9
+   guard was already present — audit finding stale).
+2. **N detail fields FIXED**: /scores/{topic} recomputes queries_30d/24h/daily_rate fresh
+   from topic_queries (never persisted in velocity_scores — the "No internal query history
+   yet" at N=100 bug + the N-degenerate scoringcontract finding). VERIFIED: coding_agent
+   N=73.5 now shows 313 queries/30d with a real narrative.
+3. **Observable calibration swallows**: the last two silent apply_calibration except:pass
+   (direct-query path + history-row calibrator) now log + stamp calibration_errors.
+4. **risk_stage vocab**: verified ALREADY fixed (_RISK_TO_MARKET_TIER at write site).
+5. **Legacy weights**: verified ALREADY fixed (calibration_engine imports scoring_weights).
+6. **LEDGER first-crossing enrollment + pre-broken segmentation** (held-out,
+   measurement-only, no stored rows touched):
+   - Enrollment: first-seen ≤ LEDGER_ENROLL_RECENT_DAYS(14) + floor crossing, excludes
+     ESTABLISHED/MONITORING (fail-open if topic_maturity absent), newest-crossers-first —
+     replaces leaderboard top-N (structurally LAGGED).
+   - Report: LAGGED split near-miss vs pre_broken (breakout >7d before first sighting);
+     new tracked_race_hit_rate_pct. **First read: 44/59 lagged were PRE-BROKEN cold-start
+     rows; tracked-race hit rate 26.9% (7/26) vs blended 10%** — the honest race-level
+     read of the before-it-arrives claim. Both rates served; nothing hidden.
+
+### Open / Next
+- Enrollment change takes effect at the next enrollment run — watch the pending pool's
+  composition shift toward fresh crossers over the coming days.
+- Remaining strategic ledger items (not yet built): canonical-query resolution before
+  sweeping (the "mexico" ambiguity), second referee corroboration (referee_wikipedia),
+  LED-vs-LAGGED detection-time feature mining, GHOST_FEEDS Dark-Matter expansion
+  (backtest-gated), positioning floor-pin omission (backtest-gated).
+- Founder: lexicon candidates (reddit → tech, Roman Safiullin → sports) still pending.

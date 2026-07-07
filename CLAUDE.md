@@ -343,6 +343,16 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   is in the waiting" — Munger). Held-out — measurement only, NO score impact. NEVER shorten without
   founder sign-off + a denominator backtest. Aligns with the 365-day retention (§13). `param_version`
   → `calib-params-v2-patience365`.
+- **LEDGER ENROLLMENT + PRE-BROKEN SPLIT (2026-07-07, measurement-only).** Enrollment is
+  FIRST-CROSSING: `_record_top_detections` enrolls topics first-seen within
+  `LEDGER_ENROLL_RECENT_DAYS` (14) that cross the floor, excluding ESTABLISHED/MONITORING
+  maturity — NOT the leaderboard top-N (already-big topics Google broke out on →
+  structurally LAGGED; the old query measured coverage latency, not the thesis). Report
+  splits LAGGED at report-time only: near-miss (race run and lost) vs **pre_broken**
+  (breakout > `LEDGER_PRE_BROKEN_DAYS`=7 before first sighting — cold-start, never a race);
+  `tracked_race_hit_rate_pct` = LED over races actually run. Blended honest rate still
+  counts everything; no stored rows changed. First read: blended 10% → tracked-race 26.9%
+  (44 of 59 lagged were pre-broken cold-start rows).
 - **Guardrail (do NOT violate):** this model governs SORTING/MATCHING only. It removes
   NO scoring input — all Gradient-Score components and Market-Risk inputs (incl.
   leverage/positioning) are preserved exactly. Operational `*_at` timestamps keep their
