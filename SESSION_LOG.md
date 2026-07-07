@@ -1364,3 +1364,24 @@ financial, investment, or legal advice."
 - Mobile (f680a52 + c200e4f → preview 76b8bdf): Disclaimer component + TopicResearch caveat;
   signal/[id] + risk/[key] detail panels now carry it top AND bottom. Bundle check:
   newdisc 2 / olddisc 0 / gate intact.
+
+### End-of-day 2026-07-07 — docs/skills sync + AI-Context root cause (founder to bed)
+- **AI Context NOT loading — ROOT CAUSE: Anthropic API account credits EXHAUSTED.** Every engine
+  Claude call returns 400 "Your credit balance is too low to access the Anthropic API." Affects
+  NEW topic definitions (AI Context) + the Grade tool's Claude synthesis stage; CACHED explainers
+  still serve (why some topics show context). NOT the engine budget (Cost Sentinel AI line is
+  $0.92/$20 this period) — it is the prepaid balance at Anthropic. FIX (founder):
+  console.anthropic.com → Plans & Billing → purchase credits. Recovers immediately, no deploy.
+  (Probed all model names with the live key — all 400 with the credit message, so not a model
+  retirement; AI_GRADE_CLAUDE_MODEL=claude-sonnet-4-6 as configured.)
+- **Docs updated**: CLAUDE.md footer → 2026-07-07 block (ledger truth layer, match validity,
+  3-platform ledger UI + entry-analysis panel, hardening, disclaimer, ops, ⚠ Anthropic credits).
+  §14 already carried the enrollment/pre-broken rule from earlier today.
+- **Skills updated**: /nowtrendin2.0 CURRENT BUILD STATE → 2026-07-07 (+ the Anthropic-credits
+  PENDING USER ACTION at the top); /accuracy-sweep report structure → publish BOTH rates
+  (blended + tracked-race) + match-validity section + preBroken-vs-laggedNear failure modes +
+  ACCURACY_LOG line format extended.
+- **Memory saved**: project-ledger-match-validity (first-crossing enrollment, pre-broken split,
+  tracked-race, wiki referee, D-is-late-confirmation finding) + MEMORY.md index.
+- NOTE: founder's last screenshot showed the OLD disclaimer — that tab was on a cached bundle;
+  gh-pages verified serving the new one (hard refresh fixes).

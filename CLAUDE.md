@@ -466,7 +466,34 @@ backtest-before-ship).** Two coupled changes to the `_news_write` provenance dec
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-07-06 — **Catch-all fixed + Apify clock-slot rule + true costs + INV-1 serve-consistency +
+*Last updated: 2026-07-07 — **Ledger truth + match validity + 3-platform ledger UI + hardening sweep.**
+(1) **LEDGER FIRST-CROSSING ENROLLMENT + PRE-BROKEN SPLIT** (§14; measurement-only): enrollment now
+takes fresh floor-crossers (first-seen ≤ `LEDGER_ENROLL_RECENT_DAYS`=14, ESTABLISHED/MONITORING excluded),
+NOT the leaderboard top-N (structurally LAGGED). Report splits LAGGED near-miss vs **pre_broken** (breakout
+>7d before first sighting — never a race); `tracked_race_hit_rate_pct` = LED over races run. First read:
+blended 10% → **tracked-race 26.9%** (44/59 lagged were pre-broken cold-start rows). (2) **MATCH VALIDITY**:
+every sweep resolution records `sweep_query` + `query_ambiguous` (single word / bare geo = weak Trends match);
+LED/SAME_DAY wins get an INDEPENDENT **Wikipedia-pageviews referee** (±14d of breakout; fail-open; old wins
+honestly "unchecked"). (3) **Accuracy Ledger UI on all 3 platforms**: web chips (Lagged·near / Pre-broken) +
+tracked-race + referee cards; mobile got LEDGER mode chips + verdict filter chips + a filterable row list
+(server-computed pre_broken — ONE grace definition); **click/tap a row → Ledger Entry Analysis panel**
+(`POST /analysis/ledger`, deterministic signal_analysis kind='ledger': method-of-tracking + verdict meaning +
+match validity, formula-confidential). (4) **Hardening**: grade `_num` clamps AI numerics to [0,100]; N detail
+(queries 30d/24h/rate) recomputed at detail-serve from topic_queries (the "No internal query history yet" at
+N=100 bug); last two silent apply_calibration swallows now log + stamp `calibration_errors`. (5) **Feature
+mining** (read-only, audits/ledger-research/): D=0 at first sighting for winners AND near-misses but 40 for
+pre-broken → current Dark Matter is LATE-confirmation, not early-warning — empirical case for the §15
+GHOST_FEEDS expansion; LED median M=80 vs near-lag 50 (breadth-at-first-sighting separates winners); 5/15
+near-misses lost by 1–2 days (fast-lane recheck flips them). (6) **Founder-approved DISCLAIMER (verbatim,
+sign-off to edit)** on all platforms, panels top AND bottom: "*All information contained herein may not be
+accurate including any and all figures indicated in this section and or site and may be an approximation and
+should not be construed as financial, investment, or legal advice." (7) **Ops**: GITHUB_TOKEN rotated (classic
+no-scope no-expiry; collector HEALTHY 6132 signals) + 401-fallback in collect_github; monitor fixes verified
+(datecanon ok — market/crypto ledger date cols registered, timeout_date = operational allowlist; calibration
+auditor reads real denominators 70/821); Cost Sentinel back under cap $497.89/$700. ⚠ **Anthropic API account
+credits EXHAUSTED** (400 "credit balance too low" on every call) — AI Context definitions + Grade Claude stage
+DOWN until credits purchased at console.anthropic.com (cached explainers still serve).
+Prior: 2026-07-06 — **Catch-all fixed + Apify clock-slot rule + true costs + INV-1 serve-consistency +
 self-healing DB pool + mobile parity (audit #3).** (1) **/monitor/catchall FIXED** (was 503/H12): the auditors
 measured the bare lexicon while users see the layered `_category_for` — both catch-all auditors now use the
 SERVE-TIME classifier (true served catch-all **70.2%**, not the phantom 80.5%); scan bounded to the recent
