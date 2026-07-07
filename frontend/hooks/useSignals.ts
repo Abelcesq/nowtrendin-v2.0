@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
+import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -89,6 +89,26 @@ export function useRiskScores() {
 export function useAccuracy() {
   const q = useQuery({ queryKey: ['accuracy'], queryFn: fetchAccuracy, staleTime: 5 * 60 * 1000, retry: 1 });
   return { report: q.data, isLoading: q.isLoading, isError: q.isError };
+}
+
+// Attention-ledger per-row detail (for the mobile ledger's filter chips + row list).
+export function useAccuracyDetail() {
+  const q = useQuery({ queryKey: ['accuracy-detail'], queryFn: fetchAccuracyDetail, staleTime: 5 * 60 * 1000, retry: 1 });
+  return { rows: q.data ?? [], isLoading: q.isLoading };
+}
+
+// Money + Crypto ledgers (distinct ground truths) — fetched lazily when the mode
+// chip is selected so the default Attention view costs no extra requests.
+export function useMarketAccuracy(enabled: boolean) {
+  const q = useQuery({ queryKey: ['market-accuracy'], queryFn: fetchMarketAccuracy, enabled, staleTime: 5 * 60 * 1000, retry: 1 });
+  const d = useQuery({ queryKey: ['market-accuracy-detail'], queryFn: fetchMarketAccuracyDetail, enabled, staleTime: 5 * 60 * 1000, retry: 1 });
+  return { report: q.data, rows: d.data ?? [], isLoading: q.isLoading || d.isLoading };
+}
+
+export function useCryptoAccuracy(enabled: boolean) {
+  const q = useQuery({ queryKey: ['crypto-accuracy'], queryFn: fetchCryptoAccuracy, enabled, staleTime: 5 * 60 * 1000, retry: 1 });
+  const d = useQuery({ queryKey: ['crypto-accuracy-detail'], queryFn: fetchCryptoAccuracyDetail, enabled, staleTime: 5 * 60 * 1000, retry: 1 });
+  return { report: q.data, rows: d.data ?? [], isLoading: q.isLoading || d.isLoading };
 }
 
 export function useXSignal(topic: string | undefined, enabled: boolean) {

@@ -526,13 +526,28 @@ export interface AccuracyReport {
   status: string;
   total?: number;
   led?: number;
+  sameDay?: number;
   lagged?: number;
+  // Pre-broken split of LAGGED: near = races run and lost; preBroken = the Google
+  // breakout happened >grace (7d) BEFORE our first sighting — never a race. The
+  // blended hitRate still counts BOTH (nothing hidden).
+  laggedNear?: number | null;
+  preBroken?: number | null;
+  falsePositives?: number;
   pending?: number;
   hitRate?: number;
+  trackedRaceHitRate?: number | null;
+  trackedRaceSample?: number | null;
+  // Independent Wikipedia-pageviews referee on the LED wins (wins resolved before
+  // 2026-07-07 predate the metadata and are honestly "unchecked").
+  ledCorroborated?: number | null;
+  ledUncorroborated?: number | null;
+  ledUnchecked?: number | null;
   avgLead?: number;
   medianLead?: number;
   maxLead?: number;
-  best?: { topic: string; leadDays: number; multiple?: number }[];
+  best?: { topic: string; leadDays: number; multiple?: number;
+           refereeCorroborated?: number | null; queryAmbiguous?: number | null }[];
 }
 
 // The Accuracy Ledger — documented lead time vs Google Trends breakout.
@@ -549,15 +564,89 @@ export async function fetchAccuracy(): Promise<AccuracyReport> {
     status: d.status,
     total: d.total ?? d.total_predictions,
     led: d.led ?? d.led_count,
+    sameDay: d.sameDay,
     lagged: d.lagged ?? d.lagged_count,
+    laggedNear: d.laggedNear ?? null,
+    preBroken: d.preBroken ?? null,
+    falsePositives: d.falsePositives,
     pending: d.pending,
     hitRate: d.hitRate ?? d.hit_rate_pct,
+    trackedRaceHitRate: d.trackedRaceHitRate ?? null,
+    trackedRaceSample: d.trackedRaceSample ?? null,
+    ledCorroborated: d.ledCorroborated ?? null,
+    ledUncorroborated: d.ledUncorroborated ?? null,
+    ledUnchecked: d.ledUnchecked ?? null,
     avgLead: d.avgLead ?? d.avg_lead_time_days,
     medianLead: d.medianLead ?? d.median_lead_time_days,
     maxLead: d.maxLead ?? d.max_lead_time_days,
     best: (d.best ?? d.best_predictions ?? []).map((b: any) => ({
       topic: b.topic, leadDays: b.leadDays ?? b.lead_days, multiple: b.multiple,
+      refereeCorroborated: b.refereeCorroborated ?? null,
+      queryAmbiguous: b.queryAmbiguous ?? null,
     })),
+  };
+}
+
+// Attention-ledger per-row detail. pre_broken is SERVER-computed (one grace
+// definition shared with the honest report) — clients only render it.
+export interface LedgerDetailRow {
+  topicKey: string; topic: string;
+  detectionDate?: string; detectionScore?: number;
+  breakoutDate?: string; leadDays?: number | null;
+  verdict?: string; preBroken?: boolean;
+  refereeCorroborated?: number | null; queryAmbiguous?: number | null;
+  validatedAt?: string;
+}
+
+export async function fetchAccuracyDetail(): Promise<LedgerDetailRow[]> {
+  const res = await fetch(`${GRADIENT_API}/accuracy/ledger/detail?limit=500`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`AccuracyDetail ${res.status}`);
+  const d = await res.json();
+  return (d.rows ?? []).map((r: any) => ({
+    topicKey: r.topic_key, topic: r.topic_display || r.topic_key,
+    detectionDate: r.detection_date, detectionScore: r.detection_score,
+    breakoutDate: r.breakout_date, leadDays: r.lead_time_days,
+    verdict: r.verdict, preBroken: !!r.pre_broken,
+    refereeCorroborated: r.referee_corroborated ?? null,
+    queryAmbiguous: r.query_ambiguous ?? null,
+    validatedAt: r.validated_at,
+  }));
+}
+
+// Money/Crypto ledger per-row detail (realized price-direction ground truth).
+export interface PriceLedgerDetailRow {
+  key: string; name: string; flow?: string;
+  detectionDate?: string; priceChangePct?: number | null;
+  leadDays?: number | null; verdict?: string; validatedAt?: string;
+}
+
+async function _priceLedgerDetail(path: string): Promise<PriceLedgerDetailRow[]> {
+  const res = await fetch(`${GRADIENT_API}${path}?limit=500`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`LedgerDetail ${res.status}`);
+  const d = await res.json();
+  return (d.rows ?? []).map((r: any) => ({
+    key: r.ticker || r.coin || '', name: r.name || r.ticker || r.coin || '',
+    flow: r.flow, detectionDate: r.detection_date,
+    priceChangePct: r.price_change_pct ?? null, leadDays: r.lead_time_days ?? null,
+    verdict: r.verdict, validatedAt: r.validated_at,
+  }));
+}
+export const fetchMarketAccuracyDetail = () => _priceLedgerDetail('/market/accuracy/detail');
+export const fetchCryptoAccuracyDetail = () => _priceLedgerDetail('/crypto/accuracy/detail');
+
+// Crypto accuracy ledger — validated by realized COIN price direction (FMP crypto +
+// AV); same report shape as the market ledger, DISTINCT ledger.
+export async function fetchCryptoAccuracy(): Promise<MarketAccuracyReport> {
+  const res = await fetch(`${GRADIENT_API}/crypto/accuracy`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`CryptoAccuracy ${res.status}`);
+  const d = await res.json();
+  return {
+    status: d.status,
+    resolved: d.resolved, pending: d.pending, confirmed: d.confirmed, notConfirmed: d.not_confirmed, noMove: d.no_move,
+    confirmRate: d.confirm_rate_pct, medianLead: d.median_lead_days,
+    moveThresholdPct: d.move_threshold_pct, timeoutDays: d.timeout_days,
+    inflowConfirm: d.by_flow?.inflow?.confirm_rate_pct ?? null,
+    outflowConfirm: d.by_flow?.outflow?.confirm_rate_pct ?? null,
   };
 }
 
