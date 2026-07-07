@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, LayoutAnimation, Platf
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, ChevronDown, Bell, ArrowRight } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
+import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { Rise } from '../../../components/ui/Rise';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
 import { DualScoreAnalysis } from '../../../components/trends/DualScoreAnalysis';
@@ -116,6 +117,9 @@ export default function SignalDetail() {
           {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
         </Text>
       </View>
+
+      {/* Legal disclaimer — top of the panel (founder rule: top AND bottom) */}
+      <Disclaimer className="mt-3 mb-0 px-0 text-left" />
 
       {/* ── Primary card: the two scores + gap + the one-line read ── */}
       <View className="bg-card rounded-3xl mt-5 px-5 pt-6 pb-5"
@@ -267,6 +271,8 @@ export default function SignalDetail() {
       <Text style={{ color: '#9A9AA2', fontSize: 12, textAlign: 'center', marginTop: 6, lineHeight: 15 }}>
         Signal analysis only — not financial, investment, or legal advice. You decide any action.
       </Text>
+      {/* Legal disclaimer — bottom of the panel */}
+      <Disclaimer />
     </Screen>
   );
 }

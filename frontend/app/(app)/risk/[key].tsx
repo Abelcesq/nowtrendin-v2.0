@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
+import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
 import { useRisk } from '../../../hooks/useSignals';
 
@@ -113,6 +114,9 @@ export default function RiskDetail() {
               <Text className="text-textPrimary text-3xl font-bold flex-1">{titleCaseTopic(risk.display)}</Text>
             </View>
             <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {tier}</Text>
+
+            {/* Legal disclaimer — top of the panel (founder rule: top AND bottom) */}
+            <Disclaimer className="mt-0 mb-3 px-0 text-left" />
 
             {/* Market Gradient — dual score (Detection vs Confidence), mirrors Trends */}
             {mg ? (
@@ -524,10 +528,12 @@ export default function RiskDetail() {
         </View>
       )}
 
-      <Text className="text-textMuted text-[12px] text-center mb-8 px-2 leading-4">
+      <Text className="text-textMuted text-[12px] text-center px-2 leading-4">
         Positioning analysis for informational purposes only — not financial, investment, or legal advice,
         and not a risk rating of any company. All decisions are your own.
       </Text>
+      {/* Legal disclaimer — bottom of the panel */}
+      <Disclaimer className="mb-8" />
     </Screen>
   );
 }

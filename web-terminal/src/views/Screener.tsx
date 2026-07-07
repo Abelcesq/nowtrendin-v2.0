@@ -268,7 +268,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         ) : (
           <div className="narr muted">{exLoading ? 'Generating a source-aware definition…' : 'No AI definition yet — it generates on first view and is cached.'}</div>
         )}
-        {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any figures are approximate and the measured score and velocity and should not be construed as financial, investment, or legal advice.</div>}
+        {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
       </div>
 
       {/* Now TrendIn (N) + Now Trending Gradient (demand-inclusive) + Convergence */}
