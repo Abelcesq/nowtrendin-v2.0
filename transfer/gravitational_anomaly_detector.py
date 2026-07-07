@@ -6574,13 +6574,24 @@ def accuracy_ledger_detail(limit: int = Query(300, ge=1, le=1000),
         rows = [dict(r) for r in conn.execute(f"""
             SELECT topic_key, topic_display, detection_date, detection_score,
                    breakout_date, breakout_multiple, lead_time_days, verdict,
-                   validated_at, provider
+                   validated_at, provider,
+                   sweep_query, query_ambiguous, referee_corroborated
             FROM accuracy_ledger {where}
             ORDER BY validated_at DESC
             LIMIT ?
         """, params).fetchall()]
         conn.close()
-        return {"status": "ok", "count": len(rows), "rows": rows}
+        # pre_broken (server-side, ONE definition — same grace as the honest report):
+        # a LAGGED row whose breakout preceded first sighting by more than the grace
+        # window was never a race; clients render it as its own honest category.
+        _grace = int(os.getenv("LEDGER_PRE_BROKEN_DAYS", "7"))
+        for r in rows:
+            r["pre_broken"] = bool(
+                r.get("verdict") == "LAGGED"
+                and r.get("lead_time_days") is not None
+                and r["lead_time_days"] < -_grace)
+        return {"status": "ok", "count": len(rows), "rows": rows,
+                "pre_broken_grace_days": _grace}
     except Exception as e:
         return {"status": "empty", "count": 0, "rows": [], "note": str(e)[:140]}
 
