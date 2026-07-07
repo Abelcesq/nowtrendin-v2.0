@@ -329,15 +329,153 @@ def _ledger_facts_trend(ledger: dict):
     return out
 
 
+def _ledger_entry(item: dict, ledger: dict) -> dict:
+    """Analysis of ONE accuracy-ledger row — what was recorded, HOW the tracking method
+    works (conceptually; exact thresholds proprietary), what THIS verdict means, its match
+    validity (query ambiguity + independent Wikipedia referee), and the honest track-record
+    context. Deterministic; composes only real row fields — absent values are omitted."""
+    name = _first(item.get("topic_display"), item.get("topic"), item.get("topic_key"), "this entry")
+    verdict = (str(_first(item.get("verdict"), "")) or "").upper().replace("-", "_")
+    pre = bool(item.get("pre_broken") or item.get("preBroken"))
+    lead = _i(_first(item.get("lead_time_days"), item.get("leadDays")))
+    det_date = _first(item.get("detection_date"), item.get("detectionDate"))
+    brk_date = _first(item.get("breakout_date"), item.get("breakoutDate"))
+    det_score = _first(item.get("detection_score"), item.get("detectionScore"))
+    corr = _first(item.get("referee_corroborated"), item.get("refereeCorroborated"))
+    ambig = _first(item.get("query_ambiguous"), item.get("queryAmbiguous"))
+    sweep_q = _first(item.get("sweep_query"), item.get("sweepQuery"))
+    validated = _first(item.get("validated_at"), item.get("validatedAt"))
+
+    sections, facts = [], []
+
+    # Facts strip — only real fields, never zero-filled.
+    if det_date:
+        v = str(det_date)
+        if det_score is not None:
+            v += f" (Detection {_i(det_score)}/100 at the call)"
+        facts.append({"label": "Detected", "value": v})
+    if brk_date:
+        facts.append({"label": "Google Trends breakout", "value": str(brk_date)})
+    if lead is not None:
+        facts.append({"label": "Lead", "value": f"{'+' if lead > 0 else ''}{lead} days"})
+    facts.append({"label": "Verdict", "value": "PRE-BROKEN" if pre else (verdict.replace('_', ' ') or "—")})
+    if sweep_q:
+        facts.append({"label": "Matched search term", "value": str(sweep_q)})
+    if validated:
+        facts.append({"label": "Validated", "value": str(validated)[:10]})
+
+    # 1) What this entry records.
+    sections.append({"heading": "What this entry records", "body":
+        f"This is one row of the Accuracy Ledger — a falsifiable, timestamped record of the moment the "
+        f"engine first detected {name} as an early attention signal, later tested against an external "
+        "benchmark the engine does not control: the date the topic broke out on Google Trends. The row is "
+        "written when the detection happens and resolved only when the external evidence arrives (or a "
+        "full patience window elapses), so the outcome can never be back-fitted."})
+
+    # 2) The tracking method — conceptual; exact thresholds proprietary.
+    sections.append({"heading": "How the tracking works", "body":
+        "The detection date is the topic's first sighting in the engine, stamped to a canonical calendar "
+        "date. To resolve the row, the topic's Google Trends interest curve is fetched over a window "
+        "spanning detection to the present, and a breakout is identified as the first sustained surge "
+        "above the topic's own quiet baseline (the exact surge multiple and sustain rules are "
+        "proprietary). Matching is deliberately asymmetric: a surge that happened well before our "
+        "detection is treated as a different, older event rather than claimed as a match, while a "
+        "breakout arriving up to a year after detection still counts — attention is given a full "
+        "365-day patience window before a detection can be judged a false positive. Wins are "
+        "additionally checked against an independent second referee (Wikipedia page-view arrivals) "
+        "that the engine also does not control."})
+
+    # 3) What THIS row's outcome means — verdict-specific, honest.
+    tl = []
+    if det_date:
+        tl.append(f"The engine first sighted {name} on {det_date}" +
+                  (f" with a Detection read of {_i(det_score)}/100" if det_score is not None else "") + ".")
+    if brk_date:
+        tl.append(f"Google Trends shows the topic's breakout on {brk_date}.")
+    if pre:
+        tl.append("The breakout preceded our first sighting by more than the grace window: the topic "
+                  "entered tracking already past its public breakout, so this was never a race the engine "
+                  "could win. PRE-BROKEN rows measure discovery latency — how long it took the topic to "
+                  "reach the engine at all — not the early-signal claim. They remain fully counted in the "
+                  "blended honest hit rate and are excluded only from the tracked-race rate.")
+    elif verdict == "LED":
+        if lead is not None:
+            tl.append(f"The detection PRECEDED the external breakout by {lead} days — a documented early "
+                      "call on the strictest bar the ledger has.")
+        if corr == 1:
+            tl.append("An independent referee corroborates it: Wikipedia page views show attention "
+                      "arriving in the same window.")
+        elif corr == 0:
+            tl.append("The independent Wikipedia referee did not find a matching page-view arrival — the "
+                      "win rests on the Google Trends evidence alone and is labeled accordingly.")
+        else:
+            tl.append("This win resolved before the independent Wikipedia referee existed, so it is "
+                      "honestly labeled 'referee unchecked' rather than implied as corroborated.")
+    elif verdict == "SAME_DAY":
+        tl.append("Detection and external breakout landed on the same day — the engine matched, but did "
+                  "not precede, public attention.")
+    elif verdict == "LAGGED":
+        tl.append(f"The external breakout preceded our detection{f' by {abs(lead)} days' if lead is not None else ''} "
+                  "— a race the engine ran and lost, counted in full against the hit rate.")
+    elif verdict == "FALSE_POSITIVE":
+        tl.append("No qualifying external breakout arrived within the full patience window, so the "
+                  "detection is counted as a false positive — in the denominator, against us.")
+    elif verdict == "LATE_REDETECTION":
+        tl.append("The only matching surge occurred far outside the allowed match window — most likely a "
+                  "different, older event. To avoid claiming a win (or charging a loss) on a mismatched "
+                  "surge, these rows are excluded from the honest denominator and reported separately.")
+    if tl:
+        sections.append({"heading": "This item's outcome", "body": " ".join(tl)})
+
+    # 4) Match validity — how much weight the Trends match itself can carry.
+    term = sweep_q or name
+    if ambig == 1:
+        mv = (f"The matched search term (“{term}”) is a broad, generically ambiguous term — a "
+              "Google Trends movement on it can reflect attention unrelated to this specific signal, so "
+              "this row's match is weaker evidence than a distinctive term and is flagged as such.")
+    elif ambig == 0:
+        mv = (f"The matched search term (“{term}”) is specific enough that the matched Trends "
+              "movement plausibly reflects this signal.")
+    else:
+        mv = ("This row resolved before match-validity metadata (matched term, ambiguity, independent "
+              "referee) was recorded; newer resolutions carry all three.")
+    sections.append({"heading": "Match validity", "body": mv})
+
+    # 5) Track-record context — the same honest framing the other analyses use.
+    sections.append({"heading": "Track record & accountability", "body": _track_trend(ledger)})
+    facts.extend(_ledger_facts_trend(ledger))
+
+    if pre:
+        headline = "Pre-broken — already public before first sighting (never a race)"
+    elif verdict == "LED":
+        headline = f"Led the breakout{f' by {lead} days' if lead is not None else ''} — documented early call"
+    elif verdict == "SAME_DAY":
+        headline = "Matched the breakout day"
+    elif verdict == "LAGGED":
+        headline = f"Near miss — lagged the breakout{f' by {abs(lead)} days' if lead is not None else ''}"
+    elif verdict == "FALSE_POSITIVE":
+        headline = "False positive — no breakout within the patience window"
+    elif verdict == "LATE_REDETECTION":
+        headline = "Excluded — matched surge outside the allowed window"
+    else:
+        headline = "Ledger entry"
+    return {"title": "Ledger Entry Analysis", "kind": "ledger", "item": name, "headline": headline,
+            "facts": facts, "sections": sections, "disclaimer": _DISCLAIMER,
+            "generated": "Reproducible — composed from this ledger row and the accuracy ledger; no model inference."}
+
+
 # ── entry point ──────────────────────────────────────────────────────────────────────────────────
 def build(kind: str, item: dict, ledger_report: Optional[dict] = None) -> dict:
-    """kind: 'trend' | 'market' | 'crypto'. item: the finished score dict. ledger_report: the matching
-    accuracy-ledger report dict (generate_honest_report / market or crypto report). Pure + deterministic."""
+    """kind: 'trend' | 'market' | 'crypto' | 'ledger'. item: the finished score dict (or a ledger
+    row for kind='ledger'). ledger_report: the matching accuracy-ledger report dict
+    (generate_honest_report / market or crypto report). Pure + deterministic."""
     k = (kind or "").lower().strip()
     item = item or {}
     ledger_report = ledger_report or {}
     if k == "trend":
         return _trend(item, ledger_report)
+    if k == "ledger":
+        return _ledger_entry(item, ledger_report)
     if k == "crypto":
         return _money(item, ledger_report, asset="crypto")
     return _money(item, ledger_report, asset="market")

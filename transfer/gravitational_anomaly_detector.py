@@ -6388,7 +6388,7 @@ def signal_analysis_endpoint(kind: str, payload: dict = Body(default={})):
             ledger = crypto_ledger.report(DB_PATH)
         elif k == "market" and _MARKET_LEDGER_AVAILABLE:
             ledger = market_ledger.report(DB_PATH)
-        elif k == "trend" and _LEDGER_PLUS_AVAILABLE:
+        elif k in ("trend", "ledger") and _LEDGER_PLUS_AVAILABLE:
             ledger = ledger_plus.generate_honest_report(DB_PATH)
     except Exception as _le:
         print(f"[analysis] ledger load error ({k}): {_le}")
