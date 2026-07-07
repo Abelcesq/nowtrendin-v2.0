@@ -1284,3 +1284,23 @@ live search probe 200. github collector confirms at the next 6h collect slot.
   LED-vs-LAGGED detection-time feature mining, GHOST_FEEDS Dark-Matter expansion
   (backtest-gated), positioning floor-pin omission (backtest-gated).
 - Founder: lexicon candidates (reddit → tech, Roman Safiullin → sports) still pending.
+
+### Addendum 2026-07-07 — match-validity metadata + feature mining (engine 7ca65c7)
+- **Sweep match-validity shipped**: accuracy_ledger + sweep now record sweep_query,
+  query_ambiguous (single word / bare geo = weak Trends match), and referee_corroborated
+  (INDEPENDENT Wikipedia-pageviews referee on LED/SAME_DAY wins, ±14d of breakout,
+  fail-open). /accuracy/ledger serves ledCorroborated/ledUncorroborated/ledUnchecked/
+  ledAmbiguousQuery; best[] carries both flags. Existing 7 LED wins honestly "unchecked"
+  (resolved pre-metadata). Verdicts/scores untouched.
+- **LED-vs-LAGGED feature mining** (read-only, audits/ledger-research/
+  LED_FEATURE_MINING_2026-07-07.md): D=0 at first sighting for winners AND near-misses
+  but 40 for pre-broken → current Dark Matter is late-confirmation, not early-warning —
+  empirical case for GHOST_FEEDS expert/niche expansion. LED median M=80 vs near-lag 50
+  (breadth-at-first-sighting separates winners). Median near-miss loss ≈ −4d; 5/15 lost
+  by 1–2 days → fast-lane recheck plausibly flips them. Small samples; directional only.
+
+### Open / Next
+- Backtest-gated queue (founder sign-off to start): GHOST_FEEDS expert/niche outlets;
+  breadth-at-first-sighting enrollment priority; free-source fast-lane recheck;
+  positioning floor-pin omission.
+- Re-run feature mining when the first-crossing enrollment cohort resolves.
