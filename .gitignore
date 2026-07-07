@@ -19,5 +19,3 @@ __pycache__/
 *.pyc
 transfer/anomaly_detector.db
 
-# Personal file (non-project) — keep local
-revised PTCS on Coffe.pdf
