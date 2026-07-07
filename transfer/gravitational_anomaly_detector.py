@@ -1933,10 +1933,26 @@ def collect_github(conn: sqlite3.Connection) -> int:
                 },
                 headers=headers, timeout=10,
             )
+            if resp.status_code == 401 and "Authorization" in headers:
+                # Bad/expired GITHUB_TOKEN: every topic 401s into a silent 0-signal
+                # run (the 2026-07-06 DEGRADED). Fall back to unauthenticated search
+                # (10 req/min; the 403 handler below absorbs the tighter limit) and
+                # say so once — rotate GITHUB_TOKEN to restore the full rate.
+                print("  GitHub: token rejected (401) — unauthenticated fallback this run; rotate GITHUB_TOKEN")
+                headers.pop("Authorization")
+                resp = requests.get(
+                    "https://api.github.com/search/repositories",
+                    params={
+                        "q": f"topic:{gh_topic} created:>{since}",
+                        "sort": "stars", "order": "desc", "per_page": 30,
+                    },
+                    headers=headers, timeout=10,
+                )
             if resp.status_code == 403:
                 time.sleep(60)
                 continue
             if resp.status_code != 200:
+                print(f"  GitHub topic:{gh_topic}: HTTP {resp.status_code}")
                 continue
 
             for repo in resp.json().get("items", []):

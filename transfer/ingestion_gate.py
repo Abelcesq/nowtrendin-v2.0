@@ -42,6 +42,13 @@ DATE_SEMANTIC = {
     "pull_history":          ["snapshot_date"],
     "score_archive":         ["snapshot_date"],
     "topic_baselines":       ["snapshot_date"],
+    # market + crypto accuracy ledgers (writers canonicalize via to_iso_date —
+    # market_accuracy_ledger.py + crypto_accuracy_ledger.py; registered 2026-07-06
+    # after the Canonical Date Auditor's B3a auto-discovery flagged them undeclared)
+    "market_accuracy_ledger":    ["detection_date", "move_date"],
+    "market_pending_detections": ["detection_date", "timeout_date"],
+    "crypto_accuracy_ledger":    ["detection_date", "move_date"],
+    "crypto_pending_detections": ["detection_date", "timeout_date"],
 }
 
 

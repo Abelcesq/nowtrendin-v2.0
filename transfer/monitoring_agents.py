@@ -452,10 +452,14 @@ def calibration_auditor() -> dict:
             led = g.ledger_plus.generate_honest_report(g.DB_PATH) or {}
     except Exception as e:
         alerts.append({"level": "warn", "block": "B5", "msg": f"ledger read failed: {e}"})
-    total = led.get("total", 0) or 0
-    pending = led.get("pending", 0) or 0
-    hit = led.get("hitRate")
-    small = bool(led.get("smallSample")) or total < 30
+    # generate_honest_report() keys are sample_size/still_pending/honest_hit_rate_pct/
+    # small_sample_warning — the /accuracy/ledger ENDPOINT renames them (total/pending/
+    # hitRate/smallSample). Reading the endpoint names off the raw report silently
+    # yielded 0/0 here (same bug class as the mobile camelCase ledger zeros).
+    total = led.get("sample_size", led.get("total", 0)) or 0
+    pending = led.get("still_pending", led.get("pending", 0)) or 0
+    hit = led.get("honest_hit_rate_pct", led.get("hitRate"))
+    small = bool(led.get("small_sample_warning", led.get("smallSample"))) or total < 30
     summary.update({"evaluated": total, "pending": pending,
                     "hit_rate": hit, "small_sample": small})
     if small:

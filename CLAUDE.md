@@ -316,7 +316,11 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
 - Date-semantic columns: `accuracy_ledger.detection_date/breakout_date`,
   `pending_detections.detection_date`, `risk_signals.signal_date` (+ `source_time`,
   `signal_time`), `market_signal_history.signal_date` (+ `signal_time`),
-  `pull_history.snapshot_date`, `score_archive.snapshot_date`, `topic_baselines.snapshot_date`.
+  `pull_history.snapshot_date`, `score_archive.snapshot_date`, `topic_baselines.snapshot_date`,
+  `market_accuracy_ledger.detection_date/move_date`, `market_pending_detections
+  .detection_date/timeout_date`, `crypto_accuracy_ledger.detection_date/move_date`,
+  `crypto_pending_detections.detection_date/timeout_date` (market/crypto ledgers registered
+  2026-07-06 after B3a auto-discovery; writers canonicalize via `to_iso_date`).
 - Parsers try WHOLE-STRING formats FIRST — NEVER naive-split on a space (the
   `'May 22, 2026' → 'May'` bug silently dropped 13 accuracy-ledger rows). NEVER
   reintroduce raw `[:10]` date slicing.
