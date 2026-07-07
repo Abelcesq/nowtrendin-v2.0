@@ -1396,3 +1396,32 @@ Optional follow-up: mobile risk/[key] has no AI Context equivalent either — ad
 Founder purchased credits. Verified: /explainer generates for both a trend topic
 (firm_blackcore) and a market instrument (alphabet — the new Market Signal AI Context
 section). Definitions generate on first view + cache; Grade Claude stage restored too.
+
+## Session 2026-07-07 (cont.) — research-outlet onboarding VALIDATED + lexicon verified (engine e32a59c)
+
+### GHOST research feeds — §16 five-gate run + held-out validation (the "backtest")
+- **Integrity finding that changed the design:** the generic blog n-gram extractor FAILS the
+  FORMAT gate on editorial titles — filler fragments ("gathering clouds building") and NBER
+  AUTHOR NAMES ("ulrike malmendier stefan") SURVIVE `_is_quality_topic`, and expert-tier
+  signals are EXEMPT from the corroboration floor → junk would enter scoring at the
+  highest-trust tier. Shipping as originally designed would have violated the integrity standard.
+- **Fix built:** `research_entity_topics()` — entity-anchored extraction (capitalized runs
+  holding a non-common-dictionary word; edge-trim floor of 2 words; standalone-proper-noun
+  singles only; no entity → write NOTHING). Iterated 3× against live feeds until precision
+  ~80%+ (real entities: shin bet, taliban rule, venezuela humanitarian, texas screwworm,
+  deterring russia, temu). `_parse_rss` ET fallback made namespace-agnostic (Atom bug).
+- **Verdicts:** WoR / Rest of World / Global Issues / RAND **PASS**; **NBER FAIL** (2nd
+  documented failure); **Pew FAIL as-is** (Methodology/Acknowledgments sub-pages in feed).
+- **Premise test:** 51/59 clean topics NOVEL to velocity_scores — the outlets genuinely see
+  what the engine doesn't (matches the D-is-late-confirmation mining finding).
+- **Shipped flag-gated OFF** (`GHOST_RESEARCH_FEEDS=0`); founder flips after reviewing
+  audits/source-onboarding/RESEARCH_FEEDS_VALIDATION_2026-07-07.md → recommend a 2-week
+  monitored trial (topic-quality + catch-all auditors). Rollback = unset the flag.
+
+### Lexicon adds — verified against real data before applying
+- **safiullin → sports APPLIED + LIVE-VERIFIED** (roman_safiullin now serves sports): the
+  topic's OWN signals are 8/8 tennis (Wimbledon/Guardian Sport/"safiullin tennis"); overmatch
+  checks pass (russia/roman empire/saffron unchanged).
+- **reddit NOT added — the add would have been redundant:** serve-time `_category_for`
+  already returns technology (context/situation layers route it). Verified live before
+  touching the lexicon; adding it would have been unverified drift.

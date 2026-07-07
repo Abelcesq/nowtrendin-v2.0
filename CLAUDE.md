@@ -392,16 +392,23 @@ price-verify + microstructure). Finviz crypto is display-only → FMP serves cry
   cup" (5→4 stories) demotes to a dark-matter trigger (det 38.5→70). The ½/full weight reweighting below is the
   related, still-in-design refinement.
 
-**M / D provenance reweighting — ⏳ IN DESIGN (next phase, NOT yet shipped; gated by
-backtest-before-ship).** Two coupled changes to the `_news_write` provenance decision:
+**M / D provenance reweighting — part 2 BUILT (2026-07-07, flag-gated OFF awaiting founder flip);
+part 1 still in design.** Two coupled changes:
 1. **Reputable ≠ automatic mainstream full weight.** 1 reputable source = **½ weight**;
    FULL weight only on **≥2 DISTINCT reputable sources** (keyed on distinct `source_name`
    to defeat wire-syndication). The "Belgium vs Iran, 2026 World Cup" corroboration case.
    Extends the catch-all corroboration philosophy (`CATCHALL_MIN_SOURCES ≥2`) from
    *admission* to *weight*.
-2. **Research / early-signal outlets → Dark Matter (D), NOT Mainstream (M).** War on
-   Rocks, Rest of World, Global Issues, Pew Research, RAND (blog), NBER — they surface
-   topics BEFORE mainstream (research that reads like blogs).
+2. **Research / early-signal outlets → Dark Matter (D), NOT Mainstream (M) — ✅ BUILT
+   2026-07-07, flag `GHOST_RESEARCH_FEEDS` (default OFF; founder flips after reviewing
+   `audits/source-onboarding/RESEARCH_FEEDS_VALIDATION_2026-07-07.md`).** §16 five-gate
+   verdicts: **War on Rocks / Rest of World / Global Issues / RAND PASS** via the new
+   ENTITY-ANCHORED extractor (`blog_collectors.research_entity_topics`,
+   `mode="research_entity"` — required because the generic n-gram extractor FAILED the
+   FORMAT gate on editorial titles and expert-tier signals bypass the corroboration
+   floor); **NBER FAILED (2nd time — author-name topics + undated items)**; **Pew FAILED
+   as-is (report sub-pages pollute the feed)**. Premise test: 51/59 extracted topics were
+   NOVEL to the system. They surface topics BEFORE mainstream (research that reads like blogs).
    **Mechanism (mapped + anchored this session):** the D-vs-M router is **`platform_tier`**,
    NOT `is_organic`. `tier="mainstream"` feeds M (dual-pathway breadth/magnitude), lands
    in G's denominator (SUPPRESSES the early read) and raises blend weight `w`; `tier in
