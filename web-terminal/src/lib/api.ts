@@ -37,7 +37,14 @@ export interface LedgerSummary {
   avgLead?: number; medianLead?: number; maxLead?: number
   total?: number; led?: number; sameDay?: number; lagged?: number
   falsePositives?: number; pending?: number; smallSample?: boolean
-  best?: { topic: string; leadDays: number }[]
+  // Pre-broken split of LAGGED: near = races run and lost; preBroken = Google broke
+  // out >grace before our first sighting (never a race). Blended hitRate counts BOTH.
+  laggedNear?: number | null; preBroken?: number | null
+  trackedRaceHitRate?: number | null; trackedRaceSample?: number | null
+  // Match validity of the LED wins (independent Wikipedia referee).
+  ledCorroborated?: number | null; ledUncorroborated?: number | null
+  ledUnchecked?: number | null; ledAmbiguousQuery?: number | null
+  best?: { topic: string; leadDays: number; refereeCorroborated?: number | null; queryAmbiguous?: number | null }[]
 }
 
 export interface LedgerRow {
@@ -46,6 +53,11 @@ export interface LedgerRow {
   breakout_date?: string; breakout_multiple?: number
   lead_time_days?: number | null; verdict?: string
   validated_at?: string; provider?: string
+  // Match-validity metadata (rows resolved before 2026-07-07 carry nulls = unchecked)
+  pre_broken?: boolean
+  sweep_query?: string | null
+  query_ambiguous?: number | null
+  referee_corroborated?: number | null
 }
 
 // Money Gradient ledger — validated by realized EOD price direction (FMP), NOT Google Trends.

@@ -3,10 +3,19 @@ import { api, type LedgerSummary, type LedgerRow, type MarketLedgerSummary, type
 
 type SortKey = 'topic_display' | 'detection_score' | 'lead_time_days' | 'verdict' | 'validated_at'
 
-const VERDICTS = ['', 'LED', 'SAME_DAY', 'LAGGED', 'FALSE_POSITIVE'] as const
+const VERDICTS = ['', 'LED', 'SAME_DAY', 'LAGGED_NEAR', 'PRE_BROKEN', 'FALSE_POSITIVE'] as const
 const VLABEL: Record<string, string> = {
-  '': 'All', LED: 'Led', SAME_DAY: 'Same day', LAGGED: 'Lagged', FALSE_POSITIVE: 'False positive',
+  '': 'All', LED: 'Led', SAME_DAY: 'Same day', LAGGED_NEAR: 'Lagged · near miss',
+  PRE_BROKEN: 'Pre-broken', FALSE_POSITIVE: 'False positive',
 }
+
+// PRE-BROKEN = a LAGGED row whose Google breakout happened more than the grace window
+// (server default 7d) BEFORE our first sighting — the topic entered tracking already
+// post-breakout, so it was never a race. Server-computed (r.pre_broken); the lead-based
+// fallback only covers a cached/older API response.
+const isPreBroken = (r: { pre_broken?: boolean; verdict?: string; lead_time_days?: number | null }) =>
+  r.pre_broken === true || (r.pre_broken == null && (r.verdict || '').toUpperCase() === 'LAGGED'
+    && r.lead_time_days != null && r.lead_time_days < -7)
 
 // Money-ledger verdicts (distinct: validated by realized EOD price direction, not Trends).
 const MVERDICTS = ['', 'CONFIRMED', 'NOT_CONFIRMED', 'NO_MOVE'] as const
@@ -74,7 +83,9 @@ export function Ledger() {
 
   const view = useMemo(() => {
     let r = rows.slice()
-    if (filter) r = r.filter((x) => (x.verdict || '').toUpperCase() === filter)
+    if (filter === 'PRE_BROKEN') r = r.filter((x) => isPreBroken(x))
+    else if (filter === 'LAGGED_NEAR') r = r.filter((x) => (x.verdict || '').toUpperCase() === 'LAGGED' && !isPreBroken(x))
+    else if (filter) r = r.filter((x) => (x.verdict || '').toUpperCase() === filter)
     r.sort((a, b) => {
       const va = a[sortKey] as any, vb = b[sortKey] as any
       if (typeof va === 'string' || typeof vb === 'string')
@@ -171,13 +182,24 @@ export function Ledger() {
           </div>
         </>
       ) : (
-        <div className="statstrip">
-          <div className="statcard"><div className="sl">Honest hit rate</div><div className="sv good">{hit.toFixed(1)}%</div><div className="sf">LED ÷ all resolved (misses counted)</div></div>
-          <div className="statcard"><div className="sl">Median lead time</div><div className="sv early">{med}d</div><div className="sf">days ahead of Google Trends breakout</div></div>
-          <div className="statcard"><div className="sl">Max lead</div><div className="sv det">{summary?.maxLead ?? 0}d</div><div className="sf">best documented early call</div></div>
-          <div className="statcard"><div className="sl">Led / Same / Lagged / FP</div><div className="sv">{summary?.led ?? 0}/{summary?.sameDay ?? 0}/{summary?.lagged ?? 0}/{summary?.falsePositives ?? 0}</div><div className="sf">outcome breakdown</div></div>
-          <div className="statcard"><div className="sl">Resolved · pending</div><div className="sv">{resolved}·{summary?.pending ?? 0}</div><div className="sf">{summary?.smallSample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
-        </div>
+        <>
+          <div className="cal-banner">
+            ◷ <b>Pre-broken</b> = the Google breakout happened more than {' '}
+            <b>7 days before our first sighting</b> — the topic entered tracking already
+            post-breakout, so it was never a race we could win. Pre-broken rows stay {' '}
+            <b>counted in the honest rate</b>; the <b>tracked-race rate</b> reports only the
+            races actually run. LED wins additionally carry an <b>independent Wikipedia-pageviews
+            referee</b> check (wins resolved before 2026-07-07 predate it and read "unchecked").
+          </div>
+          <div className="statstrip">
+            <div className="statcard"><div className="sl">Honest hit rate</div><div className="sv good">{hit.toFixed(1)}%</div><div className="sf">LED ÷ all resolved (misses counted)</div></div>
+            <div className="statcard"><div className="sl">Tracked-race hit rate</div><div className="sv early">{summary?.trackedRaceHitRate != null ? summary.trackedRaceHitRate.toFixed(1) + '%' : '—'}</div><div className="sf">LED ÷ races actually run ({summary?.trackedRaceSample ?? '—'}; pre-broken excluded)</div></div>
+            <div className="statcard"><div className="sl">Median lead time</div><div className="sv early">{med}d</div><div className="sf">days ahead of Google Trends breakout</div></div>
+            <div className="statcard"><div className="sl">Led / Same / Near / Pre-broken / FP</div><div className="sv">{summary?.led ?? 0}/{summary?.sameDay ?? 0}/{summary?.laggedNear ?? summary?.lagged ?? 0}/{summary?.preBroken ?? 0}/{summary?.falsePositives ?? 0}</div><div className="sf">outcome breakdown (near + pre-broken = lagged)</div></div>
+            <div className="statcard"><div className="sl">LED referee check</div><div className="sv">{summary?.ledCorroborated ?? 0}✓ · {summary?.ledUncorroborated ?? 0}– · {summary?.ledUnchecked ?? 0}·</div><div className="sf">Wikipedia-corroborated · not corroborated · unchecked</div></div>
+            <div className="statcard"><div className="sl">Resolved · pending</div><div className="sv">{resolved}·{summary?.pending ?? 0}</div><div className="sf">{summary?.smallSample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
+          </div>
+        </>
       )}
 
       <div className="grid-wrap">
@@ -243,14 +265,38 @@ export function Ledger() {
             <tbody>
               {view.map((r, i) => {
                 const lead = r.lead_time_days
+                const pre = isPreBroken(r)
+                const win = r.verdict === 'LED' || r.verdict === 'SAME_DAY'
                 return (
                   <tr key={r.topic_key + i}>
-                    <td><div className="topic-name">{r.topic_display}</div><div className="topic-cat">{r.topic_key}</div></td>
+                    <td>
+                      <div className="topic-name">{r.topic_display}</div>
+                      <div className="topic-cat">
+                        {r.topic_key}
+                        {r.query_ambiguous === 1 && (
+                          <span title="Broad/ambiguous search term — a Trends breakout on it is weaker evidence the matched surge is this specific signal"> · broad term</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="r"><span className="score-cell det">{r.detection_score ?? '—'}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.detection_date)}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.breakout_date)}</span></td>
                     <td className="r"><span className={'gapnum ' + (lead != null && lead > 0 ? 'wide' : 'neg')}>{lead != null ? `${lead > 0 ? '+' : ''}${lead}d` : '—'}</span></td>
-                    <td><span className={'verdict ' + (r.verdict || '')}>{r.verdict || '—'}</span></td>
+                    <td>
+                      <span className={'verdict ' + (pre ? 'PRE_BROKEN' : (r.verdict || ''))}
+                            style={pre ? { color: '#94A3B8', background: 'rgba(148,163,184,.12)' } : undefined}
+                            title={pre ? 'Breakout occurred >7d before our first sighting — the topic entered tracking already post-breakout (never a race). Counted in the honest rate; excluded from the tracked-race rate.' : undefined}>
+                        {pre ? 'PRE-BROKEN' : (r.verdict || '—')}
+                      </span>
+                      {win && (
+                        <div className="topic-cat" style={{ marginTop: 2 }}
+                             title="Independent second referee: Wikipedia pageviews showed attention arriving within ±14d of the Google breakout">
+                          {r.referee_corroborated === 1 ? '✓ wiki-corroborated'
+                            : r.referee_corroborated === 0 ? '– wiki: no arrival match'
+                            : '· referee unchecked'}
+                        </div>
+                      )}
+                    </td>
                     <td><span className="muted">{r.provider || '—'}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.validated_at)}</span></td>
                   </tr>
