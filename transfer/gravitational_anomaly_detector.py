@@ -6343,7 +6343,15 @@ def accuracy_ledger_report():
                     "falsePositives": h["misses_false_positive"],
                     "pending": h["still_pending"],
                     "smallSample": h["small_sample_warning"],
-                    "best": [{"topic": b["topic"], "leadDays": b["lead_days"]}
+                    # Match-validity: LED wins corroborated by the independent Wikipedia
+                    # referee vs unchecked (rows resolved before the metadata existed).
+                    "ledCorroborated": h.get("led_referee_corroborated"),
+                    "ledUncorroborated": h.get("led_referee_uncorroborated"),
+                    "ledUnchecked": h.get("led_referee_unchecked"),
+                    "ledAmbiguousQuery": h.get("led_ambiguous_query"),
+                    "best": [{"topic": b["topic"], "leadDays": b["lead_days"],
+                              "refereeCorroborated": b.get("referee_corroborated"),
+                              "queryAmbiguous": b.get("query_ambiguous")}
                              for b in h.get("best", [])],
                     # Maturity-segmented — early detection of EMERGING topics is the claim;
                     # established topics can only resolve LAGGED (coverage latency, not the thesis).

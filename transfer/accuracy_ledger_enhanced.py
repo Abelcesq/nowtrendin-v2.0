@@ -70,7 +70,70 @@ def init_pending_db(db_path: str = DB_PATH):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_detections(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_verdict2 ON accuracy_ledger(verdict)")
     conn.commit()
+    # Match-validity metadata (2026-07-07, measurement-only): the exact query the sweep
+    # matched on, whether that query is generically AMBIGUOUS (a Trends curve for
+    # 'mexico' is country-level noise — a breakout in it may not be OUR surge), and
+    # whether an independent referee (Wikipedia pageviews) corroborated a win.
+    # Idempotent ALTERs; each failure ROLLED BACK so a PG txn never aborts on the
+    # duplicate-column error (the market-ledger startup lesson).
+    for _col, _typ in (("sweep_query", "TEXT"),
+                       ("query_ambiguous", "INTEGER"),
+                       ("referee_corroborated", "INTEGER")):
+        try:
+            conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     conn.close()
+
+
+# ── Match validity: query ambiguity + independent referee ─────────────────────────────
+# Bare geo/institution terms whose Trends curves aggregate unrelated attention.
+_GENERIC_GEO = {
+    "united states", "the us", "usa", "america", "new york", "white house",
+    "washington", "europe", "china", "russia", "mexico", "spain", "france",
+    "germany", "india", "japan", "brazil", "canada", "australia", "england",
+    "london", "texas", "california", "florida", "congress", "senate",
+}
+
+
+def _query_ambiguity(display: str) -> int:
+    """1 = the sweep query is generically ambiguous (single word, or a bare
+    geo/institution term) — a breakout on its Trends curve is weak evidence the
+    matched surge is OURS. Metadata only; changes no verdict."""
+    d = (display or "").strip().lower()
+    if not d:
+        return 1
+    if d in _GENERIC_GEO:
+        return 1
+    return 1 if len(d.split()) == 1 else 0
+
+
+def _referee_corroborate(topic_display, detection_date, breakout_date):
+    """Independent second referee (held-out): did Wikipedia pageviews ALSO show
+    attention arriving near the Google breakout? 1 = arrival within ±14d of the
+    breakout; 0 = referee readable but no matching arrival; None = referee
+    unavailable/unresolvable (never blocks or changes a resolution). Free API."""
+    try:
+        import referee_wikipedia as _rw
+        art = _rw.resolve_article(topic_display)
+        if not art:
+            return None
+        det = _parse(detection_date)
+        brk = _parse(breakout_date)
+        curve = _rw.fetch_pageviews(art, det - timedelta(days=30), brk + timedelta(days=14))
+        if not curve:
+            return None
+        arrival = _rw.detect_arrival_date(curve, since=(det - timedelta(days=30)).date().isoformat())
+        if not arrival or not arrival.get("arrival_date"):
+            return 0
+        adt = _parse(arrival["arrival_date"])
+        return 1 if abs((adt - brk).days) <= 14 else 0
+    except Exception:
+        return None
 
 
 def _parse(date_str: str) -> datetime:
@@ -145,19 +208,24 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
             conn.close()
 
 
-def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict, provider):
+def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict, provider,
+                   sweep_query=None, query_ambiguous=None, referee_corroborated=None):
     now = datetime.now(timezone.utc).isoformat()
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
-             breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+             breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
+             sweep_query, query_ambiguous, referee_corroborated)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
-            validated_at=EXCLUDED.validated_at, provider=EXCLUDED.provider
+            validated_at=EXCLUDED.validated_at, provider=EXCLUDED.provider,
+            sweep_query=EXCLUDED.sweep_query, query_ambiguous=EXCLUDED.query_ambiguous,
+            referee_corroborated=EXCLUDED.referee_corroborated
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
-          p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider))
+          p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
+          sweep_query, query_ambiguous, referee_corroborated))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
@@ -258,17 +326,26 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                 # genuine LED win, not a re-detection. This is the patience principle in code — we do
                 # NOT disqualify our own early read just because human attention took months to arrive.
                 _lt = lead["lead_time_days"]
+                _q = p["topic_display"]
+                _amb = _query_ambiguity(_q)
                 if _lt < -MATCH_WINDOW_DAYS or _lt > LEAD_MAX_DAYS:
                     rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                     _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
-                                   lead["lead_time_days"], "LATE_REDETECTION", "sweep")
+                                   lead["lead_time_days"], "LATE_REDETECTION", "sweep",
+                                   sweep_query=_q, query_ambiguous=_amb)
                     conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
                     conn.commit()
                     late += 1
                     continue
+                # Independent referee on WINS only (LED/SAME_DAY — the claims we publish):
+                # free Wikipedia pageviews, fail-open, never changes the verdict.
+                _corr = None
+                if lead["verdict"] in ("LED", "SAME_DAY"):
+                    _corr = _referee_corroborate(_q, p["detection_date"], lead["breakout_date"])
                 rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                 _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
-                               lead["lead_time_days"], lead["verdict"], "sweep")
+                               lead["lead_time_days"], lead["verdict"], "sweep",
+                               sweep_query=_q, query_ambiguous=_amb, referee_corroborated=_corr)
                 conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
                 conn.commit()
                 if lead["verdict"] == "LED": led += 1
@@ -404,6 +481,12 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "misses_lagged_near": len(lag_near),
         "misses_pre_broken": len(lag_pre),
         "pre_broken_grace_days": _pre_grace,
+        # Match-validity segmentation of the WINS (metadata recorded at sweep time;
+        # older rows resolved before 2026-07-07 have NULLs = 'unchecked'):
+        "led_referee_corroborated": sum(1 for r in led if r.get("referee_corroborated") == 1),
+        "led_referee_uncorroborated": sum(1 for r in led if r.get("referee_corroborated") == 0),
+        "led_referee_unchecked": sum(1 for r in led if r.get("referee_corroborated") is None),
+        "led_ambiguous_query": sum(1 for r in led if r.get("query_ambiguous") == 1),
         "tracked_race_hit_rate_pct": (round(len(led) / _race_denom * 100, 1)
                                       if _race_denom else None),
         "tracked_race_sample": _race_denom,
@@ -422,6 +505,8 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                               "total_resolved_rows": len(rows)},
         "early_detection_hit_rate_pct": by_mat["emerging"]["hit_rate_pct"],
         "early_detection_sample": by_mat["emerging"]["resolved"],
-        "best": sorted([{"topic": r["topic_display"], "lead_days": r["lead_time_days"]}
+        "best": sorted([{"topic": r["topic_display"], "lead_days": r["lead_time_days"],
+                         "referee_corroborated": r.get("referee_corroborated"),
+                         "query_ambiguous": r.get("query_ambiguous")}
                         for r in led], key=lambda x: x["lead_days"] or 0, reverse=True)[:5],
     }
