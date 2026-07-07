@@ -1385,3 +1385,9 @@ financial, investment, or legal advice."
   tracked-race, wiki referee, D-is-late-confirmation finding) + MEMORY.md index.
 - NOTE: founder's last screenshot showed the OLD disclaimer — that tab was on a cached bundle;
   gh-pages verified serving the new one (hard refresh fixes).
+
+### Addendum 2026-07-07 — Market Signal rail: AI Context section added (712a739 → gh-pages ba66731)
+Trend-rail parity (§12): same /explainer source-aware definition, first section under the
+score gauges. Preview-verified (renders first, 0 console errors). Shows the honest placeholder
+until the Anthropic account credits are restored (then generates on first view + caches).
+Optional follow-up: mobile risk/[key] has no AI Context equivalent either — add for full parity.
