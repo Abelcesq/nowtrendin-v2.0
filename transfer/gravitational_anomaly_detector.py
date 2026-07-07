@@ -5431,6 +5431,16 @@ def _prewarm_caches() -> dict:
 def _prewarm_caches_locked(_t) -> dict:
     warmed = []
     t0 = _t.time()
+    # BATCH PACING (founder rule 2026-07-06): a PREWARM_FEED_PAUSE_S (default
+    # 10s) breather between feed builds — matching the paced collectors +
+    # scorer. The warm refreshes the caches WITHOUT itself becoming a
+    # continuous 7-build slam on the dyno CPU + DB.
+    _feed_pause = float(os.getenv("PREWARM_FEED_PAUSE_S", "10"))
+
+    def _pz():
+        if _feed_pause > 0 and warmed:      # between feeds only, never before the first
+            _t.sleep(_feed_pause)
+
     # scores + topics go through the SINGLE-FLIGHT gate (force=True: a
     # pull-synchronized warm must REBUILD, not serve the stale cache) so a
     # warm and a client request can never double-build the same superset.
@@ -5442,6 +5452,7 @@ def _prewarm_caches_locked(_t) -> dict:
                       else {"feed": "scores", "error": "busy (another build in flight)"})
     except Exception as e:
         warmed.append({"feed": "scores", "error": str(e)})
+    _pz()
     try:
         grid = _get_or_build("topics_full::0",
                              lambda: _compute_topics_full("", False),
@@ -5454,6 +5465,7 @@ def _prewarm_caches_locked(_t) -> dict:
     # points=12 so the heavy trajectory build never blocks a load. Shorter windows
     # are cheaper; all stay hot because prewarm re-runs inside the cache TTL.
     for _win in ("7d", "24h", "12h"):
+        _pz()
         try:
             hist = _compute_history_full(_win, 12)
             _cache.set(f"history_full:{_win}:12", hist, CACHE_TTL_SCORES_FULL)
@@ -5462,6 +5474,7 @@ def _prewarm_caches_locked(_t) -> dict:
             warmed.append({"feed": f"history:{_win}", "error": str(e)})
     # Market Signal (/risk/scores): warm the full instrument universe so the Market
     # tab paints instantly too — full parity with scores/topics/history.
+    _pz()
     try:
         rf = _compute_risk_full()
         _cache.set("risk_full", rf, CACHE_TTL_SCORES_FULL)
@@ -5472,6 +5485,7 @@ def _prewarm_caches_locked(_t) -> dict:
     # compute does FMP price + Finviz/AV-throttled proxy Dark Matter across the roster — far too slow
     # per-request, so it MUST be served from this prewarmed cache (parity with scores/topics/risk).
     if _CRYPTO_AVAILABLE and crypto_engine.CRYPTO_SIGNAL:
+        _pz()
         try:
             cf = crypto_engine.serve_crypto(record=False, db_path=DB_PATH)
             _cache.set("crypto_full", cf, CACHE_TTL_SCORES_FULL)
