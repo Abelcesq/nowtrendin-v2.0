@@ -45,7 +45,7 @@ export function TopicResearch({ topicKey, topicName }: { topicKey: string; topic
                 </Text>
               );
             })}
-            <Text className="text-textMuted text-[12px] mt-1">AI-generated overview · qualitative context, not investment advice. Any figures are approximate; the measured score and velocity are the engine's.</Text>
+            <Text className="text-textMuted text-[12px] mt-1">AI-generated overview · qualitative context are computer generated. *All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</Text>
           </>
         )}
       </View>
