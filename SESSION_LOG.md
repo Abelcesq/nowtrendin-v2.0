@@ -1391,3 +1391,8 @@ Trend-rail parity (§12): same /explainer source-aware definition, first section
 score gauges. Preview-verified (renders first, 0 console errors). Shows the honest placeholder
 until the Anthropic account credits are restored (then generates on first view + caches).
 Optional follow-up: mobile risk/[key] has no AI Context equivalent either — add for full parity.
+
+### RESOLVED 2026-07-07 — Anthropic credits restored, AI Context LIVE
+Founder purchased credits. Verified: /explainer generates for both a trend topic
+(firm_blackcore) and a market instrument (alphabet — the new Market Signal AI Context
+section). Definitions generate on first view + cache; Grade Claude stage restored too.
