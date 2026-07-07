@@ -1351,3 +1351,16 @@ live search probe 200. github collector confirms at the next 6h collect slot.
 - NOTE: deterministic composition per the enterprise standard (reproducible, no model
   inference, no per-view AI cost) — the "AI prompt" ask is satisfied by feeding the tracking
   method into the same held-out analysis engine that powers the trend/market/crypto panels.
+
+### Addendum 2026-07-07 — founder-approved disclaimer EVERYWHERE (verbatim, sign-off required to edit)
+New copy: "*All information contained herein may not be accurate including any and all figures
+indicated in this section and or site and may be an approximation and should not be construed as
+financial, investment, or legal advice."
+- Engine (5d1ed35): signal_analysis _DISCLAIMER → all 4 analysis panels (trend/market/crypto/
+  ledger) on every platform, no client rebuild needed. Crypto keeps its appended caveat.
+- Web (f680a52 → gh-pages ce87964): LEGAL_DISCLAIMER constant + 4 inline copies (Shell footer,
+  Crypto/MarketSignal/Screener AI-overview lines). Trend + market rails verified TOP AND BOTTOM
+  (2 legal-disc per rail), old text gone site-wide, 0 console errors.
+- Mobile (f680a52 + c200e4f → preview 76b8bdf): Disclaimer component + TopicResearch caveat;
+  signal/[id] + risk/[key] detail panels now carry it top AND bottom. Bundle check:
+  newdisc 2 / olddisc 0 / gate intact.
