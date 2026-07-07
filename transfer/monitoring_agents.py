@@ -1078,7 +1078,11 @@ def canon_date_auditor(conn=None, db_path=None) -> dict:
     # Date-NAMED columns that are intentionally operational INSTANTS (full ISO datetime),
     # NOT canonical primary sort keys — §14 allows these to keep their precise instant.
     # Allowlisted so they are neither flagged as drift nor value-audited as bare dates.
-    operational = {("pending_detections", "timeout_date")}
+    operational = {("pending_detections", "timeout_date"),
+                   # market/crypto ledgers store the same computed deadline INSTANT
+                   # (detection + TIMEOUT_DAYS).isoformat(), consumed via now > _parse()
+                   ("market_pending_detections", "timeout_date"),
+                   ("crypto_pending_detections", "timeout_date")}
     discovered = _discover_date_columns(conn) - operational
     # (b) drift — a date-named column nobody registered/gated (likely a new source).
     #     WARN (classify it: gate + register it, OR add to the operational allowlist) —

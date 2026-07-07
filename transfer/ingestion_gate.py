@@ -44,11 +44,14 @@ DATE_SEMANTIC = {
     "topic_baselines":       ["snapshot_date"],
     # market + crypto accuracy ledgers (writers canonicalize via to_iso_date —
     # market_accuracy_ledger.py + crypto_accuracy_ledger.py; registered 2026-07-06
-    # after the Canonical Date Auditor's B3a auto-discovery flagged them undeclared)
+    # after the Canonical Date Auditor's B3a auto-discovery flagged them undeclared).
+    # Their timeout_date columns are OPERATIONAL INSTANTS (full ISO datetime, consumed
+    # via now > _parse(...)) — allowlisted in canon_date_auditor like the attention
+    # ledger's pending_detections.timeout_date, NOT registered here.
     "market_accuracy_ledger":    ["detection_date", "move_date"],
-    "market_pending_detections": ["detection_date", "timeout_date"],
+    "market_pending_detections": ["detection_date"],
     "crypto_accuracy_ledger":    ["detection_date", "move_date"],
-    "crypto_pending_detections": ["detection_date", "timeout_date"],
+    "crypto_pending_detections": ["detection_date"],
 }
 
 
