@@ -1321,3 +1321,16 @@ live search probe 200. github collector confirms at the next 6h collect slot.
 - Desktop inherits via the web build (§12). ⏳ Mobile parity: the Aurora Accuracy Ledger
   screen still shows the pre-split summary — add trackedRace/near/pre-broken lines +
   /deploy-mobile-preview (next parity task).
+
+### Addendum 2026-07-07 — 3-platform ledger parity COMPLETE (mobile chips + segmentation deployed)
+- Mobile (97f1397, preview release 512efb4): Accuracy Ledger screen now has the web's
+  chip rows — LEDGER mode (Attention·Trends / Money·Market / Crypto·Coin, lazy-loaded)
+  + verdict filters (All/Led/Same day/Lagged·near/Pre-broken/False positive; price
+  ledgers Confirmed/Not confirmed/No move) — Aurora pill style, tokens only. Metrics
+  add TRACKED-RACE beside blended HIT RATE; honest breakdown + LED-referee lines +
+  pre-broken explainer; NEW filterable row list (/accuracy/ledger/detail, windowed 30,
+  server-computed pre_broken, wins carry wiki-referee status, 'broad term' markers).
+- Deployed via /deploy-mobile-preview: gate + DB-target + new-UI strings verified in
+  bundle BEFORE push; live checks pass (PIN page w/o cookie, 401 wrong PIN, app +
+  TRACKED-RACE served with cookie). Parity: web gh-pages ✓ · desktop (inherits web) ✓ ·
+  mobile preview ✓ — §12/§17 satisfied for the ledger.
