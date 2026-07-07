@@ -44,12 +44,13 @@ def _flow_word(flow) -> str:
     return "inflow" if f == "inflow" else "outflow" if f == "outflow" else ""
 
 
-_DISCLAIMER = ("This is a measurement of where money and attention are positioned, drawn from public "
-               "disclosures and validated against an external, auditable ground truth. It is not a "
-               "forecast, a price target, a recommendation, or investment, legal or financial advice.")
+# Founder-approved legal copy (2026-07-07) — verbatim; do not edit without founder sign-off.
+_DISCLAIMER = ("*All information contained herein may not be accurate including any and all figures "
+               "indicated in this section and or site and may be an approximation and should not be "
+               "construed as financial, investment, or legal advice")
 
 # Crypto carries an explicit additional caveat (founder request) — appended to the shared disclaimer.
-_DISCLAIMER_CRYPTO = (_DISCLAIMER + " Be advised that this summary may be inaccurate and is not intended "
+_DISCLAIMER_CRYPTO = (_DISCLAIMER + ". Be advised that this summary may be inaccurate and is not intended "
                       "to be financial, legal or investment advice.")
 
 
