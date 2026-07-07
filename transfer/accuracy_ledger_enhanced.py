@@ -259,9 +259,15 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     if limit and _newest_k > 0 and len(pending) == int(limit):
         keep = pending[: int(limit) - _newest_k]
         have = {p["id"] for p in keep}
+        # Board condition (Challenger + Executioner, 2026-07-07): 24h cooldown on the
+        # newest slots — without it the SAME still-pending newest rows would occupy the
+        # reserved slots every run, burning a paid Trends fetch per run on identical
+        # rows while the tail starves.
+        _cool = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
         newest = [dict(r) for r in conn.execute(
             "SELECT * FROM pending_detections WHERE status='pending' "
-            "ORDER BY detection_date DESC LIMIT ?", (int(limit),)).fetchall()]
+            "AND (last_checked IS NULL OR last_checked < ?) "
+            "ORDER BY detection_date DESC LIMIT ?", (_cool, int(limit))).fetchall()]
         for p in newest:
             if len(keep) >= int(limit):
                 break
@@ -409,15 +415,35 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         # DAYS the topic was scored. Present across many days = an ESTABLISHED, sustained trend
         # Google Trends already knows (can only resolve LAGGED); few days = still EMERGING/early.
         # Frequency-independent, uses the real scored_at column. Used where topic_maturity is blank.
+        # LEDGER_MATURITY_AT_DETECTION (rec D board condition, 2026-07-07, default OFF):
+        # the all-time day count reads the FUTURE — a topic genuinely EMERGING on its
+        # detection day that sustained afterward files ESTABLISHED with hindsight,
+        # silently migrating winners OUT of the early-detection headline cohort (the
+        # Challenger's candidate explanation for the 2.3%-vs-24% inversion). Flag ON:
+        # each row's cohort uses ONLY days scored ON/BEFORE its own detection_date, and
+        # the as-of-today class map is bypassed (it is hindsight too). maturity_source
+        # is labeled with the basis so no published cohort silently spans two regimes.
+        _AT_DETECTION = os.getenv("LEDGER_MATURITY_AT_DETECTION", "0") == "1"
         vs_days = {}
         try:
-            tks = list({r.get("topic_key") for r in rows if r.get("topic_key")})
-            if tks:
-                ph = ",".join((["%s"] if db_compat.USE_PG else ["?"]) * len(tks))
-                vq = ("SELECT topic_key, COUNT(DISTINCT substr(scored_at,1,10)) AS d "
-                      f"FROM velocity_scores WHERE topic_key IN ({ph}) GROUP BY topic_key")
-                for _v in conn.execute(vq, tuple(tks)).fetchall():
-                    _vd = dict(_v); vs_days[_vd.get("topic_key")] = int(_vd.get("d") or 0)
+            if _AT_DETECTION:
+                for r in rows:
+                    tk, dd = r.get("topic_key"), r.get("detection_date")
+                    if not tk or not dd or (tk, dd) in vs_days:
+                        continue
+                    _v = conn.execute(
+                        "SELECT COUNT(DISTINCT substr(scored_at,1,10)) AS d "
+                        "FROM velocity_scores WHERE topic_key = ? AND scored_at <= ?",
+                        (tk, str(dd) + "T23:59:59")).fetchone()
+                    vs_days[(tk, dd)] = int(dict(_v).get("d") or 0)
+            else:
+                tks = list({r.get("topic_key") for r in rows if r.get("topic_key")})
+                if tks:
+                    ph = ",".join((["%s"] if db_compat.USE_PG else ["?"]) * len(tks))
+                    vq = ("SELECT topic_key, COUNT(DISTINCT substr(scored_at,1,10)) AS d "
+                          f"FROM velocity_scores WHERE topic_key IN ({ph}) GROUP BY topic_key")
+                    for _v in conn.execute(vq, tuple(tks)).fetchall():
+                        _vd = dict(_v); vs_days[_vd.get("topic_key")] = int(_vd.get("d") or 0)
         except Exception:
             vs_days = {}
     except Exception:
@@ -465,7 +491,15 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     _RES = ("LED", "SAME_DAY", "LAGGED", "FALSE_POSITIVE")
     _EMERGING, _ESTABLISHED = {"NEW", "EMERGING", "RESURGENT"}, {"ESTABLISHED", "MONITORING"}
     _EST_MIN_DAYS = int(os.getenv("LEDGER_ESTABLISHED_MIN_DAYS", "14"))
-    def _cohort(tk):
+    def _cohort(r_or_tk):
+        # AT-DETECTION basis (flag ON): per-row, no-lookahead — only days scored on/before
+        # the row's own detection_date count; the as-of-today class map is bypassed.
+        if _AT_DETECTION and isinstance(r_or_tk, dict):
+            d = vs_days.get((r_or_tk.get("topic_key"), r_or_tk.get("detection_date")))
+            if d is not None:
+                return "established" if d >= _EST_MIN_DAYS else "emerging"
+            return "unknown"
+        tk = r_or_tk.get("topic_key") if isinstance(r_or_tk, dict) else r_or_tk
         c = mat.get(tk, "")
         if c in _EMERGING:
             return "emerging"
@@ -477,7 +511,7 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
             return "established" if d >= _EST_MIN_DAYS else "emerging"
         return "unknown"
     def _seg(name):
-        sub = [r for r in rows if r["verdict"] in _RES and _cohort(r.get("topic_key")) == name]
+        sub = [r for r in rows if r["verdict"] in _RES and _cohort(r) == name]
         s_led = [r for r in sub if r["verdict"] == "LED"]
         s_leads = [r["lead_time_days"] for r in s_led if r["lead_time_days"] is not None]
         return {"resolved": len(sub), "led": len(s_led),
@@ -488,6 +522,9 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     return {
         "status": "ok",
         "param_version": LEDGER_PARAM_VERSION,
+        # Measurement-policy stamps (board convergence: no published rate silently
+        # spans two regimes — a reader can always see which policies were in force).
+        "sweep_newest_slots": int(os.getenv("LEDGER_SWEEP_NEWEST_SLOTS", "0")),
         "sample_size": resolved,
         "still_pending": pending,
         "late_redetection_excluded": len(late),
@@ -515,10 +552,20 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "small_sample_warning": resolved < 20,
         # Maturity-segmented — headline going forward = the EMERGING cohort (the product's claim).
         "by_maturity": by_mat,
-        "maturity_source": ("topic_maturity.maturity_class, else velocity_scores sustained-days "
-                            "(>=%dd distinct = established)" % _EST_MIN_DAYS),
-        "maturity_coverage": {"by_topic_maturity": sum(1 for r in rows if mat.get(r.get("topic_key"))),
-                              "by_sustained_days_fallback": sum(1 for r in rows if r.get("topic_key") in vs_days),
+        # Basis is LABELED so no published cohort silently spans two regimes (board
+        # convergence: stamp every measurement-definition change).
+        "maturity_basis": ("as-of-detection (no lookahead)" if _AT_DETECTION else "as-of-today"),
+        "maturity_source": (("velocity_scores distinct days scored ON/BEFORE each row's "
+                             "detection_date (>=%dd = established); class map bypassed"
+                             % _EST_MIN_DAYS) if _AT_DETECTION else
+                            ("topic_maturity.maturity_class, else velocity_scores sustained-days "
+                             "(>=%dd distinct = established)" % _EST_MIN_DAYS)),
+        "maturity_coverage": {"by_topic_maturity": (0 if _AT_DETECTION else
+                                                    sum(1 for r in rows if mat.get(r.get("topic_key")))),
+                              "by_sustained_days_fallback": (
+                                  sum(1 for r in rows if (r.get("topic_key"), r.get("detection_date")) in vs_days)
+                                  if _AT_DETECTION else
+                                  sum(1 for r in rows if r.get("topic_key") in vs_days)),
                               "total_resolved_rows": len(rows)},
         "early_detection_hit_rate_pct": by_mat["emerging"]["hit_rate_pct"],
         "early_detection_sample": by_mat["emerging"]["resolved"],
