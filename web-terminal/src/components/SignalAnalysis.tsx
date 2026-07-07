@@ -18,7 +18,7 @@ function renderBody(text: string) {
       : <span key={i}>{p}</span>)
 }
 
-export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' | 'crypto'; item: any }) {
+export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' | 'crypto' | 'ledger'; item: any }) {
   const [a, setA] = useState<SignalAnalysis | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading')
   const sig = JSON.stringify(item || {})

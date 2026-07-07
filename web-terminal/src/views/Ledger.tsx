@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { api, type LedgerSummary, type LedgerRow, type MarketLedgerSummary, type MarketLedgerRow } from '../lib/api'
+import { SignalAnalysisPanel } from '../components/SignalAnalysis'
 
 type SortKey = 'topic_display' | 'detection_score' | 'lead_time_days' | 'verdict' | 'validated_at'
 
@@ -46,6 +47,8 @@ export function Ledger() {
   const [filter, setFilter] = useState<string>('')
   const [sortKey, setSortKey] = useState<SortKey>('validated_at')
   const [sortDir, setSortDir] = useState(-1)
+  // Row → expanded Ledger Entry Analysis (the /analysis/ledger information panel).
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -267,8 +270,13 @@ export function Ledger() {
                 const lead = r.lead_time_days
                 const pre = isPreBroken(r)
                 const win = r.verdict === 'LED' || r.verdict === 'SAME_DAY'
+                const rowId = r.topic_key + '|' + (r.detection_date || i)
+                const open = expanded === rowId
                 return (
-                  <tr key={r.topic_key + i}>
+                  <Fragment key={rowId}>
+                  <tr onClick={() => setExpanded(open ? null : rowId)}
+                      style={{ cursor: 'pointer' }}
+                      title="Click for the full entry analysis — what was recorded, how tracking works, and what this verdict means">
                     <td>
                       <div className="topic-name">{r.topic_display}</div>
                       <div className="topic-cat">
@@ -300,6 +308,14 @@ export function Ledger() {
                     <td><span className="muted">{r.provider || '—'}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.validated_at)}</span></td>
                   </tr>
+                  {open && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '0 12px 12px' }}>
+                        <SignalAnalysisPanel kind="ledger" item={{ ...r, pre_broken: pre }} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 )
               })}
             </tbody>

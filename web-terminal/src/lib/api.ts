@@ -192,7 +192,7 @@ export const api = {
   cryptoDetail: (coin: string) => get<CryptoCoin>(`/crypto/${encodeURIComponent(coin)}`),
   // Per-item Signal Analysis — POST the item the rail already has; engine attaches the matching
   // accuracy-ledger report and returns the held-out, reproducible narrative.
-  analysis: (kind: 'trend' | 'market' | 'crypto', item: any) =>
+  analysis: (kind: 'trend' | 'market' | 'crypto' | 'ledger', item: any) =>
     post<SignalAnalysis>(`/analysis/${kind}`, { item }),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
   // The WHOLE Market universe, fetched 100 at a time (engine serves O(1) slices from
