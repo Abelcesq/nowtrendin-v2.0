@@ -68,7 +68,11 @@ _LEX = {
          # the Spanish-language WC queries (goleadores del mundial); unambiguous
          # football entities from the tracked-call worklist + Google-viral misses.
          "worldcup", "mundial", "golden boot", "usmnt", "haaland",
-         "manchester united"],
+         "manchester united",
+         # tracked-call reclassification (Catch-All Auditor 2026-07-07): Safiullin =
+         # ATP tennis player — verified against the topic's OWN signals (8/8 Wimbledon /
+         # Guardian-Sport / "safiullin tennis" queries); distinctive surname, no overmatch.
+         "safiullin"],
         # weak — sports-ish, can appear elsewhere
         ["soccer", "football", "basketball", "baseball", "hockey", "tennis",
          "golf", "boxing", "cricket", "rugby", "cycling", "match", "league",

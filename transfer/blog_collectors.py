@@ -178,6 +178,124 @@ GHOST_FEEDS = [
     {"name":"AI Supremacy",            "url":"https://aisupremacy.substack.com/feed",                "tier":"expert"},
 ]
 
+# ── RESEARCH / EARLY-SIGNAL outlets (§15 M/D reweighting — Dark Matter D, expert tier) ──
+# FLAG-GATED OFF by default (GHOST_RESEARCH_FEEDS=1 to enable): a score-affecting source
+# ships only after founder review of the held-out validation (backtest-before-ship).
+# ONBOARDING VERDICTS (2026-07-07, §16 five-gate run on LIVE samples):
+#   • War on the Rocks / Rest of World / Global Issues / RAND — PASS with the
+#     ENTITY-ANCHORED extractor below. The generic blog n-gram extractor FAILED the
+#     FORMAT gate on these editorial titles ("gathering clouds building",
+#     "nissan can fill" survived _is_quality_topic) — and expert-tier signals are
+#     EXEMPT from the catch-all corroboration floor, so that junk would have entered
+#     scoring at the HIGHEST-trust tier. mode="research_entity" restricts extraction
+#     to proper-noun-anchored entities (zero filler n-grams; misses > junk).
+#   • NBER — FAILED (2nd documented failure): academic titles extract AUTHOR NAMES as
+#     topics ("ulrike malmendier stefan" passed the quality gate) + items carry NO
+#     dates. Do NOT re-add without a paper-title-specific extractor.
+#   • Pew Research — FAILED as-is: the feed mixes report sub-pages ("Methodology",
+#     "Acknowledgments", "Appendix B…") into items; "acknowledgments" passed the
+#     quality gate. Revisit only with a sub-page title filter.
+RESEARCH_FEEDS = [
+    {"name":"War on the Rocks", "url":"https://warontherocks.com/feed/",        "tier":"expert", "mode":"research_entity"},
+    {"name":"Rest of World",    "url":"https://restofworld.org/feed/latest/",   "tier":"expert", "mode":"research_entity"},
+    {"name":"Global Issues",    "url":"https://www.globalissues.org/news/feed", "tier":"expert", "mode":"research_entity"},
+    {"name":"RAND (blog)",      "url":"https://www.rand.org/blog.xml",          "tier":"expert", "mode":"research_entity"},
+]
+GHOST_RESEARCH_ENABLED = os.getenv("GHOST_RESEARCH_FEEDS", "0") == "1"
+
+
+def _load_common_words_local() -> set:
+    """The engine's wordfreq common-word dictionary (common_words.txt, ~10k words).
+    Loaded directly (importing the detector here would be a circular import)."""
+    try:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "common_words.txt")
+        with open(path, encoding="utf-8") as f:
+            return {w.strip().lower() for w in f if w.strip()}
+    except Exception:
+        return set()
+
+
+_RESEARCH_COMMON = _load_common_words_local()
+
+
+def research_entity_topics(title: str, max_topics: int = 5) -> list:
+    """ENTITY-ANCHORED topic extraction for research/editorial headlines.
+
+    The generic n-gram extractor turns policy/editorial titles into filler fragments
+    ("building digital strategic") that survive the scoring quality gate — and
+    expert-tier signals bypass the corroboration floor, so precision here is an
+    INTEGRITY requirement, not a preference. This keeps ONLY maximal runs of
+    capitalized words containing at least one NON-common word (a real entity:
+    "Texas Screwworm", "Travis Kelce", "Venezuela") and drops everything else.
+    Conservative by design: a missed entity costs one topic; injected junk
+    corrupts the Dark-Matter pathway."""
+    import re as _re
+    if not title:
+        return []
+    out, seen = [], set()
+
+    def _norm(w):
+        # strip possessives + edge punctuation ("China's" → "china")
+        w = _re.sub(r"[’']s$", "", w, flags=_re.IGNORECASE)
+        return w.lower().strip("'’-")
+
+    # Split into sentences/segments so sentence-initial capitals don't chain runs.
+    for seg in _re.split(r"[.:;!?—|]|--", title):
+        words = _re.findall(r"[A-Za-z][A-Za-z'’-]*", seg)
+        if not words:
+            continue
+        caps = sum(1 for w in words if w[0].isupper())
+        # Title-Case segment (most words capitalized): single capitalized words are
+        # style, not entities — require runs of ≥2 words there. Sentence-case
+        # segments: a lone capitalized word MID-sentence is a genuine proper noun.
+        title_case = caps >= max(2, int(len(words) * 0.7))
+        min_run = 2 if title_case else 1
+
+        def _flush(run, start_idx):
+            if not run or len(run) < min_run:
+                # sentence-case: allow a 1-word entity only when NOT segment-initial
+                if not (run and not title_case and start_idx > 0):
+                    return
+            lower = [_norm(w) for w in run]
+            lower = [w for w in lower if w]
+            if not lower or len(lower) > 3:
+                return
+            def _is_entity(w):
+                return w not in _RESEARCH_COMMON and w not in STOP_WORDS and len(w) >= 3
+            # Trim capitalized-but-common EDGE words (Title-Case style riding along:
+            # "afghanistan barbers UNDER") — but never below 2 words: a phrase trimmed
+            # to a single word is a style word, not an entity ("Compute Age"→"compute").
+            while len(lower) > 2 and not _is_entity(lower[-1]):
+                lower.pop()
+            while len(lower) > 2 and not _is_entity(lower[0]):
+                lower.pop(0)
+            # Single-word topics ONLY for standalone proper nouns: a 1-word run in a
+            # sentence-case segment, mid-sentence, ≥4 chars ("Temu", "Maldives") —
+            # never a trim residue or a Title-Case style word.
+            if len(lower) == 1 and not (len(run) == 1 and not title_case and start_idx > 0
+                                        and len(lower[0]) >= 4 and _is_entity(lower[0])):
+                return
+            # entity = at least one word NOT in the common dictionary
+            if not any(_is_entity(w) for w in lower):
+                return
+            phrase = " ".join(lower)[:60]
+            if len(phrase) >= 4 and phrase not in seen:
+                seen.add(phrase)
+                out.append(phrase)
+
+        run, start = [], 0
+        for i, w in enumerate(words):
+            if w[0].isupper() and _norm(w) not in STOP_WORDS:
+                if not run:
+                    start = i
+                run.append(w)
+                if len(run) == 3:   # cap phrase length at 3 words
+                    _flush(run, start); run = []
+            else:
+                _flush(run, start); run = []
+        _flush(run, start)
+    return out[:max_topics]
+
 
 # ── Stop words & domain terms (mirrors gravitational_anomaly_detector.py) ──
 
@@ -391,9 +509,16 @@ def _parse_rss(url):
         root = ET.fromstring(r.content)
         items = root.findall(".//item") or \
                 root.findall(".//{http://www.w3.org/2005/Atom}entry")
-        return [{"title": (i.findtext("title") or "").strip(),
-                 "link":  (i.findtext("link")  or "").strip(),
-                 "author": "", "summary": (i.findtext("description") or "").strip(),
+        # Namespace-agnostic reads: Atom feeds (and RSS with a default xmlns) make
+        # findtext("title") return '' — match on the local tag name instead.
+        def _lt(el, name):
+            for c in el.iter():
+                if c.tag.split('}')[-1] == name and (c.text or "").strip():
+                    return c.text.strip()
+            return ""
+        return [{"title": _lt(i, "title"),
+                 "link":  _lt(i, "link"),
+                 "author": "", "summary": _lt(i, "description") or _lt(i, "summary"),
                  "tags": []}
                 for i in items]
     except Exception:
@@ -813,9 +938,11 @@ def collect_ghost(conn):
     - "Expert" tier: highest source quality in the system
     """
     total_s, total_t = 0, 0
-    print(f"  [Ghost RSS] {len(GHOST_FEEDS)} expert blog feeds...")
+    feeds = list(GHOST_FEEDS) + (list(RESEARCH_FEEDS) if GHOST_RESEARCH_ENABLED else [])
+    print(f"  [Ghost RSS] {len(feeds)} expert blog feeds"
+          f"{' (+research outlets)' if GHOST_RESEARCH_ENABLED else ''}...")
 
-    for cfg in GHOST_FEEDS:
+    for cfg in feeds:
         items = _parse_rss(cfg["url"])
         count = 0
         for item in items:
@@ -828,9 +955,19 @@ def collect_ghost(conn):
             ft = _first_timer(conn, author, "ghost", cfg["name"])
             sid = _id("ghost", link or title)
             text = f"{title} {item.get('summary', '')[:300]}"
+            # Research/editorial outlets use the ENTITY-ANCHORED extractor — the
+            # generic n-gram extractor failed the §16 FORMAT gate on their titles
+            # (filler fragments that survive the quality gate would enter the
+            # corroboration-floor-exempt expert pathway).
+            if cfg.get("mode") == "research_entity":
+                topics = research_entity_topics(title)
+                if not topics:
+                    continue   # no clean entity → write NOTHING (misses > junk)
+            else:
+                topics = extract_topics(text, tags=tags)
             _write_signal(conn, sid, "ghost", tier, cfg["name"],
                           title, link, author, 60, 0, ft, True, text)
-            n = _write_topics(conn, sid, extract_topics(text, tags=tags),
+            n = _write_topics(conn, sid, topics,
                               "ghost", tier, cfg["name"], 60, 0, True)
             total_s += 1; total_t += n; count += 1
         print(f"    {cfg['name']}: {count} articles")
