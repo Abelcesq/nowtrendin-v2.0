@@ -824,7 +824,7 @@ export interface SignalAnalysisData {
   disclaimer?: string;
 }
 export async function fetchSignalAnalysis(
-  kind: 'trend' | 'market' | 'crypto', item: any,
+  kind: 'trend' | 'market' | 'crypto' | 'ledger', item: any,
 ): Promise<SignalAnalysisData | null> {
   try {
     const res = await fetch(`${GRADIENT_API}/analysis/${kind}`, {

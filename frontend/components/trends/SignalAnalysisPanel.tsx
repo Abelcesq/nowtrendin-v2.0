@@ -25,7 +25,7 @@ function Body({ text }: { text: string }) {
   );
 }
 
-export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' | 'crypto'; item: any }) {
+export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' | 'crypto' | 'ledger'; item: any }) {
   const [a, setA] = useState<SignalAnalysisData | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'empty'>('loading');
   const sig = JSON.stringify(item || {});

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Target, TrendingUp, Clock } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
 import { Disclaimer } from '../../../components/ui/Disclaimer';
+import { SignalAnalysisPanel } from '../../../components/trends/SignalAnalysisPanel';
 import { useAccuracy, useAccuracyDetail, useMarketAccuracy, useCryptoAccuracy } from '../../../hooks/useSignals';
 import type { LedgerDetailRow, PriceLedgerDetailRow } from '../../../lib/gradientApi';
 
@@ -91,6 +92,8 @@ export default function AccuracyLedger() {
   const [mode, setMode] = useState<Mode>('attention');
   const [filter, setFilter] = useState('');
   const [shown, setShown] = useState(PAGE);
+  // Tap a row → the full Ledger Entry Analysis panel (/analysis/ledger).
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const { report, isLoading } = useAccuracy();
   const { rows: aRows, isLoading: aLoading } = useAccuracyDetail();
@@ -244,24 +247,31 @@ export default function AccuracyLedger() {
               {aView.slice(0, shown).map((r, i) => {
                 const v = r.preBroken ? 'PRE-BROKEN' : (r.verdict || '—');
                 const win = r.verdict === 'LED' || r.verdict === 'SAME_DAY';
+                const rowId = r.topicKey + '|' + (r.detectionDate || i);
+                const open = expanded === rowId;
                 return (
-                  <View key={r.topicKey + i} className="bg-card rounded-xl p-3 mb-2">
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-textPrimary font-semibold flex-1 mr-2" numberOfLines={1}>
-                        {titleCaseTopic(r.topic)}
-                        {r.queryAmbiguous === 1 ? <Text className="text-textMuted text-xs">  · broad term</Text> : null}
-                      </Text>
-                      <VerdictPill v={v} />
-                    </View>
-                    <View className="flex-row items-center justify-between mt-1.5">
-                      <Text className="text-textMuted text-xs">
-                        det {fmtD(r.detectionDate)} · breakout {fmtD(r.breakoutDate)}
-                      </Text>
-                      <Text className="text-textSecondary text-xs font-black">
-                        {r.leadDays != null ? `${r.leadDays > 0 ? '+' : ''}${r.leadDays}d` : '—'}
-                      </Text>
-                    </View>
-                    {win && <Text className="text-textMuted text-xs mt-1">{refereeLine(r)}</Text>}
+                  <View key={rowId}>
+                    <TouchableOpacity activeOpacity={0.85} onPress={() => setExpanded(open ? null : rowId)}
+                      className="bg-card rounded-xl p-3 mb-2">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-textPrimary font-semibold flex-1 mr-2" numberOfLines={1}>
+                          {titleCaseTopic(r.topic)}
+                          {r.queryAmbiguous === 1 ? <Text className="text-textMuted text-xs">  · broad term</Text> : null}
+                        </Text>
+                        <VerdictPill v={v} />
+                      </View>
+                      <View className="flex-row items-center justify-between mt-1.5">
+                        <Text className="text-textMuted text-xs">
+                          det {fmtD(r.detectionDate)} · breakout {fmtD(r.breakoutDate)}
+                        </Text>
+                        <Text className="text-textSecondary text-xs font-black">
+                          {r.leadDays != null ? `${r.leadDays > 0 ? '+' : ''}${r.leadDays}d` : '—'}
+                        </Text>
+                      </View>
+                      {win && <Text className="text-textMuted text-xs mt-1">{refereeLine(r)}</Text>}
+                      {!open && <Text className="text-textMuted text-[12px] mt-1">Tap for the full entry analysis</Text>}
+                    </TouchableOpacity>
+                    {open && <SignalAnalysisPanel kind="ledger" item={r} />}
                   </View>
                 );
               })}
