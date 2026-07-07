@@ -281,8 +281,19 @@ the **Frontend Consistency** agent (`/frontend-consistency`).
   Cost Sentinel, Data Subscriptions, Calibration Auditor, **Canonical Date Auditor** (B3a —
   `/monitor/datecanon`; audits every date-semantic + discovered `*_date` column so §14
   compliance is verified for ALL sources, new ones auto-covered). Plus the **Prewarm Agent**
-  (operational, read-only, API-process `/prewarm` — keeps every list-feed superset cache hot).
+  (operational, read-only, API-process `/prewarm` — keeps every list-feed superset cache hot;
+  PULL-SYNCHRONIZED: fires `PREWARM_AFTER_PULL_S` = 60s after EVERY data pull completes, with
+  the 25-min loop as TTL safety net; warms are overlap-guarded).
   Full specs: `AGENT_CHARTER.md` (Agents 1–16) + `DATA_BUILDING_BLOCKS.md`.
+- **BATCH-PACED PIPELINE (founder rule, 2026-07-06 — heavy phases must never clog the serve
+  path).** The whole pipeline breathes between units of heavy work so the DB pool + serve path
+  stay responsive: collectors pause `COLLECT_SOURCE_PAUSE_S` (10s) between sources; the scorer
+  scores in batches of `SCORE_BATCH_SIZE` (100) with `SCORE_BATCH_PAUSE_S` (10s) between
+  batches; prewarm pauses `PREWARM_FEED_PAUSE_S` (10s) between its 7 feed builds. Superset
+  builds are additionally **SINGLE-FLIGHT** (`_get_or_build`): one builder per cache key —
+  concurrent requests wait for its result or get an honest 503 "warming", never a second
+  build (the 2026-07-06 thundering-herd lesson). All in
+  `transfer/gravitational_anomaly_detector.py`; env-tunable, defaults live (no overrides set).
 
 ## 14. CANONICAL DATE & TIME MODEL — data streamlining → Accuracy-Ledger viability
 

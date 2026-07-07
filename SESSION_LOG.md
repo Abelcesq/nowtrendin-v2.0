@@ -1154,3 +1154,49 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
     all "token/secret" matches were prose, no credentials.
 - Also committed the pending AGENT_CHARTER.md Agent-15 spec update (aa846e3).
 - `git status` now fully clean.
+
+## Session 2026-07-06 (night) — batch-paced pipeline CONFIRMED LIVE + full agent health check
+
+### Batch-paced pipeline (founder rule) — implementation confirmed, docs closed
+The three pacing commits (2955260 batch-paced collect+score, aa802ed single-flight supersets,
+530b0f4 prewarm feed pacing) are LIVE on the engine; docs were lagging — AGENT_CHARTER had it,
+SESSION_LOG + CLAUDE.md did not. Both now updated (CLAUDE.md §13 new BATCH-PACED PIPELINE bullet).
+Confirmed in `transfer/gravitational_anomaly_detector.py`, env-tunable, NO overrides set on
+Heroku → defaults live:
+- Scorer: `SCORE_BATCH_SIZE`=100 per batch + `SCORE_BATCH_PAUSE_S`=10s between batches.
+- Collectors: `COLLECT_SOURCE_PAUSE_S`=10s between sources.
+- Prewarm: `PREWARM_AFTER_PULL_S`=60s after EVERY data pull (the founder 60s warm rule) +
+  `PREWARM_FEED_PAUSE_S`=10s between the 7 feed builds; overlap-guarded.
+- Single-flight `_get_or_build`: observed live — prewarm reported scores feed
+  "busy (another build in flight)" instead of launching a second build. Working as designed.
+
+### Full agent + data-pull health check (2026-07-07 ~02:45 UTC)
+- **No data leaking, scoring active and clean.** Scorer heartbeat 3.3 min (cloud); pipeline
+  integrity OK — 0 stale serve payloads (INV-1 fix holding), 0 dupe groups, 0 junk singles,
+  serve-consistency 40/40. Datecanon: 16 columns audited, **0 non-canonical values**.
+  Catch-all: 38.3% served (down from 70.2%), floor STABLE, single-source leak 3 (delta −5,
+  improving). Fragments 0.
+- **Collectors 15/17 HEALTHY**, all critical healthy (trust=true). DEGRADED (ran, 0 signals):
+  `github` (token configured — investigate) + `reddit` (expected — keys deferred).
+- **Cost Sentinel back under cap: $497.89 / $700** (was CRITICAL $718.82) — the Apify
+  clock-slot fix landed (Apify live-metered $0.96 this period). X posts 16.9% of budget.
+- **Prewarm** pull-synchronized + healthy; all 7 feeds warm (scores 2522 · topics ~1860 ·
+  history 7d/24h/12h 2000 · risk ~290 · crypto 12).
+
+### Warns to action (none are leaks; all flag-never-force worklist)
+1. `github` collector DEGRADED — runs but 0 signals for ~1h+; check token/API response shape.
+2. **Datecanon B3a: 8 undeclared `*_date` columns** — the NEW crypto + market ledgers
+   (crypto_accuracy_ledger.detection_date/move_date, crypto_pending_detections
+   .detection_date/timeout_date, market_accuracy_ledger + market_pending_detections same) were
+   never registered in DATE_SEMANTIC. The auditor's auto-discovery working exactly as designed;
+   classify + register them.
+3. **Catch-all auditor: 52 TRACKED calls (ledger/pending) stuck in catch-all** — reclassify
+   worklist (visa, United States, trillionaire, …); policy: situation layer routes bare
+   countries/visa, so route via lexicon/situation review, not blind lexicon adds.
+4. Calibration auditor reads evaluated=0/pending=0 in ITS window while /accuracy/ledger serves
+   821 pending / 70 resolved — likely a scoped-window read in the auditor, worth a look so its
+   small-sample guardrail reflects the real ledger denominators.
+
+### Open / Next
+- Investigate github collector 0-signals; register the 8 crypto/market ledger date columns;
+  work the 52-tracked-calls reclassification list; check calibration auditor's ledger read.
