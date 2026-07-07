@@ -136,6 +136,19 @@ function bar(label: string, val: number | null, color: string) {
 function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   const raw = row.raw
   const [act, setAct] = useState('')
+  // Source-aware AI definition — same /explainer the Trends rail + mobile show
+  // (generated once, persisted + cached engine-side; §17: renders a placeholder,
+  // never a fabricated definition).
+  const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
+  const [exLoading, setExLoading] = useState(true)
+  const [showFull, setShowFull] = useState(false)
+  useEffect(() => {
+    let alive = true; setExLoading(true); setShowFull(false); setEx(null)
+    api.explainer(row.key)
+      .then((x) => alive && setEx(x?.available ? x : null))
+      .catch(() => {}).finally(() => alive && setExLoading(false))
+    return () => { alive = false }
+  }, [row.key])
   const onWatch = async () => setAct(await addToWatchlist(row.key, row.name, 'market'))
   const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this instrument.')
   const onExport = () => exportEntityCsv(`${row.key}_market.csv`, [
@@ -190,6 +203,24 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       <div className="gauges" style={mg.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
         <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MM_LABEL : 'Detection'}</div><div className="gf">{row.v2 ? 'informed money · D' : 'analysts + positioning'}</div></div>
         <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MC_LABEL : 'Confidence'}</div><div className="gf">{row.v2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
+      </div>
+
+      {/* AI Context — the same source-aware definition the Trends rail shows (§12 parity),
+          placed under the score like the trend panel. */}
+      <div className="sect">
+        <h4>AI Context</h4>
+        {ex?.short ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{ex.short}</div>
+            {ex.full && ex.full.trim() !== ex.short.trim() && (
+              showFull ? <div className="ai-full">{ex.full}</div>
+                : <button className="ai-more" onClick={() => setShowFull(true)}>Read full definition ↓</button>
+            )}
+          </div>
+        ) : (
+          <div className="narr muted">{exLoading ? 'Generating a source-aware definition…' : 'No AI definition yet — it generates on first view and is cached.'}</div>
+        )}
+        {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
       </div>
       <div className="sect">
         {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
