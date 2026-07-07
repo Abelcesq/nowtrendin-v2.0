@@ -692,7 +692,10 @@ def grade_topic(topic: str) -> dict:
 
 
 def _num(v, default=0.0):
+    """Coerce an AI-returned component to a number CLAMPED to [0, 100] — the model
+    can return 150, -20, or a 0-1 ratio; an out-of-range value must never enter
+    _composite unbounded (contract: every AI numeric bounded before scoring)."""
     try:
-        return round(float(v), 1)
+        return round(min(100.0, max(0.0, float(v))), 1)
     except Exception:
         return default

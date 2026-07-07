@@ -337,6 +337,28 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     # LATE_REDETECTION rows are excluded from the honest denominator (C1 gate).
     late = [r for r in rows if r["verdict"] == "LATE_REDETECTION"]
     resolved = len(led) + len(same) + len(lag) + len(fp)
+
+    # ── PRE-BROKEN segmentation (report-time only; no stored row changes) ────────────
+    # A LAGGED row whose Google breakout happened more than LEDGER_PRE_BROKEN_DAYS
+    # BEFORE our first sighting was never a race we were in: the topic entered the
+    # system already post-breakout (ledger cold-start / late discovery — e.g. the
+    # 2026-06-13 bulk-enrollment rows lagging May breakouts). Those measure coverage
+    # latency. A NEAR-MISS lag (within the grace window) is a race we ran and lost.
+    # NOTHING leaves the honest denominator — both cohorts stay counted; this only
+    # names them so the blended rate can be read correctly.
+    _pre_grace = int(os.getenv("LEDGER_PRE_BROKEN_DAYS", "7"))
+    def _lag_days(r):
+        ld = r.get("lead_time_days")
+        if ld is not None:
+            return ld  # negative = breakout preceded detection
+        try:
+            return (_parse(r["breakout_date"]) - _parse(r["detection_date"])).days
+        except Exception:
+            return None
+    lag_pre = [r for r in lag if (_lag_days(r) is not None and _lag_days(r) < -_pre_grace)]
+    lag_near = [r for r in lag if r not in lag_pre]
+    # Hit rate over races actually RUN (pre-broken rows excluded from THIS view only).
+    _race_denom = len(led) + len(same) + len(lag_near) + len(fp)
     if resolved == 0:
         return {"status": "empty", "message": "No resolved predictions yet.", "pending": pending,
                 "late_redetection_excluded": len(late), "param_version": LEDGER_PARAM_VERSION}
@@ -377,6 +399,14 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "late_redetection_excluded": len(late),
         "hits_led": len(led), "same_day": len(same),
         "misses_lagged": len(lag), "misses_false_positive": len(fp),
+        # Pre-broken split of LAGGED (see comment above) — transparency fields; the
+        # blended honest rate below still counts EVERYTHING.
+        "misses_lagged_near": len(lag_near),
+        "misses_pre_broken": len(lag_pre),
+        "pre_broken_grace_days": _pre_grace,
+        "tracked_race_hit_rate_pct": (round(len(led) / _race_denom * 100, 1)
+                                      if _race_denom else None),
+        "tracked_race_sample": _race_denom,
         "honest_hit_rate_pct": round(len(led) / resolved * 100, 1),
         "naive_hit_rate_pct": round(len(led) / naive_denom * 100, 1) if naive_denom else 0.0,
         "median_lead_days": round(statistics.median(lead_times), 1) if lead_times else 0,

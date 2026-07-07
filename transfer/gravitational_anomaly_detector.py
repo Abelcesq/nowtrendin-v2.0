@@ -465,17 +465,30 @@ def _apify_sweep_budget_ok(reserve_usd: float = None) -> dict:
 
 
 def _record_top_detections(limit=20, min_detection=None):
-    """Log the engine's strongest current detections as PENDING ledger entries
-    (starts the clock for every call, not just the winners). Uses each topic's
-    true first-seen as the detection date. Idempotent."""
+    """Log detections as PENDING ledger entries — FIRST-CROSSING enrollment.
+
+    2026-07-07 enrollment fix (measurement-only, held-out): the old query enrolled
+    the TOP of the current leaderboard (ORDER BY detection_score DESC). A topic at
+    the top of the leaderboard is already big — the exact population Google has
+    already broken out on — so the ledger structurally defaulted to LAGGED and the
+    hit rate measured coverage latency, not the before-it-arrives thesis. Now we
+    enroll topics at their FIRST CROSSING of the detection floor:
+      • first-seen must be RECENT (LEDGER_ENROLL_RECENT_DAYS, default 14) — fresh
+        crossers, not perennial leaders re-sampled every run;
+      • ESTABLISHED/MONITORING topics (topic_maturity) are excluded — they can only
+        resolve LAGGED and pollute the denominator;
+      • newest crossers first (the race we can still win), not highest score.
+    Uses each topic's true first-seen as the detection date. Idempotent."""
     if not _LEDGER_PLUS_AVAILABLE:
         return 0
     floor = float(min_detection if min_detection is not None
                   else os.getenv("LEDGER_DETECTION_FLOOR", "10"))
+    recent_days = int(os.getenv("LEDGER_ENROLL_RECENT_DAYS", "14"))
+    first_seen_cut = (datetime.now(timezone.utc) - timedelta(days=recent_days)).isoformat()
     conn = get_db(DB_PATH)
     n = 0
     try:
-        rows = conn.execute("""
+        _base_sql = """
             SELECT v.topic_key, v.topic_display, v.detection_score,
                    COALESCE(lc.first_detected_at, fs.first_at) AS det_date
             FROM velocity_scores v
@@ -484,9 +497,26 @@ def _record_top_detections(limit=20, min_detection=None):
             INNER JOIN (SELECT topic_key, MIN(scored_at) first_at FROM velocity_scores GROUP BY topic_key) fs
               ON v.topic_key=fs.topic_key
             LEFT JOIN topic_lifecycle lc ON v.topic_key=lc.topic_key
+            {tm_join}
             WHERE v.detection_score >= ?
-            ORDER BY v.detection_score DESC LIMIT ?
-        """, (floor, limit)).fetchall()
+              AND COALESCE(lc.first_detected_at, fs.first_at) >= ?
+              {tm_where}
+            ORDER BY COALESCE(lc.first_detected_at, fs.first_at) DESC LIMIT ?
+        """
+        try:
+            rows = conn.execute(_base_sql.format(
+                tm_join="LEFT JOIN topic_maturity tm ON v.topic_key=tm.topic_key",
+                tm_where="AND UPPER(COALESCE(tm.maturity_class, '')) NOT IN ('ESTABLISHED', 'MONITORING')",
+            ), (floor, first_seen_cut, limit)).fetchall()
+        except Exception:
+            # topic_maturity absent/unreadable — enroll on first-crossing recency alone
+            # (fail OPEN on the maturity filter, never on enrollment itself).
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            rows = conn.execute(_base_sql.format(tm_join="", tm_where=""),
+                                (floor, first_seen_cut, limit)).fetchall()
         import date_utils
         for r in rows:
             # Canonical PRIMARY date (§14): never raw [:10] — to_iso_date tries
@@ -6303,6 +6333,13 @@ def accuracy_ledger_report():
                     "led": h["hits_led"],
                     "sameDay": h["same_day"],
                     "lagged": h["misses_lagged"],
+                    # Pre-broken split: laggedNear = races run and lost; preBroken =
+                    # Google broke out >grace before our first sighting (cold-start /
+                    # late discovery — never a race). Blended hitRate counts BOTH.
+                    "laggedNear": h.get("misses_lagged_near"),
+                    "preBroken": h.get("misses_pre_broken"),
+                    "trackedRaceHitRate": h.get("tracked_race_hit_rate_pct"),
+                    "trackedRaceSample": h.get("tracked_race_sample"),
                     "falsePositives": h["misses_false_positive"],
                     "pending": h["still_pending"],
                     "smallSample": h["small_sample_warning"],
@@ -7608,8 +7645,11 @@ def query_topic(payload: dict = Body(...)):
     if _CAL_AVAILABLE:
         try:
             result = apply_calibration(result, db_path=DB_PATH)
-        except Exception:
-            pass
+        except Exception as _ce:
+            # OBSERVABLE swallow (C8): log + stamp so an uncalibrated direct-query
+            # score is detectable, never indistinguishable from a calibrated one.
+            print(f"[direct-query] apply_calibration failed topic={tkey}: {_ce}")
+            result.setdefault("calibration_errors", []).append("apply_calibration")
     try:
         detector._update_topic_lifecycle(conn, result)
     except Exception:
@@ -8378,6 +8418,30 @@ def get_topic_detail(topic_key: str):
         "SELECT * FROM topic_lifecycle WHERE topic_key = ?", (topic_key,)
     ).fetchone()
 
+    # N detail (queries 30d / 24h / daily rate): velocity_scores never persisted
+    # these (schema has only nowtrendin_score), so reading them off the row was
+    # always 0 — "No internal query history yet" even at N=100. Recompute fresh
+    # from topic_queries (three indexed single-topic COUNTs, same formulas as the
+    # N scorer). Display-only — N stays out of the composite.
+    _nq_30d = _nq_24h = 0
+    _nq_rate = 0.0
+    try:
+        _c30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        _c7  = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        _c24 = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        _nq_30d = conn.execute(
+            "SELECT COUNT(*) AS c FROM topic_queries WHERE topic_key = ? AND queried_at >= ?",
+            (topic_key, _c30)).fetchone()["c"] or 0
+        _nq_7d = conn.execute(
+            "SELECT COUNT(*) AS c FROM topic_queries WHERE topic_key = ? AND queried_at >= ?",
+            (topic_key, _c7)).fetchone()["c"] or 0
+        _nq_24h = conn.execute(
+            "SELECT COUNT(*) AS c FROM topic_queries WHERE topic_key = ? AND queried_at >= ?",
+            (topic_key, _c24)).fetchone()["c"] or 0
+        _nq_rate = round(_nq_7d / 7.0, 2)
+    except Exception:
+        pass
+
     conn.close()
 
     s   = _parse_json_fields(dict(latest))
@@ -8486,15 +8550,10 @@ def get_topic_detail(topic_key: str):
                 "weight_overall": "—", "weight_detect": "—", "weight_conf": "—",
                 "in_composite": False,
                 "label": "Community demand (separate signal)",
-                "total_queries_30d": s.get("nowtrendin_queries_30d", 0),
-                "queries_24h":       s.get("nowtrendin_queries_24h", 0),
-                "daily_rate_7d":     s.get("nowtrendin_daily_rate", 0),
-                "plain_english": _explain_n(
-                    n,
-                    s.get("nowtrendin_queries_30d", 0),
-                    s.get("nowtrendin_queries_24h", 0),
-                    s.get("nowtrendin_daily_rate", 0),
-                ),
+                "total_queries_30d": _nq_30d,
+                "queries_24h":       _nq_24h,
+                "daily_rate_7d":     _nq_rate,
+                "plain_english": _explain_n(n, _nq_30d, _nq_24h, _nq_rate),
             },
         },
 
@@ -8921,8 +8980,10 @@ def get_topic_history(topic_key: str):
             if _CAL_AVAILABLE:
                 try:
                     h = apply_calibration(h)
-                except Exception:
-                    pass
+                except Exception as _ce:
+                    # OBSERVABLE swallow (C8): log + stamp the downgrade
+                    print(f"[history-cal] apply_calibration failed topic={h.get('topic_key')}: {_ce}")
+                    h.setdefault("calibration_errors", []).append("apply_calibration")
 
             # 2. AI tier-aware score overrides
             if _AI_INTEL_AVAILABLE:
