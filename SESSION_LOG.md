@@ -1133,3 +1133,24 @@ Internal founder key (gated engine endpoints): `X-Internal-Key: nt-internal-7f3a
   moment they exist (was: up to 25 min later on the loop). Warms are now OVERLAP-GUARDED
   (one at a time; stacked kicks no-op — the thundering-herd lesson). The 25-min loop stays
   as the TTL safety net. AGENT_CHARTER Agent 15 spec updated.
+
+## Session 2026-07-06 (late) — repo root cleanup (untracked clutter)
+
+### Completed
+- Researched all 38 untracked items, then fixed by category (commit 152147c):
+  - **Gitignored**: `.ghpages-deploy/` + `web-deploy-terminal/` (deploy staging clones with
+    their own .git), `__pycache__/`/`*.pyc`, `transfer/anomaly_detector.db`, and the personal
+    `revised PTCS on Coffe.pdf` (kept local, non-project).
+  - **Deleted (regenerable scratch)**: 10 diagnostic curl/DB dumps (ana_crypto/crypto_check/du/
+    hist/ledger_detail/pg/risk_check/sc_tmp .json, gt_rss.xml, the broken-redirect
+    "C:Tempnyt_economy.xml" NYT RSS sample, transfer/fmp_hist.json) + 3 dated `_06_17_26`
+    diagnostic drafts — verified superseded by the TRACKED canonical
+    `transfer/{market,trend}_signal_diagnostic.py` (dated ones were the pre-wiring
+    standalone versions).
+  - **Committed deliverables**: 2026-06-23 audit PDFs → `audits/`; pitch deck →
+    `docs/business/`; 4 Jun-15 design mockup HTMLs → `docs/design-mockups/`; Alpha-Engine
+    Phases 1-3 + Developer Punch List + nightly-agent moat charter MDs → `docs/`.
+  - **Committed `_audit_work/`** (provenance for the two audit PDFs) after a secret scan —
+    all "token/secret" matches were prose, no credentials.
+- Also committed the pending AGENT_CHARTER.md Agent-15 spec update (aa846e3).
+- `git status` now fully clean.
