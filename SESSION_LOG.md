@@ -1200,3 +1200,48 @@ Heroku → defaults live:
 ### Open / Next
 - Investigate github collector 0-signals; register the 8 crypto/market ledger date columns;
   work the 52-tracked-calls reclassification list; check calibration auditor's ledger read.
+
+## Session 2026-07-07 (early) — the 4 health-check warns: researched + fixed (engine deployed ×2)
+
+### 1. github collector DEGRADED — ROOT CAUSE: expired/revoked GITHUB_TOKEN (HTTP 401)
+Tested the live Heroku token directly: 401 on /rate_limit AND /search — the 93-char length
+says fine-grained PAT (they expire; 90-day default). `collect_github` silently `continue`d
+on non-200 → the invisible 0-signal runs. FIXED in code (2185e0f): on 401 the collector now
+logs once + retries UNAUTHENTICATED (10 req/min; existing 403 handler absorbs the tighter
+limit) so github signals degrade gracefully instead of vanishing; non-200s now logged.
+USER ACTION: rotate GITHUB_TOKEN (classic PAT, no scopes, no expiry recommended) — set it
+directly in the user's own terminal (never paste a token into a Claude transcript — the
+APIFY_TOKEN lesson). Same env var also feeds gradient_engine_backend + research_history.
+
+### 2. Datecanon 8 undeclared *_date columns — registered + classified (2185e0f, fd96200)
+detection_date/move_date on market/crypto accuracy ledgers registered in DATE_SEMANTIC
+(writers already canonicalize via to_iso_date — 0 non-canonical). First deploy exposed the
+right finding: the 3 *_pending_detections.timeout_date columns hold computed deadline
+INSTANTS ((detection+TIMEOUT_DAYS).isoformat(), consumed via now > _parse()) — classified
+onto the auditor's OPERATIONAL allowlist exactly like the attention ledger's
+pending_detections.timeout_date (already there). NO data rewritten (forward-only honored).
+VERIFIED live: datecanon status ok — 14 columns, 0 non-canonical, 0 undeclared.
+
+### 3. Calibration auditor 0/0 — key-name mismatch (2185e0f)
+It read the /accuracy/ledger ENDPOINT's renamed keys (total/pending/hitRate/smallSample)
+off the RAW generate_honest_report dict (sample_size/still_pending/honest_hit_rate_pct/
+small_sample_warning) → always 0/0 + phantom small-sample warn. Same bug class as the
+mobile camelCase ledger zeros. Now reads raw keys with endpoint-name fallbacks.
+VERIFIED live: calibration_auditor ok — evaluated=70, pending=821, hit_rate=10.0.
+
+### 4. Catch-all 52 tracked calls — classified worklist (flag-never-force, NO changes applied)
+Auditor caps examples at 15; classification of the visible set:
+- POLICY-ROUTED (stay out of lexicon; situation layer handles): United States, the us, visa.
+- OLD JUNK PENDINGS (generic words predating the fragment gate; correctly catch-all —
+  resolve via the 365d patience-window timeout, NO action): trillionaire, sonny, socialists,
+  secretive, scrambling, scanner, rewriting, programmers.
+- LEXICON CANDIDATES (founder sign-off; precedent = youtube/whatsapp adds): reddit → tech;
+  Roman Safiullin → sports (haaland/balogun precedent); phi + pegasus AMBIGUOUS (greek
+  letter / mythical name over-match risk) — recommend skip.
+Founder decision pending before any lexicon change.
+
+### Open / Next
+- USER: rotate GITHUB_TOKEN on nowtrendin-v2-engine (steps given in chat).
+- Founder: approve/reject the 2 lexicon candidates (reddit, Roman Safiullin).
+- source_watchdog github warn clears at the first collect slot after token rotation
+  (or degrades gracefully unauthenticated meanwhile).
