@@ -1425,3 +1425,20 @@ section). Definitions generate on first view + cache; Grade Claude stage restore
 - **reddit NOT added — the add would have been redundant:** serve-time `_category_for`
   already returns technology (context/situation layers route it). Verified live before
   touching the lexicon; adding it would have been unverified drift.
+
+## Session 2026-07-07 (Board) — Advisory Board created + branch A-G reviewed, fixed, merged flags-OFF
+- **/advisory-board skill created** (6 independent archetypes: Challenger, First-Principles
+  Guardian, Expansionist, Outsider VC/Banker, Executioner, Economist w/ founder-specified
+  canon — 12/12 source texts access-verified, incl. founder-provided Bogle/Bernstein/R&R/
+  Belsky-Gilovich local files; Bogle needs render-to-image, method recorded in the skill).
+- **Branch integrity-recs-A-G**: 7 recs implemented flag-gated OFF; six independent board
+  memos (audits/board/BOARD_integrity-recs-A-G_2026-07-07.md). Board caught 2 real defects:
+  F was a near-no-op (3 stage-write sites) and D's INSERT omitted calibration_multiplier
+  (transient inflation). Both fixed per board conditions + Challenger's no-lookahead basis
+  + E cooldown + B shadow log + policy stamps.
+- **Merged flags-OFF (fe2cefc), deployed (72285bb), zero behavior change verified.**
+- **A DECIDED: no reweight** (AUC noise); re-run at ≥30 post-fix races.
+- **INVERSION SOLVED**: as_of_detection_days = 0–1 for ~all ledger topics — the 2.3%-vs-24%
+  maturity inversion is a hindsight-classification artifact, not a thesis failure.
+- D-weight backtest results + D dry-run distribution: 698 EST / 156 EMERG / 80 NEW.
+- Remaining: 6 sequenced flag flips = per-item Chairman decisions (listed in board record).

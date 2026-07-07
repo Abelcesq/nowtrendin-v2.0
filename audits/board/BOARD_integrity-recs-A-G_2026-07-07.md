@@ -195,7 +195,31 @@ information; referee gate stands; set a review date).
    5 of 6 components" is defensible; silent renormalization is a smaller 30.0 pin. Risk
    is what remains after you think you've measured — say how much measuring happened.
 
-## STATUS
-Branch `integrity-recs-A-G` at `7e7708c`, all flags OFF, not merged. Two branch defects
-identified by the board (F's three write sites; D's calibration_multiplier omission)
-await the Chairman's instruction. Chairman — your decision per item.
+## STATUS + CHAIRMAN RULINGS (updated 2026-07-07, post-review)
+Chairman authorized "proceed with the Board's recommendations on fixes." Executed:
+- Board-conditioned fixes applied on the branch (627a8b8): F completed at ALL THREE
+  signal_stage write sites; D rewritten CALIBRATION-NEUTRAL BY CONSTRUCTION (exact
+  lifecycle-fallback rule + explicit calibration_multiplier) with the report's cohort
+  basis behind LEDGER_MATURITY_AT_DETECTION (no-lookahead, default OFF); E gained the
+  24h newest-slot cooldown; B gained the shadow log (would-block topics printed every
+  scoring run while OFF); /accuracy/ledger stamped with sweep_newest_slots +
+  maturity_basis.
+- Merged to main flags-OFF (fe2cefc) → deployed (engine 72285bb) → ZERO behavior
+  change verified live (ledger 10.0/26.9/70/7/44 identical pre/post).
+- **DECISION RECORDED (item A): NO REWEIGHT.** Current Detection weights stand. The
+  what-if backtest separated nothing (AUC 0.521–0.558 on 11v15 = noise). RE-RUN
+  TRIGGER: when the post-fix first-crossing cohort reaches ≥30 resolved races —
+  and before ANY weight-vector change ever ships. The 0.558 no-D bound is noise,
+  never to be quoted as directional.
+- **DRY-RUN FINDING (D, live):** as_of_detection_days = 0–1 for essentially every
+  ledger topic → the EMERGING 2.3% vs ESTABLISHED 24% inversion is CONFIRMED a
+  hindsight artifact of as-of-today classification. Class distribution the write
+  would create (calibration-neutral): 698 ESTABLISHED / 156 EMERGING / 80 NEW.
+
+REMAINING PER-ITEM CHAIRMAN DECISIONS (the flag flips, sequenced per the Executioner):
+1. Flip E (LEDGER_SWEEP_NEWEST_SLOTS=2) — lowest risk, early cohort readout.
+2. Flip C (N_QUERY_DEDUP_MIN=10..15) — after accepting the global-dedup semantic.
+3. Flip B (MOAT_EXEMPT_STRICT=1) — after reviewing the shadow-log counts (accruing now).
+4. Post D's write (dry_run=0) — calibration-neutral, tagged rollback available.
+5. Flip G (SCORE_QUARANTINE_ENABLED=true) — after the 133-instrument shadow score-diff.
+6. Flip F (STAGE_FROM_DETECTION=1) — last; announce the visible label shift.
