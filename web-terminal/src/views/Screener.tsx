@@ -250,7 +250,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       <Disclaimer style={{ marginBottom: 10 }} />
       {/* Dual Gradient Score — mobile colors (Detection blue / Confidence green) */}
       <div className="gauges">
-        <div className="gauge det">{ring(det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">speed · ~22% FP</div></div>
+        <div className="gauge det">{ring(det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">speed · early / leading read</div></div>
         <div className="gauge conf">{ring(conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">precision · &lt;9% FP</div></div>
       </div>
 
