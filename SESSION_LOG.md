@@ -1471,3 +1471,30 @@ market/crypto confirm rates need null baseline; G's trend half unshadowed (G-2) 
 n/a population reconciliation (G-1); B unmetered while ON (register needed);
 7's basis computed live over pruned table (stamp at resolution). Consensus queue of
 15 actions awaiting Chairman ruling; 07-14/07-21 review homework pre-registered.
+
+## Session 2026-07-08 (cont.) — Chairman-ruled fixes 1-6 + GHOST flip executed (engine 4a31fc7/v226, gh-pages cc8a6cb)
+Chairman clarifications RECORDED in the Board's permanent ground rules: (a) P = persistence
+of EXTERNALLY-collected signals (composite-legitimate) vs N = platform-internal (excluded);
+(b) calibration = accuracy-tuning against real data, never "manipulation".
+1. **FP-claim purge**: fabricated ~22%/<9% strings removed from detector payload,
+   market_signal_engine, nowtrend_integration (+docstrings), web Screener gauges
+   ("speed · early / leading read" / "precision · corroborated read"). Mobile was clean.
+   Verified live: fields gone from /scores/{key}.
+2. **Referee fixed to corroborate the LEAD** (wiki arrival BEFORE detection = contradiction)
+   + SWEEP RUN on all 11 wins: **1 corroborated (Daveigh Chase, same-day) · 7 not
+   corroborated (incl. mexico +17d, court rulings +16d — no matching wiki arrival) ·
+   3 unresolvable**. Served live: LED wins now read 0✓/5–/2·, 5 ambiguous-query.
+   HONEST READ: no LED win currently carries independent corroboration — the
+   Challenger's ambiguous-term warning was correct. (Referee limitation noted:
+   steady-state wiki pages never "arrive"; uncorroborated ≠ proven false.)
+3. **Trend-side quarantine diff**: 6000 stored rows scanned — ZERO NULL components →
+   the trend path is empirically INERT; no flag split needed (G-2 closed with data).
+4. **Basis stamps**: at_detection_days + pre_broken columns added; sweep stamps at
+   resolution; 76 existing rows backfilled; report prefers stamps (pruning-proof);
+   paramVersion now calib-params-v3|patience365|lead365|match30|preb7|estmin14 (live).
+5. **moat_blocked_log register**: every strict/shadow block persisted; unblocked_at
+   stamps delay; 90d age-out; B's revert condition now falsifiable.
+6. **date_utils locale fix**: US-canonical slash parsing; unambiguous EU day>12 accepted
+   + normalized; ambiguous refused → quarantine. 9/9 tests.
+9. **GHOST_RESEARCH_FEEDS=1 flipped** (pre-registered #8; v226) — 2-week monitored trial.
+Reviews: 07-14 (E/C/G/F/7 + G-1 reconciliation + D-1 enrollment measure), 07-21 (B + feeds).
