@@ -115,3 +115,28 @@ scored ON/BEFORE each row's detection (dry-run showed 0–1 days for ~all — ne
 everything was genuinely new at detection). RECOMMENDATION: flip it so the headline
 early-detection cohort measures the claim without hindsight; basis is stamped either way.
 Not flipped — it was not among the authorized six.
+
+## 7. LEDGER_MATURITY_AT_DETECTION=1 (Chairman-authorized 2026-07-08)
+- **What**: the accuracy report's EMERGING/ESTABLISHED cohorts classify each row by
+  distinct days scored ON/BEFORE its own detection_date (no lookahead); the as-of-today
+  class map is bypassed for cohort purposes (calibration untouched — it keeps using
+  topic_maturity/fallback as before).
+- **Why**: with real classes covering all rows, the as-of-today basis put 0 of 7 wins in
+  EMERGING (winners sustain → reclassify ESTABLISHED after the fact) — the headline
+  early-detection cohort was measuring hindsight, not the claim.
+- **Expected effect**: nearly all resolved rows classify EMERGING (dry-run: 0–1
+  pre-detection days for ~everything — topics enter the ledger at first sighting), so the
+  early-detection headline converges toward the blended rate until the ledger accrues
+  rows for topics with genuine pre-detection history. maturityBasis stamp flips to
+  "as-of-detection (no lookahead)".
+- **Success metric**: earlyDetectionHitRate == a no-hindsight number (cohort membership
+  fixed at detection time, never migrates); byMaturity totals still sum to resolved.
+- **Review**: 2026-07-14. **Revert if**: cohort membership proves unstable across runs
+  (it must be deterministic per row) or the basis stamp fails to serve.
+
+**7 EXECUTED (v224, 2026-07-08):** basis live = "as-of-detection (no lookahead)".
+Result exactly as pre-registered: all 70 resolved rows classify EMERGING (0–1
+pre-detection days — every ledger topic entered at first sighting), earlyDetectionHitRate
+= 10.0 on n=70 (== blended; no hindsight migration is possible under this basis),
+byMaturity sums to resolved. The cohort split will become informative as the ledger
+accrues rows for topics WITH pre-detection history (resurgent topics, re-detections).
