@@ -6405,6 +6405,11 @@ def accuracy_ledger_report():
                     "falsePositives": h["misses_false_positive"],
                     "pending": h["still_pending"],
                     "smallSample": h["small_sample_warning"],
+                    # Measurement-policy stamps (board convergence: no published rate
+                    # silently spans two regimes).
+                    "paramVersion": h.get("param_version"),
+                    "sweepNewestSlots": h.get("sweep_newest_slots"),
+                    "maturityBasis": h.get("maturity_basis"),
                     # Match-validity: LED wins corroborated by the independent Wikipedia
                     # referee vs unchecked (rows resolved before the metadata existed).
                     "ledCorroborated": h.get("led_referee_corroborated"),
