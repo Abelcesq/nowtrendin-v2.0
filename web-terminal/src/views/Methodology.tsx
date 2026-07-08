@@ -35,6 +35,23 @@ export function Methodology() {
           not claim.
         </p>
 
+        {/* Definition changelog — measurement-policy changes are announced, never silent. */}
+        <section className="mth-sec">
+          <h3>Definition changes</h3>
+          <p>
+            <b>July 7, 2026 — Stage labels now key off Detection.</b> A signal&apos;s stage
+            (BREAKOUT / STRONG / EMERGING / WATCHING / MONITORING) is now derived from its
+            <b> Detection</b> score everywhere — previously the stored label used a blended
+            score while on-screen chips used Detection. This is a <b>label reconciliation,
+            not a re-scoring</b>: no score value changed. Some topics&apos; stage labels shift
+            as they are re-scored over the following cycles; where a label moved down, that is
+            the single definition arriving, not a downgrade of the underlying signal.
+            <b> Also July 7, 2026:</b> instruments with no measurable positioning data now show
+            an honest &quot;n/a&quot; instead of a neutral-looking default, with the score
+            weighted over the components that were actually measured.
+          </p>
+        </section>
+
         {/* The two scores */}
         <section className="mth-sec">
           <h3>The two scores</h3>
