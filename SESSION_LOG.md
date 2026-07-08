@@ -1442,3 +1442,20 @@ section). Definitions generate on first view + cache; Grade Claude stage restore
   maturity inversion is a hindsight-classification artifact, not a thesis failure.
 - D-weight backtest results + D dry-run distribution: 698 EST / 156 EMERG / 80 NEW.
 - Remaining: 6 sequenced flag flips = per-item Chairman decisions (listed in board record).
+
+## Session 2026-07-07/08 — ALL SIX CHAIRMAN-AUTHORIZED FLIPS EXECUTED (pre-registered)
+Pre-registration doc: audits/board/FLIP_PREREGISTRATION_2026-07-07.md (success metrics,
+review dates 07-14/07-21, revert conditions — written BEFORE flipping, per the Economist).
+- Preconditions run first: B shadow review (12,851 would-block topics = tag-mash junk →
+  the moat exemption was a junk highway; PASSED) · G real before/after diff (32 pinned
+  instruments: delta 0.00 everywhere, 0 still pinned, all now honest n/a; PASSED).
+- Flipped (engine v222, one restart): E sweep newest slots=2 · C N-dedup 10min ·
+  B moat-strict · G positioning quarantine · F stage-from-detection.
+- D write: 952 topic_maturity rows (calibration-neutral; coverage 3→76; headline rates
+  unchanged 10.0/26.9; tagged rollback).
+- F/G announced: "Definition changes" section on Methodology (gh-pages cf70abf).
+- Policy stamps live on /accuracy/ledger (paramVersion/sweepNewestSlots/maturityBasis).
+- ⚠ 7th decision surfaced to Chairman: LEDGER_MATURITY_AT_DETECTION (early cohort now
+  honestly exposes the hindsight artifact: 0/8 EMERGING vs 7 wins in ESTABLISHED).
+- Review dates: 2026-07-14 (E/C/G/F), 2026-07-21 (B). Watch: catchall_floor_log after
+  the next scoring cycles (B is a major scoring-pool cleanup — expect junk drop).
