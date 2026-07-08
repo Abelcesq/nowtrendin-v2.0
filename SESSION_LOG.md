@@ -1459,3 +1459,15 @@ review dates 07-14/07-21, revert conditions — written BEFORE flipping, per the
   honestly exposes the hindsight artifact: 0/8 EMERGING vs 7 wins in ESTABLISHED).
 - Review dates: 2026-07-14 (E/C/G/F), 2026-07-21 (B). Watch: catchall_floor_log after
   the next scoring cycles (B is a major scoring-pool cleanup — expect junk drop).
+
+## Session 2026-07-08 — Board Review #2 complete (execution audit + system-wide feedback)
+Six independent memos collated → audits/board/BOARD_system-feedback_2026-07-08.md.
+Executioner verified 7/7 flips real in code + live config ("no near-no-op this cycle").
+CRITICAL new findings: fabricated ~22%/<9% FP claims LIVE in UI/API (purge first);
+nonstationary ground-truth instrument (persist curves per resolution); referee
+corroborates breakout-not-lead (+ 7 LED wins unchecked — 1-2h sweep); date_utils
+%m/%d/%Y silent locale mis-parse; P self-reference; win definition unpinned;
+market/crypto confirm rates need null baseline; G's trend half unshadowed (G-2) +
+n/a population reconciliation (G-1); B unmetered while ON (register needed);
+7's basis computed live over pruned table (stamp at resolution). Consensus queue of
+15 actions awaiting Chairman ruling; 07-14/07-21 review homework pre-registered.
