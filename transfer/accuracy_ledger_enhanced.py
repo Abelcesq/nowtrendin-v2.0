@@ -41,7 +41,15 @@ MATCH_WINDOW_DAYS    = int(os.getenv("LEDGER_MATCH_WINDOW_DAYS", "30"))
 # genuine LED win (early detection of dark matter that took time to reach Google). Defaults to the
 # full patience window so the wait horizon and the lead-credit horizon move together.
 LEAD_MAX_DAYS        = int(os.getenv("LEDGER_LEAD_MAX_DAYS", str(DEFAULT_TIMEOUT_DAYS)))
-LEDGER_PARAM_VERSION = "calib-params-v2-patience365"
+# Board fix 2026-07-08 (Review #2 convergence): the version stamp now CARRIES every
+# measurement-defining constant, so a published rate can never silently span an env
+# edit — "which definition was in force when this number was generated?" is answered
+# by the stamp itself.
+LEDGER_PRE_BROKEN_DAYS_V = int(os.getenv("LEDGER_PRE_BROKEN_DAYS", "7"))
+LEDGER_EST_MIN_DAYS_V = int(os.getenv("LEDGER_ESTABLISHED_MIN_DAYS", "14"))
+LEDGER_PARAM_VERSION = (f"calib-params-v3|patience{DEFAULT_TIMEOUT_DAYS}"
+                        f"|lead{LEAD_MAX_DAYS}|match{MATCH_WINDOW_DAYS}"
+                        f"|preb{LEDGER_PRE_BROKEN_DAYS_V}|estmin{LEDGER_EST_MIN_DAYS_V}")
 
 try:
     from google_trends_validation import (
@@ -78,7 +86,11 @@ def init_pending_db(db_path: str = DB_PATH):
     # duplicate-column error (the market-ledger startup lesson).
     for _col, _typ in (("sweep_query", "TEXT"),
                        ("query_ambiguous", "INTEGER"),
-                       ("referee_corroborated", "INTEGER")):
+                       ("referee_corroborated", "INTEGER"),
+                       # Board fix 2026-07-08: STAMP the measurement basis at resolution —
+                       # never recompute published cohorts from prunable tables.
+                       ("at_detection_days", "INTEGER"),
+                       ("pre_broken", "INTEGER")):
         try:
             conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -113,10 +125,18 @@ def _query_ambiguity(display: str) -> int:
 
 
 def _referee_corroborate(topic_display, detection_date, breakout_date):
-    """Independent second referee (held-out): did Wikipedia pageviews ALSO show
-    attention arriving near the Google breakout? 1 = arrival within ±14d of the
-    breakout; 0 = referee readable but no matching arrival; None = referee
-    unavailable/unresolvable (never blocks or changes a resolution). Free API."""
+    """Independent second referee (held-out): does Wikipedia corroborate OUR LEAD?
+
+    Board fix 2026-07-08 (Review #2, Challenger B2): the original check compared the
+    Wikipedia arrival only to the GOOGLE BREAKOUT (±14d), searching from detection−30d —
+    so a win where Wikipedia attention arrived BEFORE our detection (i.e., the referee
+    says we LAGGED) could still read "corroborated". The claim under test is the LEAD:
+      1 = Wikipedia arrival exists, did NOT precede our detection (grace 2d for
+          daily-granularity jitter), AND lands within ±14d of the Google breakout —
+          independent confirmation that attention arrived AFTER our call.
+      0 = referee readable but contradicts or does not match (including an arrival
+          BEFORE detection — the referee disputes the lead).
+      None = referee unavailable/unresolvable. Never blocks or changes a verdict."""
     try:
         import referee_wikipedia as _rw
         art = _rw.resolve_article(topic_display)
@@ -131,6 +151,8 @@ def _referee_corroborate(topic_display, detection_date, breakout_date):
         if not arrival or not arrival.get("arrival_date"):
             return 0
         adt = _parse(arrival["arrival_date"])
+        if adt < det - timedelta(days=2):
+            return 0   # referee CONTRADICTS the lead — wiki attention preceded our call
         return 1 if abs((adt - brk).days) <= 14 else 0
     except Exception:
         return None
@@ -208,24 +230,47 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
             conn.close()
 
 
+def _stamp_at_detection_days(conn, topic_key, detection_date):
+    """Distinct days the topic was scored ON/BEFORE its detection — computed ONCE at
+    resolution and stamped into the row (board fix 2026-07-08: velocity_scores prunes
+    at 365d, so live recomputation would silently reclassify cohorts as history ages;
+    published bases must survive pruning byte-identically)."""
+    try:
+        r = conn.execute(
+            "SELECT COUNT(DISTINCT substr(scored_at,1,10)) AS d "
+            "FROM velocity_scores WHERE topic_key = ? AND scored_at <= ?",
+            (topic_key, str(detection_date) + "T23:59:59")).fetchone()
+        return int(dict(r).get("d") or 0)
+    except Exception:
+        return None
+
+
 def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict, provider,
                    sweep_query=None, query_ambiguous=None, referee_corroborated=None):
     now = datetime.now(timezone.utc).isoformat()
+    # Stamp the measurement basis AT RESOLUTION (board fix 2026-07-08):
+    at_det_days = _stamp_at_detection_days(conn, p["topic_key"], p["detection_date"])
+    pre_broken = None
+    if verdict == "LAGGED" and lead_days is not None:
+        pre_broken = 1 if lead_days < -LEDGER_PRE_BROKEN_DAYS_V else 0
+    elif verdict in ("LED", "SAME_DAY"):
+        pre_broken = 0
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
              breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
-             sweep_query, query_ambiguous, referee_corroborated)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
             validated_at=EXCLUDED.validated_at, provider=EXCLUDED.provider,
             sweep_query=EXCLUDED.sweep_query, query_ambiguous=EXCLUDED.query_ambiguous,
-            referee_corroborated=EXCLUDED.referee_corroborated
+            referee_corroborated=EXCLUDED.referee_corroborated,
+            at_detection_days=EXCLUDED.at_detection_days, pre_broken=EXCLUDED.pre_broken
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
           p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
-          sweep_query, query_ambiguous, referee_corroborated))
+          sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
@@ -431,6 +476,13 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                     tk, dd = r.get("topic_key"), r.get("detection_date")
                     if not tk or not dd or (tk, dd) in vs_days:
                         continue
+                    # PREFER THE STAMP (board fix 2026-07-08): rows resolved after the
+                    # stamp shipped carry at_detection_days permanently; live recompute
+                    # is only the fallback for pre-stamp rows (and erodes as
+                    # velocity_scores prunes — another reason the stamp exists).
+                    if r.get("at_detection_days") is not None:
+                        vs_days[(tk, dd)] = int(r["at_detection_days"])
+                        continue
                     _v = conn.execute(
                         "SELECT COUNT(DISTINCT substr(scored_at,1,10)) AS d "
                         "FROM velocity_scores WHERE topic_key = ? AND scored_at <= ?",
@@ -466,7 +518,7 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
     # latency. A NEAR-MISS lag (within the grace window) is a race we ran and lost.
     # NOTHING leaves the honest denominator — both cohorts stay counted; this only
     # names them so the blended rate can be read correctly.
-    _pre_grace = int(os.getenv("LEDGER_PRE_BROKEN_DAYS", "7"))
+    _pre_grace = LEDGER_PRE_BROKEN_DAYS_V
     def _lag_days(r):
         ld = r.get("lead_time_days")
         if ld is not None:
@@ -475,7 +527,13 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
             return (_parse(r["breakout_date"]) - _parse(r["detection_date"])).days
         except Exception:
             return None
-    lag_pre = [r for r in lag if (_lag_days(r) is not None and _lag_days(r) < -_pre_grace)]
+    def _is_pre(r):
+        # PREFER THE STAMP (board fix 2026-07-08); lag-based only for pre-stamp rows.
+        if r.get("pre_broken") is not None:
+            return bool(r["pre_broken"])
+        ld = _lag_days(r)
+        return ld is not None and ld < -_pre_grace
+    lag_pre = [r for r in lag if _is_pre(r)]
     lag_near = [r for r in lag if r not in lag_pre]
     # Hit rate over races actually RUN (pre-broken rows excluded from THIS view only).
     _race_denom = len(led) + len(same) + len(lag_near) + len(fp)

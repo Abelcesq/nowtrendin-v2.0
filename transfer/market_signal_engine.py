@@ -87,8 +87,10 @@ CONFIDENCE_WEIGHTS = {
     "signal_freshness":          0.15,
 }
 
-DETECTION_FP  = "~22% false-positive rate · early / leading read (measurement, not advice)"
-CONFIDENCE_FP = "<9% false-positive rate · broad confirmation"
+# Board ruling 2026-07-08: numeric FP rates here were unmeasured design-era constants —
+# removed (no fabricated accuracy claims; the ledger is the only published accuracy record).
+DETECTION_FP  = "early / leading read (measurement, not advice)"
+CONFIDENCE_FP = "broad market confirmation"
 
 # ── Market Signal v2.0 — the Money Gradient (see MARKET_SIGNAL_V2.md) ──────────────
 # Reorganizes the SAME baseline-relative components into MONEY MOVEMENT (Dark Matter =

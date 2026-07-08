@@ -4659,7 +4659,8 @@ class GravitationalAnomalyDetector:
                 except Exception:
                     pass
 
-            _moat_shadow = []   # rec B shadow log: topics strict mode WOULD block
+            _moat_shadow = []    # flag OFF: topics strict mode WOULD block
+            _moat_blocked = []   # flag ON: topics strict mode DID block (tk, nsrc, maxe)
 
             def _passes_corroboration(tk: str) -> bool:
                 nsrc, maxe, hasx = _corro.get(tk, (0, 0.0, 0))
@@ -4689,7 +4690,10 @@ class GravitationalAnomalyDetector:
                         if _would_block:
                             _moat_shadow.append(tk)
                         return True
-                    return not _would_block
+                    if _would_block:
+                        _moat_blocked.append((tk, nsrc, maxe))
+                        return False
+                    return True
                 if cat in _CATCHALL_CATS:
                     return nsrc >= CATCHALL_MIN_SOURCES
                 return True  # non-catch-all: unchanged
@@ -4701,6 +4705,55 @@ class GravitationalAnomalyDetector:
                 print(f"  [moat-shadow] MOAT_EXEMPT_STRICT would block "
                       f"{len(_moat_shadow)} single-source catch-all moat topic(s): "
                       f"{_moat_shadow[:8]}")
+            # ── DURABLE BLOCKED-TOPIC REGISTER (board fix 2026-07-08, item 5) ─────
+            # Guardian: with strict ON the shadow log recorded nothing — B's revert
+            # condition ("did a delayed topic cost a LED win?") was unfalsifiable.
+            # This register persists every block (strict AND shadow), and stamps
+            # unblocked_at when a previously-blocked topic later passes — so B's real
+            # cost (DELAY, per the Challenger: first-block → unblock latency) is a
+            # queryable number, and the quarterly breakout sweep has a denominator.
+            try:
+                conn.execute("""CREATE TABLE IF NOT EXISTS moat_blocked_log (
+                    topic_key TEXT PRIMARY KEY, mode TEXT,
+                    first_blocked_at TEXT, last_blocked_at TEXT,
+                    times_blocked INTEGER DEFAULT 1,
+                    nsrc INTEGER, maxe REAL, unblocked_at TEXT)""")
+                _now_iso = datetime.now(timezone.utc).isoformat()
+                _reg = ([(tk, "strict", n, m) for tk, n, m in _moat_blocked] +
+                        [(tk, "shadow", None, None) for tk in _moat_shadow])
+                for _tk, _mode, _n, _m in _reg[:20000]:
+                    conn.execute("""INSERT INTO moat_blocked_log
+                        (topic_key, mode, first_blocked_at, last_blocked_at,
+                         times_blocked, nsrc, maxe)
+                        VALUES (?,?,?,?,1,?,?)
+                        ON CONFLICT (topic_key) DO UPDATE SET
+                          last_blocked_at=EXCLUDED.last_blocked_at,
+                          times_blocked=moat_blocked_log.times_blocked+1,
+                          nsrc=EXCLUDED.nsrc, mode=EXCLUDED.mode""",
+                        (_tk, _mode, _now_iso, _now_iso, _n, _m))
+                # Unblock pass — the delay metric: registered topics now passing.
+                _open = {dict(r)["topic_key"] for r in conn.execute(
+                    "SELECT topic_key FROM moat_blocked_log WHERE unblocked_at IS NULL"
+                ).fetchall()}
+                _unblocked = _open.intersection(topic_keys)
+                for _tk in _unblocked:
+                    conn.execute("UPDATE moat_blocked_log SET unblocked_at=? "
+                                 "WHERE topic_key=?", (_now_iso, _tk))
+                # Bound the register: never-unblocked rows older than 90d age out
+                # (the quarterly sweep window); unblocked rows are kept (evidence).
+                _cut90 = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+                conn.execute("DELETE FROM moat_blocked_log WHERE unblocked_at IS NULL "
+                             "AND last_blocked_at < ?", (_cut90,))
+                conn.commit()
+                if _moat_blocked or _unblocked:
+                    print(f"  [moat-register] {len(_moat_blocked)} blocked recorded"
+                          f"; {len(_unblocked)} previously-blocked now passing")
+            except Exception as _mre:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                print(f"  [moat-register] error: {_mre}")
 
         print(f"\nScoring {len(topic_keys)} scoreable topics "
               f"(filtered from raw fragment pool"
@@ -8757,8 +8810,11 @@ def get_topic_detail(topic_key: str):
             "confidence_score": s["confidence_score"],
             "gap":              gap,
             "interpretation":   _gap_interpretation(gap),
-            "false_positive_detect": "~22%",
-            "false_positive_confirm": "<9%",
+            # Board ruling 2026-07-08 (Review #2, Challenger E1): the former
+            # false_positive_detect/confirm fields ("~22%"/"<9%") were design-era
+            # CONSTANTS with no measuring study — fabricated accuracy claims. Removed;
+            # the only published accuracy figures are the accuracy ledger's, with
+            # denominators and basis stamps.
             "who_uses_detection":  "Creators, marketers, trend-forward brands",
             "who_uses_confidence": "Institutional analysts, investors, strategic planners",
             "note": (

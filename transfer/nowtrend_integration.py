@@ -152,11 +152,11 @@ Confidence Decay  | confidence_decay          | 10%    | Signal freshness + dire
 
 DUAL OUTPUT (Heisenberg Split):
   detection_score   = G(0.40) + D(0.25) + I(0.20) + M(0.10) + C(0.05)
-                      → Optimized for EARLINESS (~22% false positive)
+                      → Optimized for EARLINESS (accepts more false alarms)
                       → For creators, marketers, fast-moving brands
 
   confidence_score  = I(0.35) + M(0.30) + G(0.20) + C(0.10) + D(0.05)
-                      → Optimized for PRECISION (<10% false positive)
+                      → Optimized for PRECISION (fewer false alarms)
                       → For hedge funds, institutions, strategic planners
 
 OVERALL SCORE (balanced):
@@ -758,8 +758,8 @@ def create_unified_api() -> FastAPI:
                 "confidence_score":       current.get("confidence_score"),
                 "gap":                    round(gap, 1),
                 "gap_interpretation":     _interpret_gap(gap),
-                "false_positive_risk_detect": "~22%",
-                "false_positive_risk_confirm": "<9%",
+                # Board ruling 2026-07-08: former FP-rate fields were unmeasured
+                # constants — removed (no fabricated accuracy claims).
                 "lead_time_estimate_days": current.get("lead_time_estimate_days"),
             },
             "components": {

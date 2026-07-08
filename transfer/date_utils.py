@@ -22,7 +22,39 @@ from datetime import datetime, date, timezone
 from typing import Optional
 
 # whole-string DATE formats — tried first, no space-splitting
-_DATE_FORMATS = ("%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y", "%Y%m%d")
+# NOTE (board fix 2026-07-08, Chairman-ruled): slash dates are NOT in this table —
+# they go through _parse_slash_date below, which keeps US MM/DD/YYYY as the canonical
+# interpretation but REFUSES the ambiguous case instead of silently mis-reading
+# European DD/MM input (03/04/2026 read as March 4 when a French feed meant April 3 —
+# a silent mis-canonicalization, the one failure §14 exists to prevent). Unambiguous
+# day>12 forms parse in whichever order is valid; ambiguous both-fields-≤12-and-unequal
+# returns None → the ingestion gate QUARANTINES it for human review, per the canon.
+_DATE_FORMATS = ("%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%Y%m%d")
+
+
+def _parse_slash_date(s: str):
+    """US-canonical slash-date parser with ambiguity refusal (see note above).
+    Accepts M/D/YYYY and MM/DD/YYYY; also accepts an unambiguous D/M/YYYY (day>12)
+    from European sources, normalized to the same canonical YYYY-MM-DD."""
+    parts = s.split("/")
+    if len(parts) != 3:
+        return None
+    try:
+        a, b, y = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+    if y < 1000:
+        return None
+    try:
+        if b > 12 and a <= 12:      # unambiguous US MM/DD/YYYY
+            return datetime(y, a, b, tzinfo=timezone.utc)
+        if a > 12 and b <= 12:      # unambiguous European DD/MM/YYYY
+            return datetime(y, b, a, tzinfo=timezone.utc)
+        if a == b and a <= 12:      # 5/5/2026 — same date either way
+            return datetime(y, a, b, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return None                     # both ≤12 and unequal → AMBIGUOUS → quarantine
 # explicit DATETIME formats (incl. compact GDELT-basic with no separators)
 _DT_FORMATS = ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M",
                "%Y-%m-%d %H:%M:%S", "%Y%m%dT%H%M%S")
@@ -57,6 +89,12 @@ def _to_datetime(value) -> Optional[datetime]:
             return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             pass
+
+    # slash dates: US-canonical with ambiguity refusal (board fix 2026-07-08)
+    if "/" in s:
+        _sd = _parse_slash_date(s)
+        if _sd is not None:
+            return _sd
 
     # ISO datetime via fromisoformat (handles 'Z' and offsets)
     z = s[:-1] + "+00:00" if s.endswith("Z") else s
