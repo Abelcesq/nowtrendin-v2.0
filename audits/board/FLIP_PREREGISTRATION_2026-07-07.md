@@ -140,3 +140,13 @@ pre-detection days — every ledger topic entered at first sighting), earlyDetec
 = 10.0 on n=70 (== blended; no hindsight migration is possible under this basis),
 byMaturity sums to resolved. The cohort split will become informative as the ledger
 accrues rows for topics WITH pre-detection history (resurgent topics, re-detections).
+
+## 8. GHOST_RESEARCH_FEEDS=1 (Chairman-authorized 2026-07-08, "fix ghost flip 9")
+- **What**: the four §16-cleared research outlets (War on the Rocks, Rest of World,
+  Global Issues, RAND) join the ghost collection at expert tier via the entity-anchored
+  extractor (validation: audits/source-onboarding/RESEARCH_FEEDS_VALIDATION_2026-07-07.md).
+- **Success metric**: clean entity topics from the 4 feeds appear in topic_signals at
+  expert tier; fragment count + catch-all single-source leak do NOT rise (the extractor's
+  precision holds in production); premise: novel early topics enter D's input stream.
+- **Review**: 2026-07-21 (2-week monitored trial; topic-quality + catch-all auditors).
+- **Revert if**: fragment/junk regression attributable to these feeds, or §17 violations.
