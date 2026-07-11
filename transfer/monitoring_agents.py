@@ -488,8 +488,14 @@ _MISSORT_CATS = {"business", "economy"}
 
 
 def fragment_category_auditor(conn, sample: int = 400) -> dict:
+    import os as _os
     import gravitational_anomaly_detector as g
     alerts, summary = [], {}
+    # WARMTH GUARD (Board-ruled 2026-07-11): when _CONTEXT_CAT is cold, _category_for is
+    # on the bare lexicon and news_pct is inflated — suppress the >=70% catch-all alarm
+    # so a post-restart run can't fire a false "category sorting is thin" warning.
+    _n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
+    _warm = _n_ctx >= int(_os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
     rows = []
     try:
         rows = conn.execute(
@@ -534,7 +540,8 @@ def fragment_category_auditor(conn, sample: int = 400) -> dict:
     n = len(rows) or 1
     news_pct = round(news_catch / n * 100, 1)
     summary = {"sampled": len(rows), "fragments": len(fragments),
-               "geo_missorted": len(geo_missort), "news_catchall_pct": news_pct}
+               "geo_missorted": len(geo_missort), "news_catchall_pct": news_pct,
+               "warm": _warm}
     if fragments:
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"{len(fragments)} news-filler/multi-word fragments served "
@@ -544,10 +551,15 @@ def fragment_category_auditor(conn, sample: int = 400) -> dict:
                        "msg": f"{len(geo_missort)} geo/country topics mis-sorted to "
                               f"Business/Economy (e.g. {geo_missort[:5]}) — should be "
                               "current-events/politics"})
-    if news_pct >= 70:
+    if news_pct >= 70 and _warm:
         alerts.append({"level": "warn", "block": "B3",
                        "msg": f"{news_pct}% of topics in the 'news'/general catch-all — "
                               "category sorting is thin; sources read unclear"})
+    elif news_pct >= 70 and not _warm:
+        alerts.append({"level": "warn", "block": "B3",
+                       "msg": f"COLD reading ({_n_ctx} context entries): news_pct {news_pct}% is "
+                              "bare-lexicon-inflated; catch-all alarm suppressed until the override "
+                              "maps warm."})
     return {"agent": "fragment_category_auditor", "status": _roll_up(alerts),
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
@@ -716,6 +728,15 @@ def catchall_auditor(conn) -> dict:
     min_src = getattr(g, "CATCHALL_MIN_SOURCES", 2)
     catch_cats = getattr(g, "_CATCHALL_CATS", ("news", "general", ""))
     hi_mag = getattr(g, "HIGH_MAGNITUDE_ENG", 9.9)   # floor's mass-attention exemption
+    # WARMTH GUARD (Board-ruled 2026-07-11, the Challenger's writer finding): _category_for
+    # falls to the bare lexicon while _CONTEXT_CAT is cold (post-restart), inflating the
+    # catch-all to ~68% vs the warm ~33%. A cold run must NOT persist a poisoned row to
+    # catchall_floor_log, nor fire the WORSENING/leak floor alarms off a cold-inflated set.
+    # With the warm-on-boot snapshot this is now rare (defense-in-depth for first-ever boot
+    # or a failed/disabled snapshot). Computed once here; the writer + alarms gate on it.
+    _n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
+    _warm = _n_ctx >= int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
+    _cat_meta = getattr(g, "_CAT_MAP_META", {}) or {}
 
     # corroboration per topic — MUST replicate the SCORING floor's signals exactly
     # (distinct sources + peak engagement + any expert-tier row), else the leak metric
@@ -845,44 +866,49 @@ def catchall_auditor(conn) -> dict:
     top_terms = token_freq.most_common(25)
 
     # ── Persist time-series row and compute trend ──────────────────────────────
+    # WARMTH GUARD: only persist + compute the floor trend when the context map is warm.
+    # A cold reading measures the BARE LEXICON (a different quantity), not the served
+    # catch-all — persisting it poisons the trajectory and its inflated single_source set
+    # can trip a FALSE 'WORSENING' floor alarm (the Challenger's finding, confirmed live).
     trend = "STABLE"
     leak_delta = None
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS catchall_floor_log (
-                logged_at TEXT PRIMARY KEY,
-                total_scored INTEGER,
-                catchall_count INTEGER,
-                catchall_pct REAL,
-                single_source_leak INTEGER,
-                misclassified_tracked INTEGER,
-                min_sources INTEGER
-            )
-        """)
-        conn.commit()
-        prev_rows = conn.execute(
-            "SELECT single_source_leak FROM catchall_floor_log "
-            "ORDER BY logged_at DESC LIMIT 2"
-        ).fetchall()
-        now_str = _now().isoformat()
-        conn.execute("""
-            INSERT OR IGNORE INTO catchall_floor_log
-                (logged_at, total_scored, catchall_count, catchall_pct,
-                 single_source_leak, misclassified_tracked, min_sources)
-            VALUES (?,?,?,?,?,?,?)
-        """, (now_str, total, catch, catch_pct, single_src,
-              len(misclassified_real), min_src))
-        conn.commit()
-        if prev_rows:
-            prev_leak = prev_rows[0]["single_source_leak"] or 0
-            leak_delta = single_src - prev_leak
-            if leak_delta > 10:
-                trend = "WORSENING"
-            elif leak_delta < -10:
-                trend = "IMPROVING"
-    except Exception as _e:
-        alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"catchall_floor_log write failed: {_e}"})
+    if _warm:
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS catchall_floor_log (
+                    logged_at TEXT PRIMARY KEY,
+                    total_scored INTEGER,
+                    catchall_count INTEGER,
+                    catchall_pct REAL,
+                    single_source_leak INTEGER,
+                    misclassified_tracked INTEGER,
+                    min_sources INTEGER
+                )
+            """)
+            conn.commit()
+            prev_rows = conn.execute(
+                "SELECT single_source_leak FROM catchall_floor_log "
+                "ORDER BY logged_at DESC LIMIT 2"
+            ).fetchall()
+            now_str = _now().isoformat()
+            conn.execute("""
+                INSERT OR IGNORE INTO catchall_floor_log
+                    (logged_at, total_scored, catchall_count, catchall_pct,
+                     single_source_leak, misclassified_tracked, min_sources)
+                VALUES (?,?,?,?,?,?,?)
+            """, (now_str, total, catch, catch_pct, single_src,
+                  len(misclassified_real), min_src))
+            conn.commit()
+            if prev_rows:
+                prev_leak = prev_rows[0]["single_source_leak"] or 0
+                leak_delta = single_src - prev_leak
+                if leak_delta > 10:
+                    trend = "WORSENING"
+                elif leak_delta < -10:
+                    trend = "IMPROVING"
+        except Exception as _e:
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"catchall_floor_log write failed: {_e}"})
 
     summary = {
         "total_scored": total, "catchall_count": catch, "catchall_pct": catch_pct,
@@ -897,25 +923,41 @@ def catchall_auditor(conn) -> dict:
         "misclassified_examples": misclassified_real[:15],
         "lexicon_candidates": [{"term": t, "count": c} for t, c in top_terms],
         "samples": samples,
+        # Provenance so a caller can tell a warm/live reading from a cold or snapshot one.
+        "warm": _warm,
+        "persisted": _warm,                               # cold rows are NOT written
+        "override_map_source": (_cat_meta.get("context") or {}).get("source"),
+        "override_map_stamp": (_cat_meta.get("context") or {}).get("stamp"),
     }
-    if catch_pct >= 70:
+    if not _warm:
+        # COLD: everything above is bare-lexicon-inflated. Do NOT fire threshold alarms
+        # off it, and flag the reading as not-persisted (the writer guard already skipped
+        # the floor_log INSERT). One honest banner replaces the false alarms.
         alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"catch-all at {catch_pct}% ({catch}/{total}) — still congested. "
-                              f"Top lexicon candidates to reclassify: {[t for t, _ in top_terms[:10]]}"})
-    if single_src > 50:
-        alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"{single_src} single-source catch-all topics ADMITTED in the last "
-                              f"{RECENT_LEAK_H}h without corroboration (min_sources={min_src}) — floor "
-                              f"may be leaking. (Dormant pre-floor pile, retained, not counted: {dormant_pile}.)"})
-    if trend == "WORSENING":
-        alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"catch-all floor trend WORSENING: single-source leaks grew by "
-                              f"{leak_delta} since last check (now {single_src}) — "
-                              f"floor may be disabled or new junk is entering"})
-    if misclassified_real:
-        alerts.append({"level": "warn", "block": "B3",
-                       "msg": f"{len(misclassified_real)} TRACKED call(s) (ledger/pending) stuck in the "
-                              f"catch-all — reclassify first: {misclassified_real[:8]}"})
+                       "msg": f"COLD reading: context override map {_n_ctx} entries "
+                              f"(<{int(os.getenv('CATCHALL_WARM_CTX_MIN','5000'))}). _category_for is on "
+                              f"the bare-lexicon fallback, so catch-all {catch_pct}% is INFLATED (warm ~33%). "
+                              f"NOT persisted to catchall_floor_log; threshold alarms suppressed. "
+                              f"Re-read after the override maps warm (snapshot load / live refresh)."})
+    else:
+        if catch_pct >= 70:
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"catch-all at {catch_pct}% ({catch}/{total}) — still congested. "
+                                  f"Top lexicon candidates to reclassify: {[t for t, _ in top_terms[:10]]}"})
+        if single_src > 50:
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"{single_src} single-source catch-all topics ADMITTED in the last "
+                                  f"{RECENT_LEAK_H}h without corroboration (min_sources={min_src}) — floor "
+                                  f"may be leaking. (Dormant pre-floor pile, retained, not counted: {dormant_pile}.)"})
+        if trend == "WORSENING":
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"catch-all floor trend WORSENING: single-source leaks grew by "
+                                  f"{leak_delta} since last check (now {single_src}) — "
+                                  f"floor may be disabled or new junk is entering"})
+        if misclassified_real:
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"{len(misclassified_real)} TRACKED call(s) (ledger/pending) stuck in the "
+                                  f"catch-all — reclassify first: {misclassified_real[:8]}"})
     return {"agent": "catchall_auditor", "status": _roll_up(alerts),
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
@@ -986,6 +1028,14 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
     n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
     warm_min = int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
     warm = n_ctx >= warm_min
+    # OLD-vs-CURRENT distinction (Board-ruled 2026-07-11): the maps can be warm from a
+    # persisted SNAPSHOT (possibly stale) or from a LIVE refresh — always report which,
+    # so a snapshot-served category is never mistaken for a freshly-rebuilt one.
+    _meta = getattr(g, "_CAT_MAP_META", {}) or {}
+    _ctx_meta = _meta.get("context") or {}
+    override_maps = {"situation": n_sit, "context": n_ctx, "warm": warm,
+                     "context_source": _ctx_meta.get("source"),   # empty | snapshot | live
+                     "context_stamp": _ctx_meta.get("stamp")}
 
     # Trajectory (the decisive read) — light, one small table; safe to read cold.
     series = []
@@ -1010,7 +1060,7 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
                                    f"SKIPPED (meaningless cold; also H12s the 30s router under post-"
                                    f"deploy DB load). Re-read ~5 min after deploy."}],
                 "summary": {
-                    "override_maps": {"situation": n_sit, "context": n_ctx, "warm": False},
+                    "override_maps": override_maps,
                     "cold_skipped": True,
                     "headline_catchall_pct": None,
                     "historical_high_pct": old_high,
@@ -1187,7 +1237,7 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         "non_latin_share_of_catchall_pct": round(non["catch"] / (catch or 1) * 100, 1),
         "honest_headline_latin_only_pct": pct(lat),
         "frozen_panel": panel,
-        "override_maps": {"situation": n_sit, "context": n_ctx, "warm": warm},
+        "override_maps": override_maps,
         "trajectory": series[-14:],          # last 14 logged points
         "attribution_verdict": verdict,
         "notes": notes,

@@ -201,6 +201,92 @@ _CONTEXT_CAT: dict = {}
 CONTEXT_CATEGORY_ENABLED = os.getenv("CONTEXT_CATEGORY_ENABLED", "1") == "1"
 CONTEXT_CAT_MIN_CONF = float(os.getenv("CONTEXT_CAT_MIN_CONF", "0.35"))
 
+# ── Persisted snapshot of the two override maps (Board-ruled 2026-07-11) ───────────
+# Camp 2 (Expansionist) + Camp 3 (Guardian/Executioner): the maps above reset EMPTY on
+# every process restart and take ~5 min to rebuild, so for that window ~2100 topics
+# (~35% of the feed) fall back to the bare 'general' label — a cosmetic but real, and
+# at fleet-scale a STANDING, inconsistency. Persist each map to the DB and LOAD it at
+# boot so _category_for is warm-on-start instead of flickering to bare-lexicon. This is
+# DISPLAY-ONLY (mirrors the maps it snapshots — NEVER wired into scoring, no circularity)
+# and carries a FRESHNESS STAMP so a possibly-stale snapshot value is always
+# distinguishable from a live-rebuilt one and trackable across a multi-dyno fleet
+# (all dynos load the same DB snapshot → consistent categories cluster-wide).
+CATEGORY_SNAPSHOT_ENABLED = os.getenv("CATEGORY_SNAPSHOT", "1") == "1"
+# Per-kind provenance for the OLD-vs-CURRENT distinction. source: empty|snapshot|live.
+_CAT_MAP_META: dict = {
+    "situation": {"source": "empty", "stamp": None, "entries": 0},
+    "context":   {"source": "empty", "stamp": None, "entries": 0},
+}
+
+
+def _persist_category_snapshot(kind: str, mapping: dict) -> None:
+    """Best-effort persist of a freshly-rebuilt override map so it survives restarts.
+    Marks the in-memory provenance 'live' (this run just built it). Display-only; never
+    raises into the refresh path."""
+    if not CATEGORY_SNAPSHOT_ENABLED or not mapping:
+        return
+    try:
+        import json as _json
+        stamp = datetime.now(timezone.utc).isoformat()
+        conn = get_db()
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS category_override_snapshot (
+                map_kind TEXT PRIMARY KEY, payload TEXT, entry_count INTEGER, refreshed_at TEXT)""")
+            # DELETE+INSERT (dialect-neutral: one row per kind) rather than an upsert.
+            conn.execute("DELETE FROM category_override_snapshot WHERE map_kind=?", (kind,))
+            conn.execute("INSERT INTO category_override_snapshot "
+                         "(map_kind, payload, entry_count, refreshed_at) VALUES (?,?,?,?)",
+                         (kind, _json.dumps(mapping), len(mapping), stamp))
+            conn.commit()
+        finally:
+            try: conn.close()
+            except Exception: pass
+        _CAT_MAP_META[kind] = {"source": "live", "stamp": stamp, "entries": len(mapping)}
+    except Exception as e:
+        print(f"[cat-snapshot] persist {kind} skipped: {e}")
+
+
+def _load_category_snapshot() -> None:
+    """Load persisted override maps into memory at boot so _category_for is warm
+    immediately (no ~5-min bare-lexicon flicker). Marks provenance 'snapshot' (possibly
+    stale) until the live daemon refresh overwrites it. Display-only; best-effort."""
+    global _SITUATION_CAT, _CONTEXT_CAT
+    if not CATEGORY_SNAPSHOT_ENABLED:
+        return
+    try:
+        import json as _json
+        conn = get_db()
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS category_override_snapshot (
+                map_kind TEXT PRIMARY KEY, payload TEXT, entry_count INTEGER, refreshed_at TEXT)""")
+            conn.commit()
+            rows = conn.execute("SELECT map_kind, payload, refreshed_at "
+                                "FROM category_override_snapshot").fetchall()
+        finally:
+            try: conn.close()
+            except Exception: pass
+        for r in rows:
+            kind = r["map_kind"] if hasattr(r, "keys") else r[0]
+            payload = r["payload"] if hasattr(r, "keys") else r[1]
+            stamp = r["refreshed_at"] if hasattr(r, "keys") else r[2]
+            try:
+                m = _json.loads(payload) if payload else {}
+            except Exception:
+                m = {}
+            if not m:
+                continue
+            if kind == "situation":
+                _SITUATION_CAT = m
+            elif kind == "context":
+                _CONTEXT_CAT = m
+            else:
+                continue
+            _CAT_MAP_META[kind] = {"source": "snapshot", "stamp": stamp, "entries": len(m)}
+            print(f"[cat-snapshot] loaded {kind}: {len(m)} entries from snapshot "
+                  f"(refreshed_at={stamp}) — warm-on-boot, pending live refresh")
+    except Exception as e:
+        print(f"[cat-snapshot] load skipped: {e}")
+
 
 def _category_for(topic_key: str, display: str) -> str:
     """Serve-time category with three context layers, strongest first, all DISPLAY-ONLY
@@ -240,6 +326,7 @@ def _refresh_situation_categories() -> int:
         if new_map:
             global _SITUATION_CAT
             _SITUATION_CAT = new_map
+            _persist_category_snapshot("situation", new_map)   # warm-on-boot next restart
         print(f"[situation-cat] refreshed: {len(new_map)} topic→category overrides "
               f"from {res.get('situations', 0)} situations")
         return len(new_map)
@@ -296,6 +383,7 @@ def _refresh_context_categories(window_hours: int = 120, max_rows: int = 200000,
         if out:
             global _CONTEXT_CAT
             _CONTEXT_CAT = out
+            _persist_category_snapshot("context", out)          # warm-on-boot next restart
         print(f"[context-cat] refreshed: {len(out)} topic→category from headlines "
               f"({len(heads)} topics with titles)")
         return len(out)
@@ -5700,6 +5788,14 @@ async def startup_auto_collect():
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
     # news/general catch-all by context — display-only, never feed the score.
     if SITUATION_CATEGORY_ENABLED or CONTEXT_CATEGORY_ENABLED:
+        # Warm-on-boot (Board-ruled 2026-07-11): load the last persisted snapshot
+        # SYNCHRONOUSLY before serving, so _category_for never flickers to bare lexicon
+        # during the ~5-min live rebuild. One row read + json.loads (~sub-second);
+        # marked 'snapshot' (possibly stale) until the daemon's live refresh overwrites.
+        try:
+            _load_category_snapshot()
+        except Exception as _cse:
+            print(f"[startup] category snapshot load skipped: {_cse}")
         try:
             threading.Thread(target=_situation_category_loop, daemon=True,
                              name="category-enrich").start()
