@@ -8486,6 +8486,63 @@ def monitor_quality():
             except Exception: pass
 
 
+@app.get("/monitor/catmaps")
+def monitor_catmaps(clean_poisoned: bool = Query(False)):
+    """Category override-map WARMTH + PROVENANCE status (Board-ruled 2026-07-11) — a FAST
+    (no topic scan) view of the warm/cold + snapshot state so the display-category health is
+    trackable at fleet scale: in-memory entry counts, per-map source (empty|snapshot|live)
+    and refreshed_at stamp, and the persisted snapshot table. `?clean_poisoned=1` removes
+    cold-inflated rows (catch-all >=60%) from catchall_floor_log dated on/after the
+    working-set-bounding era (>=2026-07-06, where every warm reading is <40%) — a one-time
+    cleanup of the pre-writer-guard poisoning. Display/ops-only; touches no score or ledger."""
+    warm_min = int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
+    meta = _CAT_MAP_META
+    out = {
+        "warm": len(_CONTEXT_CAT) >= warm_min,
+        "warm_min_ctx": warm_min,
+        "snapshot_enabled": CATEGORY_SNAPSHOT_ENABLED,
+        "situation": {"entries": len(_SITUATION_CAT), **(meta.get("situation") or {})},
+        "context": {"entries": len(_CONTEXT_CAT), **(meta.get("context") or {})},
+    }
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        try:
+            rows = conn.execute("SELECT map_kind, entry_count, refreshed_at "
+                                "FROM category_override_snapshot").fetchall()
+            out["snapshot_table"] = [
+                {"kind": (r["map_kind"] if hasattr(r, "keys") else r[0]),
+                 "entries": (r["entry_count"] if hasattr(r, "keys") else r[1]),
+                 "refreshed_at": (r["refreshed_at"] if hasattr(r, "keys") else r[2])}
+                for r in rows]
+        except Exception as e:
+            out["snapshot_table_error"] = str(e)
+        if clean_poisoned:
+            # Safe floor: only the bounded-reading era (>=2026-07-06); pct>=60 is
+            # impossible warm there (warm is ~33%), so these are exactly cold-poisoned rows.
+            FLOOR = "2026-07-06"
+            try:
+                pois = conn.execute(
+                    "SELECT logged_at, catchall_pct FROM catchall_floor_log "
+                    "WHERE catchall_pct >= 60 AND logged_at >= ?", (FLOOR,)).fetchall()
+                out["poisoned_found"] = [
+                    {"logged_at": (r["logged_at"] if hasattr(r, "keys") else r[0]),
+                     "pct": (r["catchall_pct"] if hasattr(r, "keys") else r[1])} for r in pois]
+                conn.execute("DELETE FROM catchall_floor_log "
+                             "WHERE catchall_pct >= 60 AND logged_at >= ?", (FLOOR,))
+                conn.commit()
+                out["poisoned_deleted"] = len(out["poisoned_found"])
+            except Exception as e:
+                out["clean_error"] = str(e)
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+    return {"available": True, **out}
+
+
 @app.get("/monitor/catchall")
 def monitor_catchall():
     """Catch-All Auditor — specialist for the news/general catch-all congestion:
