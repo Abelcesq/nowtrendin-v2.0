@@ -974,6 +974,56 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
     WORKING_SET = int(os.getenv("CATCHALL_WORKING_SET", "6000"))
     cutoff = os.getenv("CATCHALL_FLIP_CUTOFF", "2026-07-07")   # day before the 07-08 flips
 
+    # ── WARMTH self-check FIRST (the 2026-07-10 lesson) ─────────────────────────
+    # _category_for reads two IN-MEMORY override maps (_SITUATION_CAT, _CONTEXT_CAT)
+    # that start EMPTY on every process restart and are rebuilt by a background daemon
+    # (situation on boot; context ~4-5 min later, scanning up to 200k rows). While the
+    # CONTEXT map is cold, _category_for falls through to the bare lexicon and catch-all
+    # reads INFLATED (~68% vs the warm ~33%). A cold decomposition is MEANINGLESS
+    # (everything is bare-lexicon) AND the extra cohort/panel DB work H12s the 30s router
+    # under post-deploy DB contention — so check warmth FIRST and return fast when cold.
+    n_sit = len(getattr(g, "_SITUATION_CAT", {}) or {})
+    n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
+    warm_min = int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
+    warm = n_ctx >= warm_min
+
+    # Trajectory (the decisive read) — light, one small table; safe to read cold.
+    series = []
+    try:
+        for lr in conn.execute(
+            "SELECT logged_at, total_scored, catchall_count, catchall_pct "
+            "FROM catchall_floor_log ORDER BY logged_at ASC").fetchall():
+            series.append({"at": lr["logged_at"], "total": lr["total_scored"],
+                           "catch": lr["catchall_count"], "pct": lr["catchall_pct"]})
+    except Exception as e:
+        notes.append(f"floor_log read failed (no trajectory): {e}")
+    old_high = max((s["pct"] for s in series if s["pct"] is not None), default=None)
+
+    if not warm:
+        # Fast, honest cold path: skip the 6000-topic decomposition (bare-lexicon =>
+        # meaningless AND H12-prone cold). Return the warmth flag + the still-valid
+        # trajectory (the auditor's own warm-measured history) + guidance.
+        return {"agent": "catchall_attribution", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3",
+                            "msg": f"COLD reading: context override map {n_ctx} entries (<{warm_min}) "
+                                   f"-- _category_for is on the bare-lexicon fallback. Decomposition "
+                                   f"SKIPPED (meaningless cold; also H12s the 30s router under post-"
+                                   f"deploy DB load). Re-read ~5 min after deploy."}],
+                "summary": {
+                    "override_maps": {"situation": n_sit, "context": n_ctx, "warm": False},
+                    "cold_skipped": True,
+                    "headline_catchall_pct": None,
+                    "historical_high_pct": old_high,
+                    "trajectory": series[-14:],
+                    "attribution_verdict": (
+                        f"COLD READING -- context map {n_ctx} entries (warm ~{warm_min}+). Catch-all "
+                        f"decomposition skipped; re-read warm (~5 min post-deploy). The trajectory below "
+                        f"is still valid -- it is the auditor's own logged history, each point measured "
+                        f"under its own conditions."),
+                    "notes": notes,
+                },
+                "checked_at": _now().isoformat()}
+
     # Working set — identical query to catchall_auditor (latest score per topic).
     try:
         rows = conn.execute(
@@ -1033,30 +1083,6 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         return round(d["catch"] / (d["n"] or 1) * 100, 1)
 
     overall_pct = round(catch / total * 100, 1)
-
-    # ── 1. Real trajectory from catchall_floor_log (the decisive read) ──────────
-    series = []
-    try:
-        for lr in conn.execute(
-            "SELECT logged_at, total_scored, catchall_count, catchall_pct "
-            "FROM catchall_floor_log ORDER BY logged_at ASC").fetchall():
-            series.append({"at": lr["logged_at"], "total": lr["total_scored"],
-                           "catch": lr["catchall_count"], "pct": lr["catchall_pct"]})
-    except Exception as e:
-        notes.append(f"floor_log read failed (no trajectory): {e}")
-    old_high = max((s["pct"] for s in series if s["pct"] is not None), default=None)
-
-    # ── WARMTH self-check (the 2026-07-10 lesson) ───────────────────────────────
-    # _category_for reads two IN-MEMORY override maps (_SITUATION_CAT, _CONTEXT_CAT)
-    # that start EMPTY on every process restart and are only rebuilt by a background
-    # daemon (situation on boot; context ~4-5 min later, scanning up to 200k rows). While
-    # the CONTEXT map is cold, _category_for falls through to the bare lexicon and the
-    # catch-all reads INFLATED (~68-76% vs the warm ~33%). A reading taken within minutes
-    # of a deploy is therefore not comparable to a warm one. Report the map sizes so the
-    # number is never misread — a monitoring tool must know when it is measuring cold.
-    n_sit = len(getattr(g, "_SITUATION_CAT", {}) or {})
-    n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
-    warm = n_ctx >= int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
 
     # ── Persisted FROZEN PANEL (fixed key set, re-measured each run) ────────────
     panel = {"id": None, "size": 0, "measured": 0, "catch": 0, "pct": None}
@@ -1127,13 +1153,7 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
     # ASCII-only strings (the API round-trips latin-1 in places; em-dashes mojibake'd).
     pre_pct = pct(pre)
     post_pct = pct(post)
-    if not warm:
-        verdict = (f"COLD READING -- the context override map has only {n_ctx} entries "
-                   f"(warm is ~5000+); _category_for is falling through to the bare lexicon, so "
-                   f"catch-all is INFLATED (headline {overall_pct}% here vs the warm ~33%). "
-                   f"Re-read after the background refresh completes (~5 min post-deploy). Do not "
-                   f"compare this number to a warm one.")
-    elif pre["n"] < 50:
+    if pre["n"] < 50:
         verdict = "INCONCLUSIVE -- too few pre-flip-cohort topics survive in the current window."
     elif old_high is not None and pre_pct >= old_high - 8 and overall_pct <= pre_pct - 8:
         verdict = (f"COMPOSITION -- the frozen (pre-flip) cohort still reads {pre_pct}% catch-all "
