@@ -93,7 +93,12 @@ _LEX = {
          # unambiguous tech terms tracked-in-catchall (Catch-All Auditor 2026-06-24)
          "javascript", "typescript", "wwdc", "chatbot", "chatbots", "webassembly",
          # tracked-call reclassifications (Catch-All Auditor 2026-06-30)
-         "token efficiency", "rag sqlite"],
+         "token efficiency", "rag sqlite",
+         # unambiguous semiconductor company (Catch-All Auditor 2026-07-10, Board-ruled;
+         # distinctive Latin token per the nvidia precedent — \bbroadcom\b won't overmatch.
+         # الله القدم CUT by the board (overmatch: "the foot" ≠ football); native-script
+         # terms deferred pending the 07-14/07-21 flip reviews + the _demojibake fix.)
+         "broadcom"],
         ["ai", "app", "chip", "rocket", "tesla", "ev", "robot", "crypto",
          "bitcoin", "ethereum", "coding", "programming", "developer", "startup",
          "gadget", "cloud", "server", "api", "hack", "cyber", "tech", "device",

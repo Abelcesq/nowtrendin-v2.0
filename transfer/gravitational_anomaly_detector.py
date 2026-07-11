@@ -8409,6 +8409,28 @@ def monitor_catchall():
             except Exception: pass
 
 
+@app.get("/monitor/catchall/attribution")
+def monitor_catchall_attribution(capture: bool = Query(False)):
+    """Catch-All ATTRIBUTION (frozen-panel re-measurement, Board-ruled 2026-07-10).
+    Decomposes the moving-window catch-all % into COMPOSITION vs CLASSIFICATION so a
+    drop (e.g. 70.2%→33.6%) is not misread as a classifier win: real floor-log
+    trajectory + first-seen cohort split (the frozen panel) + Latin/non-Latin script
+    split, plus a persisted fixed panel for forward comparability. Read-only re: any
+    score/ledger; `?capture=1` (re)snapshots the forward frozen panel."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        return {"available": True, **_monitor.catchall_attribution(conn, capture=capture)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.get("/diagnostic/market/{symbol}")
 def diagnostic_market(symbol: str):
     """Market Signal Diagnostic — audits ONE instrument's scoring: baseline depth,

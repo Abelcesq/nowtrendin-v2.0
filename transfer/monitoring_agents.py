@@ -920,6 +920,221 @@ def catchall_auditor(conn) -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+def _script_class(s: str) -> str:
+    """Coarse, dependency-free script bucket for a topic string → 'latin',
+    'non_latin', or 'none' (no alphabetic chars). A topic is 'non_latin' when the
+    MAJORITY of its alphabetic characters fall outside the Latin blocks — the
+    deterministic reason a Latin-keyword lexicon (_LEX) can NEVER classify it and it
+    falls to 'general' by construction (Board finding 2026-07-10). Accented Latin
+    (í, ü, ñ … Latin-1/Extended-A/B, < U+0250) still counts as Latin, since those
+    forms DO match the lexicon (e.g. 'valentín barco')."""
+    latin = non_latin = 0
+    for ch in s:
+        if not ch.isalpha():
+            continue
+        if ord(ch) < 0x0250:
+            latin += 1
+        else:
+            non_latin += 1
+    if latin + non_latin == 0:
+        return "none"
+    return "non_latin" if non_latin > latin else "latin"
+
+
+# ── Catch-All ATTRIBUTION (frozen-panel re-measurement) — Board-ruled 2026-07-10 ──
+# WHY: the daily catch-all % is a ratio over a MOVING 6000-most-recent window, so a
+# drop can be (a) the classifier/lexicon actually improving, or (b) the SCORED
+# POPULATION changing (junk purge, new feeds) — composition, NOT classification. The
+# 70.2%→33.6% move (2026-07-06 → 07-10) coincided with the 2026-07-08 B-moat-strict
+# scoring-pool cleanup + GHOST_RESEARCH_FEEDS flip, so it MUST be decomposed before it
+# is believed (the Challenger's frozen-panel test; the Economist's "monetary history").
+# This is READ-ONLY apart from persisting a fixed panel for forward comparability;
+# it touches NO score, ledger, or retention, and category is non-circular display data.
+#
+# THREE decompositions:
+#   1. TRAJECTORY — the real catchall_floor_log series (a STEP at the flip = composition;
+#      a gradual decline = plausible classifier/lexicon work). The decisive read.
+#   2. FIRST-SEEN COHORT split of the current window: topics first-seen ON/BEFORE the
+#      flip cutoff (the frozen panel, present in BOTH windows) vs after. If the frozen
+#      panel's catch-all is ~unchanged from the old headline, the drop is composition.
+#      CAVEAT (stated in output): the surviving pre-flip cohort is survivor-biased —
+#      purged/aged-out junk (disproportionately catch-all) is gone from the current
+#      window — so a HIGH pre-flip catch-all strongly confirms composition, while a LOW
+#      one is confounded, not proof of a classifier win.
+#   3. SCRIPT split — Latin vs non-Latin. The non-Latin share is unclassifiable by
+#      construction (English-only _LEX); reporting catch-all among LATIN-ONLY topics is
+#      the "honest headline" where lexicon work is actually the remedy.
+# Plus a PERSISTED frozen panel (fixed key set) re-measured each run → the forward-
+# looking series with composition held constant.
+def catchall_attribution(conn, capture: bool = False) -> dict:
+    import os
+    import gravitational_anomaly_detector as g
+    notes = []
+    catch_cats = getattr(g, "_CATCHALL_CATS", ("news", "general", ""))
+    WORKING_SET = int(os.getenv("CATCHALL_WORKING_SET", "6000"))
+    cutoff = os.getenv("CATCHALL_FLIP_CUTOFF", "2026-07-07")   # day before the 07-08 flips
+
+    # Working set — identical query to catchall_auditor (latest score per topic).
+    try:
+        rows = conn.execute(
+            "SELECT v.topic_key, v.topic_display, v.scored_at FROM velocity_scores v "
+            "INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
+            "GROUP BY topic_key) l ON v.topic_key=l.topic_key AND v.scored_at=l.m "
+            "ORDER BY v.scored_at DESC LIMIT ?", (WORKING_SET,)).fetchall()
+    except Exception as e:
+        return {"agent": "catchall_attribution", "status": "warn",
+                "alerts": [{"level": "warn", "block": "B3", "msg": f"scored read failed: {e}"}],
+                "summary": {}, "checked_at": _now().isoformat()}
+    total = len(rows) or 1
+    keys = [r["topic_key"] for r in rows]
+
+    # first-seen (MIN scored_at) restricted to working-set keys, chunked explicit-key
+    # queries (index seeks) to avoid the full-table group-by H12 the auditor warns about.
+    first_seen = {}
+    CHUNK = 400
+    for i in range(0, len(keys), CHUNK):
+        chunk = keys[i:i + CHUNK]
+        ph = ",".join("?" for _ in chunk)
+        try:
+            for fr in conn.execute(
+                f"SELECT topic_key, MIN(scored_at) f FROM velocity_scores "
+                f"WHERE topic_key IN ({ph}) GROUP BY topic_key", tuple(chunk)).fetchall():
+                first_seen[fr["topic_key"]] = fr["f"] or ""
+        except Exception as e:
+            notes.append(f"first_seen read failed: {e}")
+            break
+
+    # Classify each with the SERVE-TIME category (same fn the /scores feed + auditor use).
+    pre = {"n": 0, "catch": 0}          # first-seen <= cutoff  → the frozen panel
+    post = {"n": 0, "catch": 0}         # first-seen  > cutoff  → new population
+    lat = {"n": 0, "catch": 0}          # Latin-script topics
+    non = {"n": 0, "catch": 0}          # non-Latin topics
+    catch = 0
+    for r in rows:
+        k = r["topic_key"]
+        disp = (r["topic_display"] or k or "")
+        try:
+            cat = g._category_for(k, disp) or ""
+        except Exception:
+            cat = ""
+        is_catch = cat in catch_cats
+        catch += 1 if is_catch else 0
+        fs = first_seen.get(k, "")
+        bucket = pre if (fs and fs[:10] <= cutoff) else post
+        bucket["n"] += 1
+        bucket["catch"] += 1 if is_catch else 0
+        sb = lat if _script_class(disp) != "non_latin" else non
+        sb["n"] += 1
+        sb["catch"] += 1 if is_catch else 0
+
+    def pct(d):
+        return round(d["catch"] / (d["n"] or 1) * 100, 1)
+
+    overall_pct = round(catch / total * 100, 1)
+
+    # ── 1. Real trajectory from catchall_floor_log (the decisive read) ──────────
+    series = []
+    try:
+        for lr in conn.execute(
+            "SELECT logged_at, total_scored, catchall_count, catchall_pct "
+            "FROM catchall_floor_log ORDER BY logged_at ASC").fetchall():
+            series.append({"at": lr["logged_at"], "total": lr["total_scored"],
+                           "catch": lr["catchall_count"], "pct": lr["catchall_pct"]})
+    except Exception as e:
+        notes.append(f"floor_log read failed (no trajectory): {e}")
+    old_high = max((s["pct"] for s in series if s["pct"] is not None), default=None)
+
+    # ── Persisted FROZEN PANEL (fixed key set, re-measured each run) ────────────
+    panel = {"id": None, "size": 0, "measured": 0, "catch": 0, "pct": None}
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS catchall_frozen_panel (
+                topic_key TEXT PRIMARY KEY, captured_at TEXT, panel_id TEXT)
+        """)
+        conn.commit()
+        have = conn.execute("SELECT COUNT(*) c FROM catchall_frozen_panel").fetchone()
+        n_have = int(have["c"] or 0) if have else 0
+        if capture or n_have == 0:
+            pid = _now().isoformat()
+            conn.executemany(
+                "INSERT OR IGNORE INTO catchall_frozen_panel (topic_key, captured_at, panel_id) "
+                "VALUES (?,?,?)", [(k, pid, pid) for k in keys])
+            conn.commit()
+            notes.append(f"frozen panel captured ({len(keys)} keys, panel_id={pid[:19]}) — "
+                         f"forward runs measure THIS fixed set, composition held constant.")
+        prow = conn.execute("SELECT panel_id, COUNT(*) c FROM catchall_frozen_panel "
+                            "GROUP BY panel_id ORDER BY panel_id ASC LIMIT 1").fetchone()
+        if prow:
+            panel["id"] = prow["panel_id"]
+            panel["size"] = int(prow["c"] or 0)
+            pkeys = [pr["topic_key"] for pr in conn.execute(
+                "SELECT topic_key FROM catchall_frozen_panel WHERE panel_id=?",
+                (panel["id"],)).fetchall()]
+            # measure catch-all over the panel's LATEST serve-time category
+            for i in range(0, len(pkeys), CHUNK):
+                chunk = pkeys[i:i + CHUNK]
+                ph = ",".join("?" for _ in chunk)
+                for pr in conn.execute(
+                    f"SELECT v.topic_key, v.topic_display FROM velocity_scores v "
+                    f"INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
+                    f"WHERE topic_key IN ({ph}) GROUP BY topic_key) l "
+                    f"ON v.topic_key=l.topic_key AND v.scored_at=l.m",
+                    tuple(chunk)).fetchall():
+                    panel["measured"] += 1
+                    disp = (pr["topic_display"] or pr["topic_key"] or "")
+                    try:
+                        c2 = g._category_for(pr["topic_key"], disp) or ""
+                    except Exception:
+                        c2 = ""
+                    panel["catch"] += 1 if c2 in catch_cats else 0
+            if panel["measured"]:
+                panel["pct"] = round(panel["catch"] / panel["measured"] * 100, 1)
+    except Exception as e:
+        notes.append(f"frozen panel measure failed: {e}")
+
+    # ── Attribution verdict (frozen-panel logic + survivorship caveat) ──────────
+    pre_pct = pct(pre)
+    if pre["n"] < 50:
+        verdict = "INCONCLUSIVE — too few pre-flip-cohort topics survive in the current window."
+    elif old_high is not None and pre_pct >= old_high - 8 and overall_pct <= pre_pct - 8:
+        verdict = (f"COMPOSITION — the frozen (pre-flip) cohort still reads {pre_pct}% catch-all "
+                   f"(≈ the {old_high}% historical high) while the headline is {overall_pct}%. The "
+                   f"drop is driven by population turnover (junk purge + new feeds), NOT a classifier "
+                   f"improvement. Do not report the headline drop as a lexicon win.")
+    elif abs(pre_pct - overall_pct) <= 8:
+        verdict = (f"CLASSIFICATION-CONSISTENT — the frozen cohort ({pre_pct}%) tracks the headline "
+                   f"({overall_pct}%); the same old topics classify at the new rate, consistent with a "
+                   f"real serve-time classification change. (Confirm against specific lexicon edits.)")
+    else:
+        verdict = (f"MIXED — frozen cohort {pre_pct}% vs headline {overall_pct}%; neither a clean "
+                   f"composition nor a clean classification signal. Inspect cohorts + trajectory.")
+
+    summary = {
+        "headline_catchall_pct": overall_pct,
+        "total_scored": total,
+        "flip_cutoff": cutoff,
+        "historical_high_pct": old_high,
+        "cohort_pre_flip_frozen": {"n": pre["n"], "catchall_pct": pre_pct},
+        "cohort_post_flip_new": {"n": post["n"], "catchall_pct": pct(post)},
+        "post_flip_share_of_window_pct": round(post["n"] / total * 100, 1),
+        "script_latin": {"n": lat["n"], "catchall_pct": pct(lat)},
+        "script_non_latin": {"n": non["n"], "catchall_pct": pct(non)},
+        "non_latin_share_of_catchall_pct": round(non["catch"] / (catch or 1) * 100, 1),
+        "honest_headline_latin_only_pct": pct(lat),
+        "frozen_panel": panel,
+        "trajectory": series[-14:],          # last 14 logged points
+        "attribution_verdict": verdict,
+        "notes": notes,
+        "caveat": ("The surviving pre-flip cohort is survivor-biased (purged/aged-out junk, "
+                   "disproportionately catch-all, is gone from the current window), so a HIGH "
+                   "pre-flip catch-all confirms composition, but a LOW one is confounded — not "
+                   "proof of a classifier win. The persisted frozen panel removes this bias "
+                   "going FORWARD by re-measuring the same fixed key set each run."),
+    }
+    return {"agent": "catchall_attribution", "status": "info",
+            "alerts": [], "summary": summary, "checked_at": _now().isoformat()}
+
+
 # ── Agent J: MARKET UNIVERSE COVERAGE (B1 — Market Signal completeness) ──────
 # Catches the "SpaceX problem": a real publicly-traded company is trending in the
 # attention data but is MISSING from the curated Market Signal universe
