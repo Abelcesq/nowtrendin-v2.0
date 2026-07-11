@@ -1046,6 +1046,18 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         notes.append(f"floor_log read failed (no trajectory): {e}")
     old_high = max((s["pct"] for s in series if s["pct"] is not None), default=None)
 
+    # ── WARMTH self-check (the 2026-07-10 lesson) ───────────────────────────────
+    # _category_for reads two IN-MEMORY override maps (_SITUATION_CAT, _CONTEXT_CAT)
+    # that start EMPTY on every process restart and are only rebuilt by a background
+    # daemon (situation on boot; context ~4-5 min later, scanning up to 200k rows). While
+    # the CONTEXT map is cold, _category_for falls through to the bare lexicon and the
+    # catch-all reads INFLATED (~68-76% vs the warm ~33%). A reading taken within minutes
+    # of a deploy is therefore not comparable to a warm one. Report the map sizes so the
+    # number is never misread — a monitoring tool must know when it is measuring cold.
+    n_sit = len(getattr(g, "_SITUATION_CAT", {}) or {})
+    n_ctx = len(getattr(g, "_CONTEXT_CAT", {}) or {})
+    warm = n_ctx >= int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
+
     # ── Persisted FROZEN PANEL (fixed key set, re-measured each run) ────────────
     panel = {"id": None, "size": 0, "measured": 0, "catch": 0, "pct": None}
     try:
@@ -1112,20 +1124,34 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         notes.append(f"frozen panel measure failed: {e}")
 
     # ── Attribution verdict (frozen-panel logic + survivorship caveat) ──────────
+    # ASCII-only strings (the API round-trips latin-1 in places; em-dashes mojibake'd).
     pre_pct = pct(pre)
-    if pre["n"] < 50:
-        verdict = "INCONCLUSIVE — too few pre-flip-cohort topics survive in the current window."
+    post_pct = pct(post)
+    if not warm:
+        verdict = (f"COLD READING -- the context override map has only {n_ctx} entries "
+                   f"(warm is ~5000+); _category_for is falling through to the bare lexicon, so "
+                   f"catch-all is INFLATED (headline {overall_pct}% here vs the warm ~33%). "
+                   f"Re-read after the background refresh completes (~5 min post-deploy). Do not "
+                   f"compare this number to a warm one.")
+    elif pre["n"] < 50:
+        verdict = "INCONCLUSIVE -- too few pre-flip-cohort topics survive in the current window."
     elif old_high is not None and pre_pct >= old_high - 8 and overall_pct <= pre_pct - 8:
-        verdict = (f"COMPOSITION — the frozen (pre-flip) cohort still reads {pre_pct}% catch-all "
-                   f"(≈ the {old_high}% historical high) while the headline is {overall_pct}%. The "
+        verdict = (f"COMPOSITION -- the frozen (pre-flip) cohort still reads {pre_pct}% catch-all "
+                   f"(~ the {old_high}% historical high) while the headline is {overall_pct}%. The "
                    f"drop is driven by population turnover (junk purge + new feeds), NOT a classifier "
                    f"improvement. Do not report the headline drop as a lexicon win.")
+    elif pre_pct + 8 < overall_pct <= post_pct + 8:
+        verdict = (f"CLASSIFICATION-MATURATION -- older (pre-flip) topics are BETTER classified "
+                   f"({pre_pct}%) than newer ones ({post_pct}%); the headline ({overall_pct}%) sits "
+                   f"between because the layered classifier's situation/context overrides accrue as a "
+                   f"topic ages. The drop reflects real classifier maturation + lexicon work, NOT a "
+                   f"junk purge. New topics drain out of catch-all over time.")
     elif abs(pre_pct - overall_pct) <= 8:
-        verdict = (f"CLASSIFICATION-CONSISTENT — the frozen cohort ({pre_pct}%) tracks the headline "
+        verdict = (f"CLASSIFICATION-CONSISTENT -- the frozen cohort ({pre_pct}%) tracks the headline "
                    f"({overall_pct}%); the same old topics classify at the new rate, consistent with a "
                    f"real serve-time classification change. (Confirm against specific lexicon edits.)")
     else:
-        verdict = (f"MIXED — frozen cohort {pre_pct}% vs headline {overall_pct}%; neither a clean "
+        verdict = (f"MIXED -- frozen cohort {pre_pct}% vs headline {overall_pct}%; neither a clean "
                    f"composition nor a clean classification signal. Inspect cohorts + trajectory.")
 
     summary = {
@@ -1141,17 +1167,23 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         "non_latin_share_of_catchall_pct": round(non["catch"] / (catch or 1) * 100, 1),
         "honest_headline_latin_only_pct": pct(lat),
         "frozen_panel": panel,
+        "override_maps": {"situation": n_sit, "context": n_ctx, "warm": warm},
         "trajectory": series[-14:],          # last 14 logged points
         "attribution_verdict": verdict,
         "notes": notes,
         "caveat": ("The surviving pre-flip cohort is survivor-biased (purged/aged-out junk, "
                    "disproportionately catch-all, is gone from the current window), so a HIGH "
-                   "pre-flip catch-all confirms composition, but a LOW one is confounded — not "
+                   "pre-flip catch-all confirms composition, but a LOW one is confounded -- not "
                    "proof of a classifier win. The persisted frozen panel removes this bias "
-                   "going FORWARD by re-measuring the same fixed key set each run."),
+                   "going FORWARD by re-measuring the same fixed key set each run. And ALWAYS "
+                   "check override_maps.warm: a cold reading (post-deploy) is inflated toward "
+                   "the bare lexicon and is not comparable to a warm one."),
     }
-    return {"agent": "catchall_attribution", "status": "info",
-            "alerts": [], "summary": summary, "checked_at": _now().isoformat()}
+    return {"agent": "catchall_attribution", "status": ("warn" if not warm else "info"),
+            "alerts": ([{"level": "warn", "block": "B3",
+                         "msg": f"COLD reading: context override map {n_ctx} entries (<5000) -- "
+                                f"catch-all {overall_pct}% is inflated; re-read warm."}] if not warm else []),
+            "summary": summary, "checked_at": _now().isoformat()}
 
 
 # ── Agent J: MARKET UNIVERSE COVERAGE (B1 — Market Signal completeness) ──────
