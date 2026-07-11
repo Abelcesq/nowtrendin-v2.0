@@ -1010,6 +1010,7 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
     lat = {"n": 0, "catch": 0}          # Latin-script topics
     non = {"n": 0, "catch": 0}          # non-Latin topics
     catch = 0
+    is_catch_by_key = {}                # SINGLE classification pass, reused by the panel
     for r in rows:
         k = r["topic_key"]
         disp = (r["topic_display"] or k or "")
@@ -1018,6 +1019,7 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
         except Exception:
             cat = ""
         is_catch = cat in catch_cats
+        is_catch_by_key[k] = is_catch
         catch += 1 if is_catch else 0
         fs = first_seen.get(k, "")
         bucket = pre if (fs and fs[:10] <= cutoff) else post
@@ -1070,9 +1072,26 @@ def catchall_attribution(conn, capture: bool = False) -> dict:
             pkeys = [pr["topic_key"] for pr in conn.execute(
                 "SELECT topic_key FROM catchall_frozen_panel WHERE panel_id=?",
                 (panel["id"],)).fetchall()]
-            # measure catch-all over the panel's LATEST serve-time category
-            for i in range(0, len(pkeys), CHUNK):
-                chunk = pkeys[i:i + CHUNK]
+            # Measure catch-all over the panel's LATEST serve-time category, REUSING the
+            # single main-pass classification for panel keys still in the current window
+            # (zero extra _category_for — critical to stay under the 30s router limit).
+            # Only the aged-out remainder (panel keys no longer in the window) needs a
+            # fetch+classify; bounded to protect the budget as the panel ages.
+            aged = []
+            for k in pkeys:
+                if k in is_catch_by_key:
+                    panel["measured"] += 1
+                    panel["catch"] += 1 if is_catch_by_key[k] else 0
+                else:
+                    aged.append(k)
+            panel["still_in_window"] = panel["measured"]
+            AGED_CAP = int(os.getenv("CATCHALL_PANEL_AGED_CAP", "2000"))
+            aged_used = aged[:AGED_CAP]
+            if len(aged) > AGED_CAP:
+                notes.append(f"panel aged-out {len(aged)} keys; measured first {AGED_CAP} "
+                             f"(CATCHALL_PANEL_AGED_CAP) to stay under the router limit.")
+            for i in range(0, len(aged_used), CHUNK):
+                chunk = aged_used[i:i + CHUNK]
                 ph = ",".join("?" for _ in chunk)
                 for pr in conn.execute(
                     f"SELECT v.topic_key, v.topic_display FROM velocity_scores v "
