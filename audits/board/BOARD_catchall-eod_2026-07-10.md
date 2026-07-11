@@ -93,3 +93,41 @@ The board is **unusually convergent** — all six independently rejected the rep
 5. **The open question for the Chairman:** treat non-Latin as (a) cosmetic display to demote, or (b) a fat-tail early-detection opportunity to escalate (measure non-Latin→English lead time, validate held-out on the ledger). The board split 4-vs-2 toward "escalate as opportunity," and it is the highest-value idea surfaced.
 
 **Chairman — your decision per item.**
+
+---
+
+## CHAIRMAN RULING + EXECUTION (2026-07-10 EOD)
+
+Chairman authorized **(a)** ship broadcom + ratify no-ops, and **(b)** build the frozen-panel re-measurement.
+
+### (a) SHIPPED — engine v227/v228
+- `broadcom → technology` added to `_LEX` strong terms. Verified: classifies Technology (0.75); no overmatch on `abroad`/`broad market`/`road commission`/`broadcomm`. `nvidia` precedent holds.
+- `القدم` **CUT** (Executioner overmatch finding: "the foot" ≠ football). Native-script terms **deferred** pending the `_demojibake` fix + the 07-14/07-21 flip reviews.
+- No-ops **#3** (hold bare countries), **#4** (no floor purge — also protected by the 365-day no-quality-delete rule), **#5** (fragment noise) **ratified**.
+
+### (b) BUILT + RUN — `/monitor/catchall/attribution` (read-only, non-circular)
+The frozen-panel tool decomposed the 70→34 drop and **overturned the board's leading hypothesis**, and surfaced a confound none of the six anticipated.
+
+**The real trajectory (from `catchall_floor_log`, the actual monetary history):**
+| date | catch-all % | denominator |
+|---|---|---|
+| 06-30 → 07-05 | ~74% | full table (35k–42k) |
+| 07-05 23:44 | 70.2% | 6000 (working-set bounding introduced) |
+| 07-06 01:59 | 67.8% | 6000 |
+| **07-07 03:08** | **38.3%** | 6000 |
+| 07-08 01:21 | 34.7% | 6000 (B-moat-strict + GHOST flips) |
+| 07-11 05:36 | 33.6% | 6000 (today's report) |
+
+**Finding 1 — the drop is NOT the 07-08 junk purge.** The ~30-point move happened **07-06 → 07-07**, *before* the 07-08 B-moat-strict flip. The flips moved it only 38.3→34.7 (~4 pts). So the Challenger/Economist "composition from the junk purge" hypothesis is **not supported** — the big drop predates the purge.
+
+**Finding 2 — it's real classifier maturation, confirmed by the cohort split (warm):**
+- pre-flip frozen cohort (first-seen ≤ 07-07, n=2741): **22.0%** catch-all
+- post-flip new cohort (first-seen > 07-07, n=3259): **43.0%** catch-all
+
+Older topics are BETTER classified than newer ones. If it were composition/junk-purge, the surviving pre-flip topics would still read ~70%; instead they read 22% — they were **re-classified by the warmed situation/context override maps** (the layered serve-time classifier + the 07-05/06 lexicon drain). New topics start in catch-all and drain out as their override entries accrue. This is a **genuine classification improvement**, not an artifact — but also not attributable to the 07-08 flips.
+
+**Finding 3 (the confound none of the board caught) — the metric is DEPLOY/WARMTH-sensitive.** `_category_for` reads two in-memory maps (`_SITUATION_CAT`, `_CONTEXT_CAT`) that reset **empty on every process restart** and rebuild via a background daemon (context map ~4–5 min post-boot, ~69k entries). While cold, it falls through to the bare lexicon and catch-all reads **~68%**. My own two deploys caused the auditor to swing **33.6% (warm, 05:36) → 68.5% (cold, post-deploy) → 33.4% (warm again, 06:29)** — logs confirm the context-map refresh at 06:29:18 is the lever. **Consequence:** any catch-all reading within ~5 min of a deploy is inflated; and /scores serves mostly "General" categories in that window until the maps rebuild (display-only, but a real post-deploy UX dip). The tool now self-reports `override_maps.warm` and returns a COLD verdict when the context map is <5000, so the number is never misread again.
+
+**Finding 4 — non-Latin is a small share of the catch-all.** Warm: 65 non-Latin topics in the 6000 window, **3.1%** of total catch-all mass; Latin-only headline (32.7%) ≈ overall (33.4%). This **confirms the board's "demote the 157" call** — the non-Latin residue is real (95.4% of it is catch-all, unclassifiable by construction) but a minor slice of the volume, not the "highest priority."
+
+**Net answer to the Chairman's original question ("is 33.6% real?"):** The improvement from ~74% to ~33% is **largely real** (the layered/context classifier + lexicon drain genuinely route ~half the topics out of catch-all), but (1) it is **not** the 07-08 purge, (2) the absolute number is **not reproducible** — it swings 33↔68 with override-map warmth plus denominator drift, so it must **never be published externally**, and (3) the persisted frozen panel (captured 07-11, warm baseline 33.4% over a fixed 6000-key set) now isolates real classifier change from composition on all future warm runs. This vindicates the board's core ruling (do not treat the headline as a clean baseline) while correcting the specific attribution.

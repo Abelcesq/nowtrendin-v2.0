@@ -1498,3 +1498,47 @@ of EXTERNALLY-collected signals (composite-legitimate) vs N = platform-internal 
    + normalized; ambiguous refused → quarantine. 9/9 tests.
 9. **GHOST_RESEARCH_FEEDS=1 flipped** (pre-registered #8; v226) — 2-week monitored trial.
 Reviews: 07-14 (E/C/G/F/7 + G-1 reconciliation + D-1 enrollment measure), 07-21 (B + feeds).
+
+## Session 2026-07-10 — Catch-All EOD board review + frozen-panel attribution (engine v227/v228/v229)
+Convened the full 6-archetype advisory board on the daily Catch-All EOD report
+(audits/board/BOARD_catchall-eod_2026-07-10.md). Unanimous: REJECT the report's two
+headline framings — "33.6% baseline" (confounded) and "157 misclassified tracked calls =
+HIGHEST priority" (display-only, non-Latin unclassifiable by construction, never touches
+score/ledger). Chairman ruled (a)+(b).
+
+### (a) SHIPPED
+- broadcom->technology in _LEX (verified: Technology 0.75, no overmatch). القدم CUT
+  (overmatch). Native-script terms deferred (pending _demojibake fix + 07-14/07-21 reviews).
+- Ratified no-ops #3 hold bare countries / #4 no floor purge / #5 fragment noise.
+
+### (b) BUILT + RUN — /monitor/catchall/attribution (read-only, non-circular, held-out)
+Frozen-panel decomposer: real catchall_floor_log trajectory + first-seen cohort split
+(the frozen panel, survivorship-caveated) + Latin/non-Latin script split + persisted fixed
+panel for forward comparability. Findings:
+1. The 70->34 drop happened 07-06->07-07, BEFORE the 07-08 B-moat-strict flip (which moved
+   it only 38.3->34.7). So the board's "junk-purge composition" hypothesis is NOT supported.
+2. It's real CLASSIFIER MATURATION: warm cohort split = pre-flip 22.0% vs post-flip 43.0%
+   (older topics better-classified; overrides accrue with topic age via the situation/
+   context maps + the 07-05/06 lexicon drain). Not composition.
+3. CONFOUND none of the board caught: _category_for reads in-memory override maps that reset
+   EMPTY on every deploy and rebuild ~4-5min later (context ~69k entries). Cold=bare lexicon
+   =~68%; warm=~33%. My own 2 deploys swung the auditor 33.6->68.5->33.4 (logs: context
+   refresh 06:29:18 is the lever). Tool now self-reports override_maps.warm + COLD verdict
+   (<5000 ctx entries) so a post-deploy reading is never misread. Also implies /scores serves
+   mostly "General" for ~5min post-deploy (display-only UX dip).
+4. Non-Latin = 3.1% of catch-all mass (65/6000 window) -> confirms "demote the 157" ruling.
+NET: the ~74->~33 improvement is largely REAL (layered classifier + lexicon), NOT the 07-08
+purge; the absolute number is NON-reproducible (warmth+denominator) -> never publish
+externally; frozen panel (warm baseline 33.4% over fixed 6000 keys) isolates future change.
+v229 = warmth self-check + CLASSIFICATION-MATURATION verdict + ASCII output.
+
+### Board backlog surfaced to Chairman (still pending from the 07-08 review queue)
+Done earlier: queue #1-6 + #9 (FP purge, referee fix, trend quarantine diff, basis stamps,
+blocked register, date locale, GHOST flip). STILL PENDING Chairman ruling: #7 naive-baseline
+ledger column; #8 bundle (FP-timeout caveat, win-definition pin, stage-vocab reconcile,
+Wilson CIs); #10 persist Trends curves + LED re-validation (the CRITICAL nonstationary
+instrument); #11 fast-lane recheck; #12 lang/region provenance stamps on ingest; #13 null-
+baseline market/crypto ledgers; #14 P self-reference re-grounding; #15 housekeeping (weight-
+literal dedup, entity-level extraction "Haaland gap", Postgres tier date, DB_DATA_DICTIONARY
+regen). Scheduled reviews: 07-14 (E/C/G/F/7 + G-1/D-1) and 07-21 (B + GHOST feeds).
+NOTE: today's non-Latin finding maps to pending #12 + #15 (entity extraction) — raised 3x now.
