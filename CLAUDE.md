@@ -494,8 +494,9 @@ H12 under load). Board **rejected** a readiness-gate (wedged-prewarm outage clas
 refreshes on boot). Also shipped `broadcom→technology` in `_LEX` + `/monitor/catchall/attribution` (frozen-panel decomposer):
 the 70→34 catch-all drop was **classifier maturation** (07-06→07-07, pre the 07-08 flips), not the junk purge. **RULE:** never
 publish the catch-all % externally as an accuracy KPI (warmth/denominator/cycle-phase sensitive) — it is a congestion gauge,
-demoted below the accuracy ledger. ⚠ One open item: `?clean_poisoned=1` over-deleted a probably-legitimate 2026-07-06 trajectory
-row (founder decision pending: restore + tighten the cleanup FLOOR to 2026-07-09, vs document) — see SESSION_LOG 2026-07-11.
+demoted below the accuracy ledger. RESOLVED (v233, founder-ruled restore+tighten): `?clean_poisoned=1` had over-deleted a probably-legitimate 2026-07-06
+trajectory row — it was restored (idempotent, NULL for the 2 unrecovered sub-fields, not fabricated) and the cleanup FLOOR
+was tightened 2026-07-06 → 2026-07-09 (warm there is ~33-35%, so ≥60% is unambiguously a cold-boot artifact).
 Prior: 2026-07-07 — **Ledger truth + match validity + 3-platform ledger UI + hardening sweep.**
 (1) **LEDGER FIRST-CROSSING ENROLLMENT + PRE-BROKEN SPLIT** (§14; measurement-only): enrollment now
 takes fresh floor-crossers (first-seen ≤ `LEDGER_ENROLL_RECENT_DAYS`=14, ESTABLISHED/MONITORING excluded),

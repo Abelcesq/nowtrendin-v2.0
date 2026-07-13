@@ -1626,3 +1626,13 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - INTEGRITY NOTE on measurement: never publish catch-all % externally as an accuracy KPI;
   it swings with override-map warmth + moving denominator + scoring-cycle phase. It is a
   congestion gauge, demoted below the accuracy ledger.
+
+### ✅ RESOLVED 2026-07-11 (cont.) — 07-06 row restored + cleanup tightened (engine v233, founder-ruled: restore+tighten)
+- Restored the over-deleted 2026-07-06T01:59:03 row (67.8%, 4067/6000, min_sources=2; the two
+  unrecovered sub-fields single_source_leak/misclassified_tracked stored NULL, not fabricated)
+  via idempotent INSERT OR IGNORE — verified restored_2026_07_06=True.
+- Tightened /monitor/catmaps clean_poisoned FLOOR 2026-07-06 -> 2026-07-09 (warm there is
+  ~33-35%, so >=60% is unambiguously a cold-boot artifact). Re-ran cleanup: poisoned_found=[],
+  poisoned_deleted=0 -> no residual poison, 07-06 row protected (before the floor).
+- Engine confirmed warm-on-boot from snapshot (context.source=snapshot, warm=true). Open item
+  from earlier this session is CLOSED.
