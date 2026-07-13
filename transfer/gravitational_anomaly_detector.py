@@ -8487,14 +8487,17 @@ def monitor_quality():
 
 
 @app.get("/monitor/catmaps")
-def monitor_catmaps(clean_poisoned: bool = Query(False)):
+def monitor_catmaps(clean_poisoned: bool = Query(False),
+                    restore_maturation_row: bool = Query(False)):
     """Category override-map WARMTH + PROVENANCE status (Board-ruled 2026-07-11) — a FAST
     (no topic scan) view of the warm/cold + snapshot state so the display-category health is
     trackable at fleet scale: in-memory entry counts, per-map source (empty|snapshot|live)
     and refreshed_at stamp, and the persisted snapshot table. `?clean_poisoned=1` removes
-    cold-inflated rows (catch-all >=60%) from catchall_floor_log dated on/after the
-    working-set-bounding era (>=2026-07-06, where every warm reading is <40%) — a one-time
-    cleanup of the pre-writer-guard poisoning. Display/ops-only; touches no score or ledger."""
+    cold-inflated rows (catch-all >=60%) from catchall_floor_log dated on/after 2026-07-09
+    (the era where every WARM reading is <40%, so >=60% is unambiguously a cold-boot
+    artifact) — a one-time cleanup of the pre-writer-guard poisoning. `?restore_maturation_row=1`
+    re-inserts the one 2026-07-06 row an earlier too-wide cleanup removed (idempotent).
+    Display/ops-only; touches no score or ledger."""
     warm_min = int(os.getenv("CATCHALL_WARM_CTX_MIN", "5000"))
     meta = _CAT_MAP_META
     out = {
@@ -8517,10 +8520,32 @@ def monitor_catmaps(clean_poisoned: bool = Query(False)):
                 for r in rows]
         except Exception as e:
             out["snapshot_table_error"] = str(e)
+        if restore_maturation_row:
+            # One-time recovery: re-insert the single 2026-07-06 row that a too-wide
+            # clean_poisoned FLOOR (2026-07-06) removed. This was PROBABLY a legitimate warm
+            # reading (the catch-all genuinely was ~68% pre context-map maturation, before
+            # the 07-06->07-07 drop). Known fields restored exactly; the two sub-fields not
+            # recovered from the prior trajectory read are stored NULL, NOT fabricated.
+            # Idempotent (logged_at is PK -> INSERT OR IGNORE won't duplicate).
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO catchall_floor_log "
+                    "(logged_at, total_scored, catchall_count, catchall_pct, "
+                    " single_source_leak, misclassified_tracked, min_sources) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    ("2026-07-06T01:59:03.809775+00:00", 6000, 4067, 67.8, None, None, 2))
+                conn.commit()
+                chk = conn.execute("SELECT catchall_pct FROM catchall_floor_log "
+                                   "WHERE logged_at = ?",
+                                   ("2026-07-06T01:59:03.809775+00:00",)).fetchone()
+                out["restored_2026_07_06"] = bool(chk)
+            except Exception as e:
+                out["restore_error"] = str(e)
         if clean_poisoned:
-            # Safe floor: only the bounded-reading era (>=2026-07-06); pct>=60 is
-            # impossible warm there (warm is ~33%), so these are exactly cold-poisoned rows.
-            FLOOR = "2026-07-06"
+            # Safe floor: >=2026-07-09 only. Warm readings there are ~33-35%, so pct>=60 is
+            # unambiguously a cold-boot artifact. (Tightened from 2026-07-06, which was too
+            # wide and swept in the legitimate 07-06 maturation-era row now restored above.)
+            FLOOR = "2026-07-09"
             try:
                 pois = conn.execute(
                     "SELECT logged_at, catchall_pct FROM catchall_floor_log "
