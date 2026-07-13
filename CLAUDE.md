@@ -473,7 +473,30 @@ part 1 still in design.** Two coupled changes:
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-07-07 — **Ledger truth + match validity + 3-platform ledger UI + hardening sweep.**
+*Last updated: 2026-07-11 — **Catch-all warm/cold refresh: writer-guard + warm-on-boot snapshot (Board-ruled).**
+Two advisory-board reviews (audits/board/BOARD_catchall-eod_2026-07-10.md + BOARD_warm-cold-refresh_2026-07-10.md).
+**Root finding (code-inventoried):** the serve-time category `_category_for` reads two IN-MEMORY maps
+(`_SITUATION_CAT`/`_CONTEXT_CAT`) that reset EMPTY on every process restart and rebuild via a background daemon
+(context ~4-5 min post-boot, ~69k entries); while cold it falls to the bare lexicon and the catch-all metric reads
+~68% vs the warm ~33% (a deploy swung the auditor 33.6→68.5→33.4 in an hour). **SCORING + all 3 LEDGERS are
+INSULATED** — `/scores` serves stored `serve_payload`, stale rows serve stored verbatim (INV-1), the scoring-admission
+gate uses the STATELESS import-time lexicon (`_topic_category`, NOT `_category_for`), ledgers are DB-driven/restart-safe;
+the confound is DISPLAY category + the catch-all monitoring metric only. **Fixes shipped (v231/v232):** (a) **WRITER-GUARD**
+— `catchall_auditor` skips the `catchall_floor_log` write + suppresses the WORSENING/leak alarms when the context map is
+cold (<`CATCHALL_WARM_CTX_MIN`=5000); `fragment_category_auditor` suppresses its ≥70% alarm cold — a cold reading no
+longer poisons the trajectory or fires a false floor-integrity alarm. (b) **WARM-ON-BOOT SNAPSHOT** (`CATEGORY_SNAPSHOT`=1):
+each live `_refresh_*` persists its map to the new `category_override_snapshot` table; startup loads it SYNCHRONOUSLY
+before serving, so `_category_for` is warm-on-boot (no ~5-min / ~2100-topic "General" flicker) and consistent across a
+dyno fleet (all load the same DB snapshot). DISPLAY-ONLY, never wired into scoring. (c) **OLD-vs-CURRENT provenance**:
+`_CAT_MAP_META` stamps each map `source` (empty|snapshot|live) + `refreshed_at`, surfaced in `override_maps` + the auditor
+summary + the new **`/monitor/catmaps`** fast status endpoint (used because `/monitor/catchall` + `/monitor/catchall/attribution`
+H12 under load). Board **rejected** a readiness-gate (wedged-prewarm outage class) and **cut** prewarm-sync (daemon already
+refreshes on boot). Also shipped `broadcom→technology` in `_LEX` + `/monitor/catchall/attribution` (frozen-panel decomposer):
+the 70→34 catch-all drop was **classifier maturation** (07-06→07-07, pre the 07-08 flips), not the junk purge. **RULE:** never
+publish the catch-all % externally as an accuracy KPI (warmth/denominator/cycle-phase sensitive) — it is a congestion gauge,
+demoted below the accuracy ledger. ⚠ One open item: `?clean_poisoned=1` over-deleted a probably-legitimate 2026-07-06 trajectory
+row (founder decision pending: restore + tighten the cleanup FLOOR to 2026-07-09, vs document) — see SESSION_LOG 2026-07-11.
+Prior: 2026-07-07 — **Ledger truth + match validity + 3-platform ledger UI + hardening sweep.**
 (1) **LEDGER FIRST-CROSSING ENROLLMENT + PRE-BROKEN SPLIT** (§14; measurement-only): enrollment now
 takes fresh floor-crossers (first-seen ≤ `LEDGER_ENROLL_RECENT_DAYS`=14, ESTABLISHED/MONITORING excluded),
 NOT the leaderboard top-N (structurally LAGGED). Report splits LAGGED near-miss vs **pre_broken** (breakout

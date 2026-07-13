@@ -1542,3 +1542,87 @@ baseline market/crypto ledgers; #14 P self-reference re-grounding; #15 housekeep
 literal dedup, entity-level extraction "Haaland gap", Postgres tier date, DB_DATA_DICTIONARY
 regen). Scheduled reviews: 07-14 (E/C/G/F/7 + G-1/D-1) and 07-21 (B + GHOST feeds).
 NOTE: today's non-Latin finding maps to pending #12 + #15 (entity extraction) — raised 3x now.
+
+## Session 2026-07-11 — Warm/cold override-map refresh: writer-guard + warm-on-boot snapshot (engine v227→v232)
+Two board reviews + implementation, all Chairman-ruled. Board records:
+audits/board/BOARD_catchall-eod_2026-07-10.md and BOARD_warm-cold-refresh_2026-07-10.md.
+
+### Catch-All EOD board review (six archetypes) → broadcom + frozen-panel attribution
+- SHIPPED broadcom->technology in _LEX (verified no overmatch); القدم CUT (overmatch);
+  no-ops #3/#4/#5 ratified.
+- BUILT /monitor/catchall/attribution (read-only, non-circular): real floor-log trajectory
+  + first-seen cohort split (frozen panel) + Latin/non-Latin script split + persisted fixed
+  panel. FINDING: the 70->34 drop happened 07-06->07-07 (BEFORE the 07-08 B-moat-strict
+  flip, which moved it only 38.3->34.7) => real CLASSIFIER MATURATION (warm cohort: pre-flip
+  22% vs post-flip 43%; overrides accrue with topic age), NOT the junk purge. And the metric
+  is DEPLOY/WARMTH-sensitive: cold=~68% (bare lexicon) vs warm=~33%.
+
+### Warm/cold refresh board review (six archetypes) — the mechanism + fix
+- RESEARCH (code-inventory agent, file:line-cited): SCORING + all 3 LEDGERS are INSULATED.
+  /scores serves stored serve_payload; stale rows serve stored verbatim (INV-1); the
+  scoring-admission gate uses the STATELESS import-time lexicon (_topic_category), NOT the
+  cold _category_for maps (non-circular design); ledgers DB-driven/restart-safe; market/
+  crypto have zero cold state. Confound confined to DISPLAY category + the catch-all metric.
+- CHALLENGER found the exposure the inventory missed: catchall_auditor (the WRITER) had NO
+  warmth guard -> persisted cold ~68% rows to catchall_floor_log + could trip a FALSE
+  WORSENING floor alarm. CONFIRMED LIVE (self-inflicted): 2 cold rows written by this
+  session's own cold auditor calls.
+- Board decision table: writer-guard MANDATORY; A(metric guard)+F(leave serve path) the
+  substance; D(readiness gate) REJECTED 6-0 (wedged-prewarm outage class); E(prewarm-sync)
+  CUT (Executioner: daemon already refreshes on boot -> compute-bound, no latency to capture);
+  B/C split (Outsider/Economist reject as gold-plating; Expansionist: C is scale-correct;
+  Guardian: display-only under firewall). Economist prescriptions: refuse-when-cold, fixed
+  panel as series-of-record (built), condition-stamp, build-test vs bare-lexicon, demote
+  catch-all below the ledger, generalize the warmth audit.
+
+### Chairman ruling + IMPLEMENTATION (v231/v232)
+1. WRITER-GUARD (mandatory): catchall_auditor skips the catchall_floor_log INSERT +
+   suppresses WORSENING/leak/misclass alarms when the context map is cold
+   (<CATCHALL_WARM_CTX_MIN=5000); fragment_category_auditor suppresses its >=70% alarm cold.
+   Verified: cold=0 rows written+no alarm, warm=persisted.
+2. WARM-ON-BOOT SNAPSHOT (Chairman: Camp 2 + Camp 3): new category_override_snapshot table;
+   each live _refresh_* persists its map (_persist_category_snapshot); startup loads it
+   SYNCHRONOUSLY before serving (_load_category_snapshot) -> _category_for warm-on-boot, no
+   ~5-min/~2100-topic 'General' flicker. DB-persisted => fleet-consistent. Flag
+   CATEGORY_SNAPSHOT (default on). DISPLAY-ONLY, never wired into scoring.
+3. OLD-vs-CURRENT distinction (Camp 3): _CAT_MAP_META tracks per-map source
+   (empty|snapshot|live) + refreshed_at stamp; surfaced in override_maps + auditor summary.
+4. /monitor/catmaps: FAST (no topic scan) warm/cold + snapshot-provenance status +
+   ?clean_poisoned=1 cleanup. Added because /monitor/catchall + attribution H12 under load
+   (pre-existing auditor corroboration-pass cost, borderline vs the 30s router limit).
+- REJECTED D, CUT E per the board.
+
+### VERIFIED (real system behavior, not approval-gap time)
+- Warm-on-boot PROVEN: v232 booted and served the context map from the persisted snapshot
+  immediately -> /monitor/catmaps: warm=true, context.source="snapshot" (68264 entries,
+  stamp 18:56), situation.source="live". snapshot_table holds both maps. Feature works E2E.
+
+### ⚠ OPEN — poisoned-row cleanup OVER-DELETED (founder decision pending)
+?clean_poisoned=1 deleted 3 rows, not 2 (cutoff pct>=60 AND logged_at>=2026-07-06 was too
+aggressive). Deleted:
+  - 2026-07-11T06:28:49.999900+00:00  pct=68.5  (4108/6000)  <- genuinely cold (v228 boot)
+  - 2026-07-11T06:43:04.005954+00:00  pct=68.5  (4110/6000)  <- genuinely cold (v229 boot)
+  - 2026-07-06T01:59:03.809775+00:00  pct=67.8  (4067/6000)  <- PROBABLY LEGITIMATE: this
+    session's own board analysis treats the 67.8%->38.3% (07-06->07-07) drop as real
+    classifier MATURATION, i.e. the catch-all genuinely WAS ~68% then (pre context-map
+    maturation), so this was likely a warm historical reading, not poison.
+Impact bounded: catchall_floor_log is the display-only monitoring gauge (demoted below the
+ledger; NO score/ledger effect). RESTORABLE fields recorded above (single_source_leak +
+misclassified_tracked were NOT in the prior trajectory read -> would be NULL on restore, not
+fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOOR
+2026-07-06 -> 2026-07-09 (so cleanup can only touch unambiguously-cold rows), or
+(b) leave deleted + document + tighten. Recommended: tighten regardless; lean restore.
+
+### Env / ops
+- New/relevant env: CATEGORY_SNAPSHOT (default 1), CATCHALL_WARM_CTX_MIN (5000),
+  CATCHALL_FLIP_CUTOFF (2026-07-07), CATCHALL_PANEL_AGED_CAP (2000).
+- Engine versions this session: v227 broadcom+attribution · v228 perf(single-pass) ·
+  v229 warmth self-check · v230 cold early-return(fix H12) · v231 writer-guard+snapshot ·
+  v232 /monitor/catmaps.
+- KNOWN: /monitor/catchall + /monitor/catchall/attribution H12 under load (heavy warm
+  decomposition ~25s / auditor corroboration pass). Use /monitor/catmaps for a fast
+  warm/cold + provenance read. Consider moving the heavy auditor off the 30s router
+  (background job -> stored result) as a follow-up.
+- INTEGRITY NOTE on measurement: never publish catch-all % externally as an accuracy KPI;
+  it swings with override-map warmth + moving denominator + scoring-cycle phase. It is a
+  congestion gauge, demoted below the accuracy ledger.
