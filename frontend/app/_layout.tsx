@@ -1,6 +1,6 @@
 import '../global.css';
 import { Stack } from 'expo-router';
-import { Platform, View, Text as RNText, TextInput as RNTextInput } from 'react-native';
+import { Platform, View, useWindowDimensions, Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -36,6 +36,13 @@ export default function RootLayout() {
     PlusJakartaSans_800ExtraBold,
   });
 
+  // Responsive content column — fills the screen on a phone (portrait), and
+  // becomes a centered, comfortable-width column on wider viewports (phone
+  // landscape, iPad portrait/landscape) so the layout never stretches. Updates
+  // live on rotation via useWindowDimensions.
+  const { width } = useWindowDimensions();
+  const colMax = width < 560 ? width : width < 1000 ? 600 : 760;
+
   // Briefly hold render until the font is ready (loads from the bundled package,
   // no network). If it ever errors, fall through and render with the system font.
   if (!fontsLoaded && !fontError) return null;
@@ -53,10 +60,10 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           {Platform.OS === 'web' ? (
-            // On desktop web, render the app in a centered phone-width column
-            // so the mobile layout isn't stretched across a wide browser.
+            // Center the app in a responsive-width column; on a phone it fills the
+            // screen, on wider screens (landscape / iPad) it stays a centered column.
             <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#D6D9DE' }}>
-              <View style={{ flex: 1, width: '100%', maxWidth: 480, backgroundColor: '#FFFFFF',
+              <View style={{ flex: 1, width: '100%', maxWidth: colMax, backgroundColor: '#FFFFFF',
                 shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 }}>
                 {stack}
               </View>
