@@ -9584,38 +9584,67 @@ def get_trending(
 
 def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
     """The full quality+category-filtered topic grid, computed once and cached so
-    /topics pagination is O(1) slicing (web loads the whole grid 100 at a time)."""
+    /topics pagination is O(1) slicing (web loads the whole grid 100 at a time).
+
+    PLATFORM PARITY (2026-07-15, founder rule): the grid draws from the SAME
+    universe as the /scores feed — same latest-row-per-topic source, same
+    candidate cap, same mentions floor, same noise filter — so web and mobile
+    show the same topics. (The old registry scan was hard-capped at 2000 rows
+    with different filters: web served 1891 while mobile served 2960.)"""
     conn = get_db(DB_PATH)
     filter_str = "AND r.is_anomaly = 1" if anomalies_only else ""
-    # Wide candidate scan before the quality + category filters so quality topics
-    # still surface even when the top-by-score rows are junk.
-    scan = 2000
+    candidate_cap = int(os.getenv("SCORES_CANDIDATE_CAP", "5000"))
+    mentions_floor = int(os.getenv("MENTIONS_FLOOR", "5"))
     try:
         # try/finally: never leak the pool slot on a query error (see
         # _compute_scores_full — the 2026-07-06 outage lesson).
         rows = conn.execute(f"""
-            SELECT r.topic_key, r.topic_display, r.current_stage,
-                   r.total_mentions, r.is_anomaly, r.last_seen_at,
+            SELECT v.topic_key,
+                   COALESCE(v.topic_display, r.topic_display) AS topic_display,
+                   r.current_stage,
+                   COALESCE(v.total_mentions, r.total_mentions) AS total_mentions,
+                   r.is_anomaly, r.last_seen_at,
                    v.overall_score, v.detection_score, v.confidence_score,
-                   v.nowtrendin_score, v.signal_stage, v.serve_payload
-            FROM topic_registry r
-            LEFT JOIN (
-                SELECT topic_key, MAX(scored_at) as max_at
+                   v.nowtrendin_score, v.signal_stage, v.serve_payload,
+                   v.platforms_active
+            FROM velocity_scores v
+            INNER JOIN (
+                SELECT topic_key, MAX(scored_at) AS max_at
                 FROM velocity_scores GROUP BY topic_key
-            ) latest ON r.topic_key = latest.topic_key
-            LEFT JOIN velocity_scores v
-                ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
-            WHERE 1=1 {filter_str}
-            ORDER BY v.overall_score DESC NULLS LAST
+            ) agg ON v.topic_key = agg.topic_key AND v.scored_at = agg.max_at
+            LEFT JOIN topic_registry r ON r.topic_key = v.topic_key
+            WHERE v.overall_score >= 0
+              AND COALESCE(v.total_mentions, 0) >= ?
+            {filter_str}
+            ORDER BY v.overall_score DESC
             LIMIT ?
-        """, (scan,)).fetchall()
+        """, (mentions_floor, candidate_cap)).fetchall()
     finally:
         conn.close()
     topics = []
     for r in rows:
         d = dict(r)
-        if not _is_quality_topic(d.get("topic_display", "")):
+        disp = d.get("topic_display", "") or ""
+        # platforms_active is fetched ONLY for the parity noise filter below —
+        # never served (keeps the /topics response shape unchanged).
+        pa = d.pop("platforms_active", None)
+        if not _is_quality_topic(disp):
             continue   # drop profanity / bare-generic junk from the institutional grid
+        # Same noise filter as /scores (parity): drop bigram garbage + generic
+        # evergreen topics so both platforms serve the identical topic set.
+        if _CORRECTIONS_AVAILABLE:
+            try:
+                if isinstance(pa, str):
+                    try:
+                        pa = json.loads(pa)
+                    except Exception:
+                        pa = None
+                sources = len(pa or []) or 1
+                if (not is_meaningful_topic(disp, d.get("total_mentions", 0) or 0, sources)
+                        or _is_generic_topic(disp)):
+                    continue
+            except Exception:
+                pass  # non-fatal — keep the row on filter error (matches /scores)
         # SINGLE SOURCE OF TRUTH: the grid must show the SAME detection/confidence
         # the /scores feed serves. Override raw v.* with the precomputed
         # serve_payload when present (top-N); long-tail keeps the stored value.
