@@ -1701,3 +1701,16 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   positioning/classification read moved to expanded detail.
 - History: verified aligned (both recency-desc). Crypto: mobile has NO crypto section
   (parity gap — flagged to founder as its own build; web renders engine roster order).
+
+### 2026-07-15 (cont. 3) — mobile CRYPTO section built (preview 0cfb118, web parity)
+- New Crypto tab on the mobile dashboard between Market and Grade (web sidebar order).
+- List (web Crypto page parity): DIRECTION chips All/Inflow/Outflow/Neutral; roster in
+  engine-served order (never re-sorted); CryptoCard (Aurora borderless tap-to-expand) =
+  name·ticker, tier + flow, MM; expanded MC/Lead/price-7d/interpretation + FULL DETAIL.
+- /crypto/[coin] detail = the web rail's EXACT sections in Aurora: header, price as-of,
+  disclaimer top+bottom, dual rings (MM sapphire #2A5B9E / MC emerald #2E7D5B — mobile
+  market-detail convention), gap state + AI interpretation + AI note, SignalAnalysisPanel
+  kind=crypto, Market Factors (bars, feeds colors, ✓ baseline, n/a never NaN, legend),
+  Price & Dark Matter facts, what-it-measures explainer.
+- useCrypto() polls 4s while the prewarm feed reports 'warming' (web behavior); pull bar
+  hidden on Crypto (web has no crypto pull); headline "N Coins Are Moving!".
