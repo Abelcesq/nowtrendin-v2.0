@@ -135,6 +135,26 @@ export function mapSignal(r: any): Signal {
     totalMentions: r.total_mentions != null ? Number(r.total_mentions) : undefined,
     timesScored: r.times_scored != null ? Number(r.times_scored) : undefined,
     isAnomaly: Boolean(r.is_anomaly ?? r.is_gravitational_anomaly),
+    // Entity grouping (display-only): constituents carry their OWN scores.
+    entityGroup: Array.isArray(r.entity_group?.constituents) && r.entity_group.constituents.length
+      ? {
+          constituents: r.entity_group.constituents.map((c: any) => ({
+            topicKey: String(c.topic_key ?? ''),
+            display: String(c.topic_display ?? c.topic ?? c.topic_key ?? ''),
+            overall: c.overall_score != null ? Math.round(Number(c.overall_score)) : undefined,
+            detection: c.detection_score != null ? Math.round(Number(c.detection_score)) : undefined,
+            confidence: c.confidence_score != null ? Math.round(Number(c.confidence_score)) : undefined,
+            nowTrending: c.nowtrendin_score != null ? Math.round(Number(c.nowtrendin_score)) : undefined,
+            stage: c.signal_stage ?? undefined,
+            totalMentions: c.total_mentions != null ? Number(c.total_mentions) : undefined,
+            category: c.category ?? undefined,
+          })),
+          groupedKeys: Array.isArray(r.entity_group.grouped_keys)
+            ? r.entity_group.grouped_keys.map(String)
+            : r.entity_group.constituents.map((c: any) => String(c.topic_key ?? '')),
+          evidenceNote: r.entity_group.evidence_note || undefined,
+        }
+      : undefined,
   };
 }
 

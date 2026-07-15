@@ -120,6 +120,28 @@ export interface Signal {
   maturityClass?: string;       // NEW | EMERGING | ESTABLISHED | RESURGENT | MONITORING
   maturityBadge?: string;       // e.g. "🔵 New Signal"
   maturityReason?: string;
+  // Entity grouping (Board 2026-07-15, display-only): confirmed fragment keys
+  // fold under their canonical entity SERVER-side. Each constituent keeps its
+  // OWN measured score — never summed, blended, or maxed.
+  entityGroup?: EntityGroup;
+}
+
+export interface EntityConstituent {
+  topicKey: string;
+  display: string;
+  overall?: number;
+  detection?: number;
+  confidence?: number;
+  nowTrending?: number;
+  stage?: string;
+  totalMentions?: number;
+  category?: string;
+}
+
+export interface EntityGroup {
+  constituents: EntityConstituent[];
+  groupedKeys: string[];
+  evidenceNote?: string;
 }
 
 // Legend shown on the home page ("what do these scores mean").

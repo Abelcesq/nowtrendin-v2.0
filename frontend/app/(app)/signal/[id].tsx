@@ -173,6 +173,53 @@ export default function SignalDetail() {
           <View className="mt-3"><ConvergenceBadge topicKey={signal.id} /></View>
         </Section>
 
+        {(signal.entityGroup?.constituents?.length ?? 0) > 0 && (
+          <Section
+            title={`Entity group · ${signal.entityGroup!.constituents.length + 1} topics`}
+            hint="Fragment topics of the same real-world entity, grouped for display"
+          >
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>
+              These topics were confirmed as fragments of the same entity and are grouped under
+              this canonical topic. Each keeps its own independently measured score.
+            </Text>
+            {signal.entityGroup!.constituents.map((c) => (
+              <View
+                key={c.topicKey}
+                className="rounded-2xl p-3 mb-2"
+                style={{ backgroundColor: '#6B4FA00A' }}
+              >
+                <View className="flex-row items-center">
+                  <Text numberOfLines={1} style={{ flex: 1, color: '#16264A', fontSize: 16, fontWeight: '700' }}>
+                    {titleCaseTopic(c.display)}
+                  </Text>
+                  {!!c.stage && (
+                    <Text style={{ color: '#6B4FA0', fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>
+                      {stageLabel(c.stage as any)}
+                    </Text>
+                  )}
+                </View>
+                <View className="flex-row mt-1" style={{ gap: 16 }}>
+                  <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700' }}>
+                    DET <Text style={{ color: '#2A5B9E' }}>{c.detection ?? '—'}</Text>
+                  </Text>
+                  <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700' }}>
+                    CONF <Text style={{ color: '#2E7D5B' }}>{c.confidence ?? '—'}</Text>
+                  </Text>
+                  {c.nowTrending != null && (
+                    <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700' }}>
+                      N <Text style={{ color: '#16264A' }}>{c.nowTrending}</Text>
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ))}
+            <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 18, fontWeight: '500', marginTop: 4 }}>
+              {signal.entityGroup!.evidenceNote ||
+                'Constituent topics share underlying evidence with the canonical entity. Scores are never summed, blended, or maxed.'}
+            </Text>
+          </Section>
+        )}
+
         <Section title="Why the two scores differ" hint="Detection leads speed, Confidence leads precision">
           {!!signal.gapMeaning && (
             <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>{signal.gapMeaning}</Text>

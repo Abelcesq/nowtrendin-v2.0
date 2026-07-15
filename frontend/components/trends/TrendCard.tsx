@@ -62,9 +62,18 @@ export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: num
             </Text>
           )}
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}>
-              {titleCaseTopic(signal.topic)}
-            </Text>
+            <View className="flex-row items-center" style={{ gap: 8 }}>
+              <Text numberOfLines={1} style={{ flexShrink: 1, color: '#16264A', fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}>
+                {titleCaseTopic(signal.topic)}
+              </Text>
+              {(signal.entityGroup?.constituents?.length ?? 0) > 0 && (
+                <View className="rounded-full px-2.5 py-1" style={{ backgroundColor: '#6B4FA01A' }}>
+                  <Text style={{ color: '#6B4FA0', fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>
+                    ⊞ {signal.entityGroup!.constituents.length + 1}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text numberOfLines={1} style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
               {platform.toUpperCase()} · <Text style={{ color: stageCol }}>{stageLabel(signal.stage)}</Text> · {ageLabel(signal.createdAt).toUpperCase()} · <Text style={{ color: cat.color }}>{cat.label.toUpperCase()}</Text>
             </Text>
@@ -107,6 +116,27 @@ export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: num
             <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 19, fontWeight: '500', marginBottom: 16 }}>
               Category: {cat.label} · Stage: {stageLabel(signal.stage)}
             </Text>
+
+            {(signal.entityGroup?.constituents?.length ?? 0) > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: '#6B4FA0', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 8 }}>
+                  GROUPED ENTITY · {signal.entityGroup!.constituents.length + 1} TOPICS
+                </Text>
+                {signal.entityGroup!.constituents.map((c) => (
+                  <View key={c.topicKey} className="flex-row items-center" style={{ paddingVertical: 5 }}>
+                    <Text numberOfLines={1} style={{ flex: 1, color: '#3C4663', fontSize: 14, fontWeight: '600' }}>
+                      {titleCaseTopic(c.display)}
+                    </Text>
+                    <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700' }}>
+                      {c.detection ?? '—'} / {c.confidence ?? '—'}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 18, fontWeight: '500', marginTop: 6 }}>
+                  Each score is that topic&apos;s own measured score — never combined.
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={() => router.push(`/signal/${signal.id}`)}
