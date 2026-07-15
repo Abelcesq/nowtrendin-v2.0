@@ -1786,3 +1786,20 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   WITH the flag flip, per board condition 7 — not before.
 - Family-collapsed ledger sensitivity line + fragment-lead study (read-only,
   authorized) still pending as separate work.
+
+### 2026-07-15 (cont. 7) — Founder batch ruling EXECUTED: 51 confirmed, fold live at scale
+- Judged review of all 559 pending candidates delivered (4 parallel strict entity-
+  identity reviewers; multi-family aliases demoted; recommendations only):
+  audits/entity-grouping/ALIAS_REVIEW_JUDGED_2026-07-15.md — 49 confirm / 38
+  judgment / 472 reject.
+- FOUNDER RULING (verbatim intent): confirm all 49 recommended; reject the 472
+  recommended rejects AND the 38 needs-judgment rows. Executed via /aliases/
+  resolve, decided_by="founder (batch ruling 2026-07-15)": 49/49 confirmed,
+  510/510 rejected, 0 failures. All decisions reversible (revert).
+- Final live state (v240): fold ON, 51 confirmed aliases (incl. conor+mcgregor),
+  0 pending, 510 rejected, held-out wall OK. Served /scores total 3095 with
+  grouped families visible (sam_neill<-neill, jannik_sinner<-sinner,
+  jurassic_park<-jurassic, goldman_sachs<-goldman+sachs, warren_buffett<-buffett,
+  fifa_world_cup<-world_cup+fifa_world, erling_haaland<-haaland+erling, ...).
+- Web-terminal parity source committed (0adf3ca) but NOT yet deployed to
+  gh-pages; mobile (Aurora) parity not yet built — awaiting founder go.
