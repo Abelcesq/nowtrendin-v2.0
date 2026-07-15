@@ -78,12 +78,32 @@ export interface MarketLedgerRow {
   lead_time_days?: number | null; verdict?: string; validated_at?: string
 }
 
+// ── Entity grouping (Board 2026-07-15, display-only): confirmed fragment keys
+// fold under their canonical entity SERVER-side. Every score is that key's OWN
+// measured score — constituents are never summed, blended, or maxed.
+export interface EntityConstituent {
+  topic_key: string; topic_display?: string
+  overall_score?: number; detection_score?: number; confidence_score?: number
+  nowtrendin_score?: number; signal_stage?: string
+  total_mentions?: number; category?: string
+}
+export interface EntityGroup {
+  constituents?: EntityConstituent[]
+  grouped_keys?: string[]
+  evidence_note?: string
+  // detail-only:
+  role?: 'canonical' | 'constituent'
+  canonical_key?: string
+  shared_evidence_sample?: string
+}
+
 export interface TopicRow {
   topic_key: string; topic_display: string; category?: string
   current_stage?: string; overall_score?: number
   detection_score?: number; confidence_score?: number
   nowtrendin_score?: number   // N — internal "Now Trending" demand metric
   total_mentions?: number; last_seen_at?: string; is_anomaly?: number
+  entity_group?: EntityGroup
 }
 
 // ── Market Signal (the finance-native dual score — same data the mobile Market

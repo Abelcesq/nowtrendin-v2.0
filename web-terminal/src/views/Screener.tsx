@@ -414,6 +414,40 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         </div>
       )}
 
+      {/* Entity Group (Board 2026-07-15, display-only): constituent fragments of
+          the same real-world entity, each showing its OWN measured score. */}
+      {d?.entity_group?.role === 'canonical' && (d.entity_group.constituents || []).length > 0 && (
+        <div className="sect">
+          <h4>Entity Group</h4>
+          {(d.entity_group.constituents || []).map((c: any, i: number) => (
+            <div className="var-row" key={i}>
+              <span className="var-name">{c.topic_display || c.topic_key}</span>
+              {c.signal_stage && <span className="var-tier" style={{ color: stageColor(c.signal_stage) }}>{stageLabel(c.signal_stage)}</span>}
+              <span className="var-sc">{Math.round(c.detection_score ?? 0)}/{Math.round(c.confidence_score ?? 0)}</span>
+            </div>
+          ))}
+          {d.entity_group.evidence_note && (
+            <div className="narr muted" style={{ marginTop: 6 }}>{d.entity_group.evidence_note}</div>
+          )}
+          {d.entity_group.shared_evidence_sample && (
+            <div style={{ marginTop: 8 }}>
+              <div className="kv"><span>Shared evidence (de-duplicated)</span><span /></div>
+              {String(d.entity_group.shared_evidence_sample).split('\n').slice(0, 6).map((ln: string, i: number) => (
+                <div className="narr muted" key={i} style={{ marginBottom: 3 }}>{ln.replace(/^-\s*/, '')}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {d?.entity_group?.role === 'constituent' && d.entity_group.canonical_key && (
+        <div className="sect">
+          <h4>Entity Group</h4>
+          <div className="narr">
+            Constituent of the <b>{d.entity_group.canonical_key}</b> entity group. {d.entity_group.evidence_note}
+          </div>
+        </div>
+      )}
+
       {/* Source & Why */}
       {(platforms.length > 0 || why) && (
         <div className="sect">
@@ -690,7 +724,17 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                 const [dirIcon, dirColor] = dirOf(r.gap)
                 return (
                   <tr key={r.topic_key} className={r.topic_key === sel ? 'sel' : ''} onClick={() => select(r.topic_key)}>
-                    <td><div className="topic-name">{r.topic_display}</div><div className="topic-cat">{r.topic_key}</div></td>
+                    <td>
+                      <div className="topic-name">
+                        {r.topic_display}
+                        {(r.entity_group?.grouped_keys?.length ?? 0) > 0 && (
+                          <span className="eg-badge" title={`Grouped entity — includes ${r.entity_group!.grouped_keys!.join(', ')} (each keeps its own score)`}>
+                            ⊞ {r.entity_group!.grouped_keys!.length + 1}
+                          </span>
+                        )}
+                      </div>
+                      <div className="topic-cat">{r.topic_key}</div>
+                    </td>
                     <td className="r"><span className="score-cell" style={{ color: 'var(--early)' }}>{r.n || '—'}</span></td>
                     <td className="r"><span className="score-cell det">{r.det}</span></td>
                     <td className="r"><span className="score-cell conf">{r.conf}</span></td>
