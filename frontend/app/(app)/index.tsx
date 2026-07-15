@@ -74,6 +74,8 @@ export default function Dashboard() {
   const lockedRiskCount = risks.length - accessibleRisks.length;
   const mq = marketQuery.trim().toLowerCase();
   const marketFiltered = accessibleRisks.filter((r) => !mq || r.display.toLowerCase().includes(mq));
+  // #1 market signal (highest positioning score) — the Market hero pick.
+  const topRisk = [...accessibleRisks].sort((a, b) => (b.positioningScore ?? 0) - (a.positioningScore ?? 0))[0];
 
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
@@ -174,9 +176,12 @@ export default function Dashboard() {
 
         {mode === 'attention' && (
           <>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
+              What's gaining attention across every platform right now — ranked by our Gradient Score, surfaced before it hits the mainstream.
+            </Text>
             {topPick && (
               <Rise delay={90}>
-                <TouchableOpacity activeOpacity={0.93} onPress={() => router.push(`/signal/${topPick.id}`)} className="rounded-3xl overflow-hidden mt-6"
+                <TouchableOpacity activeOpacity={0.93} onPress={() => router.push(`/signal/${topPick.id}`)} className="rounded-3xl overflow-hidden mt-5"
                   style={{ shadowColor: '#0C1B3A', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 16 }, elevation: 9 }}>
                   <LinearGradient colors={['#1B3066', '#0C1B3A', '#1A1442']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 24 }}>
                     <View style={{ position: 'absolute', right: -34, top: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(201,162,75,0.13)' }} />
@@ -274,7 +279,40 @@ export default function Dashboard() {
 
         {mode === 'risk' && (
           <>
-            <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mt-6 mb-4">
+            {/* Minimalist intro — what the Market tab is */}
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
+              The Gradient Score applied to markets — how early informed money is positioning, measured against each item's own baseline.
+            </Text>
+
+            {/* ── #1 MARKET HERO — the top market signal, mirrors the Trends pick ── */}
+            {topRisk && (
+              <Rise delay={90}>
+                <TouchableOpacity activeOpacity={0.93} onPress={() => router.push(`/risk/${topRisk.key}`)} className="rounded-3xl overflow-hidden mt-5"
+                  style={{ shadowColor: '#0C1B3A', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 16 }, elevation: 9 }}>
+                  <LinearGradient colors={['#1B3066', '#0C1B3A', '#1A1442']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 24 }}>
+                    <View style={{ position: 'absolute', right: -34, top: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(201,162,75,0.13)' }} />
+                    <View style={{ position: 'absolute', left: -44, bottom: -54, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(177,18,38,0.16)' }} />
+                    <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 2.2 }}>TODAY'S #1 · MARKET SIGNAL</Text>
+                    <Text numberOfLines={2} style={{ color: '#FBF4E4', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginTop: 11, lineHeight: 33 }}>{titleCaseTopic(topRisk.display)}</Text>
+                    <View className="flex-row items-end justify-between" style={{ marginTop: 16 }}>
+                      <Text numberOfLines={2} style={{ color: '#B9C4E0', fontSize: 12, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>
+                        {topRisk.narrative || topRisk.interpretation || `${topRisk.classification ?? 'Unusual'} positioning vs its baseline.`}
+                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topRisk.positioningScore ?? 0}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
+                      </View>
+                    </View>
+                    <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>VIEW SIGNAL</Text>
+                      <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Rise>
+            )}
+
+            <View className="flex-row items-center bg-card rounded-xl px-4 py-3 mt-7 mb-4">
               <Search size={18} color="#9A9AA2" />
               <TextInput value={marketQuery} onChangeText={setMarketQuery} placeholder="Search market signals" placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
             </View>
@@ -292,7 +330,6 @@ export default function Dashboard() {
               </ScrollView>
             </View>
 
-            {!riskExplainerDismissed && <View className="mt-4"><RiskExplainer onDismiss={() => setRiskExplainerDismissed(true)} /></View>}
             <View className="mt-4"><MacroLeverageCard /></View>
 
             <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mt-6">Market Signals</Text>

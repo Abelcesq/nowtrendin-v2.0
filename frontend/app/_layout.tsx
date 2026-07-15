@@ -1,6 +1,6 @@
 import '../global.css';
 import { Stack } from 'expo-router';
-import { Platform, View, Text as RNText, TextInput as RNTextInput } from 'react-native';
+import { View, Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -49,19 +49,15 @@ export default function RootLayout() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: Platform.OS === 'web' ? '#D6D9DE' : '#FFFFFF' }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          {Platform.OS === 'web' ? (
-            // On desktop web, render the app in a centered phone-width column
-            // so the mobile layout isn't stretched across a wide browser.
-            <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#D6D9DE' }}>
-              <View style={{ flex: 1, width: '100%', maxWidth: 480, backgroundColor: '#FFFFFF',
-                shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 }}>
-                {stack}
-              </View>
-            </View>
-          ) : stack}
+          {/* Full-bleed, edge-to-edge content on every device/orientation (phone
+              portrait/landscape + iPad). Content still respects the safe-area
+              insets (notch/home indicator) via each screen's SafeAreaView. */}
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+            {stack}
+          </View>
         </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
