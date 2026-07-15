@@ -7194,17 +7194,17 @@ def _x_candidate_topics(limit: int = None) -> list:
                 seen.add(key)
                 out.append(td)
 
+    # ONE aggregation pass, not two (2026-07-15): the MAX + MIN GROUP-BYs are
+    # merged (identical semantics) — this base runs THREE times per scan, so the
+    # old shape cost six full-table aggregations per X-scan cycle and convoyed
+    # the serve-path builds.
     base = """
         SELECT v.topic_display
         FROM velocity_scores v
         INNER JOIN (
-            SELECT topic_key, MAX(scored_at) AS m
+            SELECT topic_key, MAX(scored_at) AS m, MIN(scored_at) AS f
             FROM velocity_scores GROUP BY topic_key
-        ) l ON v.topic_key = l.topic_key AND v.scored_at = l.m
-        INNER JOIN (
-            SELECT topic_key, MIN(scored_at) AS f
-            FROM velocity_scores GROUP BY topic_key
-        ) fs ON v.topic_key = fs.topic_key
+        ) fs ON v.topic_key = fs.topic_key AND v.scored_at = fs.m
         WHERE COALESCE(v.total_mentions, 0) >= 5
     """
     conn = None
@@ -7953,19 +7953,20 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
         # an orphaned checkout is a pool slot leaked FOREVER (the 2026-07-06
         # /scores outage: dead conns raised here, close() never ran, the pool
         # exhausted while the server sat near-idle).
+        # ONE aggregation pass, not two (2026-07-15): MAX + MIN used to be two
+        # separate GROUP-BY subqueries — two full scans of a 2.15M-row table per
+        # build. Merged into a single GROUP BY (identical semantics: both keyed
+        # on topic_key over the same table) so the build fits comfortably inside
+        # the statement_timeout that now guards every query.
         rows = conn.execute(f"""
-            SELECT v.*, COALESCE(lc.first_detected_at, fs.first_at) AS first_scored_at,
+            SELECT v.*, COALESCE(lc.first_detected_at, agg.first_at) AS first_scored_at,
                    COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
             FROM velocity_scores v
             INNER JOIN (
-                SELECT topic_key, MAX(scored_at) as max_at
+                SELECT topic_key, MAX(scored_at) AS max_at, MIN(scored_at) AS first_at
                 FROM velocity_scores GROUP BY topic_key
-            ) latest ON v.topic_key = latest.topic_key
-                AND v.scored_at = latest.max_at
-            INNER JOIN (
-                SELECT topic_key, MIN(scored_at) as first_at
-                FROM velocity_scores GROUP BY topic_key
-            ) fs ON v.topic_key = fs.topic_key
+            ) agg ON v.topic_key = agg.topic_key
+                AND v.scored_at = agg.max_at
             LEFT JOIN topic_lifecycle lc ON v.topic_key = lc.topic_key
             WHERE v.overall_score >= ?
               AND COALESCE(v.total_mentions, 0) >= ?
