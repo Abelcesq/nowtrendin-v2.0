@@ -9616,7 +9616,7 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
             WHERE v.overall_score >= 0
               AND COALESCE(v.total_mentions, 0) >= ?
             {filter_str}
-            ORDER BY v.overall_score DESC
+            ORDER BY v.overall_score DESC, v.total_mentions DESC, v.scored_at DESC
             LIMIT ?
         """, (mentions_floor, candidate_cap)).fetchall()
     finally:
