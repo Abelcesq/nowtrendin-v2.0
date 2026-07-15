@@ -80,6 +80,7 @@ export interface Signal {
   stage: Stage;               // displayed stage — Detection-based (see stageFromScore)
   engineStage?: Stage;        // engine's overall-based signal_stage, for reference
   createdAt: number; // epoch ms — latest score time (for "Xm ago" + sorting)
+  feedRank?: number; // position in the /scores feed (web-parity tie-breaker)
   firstSeenAt?: number; // epoch ms — earliest score time (for tier data-aging)
   // Rich fields (present for live engine data; optional for mock)
   overall?: number;
@@ -161,14 +162,18 @@ export type CategoryKey =
   | 'emerging' | 'marginal' | 'anomalies';
 
 // TIE-BREAK chain — WEB PARITY. The web ranks with a STABLE sort over rows in
-// /scores feed order, so ties fall back to: overall score → mentions →
-// recency. N saturates at 100 for many topics, so without this chain the
-// visible order is dominated by whatever order the feed arrived in (mobile's
-// feed is recency-first → the two platforms showed different N=100 orders).
+// /scores ARRIVAL order, so ties resolve to the engine's own feed order (its
+// stored sort: overall → mentions → recency). N saturates at 100 for many
+// topics, so ties dominate the visible list. feedRank (stamped at fetch) is
+// the exact arrival position — the derived chain below is only the fallback
+// for rows without one (mock data), since SERVED values can differ from the
+// engine's stored sort column and re-deriving from them diverges from the web.
 export const feedOrder = (a: Signal, b: Signal) =>
-  ((b.overall ?? b.score) - (a.overall ?? a.score)) ||
-  ((b.totalMentions ?? 0) - (a.totalMentions ?? 0)) ||
-  (b.createdAt - a.createdAt);
+  (a.feedRank != null && b.feedRank != null)
+    ? a.feedRank - b.feedRank
+    : ((b.overall ?? b.score) - (a.overall ?? a.score)) ||
+      ((b.totalMentions ?? 0) - (a.totalMentions ?? 0)) ||
+      (b.createdAt - a.createdAt);
 
 export const CATEGORY_DEFS: Array<{
   key: CategoryKey;

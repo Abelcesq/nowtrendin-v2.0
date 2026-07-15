@@ -645,10 +645,15 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
             {topicFilter && <button onClick={() => setTopicFilter('')} title="Clear" style={{ position: 'absolute', right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px', display: 'flex', alignItems: 'center' }}><X size={12} /></button>}
           </div>
         </div>
-        {/* Row 2 — CATEGORY filters (the WHAT axis) */}
+        {/* Row 2 — CATEGORY filters (the WHAT axis). Leads with an "All" chip
+            (mobile parity): active when NO category is selected; clicking it
+            clears the category back to the default Now TrendIn view. */}
         {cats.length > 0 && (
           <div className="chips">
             <span className="chip-label">Category</span>
+            <div className={'chip' + (catParam === '' ? ' active' : '')} onClick={() => setFilter('nowtrendin')}>
+              All <span className="c-cnt">{cats.reduce((n, c) => n + c.count, 0)}</span>
+            </div>
             {cats.slice(0, 12).map((c) => (
               <div key={c.key} className={'chip' + (filter === c.key ? ' active' : '')} onClick={() => setFilter(c.key)}>
                 {c.label} <span className="c-cnt">{c.count}</span>

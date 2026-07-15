@@ -146,7 +146,12 @@ export async function fetchScoresPage(limit = SCORES_PAGE_SIZE, offset = 0): Pro
   if (!res.ok) throw new Error(`Gradient API ${res.status}`);
   const data = await res.json();
   const results = Array.isArray(data?.results) ? data.results : [];
-  return { signals: results.map(mapSignal), total: Number(data?.total ?? results.length) };
+  // Stamp the /scores ARRIVAL position (global across pages). The web's ties
+  // resolve to this exact feed order (its stable sort preserves row arrival);
+  // feedRank lets mobile reproduce it instead of re-deriving from served
+  // values, which can differ from the engine's stored sort column.
+  const signals = results.map((r: any, i: number) => ({ ...mapSignal(r), feedRank: offset + i }));
+  return { signals, total: Number(data?.total ?? results.length) };
 }
 
 // Fetch ALL scored topics, 100 at a time (never one giant payload). Used by direct
