@@ -1818,3 +1818,24 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   GROUPED ENTITY UI present; PIN gate intact (401 wrong pin, app behind cookie).
 - All source on origin main (0adf3ca web, 6b10db2 mobile). No branches were open —
   "merge branches" = everything already on main, deployed from there.
+
+### 2026-07-15 (cont. 9) — Branch cleanup + outstanding tasks completed
+- BRANCH RESEARCH + CLEANUP: all 3 feature branches were 0 commits ahead of main
+  (nothing to merge). jose-sandbox = Jose Reyes's Aurora PR #1, MERGED 07-15;
+  integrity-recs-A-G + ui-consistency-migration fully merged. Deleted all three on
+  origin + the stray ui-consistency-migration on heroku-v2engine + local copies.
+  Remaining branches: main + gh-pages (deploy artifact — keep) only.
+- STUDY A (family-collapsed ledger sensitivity, read-only): 0 confirmed families
+  have >1 resolved ledger row -> collapsed rates IDENTICAL to raw (blended 9.5%,
+  tracked-race 25.0%); correlated-win effect currently ZERO. Re-run as families
+  accumulate resolved members. audits/ledger-research/FAMILY_COLLAPSED_LEDGER.
+- STUDY B (fragment-lead, read-only): of 46 usable families, fragment first-seen
+  EARLIER in 17 (up to +31d, e.g. alcatraz +23d), same-day 22, later 7; median 0.
+  Fragments lead in a meaningful MINORITY, not systematically — supports keeping
+  fragments alive as occasional early signals (anti-D evidence) while grouping
+  display. audits/ledger-research/FRAGMENT_LEAD_STUDY_2026-07-15.md.
+- Lexicon: reddit -> technology weak list applied (07-07 worklist; youtube/whatsapp
+  precedent); safiullin was already in (07-07). Engine deployed (8fbe6f3), healthy.
+- Founder-gated queue REMAINING (not mine to flip): GHOST_FEEDS flag, Postgres tier
+  upgrade (2.15GB/365d tail), Heroku cost trims (frozen-1.0 DB, nowtrendin-web),
+  Apify Scale->Starter downgrade, Guardian/Reddit API keys.
