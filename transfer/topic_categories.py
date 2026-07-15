@@ -112,7 +112,10 @@ _LEX = {
          # tracked-call + lexicon-candidate additions (Catch-All Auditor 2026-06-30)
          "data pipeline", "asi", "meta",
          # tracked-call reclassifications (Catch-All Auditor 2026-07-05)
-         "youtube", "whatsapp"],
+         "youtube", "whatsapp",
+         # pending lexicon candidate (2026-07-07 worklist, applied 2026-07-15):
+         # the platform-as-topic, same precedent as youtube/whatsapp above
+         "reddit"],
     ),
     "politics": (
         ["election", "president", "senate", "congress", "parliament",
