@@ -1690,3 +1690,14 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   defaults 'all' on every axis, combining with search; nav-chip row removed. Headline
   under the greeting is mode-aware (market count "Moving!" on Market tab). Preview
   redeployed + bundle verified (gate intact, new chips in served JS).
+
+### 2026-07-15 (cont. 2) — mobile/web SORTING alignment, all sections (preview 7530d30)
+- Trends: CATEGORY_DEFS carry the web's per-view rank (Now TrendIn→N, All Signals +
+  stage tiers→Detection); mobile default view = Now TrendIn (web default); hero +
+  TrendCard number follows the ranking metric (N label on the N-ranked view); stage
+  pages use the same def sort. nowtrendin def copy corrected (N = platform tracking).
+- Market: mobile list + hero rank by MONEY MOVEMENT desc (web table default), not the
+  positioning feed order; RiskCard collapsed = tier + MM (Money Gradient frame), the
+  positioning/classification read moved to expanded detail.
+- History: verified aligned (both recency-desc). Crypto: mobile has NO crypto section
+  (parity gap — flagged to founder as its own build; web renders engine roster order).
