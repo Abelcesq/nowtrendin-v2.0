@@ -1714,3 +1714,14 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   Price & Dark Matter facts, what-it-measures explainer.
 - useCrypto() polls 4s while the prewarm feed reports 'warming' (web behavior); pull bar
   hidden on Crypto (web has no crypto pull); headline "N Coins Are Moving!".
+
+### 2026-07-15 (cont. 4) — exact trend-order parity (feedRank) + web "All" category chip
+- ROOT CAUSE of the residual order mismatch: both platforms rank by N, but N saturates
+  at 100 → ties dominate. Web's stable sort inherits the /scores ARRIVAL order (the
+  engine's stored sort: overall → mentions → recency); mobile re-derived ties from
+  SERVED values (which can differ from the stored sort column) → divergent lists.
+- FIX: mobile stamps feedRank (global /scores arrival index) at fetch; feedOrder uses it
+  as the primary tie-break (derived chain kept only as mock-data fallback). Mobile now
+  reproduces the web's order exactly from the same cache snapshot.
+- Web Screener category row gained the leading "All" chip (mobile parity; active when no
+  category selected, returns to Now TrendIn). Deployed: gh-pages 9130266 + preview 7e9e635.
