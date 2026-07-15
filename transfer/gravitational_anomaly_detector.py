@@ -9707,22 +9707,20 @@ def list_categories():
     if cached is not None:
         return cached
     from collections import Counter
-    conn = get_db(DB_PATH)
-    rows = conn.execute("""
-        SELECT r.topic_key, r.topic_display
-        FROM topic_registry r
-        LEFT JOIN (
-            SELECT topic_key, MAX(scored_at) as max_at
-            FROM velocity_scores GROUP BY topic_key
-        ) latest ON r.topic_key = latest.topic_key
-        LEFT JOIN velocity_scores v
-            ON v.topic_key = latest.topic_key AND v.scored_at = latest.max_at
-        ORDER BY v.overall_score DESC NULLS LAST
-        LIMIT 2000
-    """).fetchall()
-    conn.close()
-    counts = Counter(_category_for(r["topic_key"], r["topic_display"]) for r in rows
-                     if _is_quality_topic(r["topic_display"]))
+    # SAME UNIVERSE as /topics + /scores (platform parity, 2026-07-15): tally
+    # over the served topics grid itself, so the category chip counts can never
+    # disagree with the grid total. (The old registry LIMIT-2000 scan counted
+    # ~1899 while the parity grid served 3109 — the web "All 1899 vs 3109
+    # topics" glitch.)
+    grid = _get_or_build("topics_full::0",
+                         lambda: _compute_topics_full("", False),
+                         CACHE_TTL_SCORES_FULL)
+    if grid is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, headers={"Retry-After": "30"},
+                            content={"status": "warming", "categories": [],
+                                     "total_classified": 0})
+    counts = Counter((t.get("category") or "general") for t in grid)
     cats = []
     try:
         from topic_categories import CATEGORIES, CATEGORY_LABELS
