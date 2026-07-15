@@ -1803,3 +1803,18 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   fifa_world_cup<-world_cup+fifa_world, erling_haaland<-haaland+erling, ...).
 - Web-terminal parity source committed (0adf3ca) but NOT yet deployed to
   gh-pages; mobile (Aurora) parity not yet built — awaiting founder go.
+
+### 2026-07-15 (cont. 8) — Entity Group parity DEPLOYED on all 3 platforms
+- WEB TERMINAL live (gh-pages 30c6255, bundle index-HezdPg97.js verified): screener
+  grouped-entity badge (⊞ count incl. canonical, amethyst) + detail-rail Entity Group
+  section (constituents' OWN det/conf + stage, evidence note, de-duplicated shared-
+  evidence sample; constituent details point to canonical). Stale gh-pages bundles
+  pruned (9 old asset files removed). Desktop inherits the web build.
+- MOBILE live (preview 1421a48, Aurora): entityGroup mapped in gradientApi (server
+  folds — feedRank stamping untouched; mock fallback safe); Signal/EntityGroup types;
+  TrendCard amethyst ⊞ chip + expanded constituent rows (own DET/CONF, "never
+  combined" note); signal/[id] "Entity group · N topics" Section with per-constituent
+  own scores + evidence note. Bundle verified: gate 1 / backend 1 / engine 1 /
+  GROUPED ENTITY UI present; PIN gate intact (401 wrong pin, app behind cookie).
+- All source on origin main (0adf3ca web, 6b10db2 mobile). No branches were open —
+  "merge branches" = everything already on main, deployed from there.
