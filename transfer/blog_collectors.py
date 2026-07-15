@@ -239,8 +239,24 @@ def research_entity_topics(title: str, max_topics: int = 5) -> list:
         w = _re.sub(r"[’']s$", "", w, flags=_re.IGNORECASE)
         return w.lower().strip("'’-")
 
+    def _is_contraction(w):
+        # "Doesn't"/"Won't"/"It'll" (curly or ASCII apostrophe) are style words,
+        # never entity anchors — they miss the common-word list only because the
+        # dictionary has no apostrophed forms (the 2026-07-15 flip-review fix).
+        return bool(_re.search(r"['’](t|re|ve|ll|d|m)$", w, flags=_re.IGNORECASE))
+
+    # Unescape HTML entities BEFORE segment-splitting — "Q&amp;A" carries a ';'
+    # that would otherwise split mid-marker and hide the Q&A pattern below.
+    title = title.replace("&amp;", "&").replace("&#038;", "&")
+
     # Split into sentences/segments so sentence-initial capitals don't chain runs.
     for seg in _re.split(r"[.:;!?—|]|--", title):
+        # Interview boilerplate: "Q&A with <Staff Name>" segments extract the STAFF
+        # member, not a trend entity (the NBER author-name failure mode; RAND Q&A
+        # posts hit it live 2026-07-15). The substantive topic lives in the other
+        # segment of the title, so dropping this segment loses nothing.
+        if _re.search(r"q\s*&\s*a", seg, flags=_re.IGNORECASE):
+            continue
         words = _re.findall(r"[A-Za-z][A-Za-z'’-]*", seg)
         if not words:
             continue
@@ -261,14 +277,47 @@ def research_entity_topics(title: str, max_topics: int = 5) -> list:
             if not lower or len(lower) > 3:
                 return
             def _is_entity(w):
-                return w not in _RESEARCH_COMMON and w not in STOP_WORDS and len(w) >= 3
+                if w in _RESEARCH_COMMON or w in STOP_WORDS or len(w) < 3:
+                    return False
+                if _is_contraction(w):
+                    return False
+                # De-inflect before deciding a word is "not common": plurals,
+                # gerunds, participles, comparatives of dictionary words are style,
+                # not entities ("loops", "fractures", "restoring", "breaking" —
+                # live junk anchors, 2026-07-15 flip review). Proper nouns
+                # (texas, screwworm, hizballah) have no common stem and survive.
+                for suf in ("s", "es", "ing", "ed", "er", "est"):
+                    if w.endswith(suf) and len(w) - len(suf) >= 3:
+                        stem = w[: len(w) - len(suf)]
+                        if stem in _RESEARCH_COMMON or (stem + "e") in _RESEARCH_COMMON:
+                            return False
+                        # doubled consonant: "stopping" → "stopp" → "stop"
+                        if len(stem) >= 4 and stem[-1] == stem[-2] and stem[:-1] in _RESEARCH_COMMON:
+                            return False
+                return True
             # Trim capitalized-but-common EDGE words (Title-Case style riding along:
-            # "afghanistan barbers UNDER") — but never below 2 words: a phrase trimmed
-            # to a single word is a style word, not an entity ("Compute Age"→"compute").
-            while len(lower) > 2 and not _is_entity(lower[-1]):
+            # "afghanistan barbers UNDER"). In TITLE-CASE segments trim all the way
+            # down — capitalization carries no signal there, so a 2-word run with a
+            # style edge word reduces to its real entity ("Breaking America" →
+            # "america", "NATO Unity" → "nato" — the 2026-07-15 flip-review fix).
+            # In SENTENCE-case segments never trim below 2: a capitalized pair in
+            # running text ("the Shin Bet") is a genuine proper-noun NAME whose
+            # common-looking word is part of it — mutilating it makes junk.
+            _floor = 1 if title_case else 2
+            while len(lower) > _floor and not _is_entity(lower[-1]):
                 lower.pop()
-            while len(lower) > 2 and not _is_entity(lower[0]):
+            while len(lower) > _floor and not _is_entity(lower[0]):
                 lower.pop(0)
+            if title_case and len(lower) == 1 and len(run) > 1:
+                w = lower[0]
+                # trim residue: keep only a strong, clean entity word
+                if (len(w) >= 4 and _is_entity(w) and "-" not in w
+                        and not w.endswith("ing")):
+                    phrase = w[:60]
+                    if phrase not in seen:
+                        seen.add(phrase)
+                        out.append(phrase)
+                return
             # Single-word topics ONLY for standalone proper nouns: a 1-word run in a
             # sentence-case segment, mid-sentence, ≥4 chars ("Temu", "Maldives") —
             # never a trim residue or a Title-Case style word.
