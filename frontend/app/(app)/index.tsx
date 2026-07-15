@@ -8,7 +8,6 @@ import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Rise } from '../../components/ui/Rise';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
-import { RiskExplainer } from '../../components/trends/RiskExplainer';
 import { MacroLeverageCard } from '../../components/trends/MacroLeverageCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
@@ -17,7 +16,7 @@ import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
-import { MARKET_CATEGORY_DEFS } from '../../lib/marketCategories';
+import { MARKET_LANES, MARKET_TIER_FILTERS, MARKET_DIRECTION_FILTERS, laneOf } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
@@ -37,15 +36,16 @@ export default function Dashboard() {
   const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
-  const [riskExplainerDismissed, setRiskExplainerDismissed] = useState(false);
   const [query, setQuery] = useState('');
   const [contentCat, setContentCat] = useState('all');
   const [signalFilter, setSignalFilter] = useState('all');
   const [marketQuery, setMarketQuery] = useState('');
+  // Market filter axes — WEB PARITY: lane / tier / direction, all defaulting to
+  // 'all' exactly like the web terminal's Market Signal page.
+  const [marketLane, setMarketLane] = useState('all');
+  const [marketTier, setMarketTier] = useState('all');
+  const [marketDir, setMarketDir] = useState('all');
   const [visible, setVisible] = useState(PAGE);
-
-  const goToMarketCategory = (key: string) => router.push(`/market-category/${key}` as any);
-  const goToCategory = (key: string) => router.push(`/category/${key}` as any);
 
   // ── Attention feed ──
   // TRENDS (signal-stage) filter — same row as the web terminal, driven by
@@ -73,7 +73,21 @@ export default function Dashboard() {
   const accessibleRisks = risks.filter((r) => isDataAccessible(tier, Date.now() - r.firstSeenAt));
   const lockedRiskCount = risks.length - accessibleRisks.length;
   const mq = marketQuery.trim().toLowerCase();
-  const marketFiltered = accessibleRisks.filter((r) => !mq || r.display.toLowerCase().includes(mq));
+  // The three axes COMBINE (lane AND tier AND direction AND search) — web parity.
+  const laneDef = MARKET_LANES.find((l) => l.key === marketLane);
+  const tierDef = MARKET_TIER_FILTERS.find((t) => t.key === marketTier);
+  const dirDef = MARKET_DIRECTION_FILTERS.find((d) => d.key === marketDir);
+  const marketFiltered = accessibleRisks.filter((r) =>
+    (!mq || r.display.toLowerCase().includes(mq)) &&
+    (!laneDef?.lane || laneOf(r) === laneDef.lane) &&
+    (!tierDef?.test || tierDef.test(r)) &&
+    (!dirDef || dirDef.test(r))
+  );
+  // Lane counts (over the full accessible set, before the other filters) for the
+  // chip labels — same as the web ("Covered 15 · Halted / micro-cap 283 …").
+  const laneCounts = Object.fromEntries(
+    MARKET_LANES.filter((l) => l.lane).map((l) => [l.key, accessibleRisks.filter((r) => laneOf(r) === l.lane).length])
+  ) as Record<string, number>;
   // #1 market signal (highest positioning score) — the Market hero pick.
   const topRisk = [...accessibleRisks].sort((a, b) => (b.positioningScore ?? 0) - (a.positioningScore ?? 0))[0];
 
@@ -85,7 +99,7 @@ export default function Dashboard() {
       : 'Good evening';                 // 6:00pm – 11:59pm
 
   // Reset the visible window whenever the feed/filter/mode changes.
-  useEffect(() => { setVisible(PAGE); }, [mode, contentCat, query, marketQuery]);
+  useEffect(() => { setVisible(PAGE); }, [mode, contentCat, signalFilter, query, marketQuery, marketLane, marketTier, marketDir]);
 
   // Tapping the Home tab resets the screen to its just-opened state: Trends
   // selected (not Market/Grade), filters cleared, scrolled to the top.
@@ -93,8 +107,12 @@ export default function Dashboard() {
     const unsub = (navigation as any).addListener('tabPress', () => {
       setMode('attention');
       setContentCat('all');
+      setSignalFilter('all');
       setQuery('');
       setMarketQuery('');
+      setMarketLane('all');
+      setMarketTier('all');
+      setMarketDir('all');
       setVisible(PAGE);
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     });
@@ -147,9 +165,18 @@ export default function Dashboard() {
         <Rise>
           <View className="mt-7">
             <Text className="text-textPrimary text-[12px] font-extrabold tracking-[2.5px] uppercase">{greeting}, {firstName}</Text>
-            <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
-              {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
-            </Text>
+            {/* Headline follows the active tab: Trends count on Trends, market-item
+                count on Market (founder 2026-07-15 — the number must describe what
+                the user is looking at). */}
+            {mode === 'risk' ? (
+              <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
+                {marketFiltered.length.toLocaleString()} Market {marketFiltered.length === 1 ? 'Signal Is' : 'Signals Are'} <Text style={{ color: '#B11226' }}>Moving!</Text>
+              </Text>
+            ) : (
+              <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
+                {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
+              </Text>
+            )}
             <View className="flex-row items-center gap-2.5 mt-3.5">
               <View className="flex-row items-center gap-1.5">
                 <TierBadgeIcon size={13} color={cfg.colour} />
@@ -317,16 +344,54 @@ export default function Dashboard() {
               <TextInput value={marketQuery} onChangeText={setMarketQuery} placeholder="Search market signals" placeholderTextColor="#9A9AA2" className="flex-1 ml-3 text-base" style={{ color: '#16264A' }} />
             </View>
 
-            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2.5">Market</Text>
+            {/* THREE filter rows — WEB PARITY (frontend-consistency): LANE / TIER /
+                DIRECTION, defaults 'all' on every axis, filtering IN PLACE exactly
+                like the web terminal's Market Signal page. They combine:
+                lane AND tier AND direction AND search. */}
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mb-2.5">Lane</Text>
             <View style={{ marginHorizontal: -20 }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-                {MARKET_CATEGORY_DEFS.map((c) => (
-                  <TouchableOpacity key={c.key} onPress={() => goToMarketCategory(c.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
-                    style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: '#F1F1F4', borderColor: '#ECECEC' }}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, marginRight: 8, backgroundColor: c.color }} />
-                    <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '700' }}>{c.short ?? c.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {MARKET_LANES.map((l) => {
+                  const on = marketLane === l.key;
+                  const count = l.lane ? (laneCounts[l.key] ?? 0) : 0;
+                  return (
+                    <TouchableOpacity key={l.key} onPress={() => setMarketLane(l.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? '#16264A' : '#F1F1F4' }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{l.label}</Text>
+                      {count > 0 && <Text style={{ color: on ? '#FFFFFF' : '#9A9AA2', fontSize: 12, fontWeight: '800', marginLeft: 7 }}>{count}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-4 mb-2.5">Tier</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {MARKET_TIER_FILTERS.map((t) => {
+                  const on = marketTier === t.key;
+                  return (
+                    <TouchableOpacity key={t.key} onPress={() => setMarketTier(t.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? '#16264A' : '#F1F1F4' }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{t.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-4 mb-2.5">Direction</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {MARKET_DIRECTION_FILTERS.map((d) => {
+                  const on = marketDir === d.key;
+                  return (
+                    <TouchableOpacity key={d.key} onPress={() => setMarketDir(d.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? '#16264A' : '#F1F1F4' }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{d.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </View>
 
@@ -339,7 +404,9 @@ export default function Dashboard() {
               <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
             ) : marketFiltered.length === 0 ? (
               <Text className="text-textMuted text-center mt-8">
-                {mq ? `No market items match "${marketQuery}".` : lockedRiskCount > 0 ? 'Newer market signals are still aging into your tier.' : 'No market signals yet.'}
+                {mq ? `No market items match "${marketQuery}".`
+                  : (marketLane !== 'all' || marketTier !== 'all' || marketDir !== 'all') ? 'No market items match these filters.'
+                  : lockedRiskCount > 0 ? 'Newer market signals are still aging into your tier.' : 'No market signals yet.'}
               </Text>
             ) : (
               <>

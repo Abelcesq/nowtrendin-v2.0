@@ -9,10 +9,44 @@ export type MarketCategoryKey =
   | 'building' | 'routine' | 'dormant' | 'leverage';
 
 // Helpers reading the live Market Gradient off a RiskScore.
-const tierOf = (r: RiskScore) => r.marketGradient?.tier ?? r.stage ?? 'DORMANT';
+export const tierOf = (r: RiskScore) => r.marketGradient?.tier ?? r.stage ?? 'DORMANT';
 const detOf = (r: RiskScore) => r.marketGradient?.detection ?? r.detection ?? 0;
 export const leverageOf = (r: RiskScore): number | null =>
   r.marketGradient?.leverageHealth ?? null;
+export const laneOf = (r: RiskScore) => r.marketGradient?.lane ?? '';
+export const flowOf = (r: RiskScore) => r.marketGradient?.flow ?? null;
+
+// ── The three Market filter axes — WEB PARITY (web MarketSignal.tsx is the model) ──
+// LANE (coverage, Tier 1) · TIER (Market Gradient tier + the Watch/Leverage cuts) ·
+// DIRECTION (factual net money-flow from filings — a fact, not advice).
+// Defaults are 'all' on every axis, exactly like the web terminal.
+
+export const MARKET_LANES: { key: string; label: string; lane?: string }[] = [
+  { key: 'all', label: 'All lanes' },
+  { key: 'covered', label: 'Covered', lane: 'covered' },
+  { key: 'halted_microcap', label: 'Halted / micro-cap', lane: 'halted_microcap' },
+  { key: 'macro_theme', label: 'Macro themes', lane: 'macro_theme' },
+];
+
+// 'Moderate' matches the BUILDING→MODERATE rename — the engine may serve either label.
+export const MARKET_TIER_FILTERS: { key: string; label: string; test?: (r: RiskScore) => boolean }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'elevated', label: 'Elevated', test: (r) => tierOf(r) === 'ELEVATED' },
+  { key: 'active', label: 'Active', test: (r) => tierOf(r) === 'ACTIVE' },
+  { key: 'moderate', label: 'Moderate', test: (r) => tierOf(r) === 'MODERATE' || tierOf(r) === 'BUILDING' },
+  { key: 'routine', label: 'Routine', test: (r) => tierOf(r) === 'ROUTINE' },
+  { key: 'dormant', label: 'Dormant', test: (r) => tierOf(r) === 'DORMANT' },
+  { key: 'watch', label: 'Watch / Unusual', test: (r) => ['WATCH', 'ELEVATED', 'UNUSUAL'].includes((r.classification ?? '').toUpperCase()) },
+  { key: 'leverage', label: 'Leverage ≥60', test: (r) => (leverageOf(r) ?? 0) >= 60 },
+];
+
+// Neutral covers anything without a clear in/out read (neutral, divergent, unknown).
+export const MARKET_DIRECTION_FILTERS: { key: string; label: string; test: (r: RiskScore) => boolean }[] = [
+  { key: 'all', label: 'All', test: () => true },
+  { key: 'inflow', label: 'Inflow', test: (r) => flowOf(r) === 'inflow' },
+  { key: 'outflow', label: 'Outflow', test: (r) => flowOf(r) === 'outflow' },
+  { key: 'neutral', label: 'Neutral', test: (r) => flowOf(r) !== 'inflow' && flowOf(r) !== 'outflow' },
+];
 
 export const MARKET_CATEGORY_DEFS: Array<{
   key: MarketCategoryKey;
