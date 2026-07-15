@@ -399,9 +399,18 @@ part 1 still in design.** Two coupled changes:
    to defeat wire-syndication). The "Belgium vs Iran, 2026 World Cup" corroboration case.
    Extends the catch-all corroboration philosophy (`CATCHALL_MIN_SOURCES ≥2`) from
    *admission* to *weight*.
-2. **Research / early-signal outlets → Dark Matter (D), NOT Mainstream (M) — ✅ BUILT
-   2026-07-07, flag `GHOST_RESEARCH_FEEDS` (default OFF; founder flips after reviewing
-   `audits/source-onboarding/RESEARCH_FEEDS_VALIDATION_2026-07-07.md`).** §16 five-gate
+2. **Research / early-signal outlets → Dark Matter (D), NOT Mainstream (M) — ✅ LIVE
+   2026-07-15 (founder-ordered flip), flag `GHOST_RESEARCH_FEEDS=1` on the engine.**
+   Pre-flip adversarial re-verify on live titles caught + fixed 3 extractor defects
+   (curly-apostrophe contractions anchoring junk; RAND "Q&amp;A with <staff>" titles
+   extracting staff names — the NBER failure mode; inflected common words passing the
+   dictionary test). Title-Case style pairs now reduce to their real entity
+   ("Breaking America"→america); sentence-case proper-noun pairs ("the Shin Bet") are
+   never mutilated. Confirmed collecting live (WoR/RoW/GI/RAND through
+   `research_entity_topics` at expert tier). **Monitored two-week trial** per the
+   validation doc: watch topic-quality + catch-all auditors (fragment count,
+   single-source leak) + ghost collector counts; roll back by unsetting the flag.
+   Original build 2026-07-07: `audits/source-onboarding/RESEARCH_FEEDS_VALIDATION_2026-07-07.md`. §16 five-gate
    verdicts: **War on Rocks / Rest of World / Global Issues / RAND PASS** via the new
    ENTITY-ANCHORED extractor (`blog_collectors.research_entity_topics`,
    `mode="research_entity"` — required because the generic n-gram extractor FAILED the

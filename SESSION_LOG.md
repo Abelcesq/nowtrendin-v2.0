@@ -1839,3 +1839,29 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - Founder-gated queue REMAINING (not mine to flip): GHOST_FEEDS flag, Postgres tier
   upgrade (2.15GB/365d tail), Heroku cost trims (frozen-1.0 DB, nowtrendin-web),
   Apify Scale->Starter downgrade, Guardian/Reddit API keys.
+
+### 2026-07-15 (cont. 10) — GHOST_RESEARCH_FEEDS flipped LIVE (founder-ordered)
+- Pre-flip ADVERSARIAL RE-VERIFY on live titles caught 3 real extractor defects that
+  the 07-07 validation-era code let through TODAY (they'd have entered the
+  corroboration-floor-EXEMPT expert pathway): (1) curly-apostrophe contractions
+  anchored junk runs ("size doesn't"); (2) RAND "Q&A with <staff>" titles extracted
+  STAFF NAMES — the NBER author failure mode; the &amp; entity's ';' split segments
+  mid-marker and hid it; (3) inflected common words passed the dictionary test
+  ("loops","fractures","restoring" anchored "empty loops"-class junk).
+- FIXES in blog_collectors.research_entity_topics (4e1cd08): contraction suffixes
+  never entity-anchor; HTML-unescape before segmenting + drop Q&A segments;
+  de-inflection stem check; Title-Case edge-trim reduces style pairs to the real
+  entity ("Breaking America"->america, "NATO Unity"->nato) while SENTENCE-case
+  proper-noun pairs ("the Shin Bet") never trim below 2 (no name mutilation).
+  Verified: live 32-title sample clean (residual singles face the scoring fragment
+  gate); regression cases pass; generic GHOST_FEEDS path untouched.
+- FLIPPED: GHOST_RESEARCH_FEEDS=1 (engine v242). CONFIRMED LIVE in logs, two cycles:
+  "[Ghost RSS] 11 expert blog feeds (+research outlets)" — WoR 74 / RoW 6 / GI 4 /
+  RAND 12 articles/cycle at expert tier (Dark Matter D pathway).
+- MONITORED TWO-WEEK TRIAL now running (per the validation doc): watch topic-quality
+  + catch-all auditors (fragment count, single-source leak) + ghost counts; the
+  weekly /improve-system audit covers it. Roll back = unset the flag (no cleanup
+  needed). Re-run LED feature mining after the cohort accumulates. CLAUDE.md §15
+  updated to LIVE.
+- Noted (separate task chip): recurring "[market_signal] record error
+  (a_k_a_brands...): float(None)" in engine logs — pre-existing, unrelated.
