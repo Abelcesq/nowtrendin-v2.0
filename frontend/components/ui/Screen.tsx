@@ -12,17 +12,12 @@ interface ScreenProps {
   padded?: boolean;
 }
 
-const isAndroid = Platform.OS === 'android';
-const isWeb = Platform.OS === 'web';
-
 // Full-bleed: content goes edge to edge on every device/orientation (phone
-// portrait/landscape + iPad). No centered max-width column.
-const webContentStyle = undefined;
+// portrait/landscape + iPad). No centered max-width column, no web centering.
+const isAndroid = Platform.OS === 'android';
 
 export function Screen({ children, scroll = false, className = '', padded = true }: ScreenProps) {
   const padding = padded ? 'px-5' : '';
-  const webWrap = (node: React.ReactNode) =>
-    isWeb ? <View style={webContentStyle} className="flex-1">{node}</View> : node;
 
   // Pinch-to-zoom. iOS uses the ScrollView's native zoom; Android has none,
   // so we drive a transform scale via a pinch gesture.
@@ -47,13 +42,13 @@ export function Screen({ children, scroll = false, className = '', padded = true
   );
 
   if (!scroll) {
-    return frame(<View className={`flex-1 ${padding} ${className}`}>{webWrap(children)}</View>);
+    return frame(<View className={`flex-1 ${padding} ${className}`}>{children}</View>);
   }
 
   const sv = (
     <ScrollView
       className={`flex-1 ${padding} ${className}`}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: 32, ...(isWeb ? { alignItems: 'center' } : null) }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       {...(isAndroid
@@ -62,8 +57,6 @@ export function Screen({ children, scroll = false, className = '', padded = true
     >
       {isAndroid ? (
         <Animated.View style={zoomStyle}>{children}</Animated.View>
-      ) : isWeb ? (
-        <View style={webContentStyle}>{children}</View>
       ) : (
         children
       )}
