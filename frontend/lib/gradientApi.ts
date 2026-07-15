@@ -855,8 +855,14 @@ export interface CryptoCoin {
   flow?: string;                   // inflow | outflow | neutral | divergent
   calibrating?: boolean;
   interpretation?: string;
+  gapState?: string;               // MIXED | EARLY | CONFIRMING | ... (web rail headline)
   priceClose?: number | null;
+  priceAsOf?: string;
   change7dPct?: number | null;
+  change30dPct?: number | null;
+  // label -> { score, feeds: money_movement|market_confirmation, baselineRelative, notApplicable }
+  components?: Record<string, { score: number | null; feeds?: string; baselineRelative?: boolean; notApplicable?: boolean }>;
+  darkMatter?: { flow?: string; intensity?: number; coverage?: string } | null;
 }
 
 export interface CryptoFeed { status?: string; coins: CryptoCoin[]; disclaimer?: string }
@@ -875,8 +881,22 @@ export async function fetchCrypto(): Promise<CryptoFeed> {
     flow: c.flow || undefined,
     calibrating: !!c.calibrating,
     interpretation: c.interpretation || undefined,
+    gapState: c.gap_state || undefined,
     priceClose: c.price?.last_close ?? null,
+    priceAsOf: c.price?.as_of || undefined,
     change7dPct: c.price?.change_7d_pct ?? null,
+    change30dPct: c.price?.change_30d_pct ?? null,
+    components: c.components
+      ? Object.fromEntries(Object.entries(c.components).map(([label, comp]: [string, any]) => [label, {
+          score: comp?.score ?? null,
+          feeds: comp?.feeds || undefined,
+          baselineRelative: !!comp?.baseline_relative,
+          notApplicable: !!comp?.not_applicable,
+        }]))
+      : undefined,
+    darkMatter: c.dark_matter
+      ? { flow: c.dark_matter.flow, intensity: c.dark_matter.intensity, coverage: c.dark_matter.coverage }
+      : null,
   }));
   return { status: d.status, coins, disclaimer: d.disclaimer };
 }

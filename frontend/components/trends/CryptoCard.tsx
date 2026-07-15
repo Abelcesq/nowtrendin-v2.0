@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { ChevronDown } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronDown, ArrowRight } from 'lucide-react-native';
 import { Rise } from '../ui/Rise';
 import { CryptoCoin } from '../../lib/gradientApi';
 import { MARKET_TIER_COLOR } from '../../lib/marketCategories';
@@ -23,6 +24,7 @@ const FLOW_META: Record<string, { label: string; color: string }> = {
 // Crypto table's columns). Collapsed: name·ticker, tier + flow, Money
 // Movement. Expanded: Market Confirmation, Lead, price, interpretation.
 export function CryptoCard({ coin }: { coin: CryptoCoin }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const tierColor = MARKET_TIER_COLOR[coin.tier] ?? '#9A9AA2';
   const flow = coin.flow ? (FLOW_META[coin.flow] ?? { label: `• ${coin.flow.toUpperCase()}`, color: '#9A9AA2' }) : null;
@@ -85,10 +87,16 @@ export function CryptoCard({ coin }: { coin: CryptoCoin }) {
             </View>
 
             {!!coin.interpretation && (
-              <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 4 }}>
+              <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500', marginBottom: 12 }}>
                 {coin.interpretation}
               </Text>
             )}
+
+            <TouchableOpacity onPress={() => router.push(`/crypto/${coin.coin}` as any)} activeOpacity={0.85}
+              className="flex-row items-center self-start" style={{ backgroundColor: '#16264A', borderRadius: 980, paddingVertical: 11, paddingHorizontal: 22 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>FULL DETAIL</Text>
+              <ArrowRight size={13} color="#F0758A" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
           </Rise>
         )}
       </TouchableOpacity>
