@@ -15,12 +15,9 @@ interface ScreenProps {
 const isAndroid = Platform.OS === 'android';
 const isWeb = Platform.OS === 'web';
 
-// On web, constrain content to a readable column and center it so the app
-// doesn't stretch edge-to-edge on desktop monitors. No-op on native.
-const WEB_MAX_WIDTH = 760;
-const webContentStyle = isWeb
-  ? ({ width: '100%', maxWidth: WEB_MAX_WIDTH, alignSelf: 'center' } as const)
-  : undefined;
+// Full-bleed: content goes edge to edge on every device/orientation (phone
+// portrait/landscape + iPad). No centered max-width column.
+const webContentStyle = undefined;
 
 export function Screen({ children, scroll = false, className = '', padded = true }: ScreenProps) {
   const padding = padded ? 'px-5' : '';
