@@ -1676,3 +1676,17 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - statement_timeout default 300s, env-tunable: finiteness beats an unbounded query; a
   legitimately-slower statement fails VISIBLY and retries next cycle (accuracy principle:
   a visible error beats silent staleness).
+
+### 2026-07-15 (cont.) — /topics parity + mobile Market web-parity (preview 0e16efb)
+- **Platform parity FIXED (engine e514679 + e1a4877):** /topics grid now draws from the
+  SAME universe as /scores (same latest-row source, 5000 cap, mentions floor, noise
+  filter, tie-breakers). Verified live: topics total = scores total = 2960 exactly
+  (was web 1891 vs mobile 2960 — the old registry scan was hard-capped at 2000).
+- **Mobile market-category crash FIXED:** [key].tsx imported laneOf + MARKET_LANES from
+  marketCategories.ts which did NOT exist (undefined.find() TypeError on every category
+  tap incl. ALL). The three Market filter axes now live in marketCategories.ts as SSOT.
+- **Mobile Market = web parity:** dashboard Market tab now has the web's three in-place
+  filter rows (LANE w/ counts · TIER incl. Watch/Unusual + Leverage≥60 · DIRECTION),
+  defaults 'all' on every axis, combining with search; nav-chip row removed. Headline
+  under the greeting is mode-aware (market count "Moving!" on Market tab). Preview
+  redeployed + bundle verified (gate intact, new chips in served JS).
