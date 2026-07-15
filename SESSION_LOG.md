@@ -1865,3 +1865,16 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   updated to LIVE.
 - Noted (separate task chip): recurring "[market_signal] record error
   (a_k_a_brands...): float(None)" in engine logs — pre-existing, unrelated.
+
+### 2026-07-15 (cont. 11) — market_signal record error FIXED (e1469c2)
+- Root cause: record_market_cycle ran float(val) on every component, but
+  positioning_concentration is legitimately None when FINRA + WhaleWisdom are both
+  unavailable (documented at the builder; the SERVE path handled None, the history
+  recorder didn't). float(None) threw AND aborted the loop — the item lost its
+  entire cycle of component baseline history (recurring "[market_signal] record
+  error (a_k_a_brands...)" each cycle).
+- Fix: absent (None) components record NOTHING (never a fabricated 0 — §17 / the
+  no-fabrication principle; a zero would poison that component's baseline); the
+  remaining components record normally. Behavior-tested (None skipped, 3/3 others
+  recorded, no error line). Deployed; engine healthy. Watch: the error line should
+  be absent from the next market cycle's logs.
