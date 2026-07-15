@@ -50,12 +50,31 @@ if USE_PG:
     POOL_REBUILD_AFTER_S = int(os.getenv("PG_POOL_REBUILD_AFTER_S", "90"))
     POOL_REBUILD_COOLDOWN_S = int(os.getenv("PG_POOL_REBUILD_COOLDOWN_S", "120"))
 
+    def _conn_kw():
+        # Connection hardening (2026-07-15 zombie-query lesson): a query with NO
+        # statement_timeout survives its client's death — a dyno restart turned an
+        # in-flight GROUP-BY scan into an immortal server-side zombie (19.5h) that
+        # convoyed every later scores build (~5h warms vs the 30-min cache TTL →
+        # the trend feed served cold all day). Every conn now carries:
+        #   • statement_timeout — any single query dies at the cap instead of
+        #     running forever (visible error; the caller's next cycle retries)
+        #   • TCP keepalives    — the client detects a dead server socket instead
+        #     of blocking in recv() indefinitely
+        #   • connect_timeout   — a bounded wait on connection establishment
+        return dict(
+            sslmode="require",
+            connect_timeout=int(os.getenv("PG_CONNECT_TIMEOUT_S", "10")),
+            keepalives=1, keepalives_idle=30, keepalives_interval=10,
+            keepalives_count=3,
+            options=f"-c statement_timeout={int(os.getenv('PG_STATEMENT_TIMEOUT_MS', '300000'))}",
+        )
+
     def _new_pool():
         # Default 8/dyno: web(8) + worker(8) = 16 < the essential-tier
         # 20-connection ceiling (PG_POOL_MAX to tune; 12 on the web-only
         # engine). PG_DIRECT_MAX direct fallbacks stay inside the remainder.
         return psycopg2.pool.ThreadedConnectionPool(
-            1, int(os.getenv("PG_POOL_MAX", "8")), DATABASE_URL, sslmode="require"
+            1, int(os.getenv("PG_POOL_MAX", "8")), DATABASE_URL, **_conn_kw()
         )
 
     def _get_pool():
@@ -119,7 +138,7 @@ if USE_PG:
             raise psycopg2.pool.PoolError(
                 "connection pool exhausted (direct-fallback cap reached)")
         try:
-            conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+            conn = psycopg2.connect(DATABASE_URL, **_conn_kw())
         except Exception:
             _direct_sem.release()
             raise

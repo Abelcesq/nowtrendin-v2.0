@@ -5637,7 +5637,8 @@ def start_scheduler():
 # the DB to recompute the cache; it never writes to or mutates the database (no
 # scores changed, no rows touched), so it cannot affect any served data.
 # ─────────────────────────────────────────────────────────────────────────────
-_PREWARM_STATUS: dict = {"last_run": None, "warmed": [], "elapsed_s": None}
+_PREWARM_STATUS: dict = {"last_run": None, "warmed": [], "elapsed_s": None,
+                         "in_flight_since": None, "in_flight_feed": None}
 _PREWARM_RUN_LOCK = _threading.Lock()   # overlap guard — one warm at a time
 
 
@@ -5674,12 +5675,25 @@ def _prewarm_caches() -> dict:
     try:
         return _prewarm_caches_locked(_t)
     finally:
+        # Always clear the in-flight markers — a warm that dies mid-feed must
+        # not leave /prewarm reporting a phantom build forever.
+        _PREWARM_STATUS.update({"in_flight_since": None, "in_flight_feed": None})
         _PREWARM_RUN_LOCK.release()
 
 
 def _prewarm_caches_locked(_t) -> dict:
     warmed = []
     t0 = _t.time()
+    # WEDGE VISIBILITY (2026-07-15): stamp the in-flight feed + start time so
+    # /prewarm can distinguish "never ran" from "N minutes deep in the scores
+    # build" (last_run alone can't — it stays null while a warm crawls; the
+    # 07-14/15 convoy sat invisible behind exactly that null).
+    _PREWARM_STATUS.update({"in_flight_since": datetime.now(timezone.utc).isoformat(),
+                            "in_flight_feed": None})
+
+    def _f0(feed):
+        _PREWARM_STATUS["in_flight_feed"] = feed
+        return _t.time()
     # BATCH PACING (founder rule 2026-07-06): a PREWARM_FEED_PAUSE_S (default
     # 10s) breather between feed builds — matching the paced collectors +
     # scorer. The warm refreshes the caches WITHOUT itself becoming a
@@ -5694,19 +5708,23 @@ def _prewarm_caches_locked(_t) -> dict:
     # pull-synchronized warm must REBUILD, not serve the stale cache) so a
     # warm and a client request can never double-build the same superset.
     try:
+        fs = _f0("scores")
         full = _get_or_build("scores_full:overall:all:0.0",
                              lambda: _compute_scores_full("overall", "all", 0.0),
                              CACHE_TTL_SCORES_FULL, force=True)
-        warmed.append({"feed": "scores", "rows": len(full)} if full is not None
+        warmed.append({"feed": "scores", "rows": len(full), "secs": round(_t.time() - fs, 1)}
+                      if full is not None
                       else {"feed": "scores", "error": "busy (another build in flight)"})
     except Exception as e:
         warmed.append({"feed": "scores", "error": str(e)})
     _pz()
     try:
+        fs = _f0("topics")
         grid = _get_or_build("topics_full::0",
                              lambda: _compute_topics_full("", False),
                              CACHE_TTL_SCORES_FULL, force=True)
-        warmed.append({"feed": "topics", "rows": len(grid)} if grid is not None
+        warmed.append({"feed": "topics", "rows": len(grid), "secs": round(_t.time() - fs, 1)}
+                      if grid is not None
                       else {"feed": "topics", "error": "busy (another build in flight)"})
     except Exception as e:
         warmed.append({"feed": "topics", "error": str(e)})
@@ -5716,18 +5734,20 @@ def _prewarm_caches_locked(_t) -> dict:
     for _win in ("7d", "24h", "12h"):
         _pz()
         try:
+            fs = _f0(f"history:{_win}")
             hist = _compute_history_full(_win, 12)
             _cache.set(f"history_full:{_win}:12", hist, CACHE_TTL_SCORES_FULL)
-            warmed.append({"feed": f"history:{_win}", "rows": len(hist)})
+            warmed.append({"feed": f"history:{_win}", "rows": len(hist), "secs": round(_t.time() - fs, 1)})
         except Exception as e:
             warmed.append({"feed": f"history:{_win}", "error": str(e)})
     # Market Signal (/risk/scores): warm the full instrument universe so the Market
     # tab paints instantly too — full parity with scores/topics/history.
     _pz()
     try:
+        fs = _f0("risk")
         rf = _compute_risk_full()
         _cache.set("risk_full", rf, CACHE_TTL_SCORES_FULL)
-        warmed.append({"feed": "risk", "rows": len(rf.get("results") or [])})
+        warmed.append({"feed": "risk", "rows": len(rf.get("results") or []), "secs": round(_t.time() - fs, 1)})
     except Exception as e:
         warmed.append({"feed": "risk", "error": str(e)})
     # Crypto Money Gradient (/crypto): warm the coin roster so the page paints instantly. The live
@@ -5736,9 +5756,10 @@ def _prewarm_caches_locked(_t) -> dict:
     if _CRYPTO_AVAILABLE and crypto_engine.CRYPTO_SIGNAL:
         _pz()
         try:
+            fs = _f0("crypto")
             cf = crypto_engine.serve_crypto(record=False, db_path=DB_PATH)
             _cache.set("crypto_full", cf, CACHE_TTL_SCORES_FULL)
-            warmed.append({"feed": "crypto", "rows": len(cf.get("coins") or [])})
+            warmed.append({"feed": "crypto", "rows": len(cf.get("coins") or []), "secs": round(_t.time() - fs, 1)})
         except Exception as e:
             warmed.append({"feed": "crypto", "error": str(e)})
     dt = round(_t.time() - t0, 2)
@@ -7186,6 +7207,7 @@ def _x_candidate_topics(limit: int = None) -> list:
         ) fs ON v.topic_key = fs.topic_key
         WHERE COALESCE(v.total_mentions, 0) >= 5
     """
+    conn = None
     try:
         conn = get_db(DB_PATH)
         _add(conn.execute(base + " ORDER BY v.detection_score DESC LIMIT ?",
@@ -7195,11 +7217,18 @@ def _x_candidate_topics(limit: int = None) -> list:
                           (per,)).fetchall())
         _add(conn.execute(base + " ORDER BY fs.f DESC LIMIT ?",
                           (per,)).fetchall())
-        conn.close()
         return out[:limit]
     except Exception as e:
         print(f"[x-scan] candidate query error: {e}")
         return out[:limit]
+    finally:
+        # try/finally: an error mid-query must still return the conn to the
+        # pool — an orphaned checkout is a slot leaked forever (07-06 lesson).
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 # Monthly X post-budget guard. Each deep author-gradient pull (search/recent)
