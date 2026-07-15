@@ -1725,3 +1725,33 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   reproduces the web's order exactly from the same cache snapshot.
 - Web Screener category row gained the leading "All" chip (mobile parity; active when no
   category selected, returns to Now TrendIn). Deployed: gh-pages 9130266 + preview 7e9e635.
+
+## Session 2026-07-15 (cont. 5) — Entity-grouping board review + Chairman ruling
+
+### Completed
+- Advisory Board convened on entity grouping / topic-alias consolidation (the
+  "conor mcgregor" / "conor" / "mcgregor" triple-BREAKOUT case). Report:
+  audits/board/BOARD_entity-grouping_2026-07-15.md (decision table + 7 convergent
+  conditions intact; verbatim memo bodies failed extraction — noted in file).
+- CHAIRMAN RULING recorded (founder, 2026-07-15): Option A (display-only alias
+  layer) APPROVED to build under all seven conditions, flag-gated ENTITY_GROUPING
+  default OFF, pre-flip audit-dump review = the measurement gate. B DEFERRED
+  (phase-2, gated on A's production evidence). C REJECTED (unanimous). D REJECTED
+  standalone. Pre-build read-only items authorized (prevalence audit ·
+  family-collapsed ledger sensitivity · fragment-lead study).
+- Housekeeping: deleted 07-07 debugging scratch from repo root (bf.json,
+  ledger.json, r0/r100/r200.json, risk.json, 0-byte '2026-07-11T06 artifact).
+
+### Open / Next
+- BUILD Option A per ruling: entity_aliases DB table (dated/versioned/evidence-
+  stamped/confidence-scored, human-confirmed, reversible) + warm-on-boot snapshot
+  (CATEGORY_SNAPSHOT clone) + held-out wall in code (never importable into scoring
+  admission / calibration / ledger enrollment / sweep) + display-only serve-time
+  grouping (canonical row = its OWN score, NO arithmetic merge) + candidate dump +
+  confirm/reject endpoints (flag-never-force). Ledger stays per-key everywhere.
+  Auditors keep measuring RAW keys. 3-platform parity ships with the flag flip.
+
+### Hard decisions made
+- Score-time merge (C) is permanently off the table; extraction-time
+  canonicalization (B) requires A's production evidence + splice protocol +
+  backtest before it can even be re-proposed.
