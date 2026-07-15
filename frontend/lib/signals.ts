@@ -171,35 +171,41 @@ export const CATEGORY_DEFS: Array<{
   howReached: string;     // how a trend lands here
   showTile: boolean;      // whether to render in the stat-tile grid
   filter: (s: Signal) => boolean; // membership predicate
+  // Ranking for this view — WEB PARITY (web Screener SIGNAL_FILTERS): the
+  // Now TrendIn view ranks by the proprietary N; All Signals + the stage tiers
+  // rank by Detection. Views without a sort fall back to Detection descending.
+  sort?: (a: Signal, b: Signal) => number;
 }> = [
   {
     key: 'nowtrendin',
     label: 'Now TrendIn',
     short: 'NOW TRENDIN',
-    range: 'Sorted by Detection Score 100 → 0',
+    range: 'Ranked by N (Now Trending) 100 → 0',
     color: '#B11226', altColor: '#B11226',
     definition:
-      'Every accessible trend, ranked by Detection Score from highest to lowest. ' +
-      'Detection Score weights the early-edge components (Gradient Strength, Dark Matter, ' +
-      'Inertia) — it is the metric Now TrendIn was built around: where attention is ' +
-      'moving BEFORE it arrives at mainstream.',
+      'Every accessible trend, ranked by the proprietary N (Now Trending) score — the ' +
+      'platform-tracking indicator of how often a topic is triggered and surfaced as a ' +
+      'tracked topic. N never enters the Gradient Score itself; it is the platform\'s own ' +
+      'ranking lens, distinct from the Detection ranking in All Signals.',
     howReached:
       'No threshold — this view shows everything the engine has scored that is accessible ' +
-      'to your tier, sorted by earliness. A high Detection Score here means the engine ' +
-      'sees concentrated niche signal ahead of mainstream confirmation.',
+      'to your tier, ranked by N. The Detection and Confidence scores on each row are the ' +
+      'same N-free Gradient Score served everywhere else.',
     showTile: true,
     filter: () => true,
+    sort: (a, b) => (b.nowTrending ?? 0) - (a.nowTrending ?? 0),
   },
   {
     key: 'all',
     label: 'All Signals',
     short: 'ALL',
-    range: 'Every accessible signal',
+    range: 'Every accessible signal · ranked by Detection',
     color: '#3C4663',
-    definition: 'Every signal currently visible to your tier, in the default engine ordering.',
+    definition: 'Every signal currently visible to your tier, ranked by Detection Score.',
     howReached: 'No filter applied.',
     showTile: false,
     filter: () => true,
+    sort: (a, b) => b.detection - a.detection,
   },
   {
     key: 'breakout',

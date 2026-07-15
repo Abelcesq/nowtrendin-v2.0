@@ -38,7 +38,8 @@ export default function Dashboard() {
   const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
   const [query, setQuery] = useState('');
   const [contentCat, setContentCat] = useState('all');
-  const [signalFilter, setSignalFilter] = useState('all');
+  // Default view = Now TrendIn (ranked by N) — the web terminal's default.
+  const [signalFilter, setSignalFilter] = useState('nowtrendin');
   const [marketQuery, setMarketQuery] = useState('');
   // Market filter axes — WEB PARITY: lane / tier / direction, all defaulting to
   // 'all' exactly like the web terminal's Market Signal page.
@@ -57,7 +58,13 @@ export default function Dashboard() {
     (contentCat === 'all' || contentCategoryMeta(s.category).key === contentCat) &&
     (!signalDef || signalDef.filter(s))
   );
-  const ranked = [...filtered].sort((a, b) => b.score - a.score);
+  // WEB PARITY ranking: each view ranks by its def's sort (Now TrendIn → N,
+  // everything else → Detection). The displayed number follows the ranking
+  // metric, exactly like the web's ranked column.
+  const ranked = [...filtered].sort(signalDef?.sort ?? ((a, b) => b.detection - a.detection));
+  const isNRanked = signalFilter === 'nowtrendin';
+  const metricOf = (s: (typeof ranked)[number]) => (isNRanked ? (s.nowTrending ?? 0) : s.score);
+  const metricLabel = isNRanked ? 'N' : 'SCORE';
   const topPick = ranked[0];
   const rest = ranked.slice(1);
   const lastUpdated = accessible.length ? ageLabel(accessible[0].createdAt) : '—';
@@ -77,19 +84,24 @@ export default function Dashboard() {
   const laneDef = MARKET_LANES.find((l) => l.key === marketLane);
   const tierDef = MARKET_TIER_FILTERS.find((t) => t.key === marketTier);
   const dirDef = MARKET_DIRECTION_FILTERS.find((d) => d.key === marketDir);
-  const marketFiltered = accessibleRisks.filter((r) =>
-    (!mq || r.display.toLowerCase().includes(mq)) &&
-    (!laneDef?.lane || laneOf(r) === laneDef.lane) &&
-    (!tierDef?.test || tierDef.test(r)) &&
-    (!dirDef || dirDef.test(r))
-  );
+  // WEB PARITY ranking: Money Movement (the Money Gradient's leading read)
+  // descending — the web table's default sort column.
+  const mmOf = (r: (typeof accessibleRisks)[number]) => r.marketGradient?.detection ?? r.detection ?? 0;
+  const marketFiltered = accessibleRisks
+    .filter((r) =>
+      (!mq || r.display.toLowerCase().includes(mq)) &&
+      (!laneDef?.lane || laneOf(r) === laneDef.lane) &&
+      (!tierDef?.test || tierDef.test(r)) &&
+      (!dirDef || dirDef.test(r)))
+    .sort((a, b) => mmOf(b) - mmOf(a));
   // Lane counts (over the full accessible set, before the other filters) for the
   // chip labels — same as the web ("Covered 15 · Halted / micro-cap 283 …").
   const laneCounts = Object.fromEntries(
     MARKET_LANES.filter((l) => l.lane).map((l) => [l.key, accessibleRisks.filter((r) => laneOf(r) === l.lane).length])
   ) as Record<string, number>;
-  // #1 market signal (highest positioning score) — the Market hero pick.
-  const topRisk = [...accessibleRisks].sort((a, b) => (b.positioningScore ?? 0) - (a.positioningScore ?? 0))[0];
+  // #1 market signal — the top Money Movement read (web parity: the web table's
+  // top row), NOT the positioning-anomaly score (that's the expanded-detail read).
+  const topRisk = [...accessibleRisks].sort((a, b) => mmOf(b) - mmOf(a))[0];
 
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
@@ -107,7 +119,7 @@ export default function Dashboard() {
     const unsub = (navigation as any).addListener('tabPress', () => {
       setMode('attention');
       setContentCat('all');
-      setSignalFilter('all');
+      setSignalFilter('nowtrendin');
       setQuery('');
       setMarketQuery('');
       setMarketLane('all');
@@ -218,8 +230,8 @@ export default function Dashboard() {
                     <View className="flex-row items-end justify-between" style={{ marginTop: 16 }}>
                       <Text style={{ color: '#B9C4E0', fontSize: 12, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>{actionLine(topPick.stage)}</Text>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topPick.score}</Text>
-                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
+                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{metricOf(topPick)}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>{metricLabel}</Text>
                       </View>
                     </View>
                     <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>
@@ -288,7 +300,7 @@ export default function Dashboard() {
             ) : (
               <>
                 {rest.slice(0, visible).map((s, i) => (
-                  <TrendCard key={s.id} signal={s} rank={i + 2} />
+                  <TrendCard key={s.id} signal={s} rank={i + 2} metric={isNRanked ? { value: s.nowTrending ?? 0, label: 'N' } : undefined} />
                 ))}
                 {ranked.length === 0 && <Text className="text-textMuted text-center mt-8 mb-4">No trends match your search.</Text>}
                 {visible < rest.length && (
@@ -326,8 +338,8 @@ export default function Dashboard() {
                         {topRisk.narrative || topRisk.interpretation || `${topRisk.classification ?? 'Unusual'} positioning vs its baseline.`}
                       </Text>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{topRisk.positioningScore ?? 0}</Text>
-                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>SCORE</Text>
+                        <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{Math.round(mmOf(topRisk))}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>MONEY MOVEMENT</Text>
                       </View>
                     </View>
                     <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>

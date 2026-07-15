@@ -27,9 +27,9 @@ export default function CategoryPage() {
   const list = useMemo(() => {
     let l = accessible.filter(cat.filter);
     if (query) l = l.filter((s) => s.topic.toLowerCase().includes(query.toLowerCase()));
-    // Default sort: by Detection Score descending. "Now TrendIn" view is
-    // explicitly this — but every focused page benefits from earliness-first.
-    l = [...l].sort((a, b) => b.detection - a.detection);
+    // WEB PARITY: rank by the def's sort (Now TrendIn → N; everything else →
+    // Detection descending), same as the dashboard and the web terminal.
+    l = [...l].sort(cat.sort ?? ((a, b) => b.detection - a.detection));
     return l;
   }, [accessible, cat, query]);
 

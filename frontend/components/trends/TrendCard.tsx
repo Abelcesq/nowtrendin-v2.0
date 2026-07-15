@@ -24,7 +24,10 @@ const metaNum = { color: '#16264A', fontSize: 28, fontWeight: '800', letterSpaci
 // confidence / gap, the component bars, the gap insight, category·stage, and a
 // MORE INFO button that opens the full Trend Detail screen. Nothing is removed —
 // the deeper analysis (AI explainer, history, etc.) lives one tap further in.
-export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
+// `metric` overrides the collapsed-row number so it matches the active view's
+// RANKING metric (web parity: the Now TrendIn view ranks + headlines by N).
+// Omitted → the default Detection-based score.
+export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: number; metric?: { value: number; label: string } }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const stageCol = stageColor(signal.stage);
@@ -67,8 +70,8 @@ export function TrendCard({ signal, rank }: { signal: Signal; rank?: number }) {
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{signal.score}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>SCORE</Text>
+            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{metric ? metric.value : signal.score}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>{metric ? metric.label : 'SCORE'}</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>

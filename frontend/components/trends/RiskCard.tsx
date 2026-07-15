@@ -5,6 +5,7 @@ import { ChevronDown, ArrowRight, Globe } from 'lucide-react-native';
 import { Rise } from '../ui/Rise';
 import { RiskScore } from '../../lib/gradientApi';
 import { titleCaseTopic } from '../../lib/signals';
+import { tierOf, MARKET_TIER_COLOR } from '../../lib/marketCategories';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -26,15 +27,20 @@ const STAGES = [
   { key: 'Retail Amplify', label: 'Retail' },
 ] as const;
 
-// Calm, tap-to-expand market row — mirrors TrendCard. Collapsed: name,
-// classification·signals, positioning score, chevron. Expanded: diffusion
-// stages, narrative, financial sustainability, sources, and Full detail.
+// Calm, tap-to-expand market row — mirrors TrendCard. Collapsed (WEB PARITY —
+// the Money Gradient frame the web table leads with): name, tier·signals,
+// Money Movement, chevron. Expanded: the positioning-vs-baseline read
+// (classification + POS), diffusion stages, narrative, sustainability,
+// sources, and Full detail.
 export function RiskCard({ risk }: { risk: RiskScore }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const cls = risk.classification ?? 'CALIBRATING';
-  const color = CLASS_COLOR[cls] ?? '#9A9AA2';
-  const score = risk.positioningScore ?? 0;
+  const clsColor = CLASS_COLOR[cls] ?? '#9A9AA2';
+  const pos = risk.positioningScore ?? 0;
+  const tier = tierOf(risk);
+  const color = MARKET_TIER_COLOR[tier] ?? '#9A9AA2';
+  const mm = Math.round(risk.marketGradient?.detection ?? risk.detection ?? 0);
   const stages = risk.stages ?? {};
   const counts = STAGES.map((s) => stages[s.key]?.count ?? 0);
   const maxStage = Math.max(1, ...counts);
@@ -57,18 +63,25 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           <View style={{ flex: 1 }}>
             <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>{titleCaseTopic(risk.display)}</Text>
             <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
-              <Text style={{ color }}>{cls}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
+              <Text style={{ color }}>{tier}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{score}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>POS</Text>
+            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{mm}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>MM</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
 
         {open && (
           <Rise duration={420} distance={10} style={{ paddingTop: 16 }}>
+            {/* Positioning-vs-baseline read (the anomaly lens) — lives in the
+                expanded detail; the collapsed row leads with Money Movement. */}
+            <View className="flex-row items-center gap-2" style={{ marginBottom: 14 }}>
+              <Text style={{ color: '#9A9AA2', fontSize: 12 }}>Positioning vs baseline</Text>
+              <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800' }}>{pos}</Text>
+              <Text style={{ color: clsColor, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>{cls}</Text>
+            </View>
             {/* Diffusion stages: insider → retail */}
             <View className="flex-row" style={{ gap: 6, marginBottom: 14 }}>
               {STAGES.map((s, i) => {
