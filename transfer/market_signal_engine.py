@@ -505,6 +505,14 @@ def record_market_cycle(item_key: str, components_current: dict,
         sig_time = iso_time_of(signal_ts, default_now=False) if source_has_time(signal_ts) else ""
     try:
         for comp, val in components_current.items():
+            if val is None:
+                # An ABSENT component (e.g. positioning_concentration when FINRA +
+                # WhaleWisdom are both unavailable) records NOTHING: a fabricated 0
+                # would poison this component's baseline history (§17: real value or
+                # n/a, never a made-up number). float(None) here used to throw and
+                # abort the WHOLE loop — dropping every other component's row for
+                # the cycle (the recurring a_k_a_brands record error, 2026-07-15).
+                continue
             rid = hashlib.md5(f"{item_key}-{comp}-{sig_date}T{sig_time}".encode()).hexdigest()[:16]
             c.execute("INSERT OR IGNORE INTO market_signal_history "
                       "(id, item_key, component, value, signal_date, signal_time) VALUES (?,?,?,?,?,?)",
