@@ -1755,3 +1755,34 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - Score-time merge (C) is permanently off the table; extraction-time
   canonicalization (B) requires A's production evidence + splice protocol +
   backtest before it can even be re-proposed.
+
+### 2026-07-15 (cont. 6) — Option A BUILT + DEPLOYED flag-OFF (engine v239)
+- transfer/entity_grouping.py (held-out, display-only) + hooks in the monolith:
+  entity_aliases table (dated/versioned/evidence-stamped/confidence-scored,
+  human-confirmed, reversible, chain-guarded), warm-on-boot map load in startup,
+  serve-time fold in /scores + /topics builders (NO arithmetic merge — canonical
+  keeps its OWN score + list position; constituent folds ONLY when its canonical
+  is visible in the same filtered list), detail entity_group (constituents' own
+  scores + de-duplicated raw_signals union labeled as shared), endpoints
+  GET /aliases + /monitor/aliasmaps + POST /aliases/scan + /aliases/resolve
+  (internal-gated). ENTITY_GROUPING default OFF. 18/18 local behavior tests.
+- Held-out wall verified LIVE on v239: zero entity_grouping refs in calibration/
+  ledger/sweep files (/monitor/aliasmaps wall_check ok).
+- EXHAUSTIVE candidate sweep run (2,068 containment pairs over the raw 3,049-key
+  working set; no silent cap): 561 evidence-corroborated pending candidates in
+  381 families → audits/entity-grouping/ALIAS_CANDIDATES_2026-07-15.md (the
+  pre-flip measurement gate). PREVALENCE ANSWER: families number in the HUNDREDS.
+- Founding case captured: conor(0.921, 27 shared titles) + mcgregor(0.852, 20)
+  -> conor_mcgregor.
+- HONEST CAVEAT in the dump: many proposed "canonicals" are themselves headline
+  fragments (lindsey_graham_sudden, spain_kill) — the directionality heuristic
+  (longer key = canonical) is a proposer, not a decider; human review is load-
+  bearing exactly as the board required. Reject freely; rejects are reversible.
+
+### Open / Next (Option A)
+- FOUNDER: review audits/entity-grouping/ALIAS_CANDIDATES_2026-07-15.md, confirm/
+  reject via POST /aliases/resolve, then set ENTITY_GROUPING=1 to flip the fold.
+- 3-platform frontend parity (grouped rows + entity_group detail section) ships
+  WITH the flag flip, per board condition 7 — not before.
+- Family-collapsed ledger sensitivity line + fragment-lead study (read-only,
+  authorized) still pending as separate work.
