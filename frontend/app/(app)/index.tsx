@@ -16,7 +16,7 @@ import { PullMarketButton } from '../../components/trends/PullMarketButton';
 import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
-import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
+import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta, feedOrder } from '../../lib/signals';
 import { MARKET_LANES, MARKET_TIER_FILTERS, MARKET_DIRECTION_FILTERS, laneOf } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores, useCrypto } from '../../hooks/useSignals';
 
@@ -65,7 +65,7 @@ export default function Dashboard() {
   // WEB PARITY ranking: each view ranks by its def's sort (Now TrendIn → N,
   // everything else → Detection). The displayed number follows the ranking
   // metric, exactly like the web's ranked column.
-  const ranked = [...filtered].sort(signalDef?.sort ?? ((a, b) => b.detection - a.detection));
+  const ranked = [...filtered].sort(signalDef?.sort ?? ((a, b) => (b.detection - a.detection) || feedOrder(a, b)));
   const isNRanked = signalFilter === 'nowtrendin';
   const metricOf = (s: (typeof ranked)[number]) => (isNRanked ? (s.nowTrending ?? 0) : s.score);
   const metricLabel = isNRanked ? 'N' : 'SCORE';

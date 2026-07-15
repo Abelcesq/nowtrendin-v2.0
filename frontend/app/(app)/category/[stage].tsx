@@ -11,7 +11,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { TIERS, TierID } from '../../../constants/tiers';
 import { dataWindowLabel } from '../../../lib/signals';
 import { useTierFeed } from '../../../hooks/useSignals';
-import { CATEGORY_DEFS, getCategory } from '../../../lib/signals';
+import { CATEGORY_DEFS, getCategory, feedOrder } from '../../../lib/signals';
 
 export default function CategoryPage() {
   const router = useRouter();
@@ -28,8 +28,9 @@ export default function CategoryPage() {
     let l = accessible.filter(cat.filter);
     if (query) l = l.filter((s) => s.topic.toLowerCase().includes(query.toLowerCase()));
     // WEB PARITY: rank by the def's sort (Now TrendIn → N; everything else →
-    // Detection descending), same as the dashboard and the web terminal.
-    l = [...l].sort(cat.sort ?? ((a, b) => b.detection - a.detection));
+    // Detection descending), same as the dashboard and the web terminal, with
+    // the shared feedOrder tie-break chain (overall → mentions → recency).
+    l = [...l].sort(cat.sort ?? ((a, b) => (b.detection - a.detection) || feedOrder(a, b)));
     return l;
   }, [accessible, cat, query]);
 

@@ -160,6 +160,16 @@ export type CategoryKey =
   | 'nowtrendin' | 'all' | 'breakout' | 'strong'
   | 'emerging' | 'marginal' | 'anomalies';
 
+// TIE-BREAK chain — WEB PARITY. The web ranks with a STABLE sort over rows in
+// /scores feed order, so ties fall back to: overall score → mentions →
+// recency. N saturates at 100 for many topics, so without this chain the
+// visible order is dominated by whatever order the feed arrived in (mobile's
+// feed is recency-first → the two platforms showed different N=100 orders).
+export const feedOrder = (a: Signal, b: Signal) =>
+  ((b.overall ?? b.score) - (a.overall ?? a.score)) ||
+  ((b.totalMentions ?? 0) - (a.totalMentions ?? 0)) ||
+  (b.createdAt - a.createdAt);
+
 export const CATEGORY_DEFS: Array<{
   key: CategoryKey;
   label: string;
@@ -193,7 +203,7 @@ export const CATEGORY_DEFS: Array<{
       'same N-free Gradient Score served everywhere else.',
     showTile: true,
     filter: () => true,
-    sort: (a, b) => (b.nowTrending ?? 0) - (a.nowTrending ?? 0),
+    sort: (a, b) => ((b.nowTrending ?? 0) - (a.nowTrending ?? 0)) || feedOrder(a, b),
   },
   {
     key: 'all',
@@ -205,7 +215,7 @@ export const CATEGORY_DEFS: Array<{
     howReached: 'No filter applied.',
     showTile: false,
     filter: () => true,
-    sort: (a, b) => b.detection - a.detection,
+    sort: (a, b) => (b.detection - a.detection) || feedOrder(a, b),
   },
   {
     key: 'breakout',
