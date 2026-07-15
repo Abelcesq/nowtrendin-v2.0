@@ -1636,3 +1636,43 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   poisoned_deleted=0 -> no residual poison, 07-06 row protected (before the floor).
 - Engine confirmed warm-on-boot from snapshot (context.source=snapshot, warm=true). Open item
   from earlier this session is CLOSED.
+
+## Session 2026-07-14/15 — Aurora PR#1 merge + zombie-query outage fix (engine 1238fe0 + 98f4a15)
+
+### Completed
+- Reviewed + merged PR #1 (jose-sandbox, Aurora front-end: Market #1 hero, tab intros,
+  full-bleed responsive, orientation unlock — front-end only, fields/imports verified).
+  Redeployed nowtrendin-v2-preview with the merged bundle (gate + hero verified live).
+- **ROOT-CAUSED the cold trend feed (20s+ loads / 503s):** queries had NO
+  statement_timeout, so each dyno restart turned in-flight GROUP-BY scans into immortal
+  server-side ZOMBIES (one ran 19.8h). Zombies convoyed every /scores build → prewarm
+  cycles took ~5h vs the 30-min cache TTL → trend feed served cold nearly all day;
+  mobile fell back to the 10-row offline sample dataset ("live engine unreachable").
+- Fixes shipped (read-path only, no scoring/data change):
+  (1) db_compat: statement_timeout (PG_STATEMENT_TIMEOUT_MS=300000) + TCP keepalives +
+      connect_timeout (PG_CONNECT_TIMEOUT_S=10) on EVERY conn (pool + direct) — the
+      zombie class is now impossible (any query dies at the cap; error visible, retried).
+  (2) /prewarm wedge visibility: in_flight_since + in_flight_feed + per-feed secs in
+      warmed[] — distinguishes "never ran" from "wedged N min into scores".
+  (3) _x_candidate_topics conn.close() → try/finally (leak on error).
+  (4) Merged the MAX+MIN double GROUP-BY into ONE aggregation pass in the /scores
+      build AND the x-scan base (identical semantics; the x-scan ran its base 3×/cycle
+      = 6 full-table aggregations). Measured: scores candidate query ~250s+ → 31s.
+- Terminated 14 zombie SELECTs directly via psycopg2 (heroku pg:kill needs local psql —
+  broken on this box; scratchpad script, kills only active SELECTs >6min, which post-fix
+  can only be pre-deploy orphans).
+- VERIFIED: full warm cycle 257.7s (was ~5h) — scores 2960 rows/176s, topics 4s,
+  history 2s, risk 0.1s, crypto 15s; /scores HTTP 200 in 0.75s with live data.
+
+### Open / Next
+- Watch scores-build secs in /prewarm warmed[] — 176s is inside the 300s ceiling but
+  monitor under scoring-cycle load; if it creeps, next lever is bounding the aggregation
+  to the recent working set or a maintained first/latest-per-topic table.
+- history:12h warms 0 rows when the last scoring cycle is >12h old — honest, not a bug.
+- velocity_scores = 2.15M rows / 2.15GB on essential-1 (RED cache hit 0.975) — the §13
+  Postgres tier upgrade gets more urgent as the 365-day tail fills.
+
+### Hard decisions made
+- statement_timeout default 300s, env-tunable: finiteness beats an unbounded query; a
+  legitimately-slower statement fails VISIBLY and retries next cycle (accuracy principle:
+  a visible error beats silent staleness).
