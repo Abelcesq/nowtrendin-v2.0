@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
+import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchCrypto, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -84,6 +84,25 @@ export function useRiskScores() {
     retry: 1,
   });
   return { risks: q.data ?? [], isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
+}
+
+// Crypto Money Gradient roster (/crypto, prewarm-served). On a cold engine boot
+// the feed returns status:'warming' with no coins — keep polling every 4s until
+// the roster arrives (same behavior as the web Crypto page).
+export function useCrypto() {
+  const q = useQuery({
+    queryKey: ['crypto'],
+    queryFn: fetchCrypto,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchInterval: (query) => (query.state.data?.status === 'warming' ? 4000 : false),
+  });
+  return {
+    coins: q.data?.coins ?? [],
+    warming: q.data?.status === 'warming',
+    isLoading: q.isLoading,
+    isError: q.isError,
+  };
 }
 
 export function useAccuracy() {

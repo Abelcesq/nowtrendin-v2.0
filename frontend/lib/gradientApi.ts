@@ -839,3 +839,44 @@ export async function fetchSignalAnalysis(
     return null;
   }
 }
+
+// ── Crypto Money Gradient (/crypto) — WEB PARITY ────────────────────────────
+// The engine serves /crypto from the prewarm cache; on a cold boot it returns
+// status:'warming' with an empty roster until the prewarm fills it (the caller
+// polls, same as the web). Roster order is the engine's — do NOT re-sort
+// (web parity: the web renders coins as served).
+export interface CryptoCoin {
+  coin: string;                    // ticker, e.g. BTC
+  name: string;                    // display name, e.g. Bitcoin
+  moneyMovement: number;           // D — informed money via crypto-exposure proxies
+  marketConfirmation: number;      // M — the coin's own price/volume confirmation
+  lead: number;                    // MM − MC (the web table's LEAD column)
+  tier: string;                    // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT
+  flow?: string;                   // inflow | outflow | neutral | divergent
+  calibrating?: boolean;
+  interpretation?: string;
+  priceClose?: number | null;
+  change7dPct?: number | null;
+}
+
+export interface CryptoFeed { status?: string; coins: CryptoCoin[]; disclaimer?: string }
+
+export async function fetchCrypto(): Promise<CryptoFeed> {
+  const res = await fetch(`${GRADIENT_API}/crypto`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`crypto feed ${res.status}`);
+  const d = await res.json();
+  const coins: CryptoCoin[] = (d.coins ?? []).map((c: any) => ({
+    coin: c.coin ?? '',
+    name: c.item_name ?? c.name ?? c.coin ?? '',
+    moneyMovement: Math.round(Number(c.money_movement ?? c.detection ?? 0)),
+    marketConfirmation: Number(c.market_confirmation ?? c.confidence ?? 0),
+    lead: Number(c.gap ?? (Number(c.money_movement ?? 0) - Number(c.market_confirmation ?? 0))),
+    tier: c.tier ?? 'ROUTINE',
+    flow: c.flow || undefined,
+    calibrating: !!c.calibrating,
+    interpretation: c.interpretation || undefined,
+    priceClose: c.price?.last_close ?? null,
+    change7dPct: c.price?.change_7d_pct ?? null,
+  }));
+  return { status: d.status, coins, disclaimer: d.disclaimer };
+}

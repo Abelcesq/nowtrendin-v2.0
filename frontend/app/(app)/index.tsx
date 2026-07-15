@@ -8,6 +8,7 @@ import { Logo, Wordmark } from '../../components/ui/Logo';
 import { Rise } from '../../components/ui/Rise';
 import { TrendCard } from '../../components/trends/TrendCard';
 import { RiskCard } from '../../components/trends/RiskCard';
+import { CryptoCard } from '../../components/trends/CryptoCard';
 import { MacroLeverageCard } from '../../components/trends/MacroLeverageCard';
 import { LockedSignalsBanner } from '../../components/trends/LockedSignalsBanner';
 import { PullTrendsButton } from '../../components/trends/PullTrendsButton';
@@ -17,7 +18,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta } from '../../lib/signals';
 import { MARKET_LANES, MARKET_TIER_FILTERS, MARKET_DIRECTION_FILTERS, laneOf } from '../../lib/marketCategories';
-import { useTierFeed, useRiskScores } from '../../hooks/useSignals';
+import { useTierFeed, useRiskScores, useCrypto } from '../../hooks/useSignals';
 
 const TIER_ICONS: Record<TierID, any> = { consumer: Zap, business: Briefcase, enterprise: Building2 };
 const PAGE = 6; // how many rows reveal per batch (mobile perf + gentle discovery)
@@ -35,7 +36,8 @@ export default function Dashboard() {
 
   const { accessible, lockedCount, isLoading, isSample } = useTierFeed(tier);
   const { risks, isLoading: riskLoading } = useRiskScores();
-  const [mode, setMode] = useState<'attention' | 'risk' | 'grade'>('attention');
+  const { coins, warming: cryptoWarming, isLoading: cryptoLoading } = useCrypto();
+  const [mode, setMode] = useState<'attention' | 'risk' | 'crypto' | 'grade'>('attention');
   const [query, setQuery] = useState('');
   const [contentCat, setContentCat] = useState('all');
   // Default view = Now TrendIn (ranked by N) — the web terminal's default.
@@ -46,6 +48,8 @@ export default function Dashboard() {
   const [marketLane, setMarketLane] = useState('all');
   const [marketTier, setMarketTier] = useState('all');
   const [marketDir, setMarketDir] = useState('all');
+  // Crypto DIRECTION filter — the web Crypto page's single chip axis.
+  const [cryptoDir, setCryptoDir] = useState('all');
   const [visible, setVisible] = useState(PAGE);
 
   // ── Attention feed ──
@@ -103,6 +107,20 @@ export default function Dashboard() {
   // top row), NOT the positioning-anomaly score (that's the expanded-detail read).
   const topRisk = [...accessibleRisks].sort((a, b) => mmOf(b) - mmOf(a))[0];
 
+  // ── Crypto feed — WEB PARITY: engine roster order (never re-sorted), one
+  // DIRECTION chip axis. Neutral covers anything without a clear in/out read.
+  const CRYPTO_DIRS = [
+    { key: 'all', label: 'All' },
+    { key: 'inflow', label: 'Inflow' },
+    { key: 'outflow', label: 'Outflow' },
+    { key: 'neutral', label: 'Neutral' },
+  ];
+  const shownCoins = coins.filter((c) =>
+    cryptoDir === 'all' ? true
+      : cryptoDir === 'inflow' ? c.flow === 'inflow'
+      : cryptoDir === 'outflow' ? c.flow === 'outflow'
+      : c.flow !== 'inflow' && c.flow !== 'outflow');
+
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
   const greeting =
@@ -111,7 +129,7 @@ export default function Dashboard() {
       : 'Good evening';                 // 6:00pm – 11:59pm
 
   // Reset the visible window whenever the feed/filter/mode changes.
-  useEffect(() => { setVisible(PAGE); }, [mode, contentCat, signalFilter, query, marketQuery, marketLane, marketTier, marketDir]);
+  useEffect(() => { setVisible(PAGE); }, [mode, contentCat, signalFilter, query, marketQuery, marketLane, marketTier, marketDir, cryptoDir]);
 
   // Tapping the Home tab resets the screen to its just-opened state: Trends
   // selected (not Market/Grade), filters cleared, scrolled to the top.
@@ -125,13 +143,14 @@ export default function Dashboard() {
       setMarketLane('all');
       setMarketTier('all');
       setMarketDir('all');
+      setCryptoDir('all');
       setVisible(PAGE);
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     });
     return unsub;
   }, [navigation]);
 
-  const activeLen = mode === 'attention' ? rest.length : mode === 'risk' ? marketFiltered.length : 0;
+  const activeLen = mode === 'attention' ? rest.length : mode === 'risk' ? marketFiltered.length : mode === 'crypto' ? shownCoins.length : 0;
   // Seamless reveal: as the user nears the bottom, load the next batch.
   const onScroll = (e: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -140,13 +159,16 @@ export default function Dashboard() {
     }
   };
 
+  // Tab order mirrors the web sidebar: Trends → Market Signal → Crypto → Grade.
   const MODES = [
     { k: 'attention', label: 'Trends' },
     { k: 'risk', label: 'Market' },
+    { k: 'crypto', label: 'Crypto' },
     { k: 'grade', label: 'Grade' },
   ] as const;
 
-  const showPull = canPull && mode !== 'grade';
+  // Pull bar exists for Trends + Market only (the web has no crypto pull).
+  const showPull = canPull && (mode === 'attention' || mode === 'risk');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
@@ -183,6 +205,10 @@ export default function Dashboard() {
             {mode === 'risk' ? (
               <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
                 {marketFiltered.length.toLocaleString()} Market {marketFiltered.length === 1 ? 'Signal Is' : 'Signals Are'} <Text style={{ color: '#B11226' }}>Moving!</Text>
+              </Text>
+            ) : mode === 'crypto' ? (
+              <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
+                {shownCoins.length.toLocaleString()} {shownCoins.length === 1 ? 'Coin Is' : 'Coins Are'} <Text style={{ color: '#B11226' }}>Moving!</Text>
               </Text>
             ) : (
               <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
@@ -310,6 +336,49 @@ export default function Dashboard() {
                 )}
                 <View className="mt-3"><LockedSignalsBanner tier={tier} lockedCount={lockedCount} /></View>
               </>
+            )}
+          </>
+        )}
+
+        {mode === 'crypto' && (
+          <>
+            {/* Minimalist intro — the web Crypto page's header line. */}
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
+              The Crypto Money Gradient — Money Movement (informed money via crypto-exposure proxies) vs Market Confirmation (the coin's own price). Measurement, not advice.
+            </Text>
+
+            {/* DIRECTION chips — same single axis as the web Crypto page. */}
+            <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase mt-6 mb-2.5">Direction</Text>
+            <View style={{ marginHorizontal: -20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+                {CRYPTO_DIRS.map((d) => {
+                  const on = cryptoDir === d.key;
+                  return (
+                    <TouchableOpacity key={d.key} onPress={() => setCryptoDir(d.key)} activeOpacity={0.8} className="flex-row items-center rounded-full"
+                      style={{ paddingVertical: 9, paddingHorizontal: 15, backgroundColor: on ? '#16264A' : '#F1F1F4' }}>
+                      <Text style={{ color: on ? '#FFFFFF' : '#3C4663', fontSize: 12, fontWeight: '700' }}>{d.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mt-6">Coins</Text>
+            <Text className="text-textMuted text-[12px] font-semibold mt-1 mb-3">Ranked as served · tap any to expand</Text>
+
+            {cryptoLoading || (cryptoWarming && coins.length === 0) ? (
+              <>
+                <ActivityIndicator size="large" color="#1B3066" style={{ marginTop: 40 }} />
+                {cryptoWarming && (
+                  <Text className="text-textMuted text-center mt-4" style={{ fontSize: 12 }}>
+                    Crypto feed is warming — the roster arrives shortly.
+                  </Text>
+                )}
+              </>
+            ) : shownCoins.length === 0 ? (
+              <Text className="text-textMuted text-center mt-8">No coins match this direction.</Text>
+            ) : (
+              shownCoins.slice(0, visible).map((c) => <CryptoCard key={c.coin} coin={c} />)
             )}
           </>
         )}
