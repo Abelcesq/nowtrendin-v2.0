@@ -437,6 +437,20 @@ except ImportError:
     _CAL_AVAILABLE = False
     print("[startup] signal_calibration_integration.py not found — running uncalibrated")
 
+# ── Entity grouping (Board 2026-07-15 · Option A) — DISPLAY-ONLY alias layer ──
+# Folds confirmed fragment keys ("conor", "mcgregor") under the canonical entity
+# ("conor mcgregor") at SERVE time only, flag ENTITY_GROUPING (default OFF).
+# HELD-OUT: imported ONLY here (serve/display path); never by scoring admission,
+# calibration, ledger enrollment, or the sweep — entity_grouping.wall_check()
+# verifies that at runtime. No arithmetic merge: every row keeps its OWN score.
+try:
+    import entity_grouping as _entity_grouping
+    _EG_AVAILABLE = True
+    print("[startup] entity_grouping loaded — display-only alias layer available")
+except ImportError:
+    _EG_AVAILABLE = False
+    print("[startup] entity_grouping.py not found — alias layer disabled")
+
 # ── Research History Engine — optional, graceful fallback ─────────
 try:
     from research_history import ResearchHistoryEngine as _ResearchHistoryEngine
@@ -5825,6 +5839,19 @@ async def startup_auto_collect():
         except Exception as _sce:
             print(f"[startup] category-enrich router failed to start: {_sce}")
 
+    # Entity grouping (Board 2026-07-15): load the CONFIRMED alias map from the
+    # entity_aliases table SYNCHRONOUSLY (warm-on-boot, CATEGORY_SNAPSHOT
+    # precedent) — display-only; the serve-time fold is gated by ENTITY_GROUPING.
+    if _EG_AVAILABLE:
+        try:
+            _egm = _entity_grouping.load_alias_map(DB_PATH)
+            _egw = _entity_grouping.wall_check()
+            print(f"[startup] entity alias map loaded: {_egm.get('confirmed', 0)} confirmed, "
+                  f"{_egm.get('pending', 0)} pending; fold={'ON' if _entity_grouping.enabled() else 'OFF'}; "
+                  f"held-out wall {'OK' if _egw.get('ok') else 'VIOLATED: ' + str(_egw.get('violations'))}")
+        except Exception as _ege:
+            print(f"[startup] entity alias map load skipped: {_ege}")
+
     # ── Init calibration tables + seed known topics ────────────────
     # Always runs (idempotent) — creates tables if missing, seeds
     # 60+ known topics so calibration works from day 1.
@@ -7447,25 +7474,29 @@ def _x_velocity_scan(topics=None, threshold=None, limit=10) -> dict:
             "threshold": threshold, "results": scanned}
 
 
-def _topic_source_context(topic_key: str, limit: int = 10) -> str:
+def _topic_source_context(topic_key: str, limit: int = 10, keys: list = None) -> str:
     """Sample of how a term is ACTUALLY appearing — recent distinct headlines/post
     titles + the platform & community they came from. Fed to the AI explainer so
     it defines the SPECIFIC trend (e.g. 'japan' from World-Cup blogs = the team's
-    run) instead of a generic dictionary definition of the bare word."""
+    run) instead of a generic dictionary definition of the bare word.
+    `keys` (entity grouping, display-only): union DISTINCT titles across an alias
+    set — the de-dupe below already collapses shared headlines (never a sum)."""
+    key_set = [k for k in (keys or [topic_key]) if k]
+    placeholders = ",".join("?" for _ in key_set)
     conn = None
     try:
         conn = get_db(DB_PATH)
         rows = conn.execute(
-            """
+            f"""
             SELECT r.title AS title, ts.platform AS platform, ts.source_name AS src
             FROM topic_signals ts
             JOIN raw_signals r ON ts.signal_id = r.id
-            WHERE ts.topic_key = ?
+            WHERE ts.topic_key IN ({placeholders})
               AND r.title IS NOT NULL AND length(trim(r.title)) > 8
             ORDER BY ts.extracted_at DESC
-            LIMIT 60
+            LIMIT {60 * max(1, len(key_set))}
             """,
-            (topic_key,),
+            tuple(key_set),
         ).fetchall()
     except Exception as e:
         print(f"[explainer] context read error: {e}")
@@ -7977,7 +8008,15 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
     finally:
         conn.close()
     result = _format_score_rows(rows)
-    return result.get("results", [])
+    out = result.get("results", [])
+    # Entity grouping (display-only, flag-gated OFF by default): fold confirmed
+    # alias rows under their canonical row. No score arithmetic; order preserved.
+    if _EG_AVAILABLE:
+        try:
+            out = _entity_grouping.group_rows(out)
+        except Exception as _ge:
+            print(f"[scores] entity grouping skipped: {_ge}")
+    return out
 
 
 # ── SINGLE-FLIGHT superset builds (2026-07-06 outage lesson) ─────────────────
@@ -8598,6 +8637,95 @@ def monitor_catmaps(clean_poisoned: bool = Query(False),
     return {"available": True, **out}
 
 
+# ── ENTITY GROUPING (Board 2026-07-15 · Option A · display-only) ─────────────
+# Flag ENTITY_GROUPING (default OFF). Candidates are PROPOSED only (pending);
+# a human confirms via /aliases/resolve (flag-never-force). The audit dump at
+# GET /aliases is the pre-flip measurement gate (Executioner sequencing).
+
+@app.get("/monitor/aliasmaps")
+def monitor_aliasmaps():
+    """Fast status for the entity-alias layer: map provenance, counts by status,
+    fold flag, and the held-out wall check (scoring/calibration/ledger/sweep
+    must never reference entity_grouping)."""
+    if not _EG_AVAILABLE:
+        return {"available": False, "reason": "entity_grouping not loaded"}
+    try:
+        meta = _entity_grouping.alias_map_meta()
+        return {"available": True, "fold_enabled": meta.pop("flag_enabled", False),
+                "meta": meta, "wall_check": _entity_grouping.wall_check()}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/aliases")
+def list_entity_aliases(status: str = Query(default=None), limit: int = Query(default=500)):
+    """Audit dump for founder review: every proposed/confirmed/rejected alias with
+    its evidence (shared-title corroboration), confidence, dates, and versions."""
+    if not _EG_AVAILABLE:
+        return {"available": False, "reason": "entity_grouping not loaded"}
+    try:
+        rows = _entity_grouping.list_aliases(DB_PATH, status=status, limit=limit)
+        meta = _entity_grouping.alias_map_meta()
+        return {"available": True, "fold_enabled": meta.pop("flag_enabled", False),
+                "count": len(rows), "aliases": rows, "meta": meta,
+                "wall_check": _entity_grouping.wall_check(),
+                "how_to_resolve": "POST /aliases/resolve {id, action: confirm|reject|revert}"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.post("/aliases/scan", dependencies=[Depends(_require_internal)])
+def scan_entity_aliases(payload: dict = Body(default={})):
+    """Propose alias candidates over the RAW served working set (un-grouped keys —
+    auditors and the scanner never see folded lists). Read-only re: display;
+    writes only status='pending' rows. Never auto-confirms."""
+    if not _EG_AVAILABLE:
+        return {"available": False, "reason": "entity_grouping not loaded"}
+    try:
+        full = _get_or_build("scores_full:overall:all:0.0",
+                             lambda: _compute_scores_full("overall", "all", 0.0),
+                             CACHE_TTL_SCORES_FULL)
+        if full is None:
+            raise HTTPException(503, "scores superset still warming — retry shortly")
+        raw_rows = _entity_grouping.ungroup_rows(full)
+        summary = _entity_grouping.scan_candidates(
+            DB_PATH, raw_rows,
+            max_keys=int(payload.get("max_keys", 4000)),
+            max_pairs=int(payload.get("max_pairs", 800)),
+            min_shared_titles=payload.get("min_shared_titles"))
+        return {"available": True, **summary,
+                "review_at": "GET /aliases?status=pending"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.post("/aliases/resolve", dependencies=[Depends(_require_internal)])
+def resolve_entity_alias(payload: dict = Body(...)):
+    """Human decision on one candidate: confirm | reject | revert. Reversible;
+    rows are never deleted. Confirm enforces one-canonical-per-alias + no chains.
+    Reloads the display map immediately and kicks a prewarm rebuild so the served
+    lists reflect the decision inside the cache TTL."""
+    if not _EG_AVAILABLE:
+        return {"available": False, "reason": "entity_grouping not loaded"}
+    try:
+        result = _entity_grouping.resolve_alias(
+            DB_PATH, int(payload["id"]), str(payload["action"]),
+            decided_by=str(payload.get("decided_by", "founder")))
+        try:
+            _prewarm_after_pull("alias-resolve")
+        except Exception:
+            pass
+        return {"available": True, **result}
+    except (KeyError, ValueError) as ve:
+        raise HTTPException(400, str(ve))
+    except LookupError as le:
+        raise HTTPException(404, str(le))
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 @app.get("/monitor/catchall")
 def monitor_catchall():
     """Catch-All Auditor — specialist for the news/general catch-all congestion:
@@ -9113,6 +9241,23 @@ def get_topic_detail(topic_key: str):
     if isinstance(_heis, dict):
         _heis.pop("false_positive_detect", None)
         _heis.pop("false_positive_confirm", None)
+
+    # ── Entity grouping (Board 2026-07-15, display-only, flag-gated): canonical
+    # detail lists each constituent's OWN score (never summed/blended) plus a
+    # DE-DUPLICATED union of distinct raw_signals across the alias set, labeled
+    # as shared evidence; a constituent detail points to its canonical. ──
+    if _EG_AVAILABLE:
+        try:
+            _eg = _entity_grouping.detail_group_info(DB_PATH, topic_key)
+            if _eg:
+                if _eg.get("role") == "canonical":
+                    _ekeys = [topic_key] + list(_eg.get("grouped_keys") or [])
+                    _ev = _topic_source_context(topic_key, limit=12, keys=_ekeys)
+                    if _ev:
+                        _eg["shared_evidence_sample"] = _ev
+                result["entity_group"] = _eg
+        except Exception as _ege:
+            print(f"[detail] entity grouping skipped for {topic_key}: {_ege}")
 
     _cache.set(cache_key, result, CACHE_TTL_DETAIL)
     return result
@@ -9662,6 +9807,15 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
         if cat and d["category"] != cat:
             continue
         topics.append(d)
+    # Entity grouping (display-only, flag-gated): fold AFTER the category filter,
+    # so a constituent only folds when its canonical row is visible in the SAME
+    # filtered list (never hidden without a visible representative). /categories
+    # counts derive from this grid → stays consistent with what is displayed.
+    if _EG_AVAILABLE:
+        try:
+            topics = _entity_grouping.group_rows(topics)
+        except Exception as _ge:
+            print(f"[topics] entity grouping skipped: {_ge}")
     return topics
 
 
