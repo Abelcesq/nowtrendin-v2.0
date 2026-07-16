@@ -1943,3 +1943,18 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   disposition record · standing import ban (scratch-restore only) · founder executes
   the destroy · retirement runbook · non-destructive steps NOW (zero backups exist).
 - AWAITING CHAIRMAN RULING per option.
+
+### 2026-07-16 (cont. 3) — 1.0 DB ARCHIVED + VERIFIED (board conditions met; destroy awaits founder)
+- Non-destructive sequence executed per the unanimous board ruling: exact manifest
+  (28 tables, 13,043,952 rows) -> Heroku capture b001 (777.87MB, 93% compression of
+  10.77GB) -> downloaded (815,657,151 bytes, size-exact) -> SHA-256
+  5961B001...C785D00D -> two copies, two failure domains (local + OneDrive; first
+  OneDrive hash raced sync ingest — re-read matched; lesson: re-hash after settle)
+  -> TEST-RESTORE to scratch essential-2: 28/28 TABLE COUNTS EXACT MATCH ->
+  scratch destroyed. Original DATABASE_URL add-on untouched.
+- Signed disposition record + reusable datastore-retirement runbook:
+  audits/infra/V1_DB_DISPOSITION_RECORD_2026-07-16.md. Standing rules in force:
+  import ban (scratch-restore only), 06-15 epoch boundary (stamp pending), lore fix.
+- FOUNDER'S FINAL STEP (reserved, flag-never-force):
+  heroku addons:destroy postgresql-shaped-41629 -a nowtrendin --confirm nowtrendin
+  then COST_HEROKU_USD 112->92 on the engine.
