@@ -1904,3 +1904,24 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   audit covers it). Remaining founder-gated queue unchanged: Postgres tier upgrade,
   frozen-1.0 DB + nowtrendin-web trims, Guardian/Reddit keys, Stripe/push at
   store publish, Aurora vs CLAUDE.md §3/§11 palette reconciliation.
+
+### 2026-07-16 (cont.) — 1.0 DATABASE researched: transfer NOT needed (already done at split)
+- Founder asked whether the frozen 1.0 Postgres can transfer to 2.0. Full research:
+  1.0 repo docs/schema (read-only agent) + READ-ONLY live inspection of BOTH DBs +
+  the freeze/consolidation MDs. Report: audits/infra/V1_DB_ASSESSMENT_2026-07-16.md.
+- KEY FINDING: v2's DB WAS CREATED 2026-06-15 AS A pg:copy OF 1.0 — v2's earliest
+  velocity row (06-04T23:03:02) is one second after 1.0's first row; 265,863
+  pre-split rows still retained in v2 (365d rule). Everything durable transferred
+  at the split and v2 maintained it better since.
+- 1.0 DB reality (10.8GB/28 tables): 91% = velocity_scores 9.7M rows spanning ONLY
+  2026-06-04->07-02 (30-min cycles, no pruning); raw/topic signals last 7 days
+  only; accuracy_ledger = 6 rows ALL LAGGED. LORE CORRECTION: "pre-April-2026
+  data" in the freeze docs is wrong — nothing predates 2026-06-04 in this DB.
+- Unique-to-1.0 = only the 06-15->07-02 parallel tail from the frozen engine:
+  duplicative (v2 scored/collected the same weeks itself) + integrity-hazardous
+  to import (different calibration epoch -> comparability break; leaderboard-era
+  pendings -> ledger denominator pollution). Full transfer also physically
+  impossible (10.8GB > v2's 10GB essential-1 cap, 32.5% used).
+- RECOMMENDATION (awaiting founder ruling): no transfer; pg:backups capture +
+  DOWNLOAD the dump (backups vanish with the add-on), then the standing -$20/mo
+  essential-2 delete can proceed.
