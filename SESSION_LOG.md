@@ -1878,3 +1878,29 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   remaining components record normally. Behavior-tested (None skipped, 3/3 others
   recorded, no error line). Deployed; engine healthy. Watch: the error line should
   be absent from the next market cycle's logs.
+
+### 2026-07-16 — Full health check + founder rulings (quarantine · Apify plan)
+- FULL SWEEP (all green): engine/backend/terminal/preview UP; 7/7 monitor agents ok,
+  0 alerts; collectors 16 healthy / 1 degraded (reddit = the known deferred-keys
+  item) / 0 down; prewarm full cycle ~146s; catmaps WARM (live, 65,303 ctx);
+  alias fold ON (51 confirmed, wall ok); last cycle scored 5,439 topics + 371 risk;
+  ghost research outlets collecting every cycle; ledger blended 9.5% / tracked-race
+  25.0% / 1,136 pending (rolling); Cost Sentinel $531.90/$700 — BACK UNDER CAP
+  (was $718.82 CRITICAL 07-06; Apify clock-slot fixes landed). market_signal
+  float(None): zero error lines post-fix (pre-fix it hit multiple warrant/microcap
+  instruments each cycle).
+- QUARANTINE RESOLVED (founder-ruled): all 13 pending Nasdaq Trade Halt dates were
+  US MM/DD/YYYY -> resolved to canonical YYYY-MM-DD via /quarantine/dates/resolve
+  (13/13, 0 failures; format_rules learned -> future identical inputs auto-apply).
+  /monitor/datecanon back to OK (14 columns, 0 non-canonical, 0 pending).
+- APIFY PLAN DECISION (founder-ruled, console-verified): STAY ON SCALE $199 / keep
+  $ unchanged. Real numbers: $34.89 in 9 days (~$3.9/day -> ~$116/mo projected;
+  Actors $26 + Proxy $8.30) vs $199 prepaid — but a Starter downgrade is NOT
+  viable: projected usage exceeds Starter's included usage and its higher unit
+  rates + lower limits would eat the gap as overage and risk the 4-slot bursts.
+  Prior-period invoice confirmed the fix worked ($221.90 usage / $316.90 total
+  Jun-Jul vs ~$116 projected now). Memory updated (project-ledger-sweep-apify).
+- Standing: GHOST_FEEDS two-week trial monitoring continues (weekly improve-system
+  audit covers it). Remaining founder-gated queue unchanged: Postgres tier upgrade,
+  frozen-1.0 DB + nowtrendin-web trims, Guardian/Reddit keys, Stripe/push at
+  store publish, Aurora vs CLAUDE.md §3/§11 palette reconciliation.
