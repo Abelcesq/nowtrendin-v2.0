@@ -50,9 +50,9 @@ verified archive above. Full analysis: `audits/infra/V1_DB_ASSESSMENT_2026-07-16
    publish blended rates spanning the boundary unsegmented (metadata stamp pending).
 3. The freeze-doc "pre-April-2026 data" lore is WRONG — this DB's data begins 2026-06-04.
 
-## Final step — RESERVED FOR THE FOUNDER
+## Final step — ✅ EXECUTED BY THE FOUNDER (2026-07-16)
 
-All non-destructive conditions are met. To retire the original add-on (−$20/mo):
+The founder personally ran the destroy (flag-never-force honored). Verified: `heroku addons -a nowtrendin` → "No add-ons"; `COST_HEROKU_USD` updated 112 → 92 (engine v244); Cost Sentinel reflects the reduction. The command that was run:
 
 ```
 heroku addons:destroy postgresql-shaped-41629 -a nowtrendin --confirm nowtrendin

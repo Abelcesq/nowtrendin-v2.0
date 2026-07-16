@@ -1973,3 +1973,12 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   lore fully explained (it referred to the external server's data).
 - CAUTION flagged to founder: the EC2 app's own DB backup posture is unknown/out of
   reach — verify that server has its own dump routine.
+
+### 2026-07-16 (cont. 5) — 1.0 DB RETIRED (founder-executed) — retirement COMPLETE
+- Founder personally destroyed postgresql-shaped-41629 (flag-never-force honored).
+  Verified: no add-ons remain on the nowtrendin app. COST_HEROKU_USD 112->92 set
+  (engine v244, healthy). The verified archive (2 checksummed copies + manifest +
+  28/28 restore-verified dump) is the sole surviving copy of the 1.0 record.
+  Disposition record marked EXECUTED. Board conditions all satisfied; import ban +
+  epoch-boundary rules remain in force. Live www.nowtrendin.com unaffected
+  (external EC2, verified segregated).
