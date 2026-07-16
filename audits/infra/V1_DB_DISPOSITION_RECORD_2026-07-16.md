@@ -71,3 +71,43 @@ After destroying, update `COST_HEROKU_USD` 112 → 92 on the engine
    destroy the scratch.
 6. Signed disposition record in the repo (this document's format).
 7. Owner personally destroys the original add-on; update the cost model.
+
+---
+
+## SEGREGATION VERIFICATION — the live app at www.nowtrendin.com (added 2026-07-16, founder request)
+
+**Question:** is the 1.0 Heroku database segregated from the previous app's data
+(pre-04/01/2026) so that its retirement cannot affect the live app at www.nowtrendin.com?
+
+**Answer: segregation is already physical and total, on every axis checked:**
+
+1. **The live site is not on Heroku at all.** `www.nowtrendin.com` CNAMEs to the apex,
+   which resolves to a single static A record — **54.160.174.150 (AWS EC2)** serving
+   nginx/1.24.0 on Ubuntu. No Heroku app in the account (`nowtrendin`, `-backend`,
+   `-terminal`, `-v2-engine`, `-v2-preview`, `-web`) has ANY custom domain attached —
+   each answers only on its own herokuapp.com hostname. The previous app and its
+   pre-April-2026 data live entirely on that external server with its own storage.
+2. **Nothing live reads the Heroku 1.0 DB.** Connections: **0/40** (sampled repeatedly);
+   the app has 0 dynos + maintenance on; the newest row in the database is 2026-07-02 —
+   no writes since the shutdown.
+3. **The Heroku 1.0 DB contains ZERO previous-app rows.** A 50-column date sweep found
+   only three columns with pre-04/01/2026 VALUES, and each is data ABOUT earlier dates
+   ingested by the June-2026 engine, not data FROM the previous app:
+   - `risk_signals.signal_date` (175 rows, back to 2022-12): source-carried historical
+     dates from finnhub (140) / sec_edgar (28) etc. — all INGESTED 2026-06-04→06-10;
+   - `topic_maturity.first_detected_at` (48 rows): the calibration seed batch, all
+     written in a single instant 2026-07-02T14:27:57;
+   - `market_signal_history.cycle_at` (120 rows, 2025-12): market-baseline backfill seeds.
+4. **The archive sequence touched only the Heroku estate** — the scratch restore add-on
+   was created and destroyed on the dormant `nowtrendin` app; the external server was
+   never contacted.
+
+**Consequences:** (a) retiring `postgresql-shaped-41629` CANNOT affect www.nowtrendin.com;
+(b) no data movement is required to achieve segregation — it already exists; (c) the
+freeze-doc "pre-April-2026 data" lore is now fully explained: it refers to the previous
+app's data on the external AWS server, which was never in this Heroku database.
+
+**⚠ Out-of-scope caution for the founder:** the previous app's own database lives on
+54.160.174.150, OUTSIDE this tooling's reach (no credentials here). Its backup posture is
+unknown to this audit — if that data matters long-term, verify that server has its own
+dump/backup routine (the retirement runbook above applies there too).

@@ -1958,3 +1958,18 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - FOUNDER'S FINAL STEP (reserved, flag-never-force):
   heroku addons:destroy postgresql-shaped-41629 -a nowtrendin --confirm nowtrendin
   then COST_HEROKU_USD 112->92 on the engine.
+
+### 2026-07-16 (cont. 4) — SEGREGATION VERIFIED: live www.nowtrendin.com vs 1.0 Heroku DB
+- Founder surfaced that www.nowtrendin.com is LIVE (the previous app, pre-April-2026
+  data) and asked for segregation before the 1.0 DB retirement. VERIFIED total
+  physical segregation: the domain resolves to an external AWS EC2 (54.160.174.150,
+  nginx/Ubuntu) — NOT Heroku; no custom domain on any of the 6 Heroku apps; 1.0 DB
+  has 0/40 connections + newest row 2026-07-02; 50-column sweep shows ZERO
+  previous-app rows (the only pre-April VALUES are source-carried historical dates
+  ingested 06-04+ by the June engine, + calibration/backfill seeds).
+- CONSEQUENCE: destroying postgresql-shaped-41629 cannot affect the live site; no
+  data movement needed. SEGREGATION VERIFICATION appended to
+  audits/infra/V1_DB_DISPOSITION_RECORD_2026-07-16.md; the "pre-April-2026" freeze
+  lore fully explained (it referred to the external server's data).
+- CAUTION flagged to founder: the EC2 app's own DB backup posture is unknown/out of
+  reach — verify that server has its own dump routine.
