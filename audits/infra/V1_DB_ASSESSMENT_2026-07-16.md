@@ -71,3 +71,29 @@ velocity_scores schemas are byte-identical) but there is nothing left worth sele
 3. Then the standing cost-trim decision (archive+delete the essential-2, **−$20/mo**)
    can proceed whenever the founder rules. Note the 1.0 Heroku APP stays as-is — this is
    only about the database add-on; the frozen repo remains read-only reference.
+
+---
+
+## ⚠ CORRECTION (board-review reconciliation, 2026-07-16 — supersedes the claim above)
+
+The board's Challenger + Outsider attacked the "v2 already has everything durable" claim.
+The reconciliation queries (read-only, both DBs) PROVED THEM RIGHT at row level:
+
+- 1.0 itself holds **934,203** velocity rows scored before the 06-15 split.
+- v2 retains **265,863** of them (~28%); a 1,000-row PK lineage sample found only
+  **282/1000** pre-split 1.0 row ids present verbatim in v2.
+- The "one second apart" MIN comparison was divergence, not identity — 1.0's earliest
+  row does not exist in v2; v2's earliest is a different row from the same first cycle.
+- 1.0's daily rate curve: the row explosion began 06-13 (330k/day) and ran ~500k/day
+  through shutdown — most pre-split bulk is from the 48-hours-before-split explosion.
+
+**Most probable cause (inference, not verified):** v2's junk-topic/fragment purges in the
+06-15 → 06-24 window, BEFORE the never-delete-within-retention rule was made canonical on
+2026-06-24. The purged rows are predominantly the junk-explosion cohort — but the exact
+prune history predates the hard rule and cannot be reconstructed from the live DBs.
+
+**Consequences for the decision:** (1) the 1.0 DB is the ONLY complete original of the
+pre-split record — the case for a VERIFIED, downloaded, checksummed dump before any
+deletion is stronger than the original assessment implied; (2) the import options are NOT
+strengthened — the missing rows are the junk-era cohort v2 deliberately shed; (3) never
+externally quote "the transfer already happened" without this caveat.
