@@ -1925,3 +1925,21 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - RECOMMENDATION (awaiting founder ruling): no transfer; pg:backups capture +
   DOWNLOAD the dump (backups vanish with the add-on), then the standing -$20/mo
   essential-2 delete can proceed.
+
+### 2026-07-16 (cont. 2) — BOARD convened on 1.0-DB disposition; assessment corrected mid-review
+- Six independent memos (identical evidence pack; full bodies embedded verbatim in
+  audits/board/BOARD_v1-db-disposition_2026-07-16.md — fixed the 07-15 extraction gap).
+- UNANIMOUS: Option A (verified archive dump -> delete) approved w/ conditions
+  (Executioner: SHIP); C (selective transfer), D (full transfer), E (status quo)
+  REJECTED by all six. B (keep paying) rejected by 4, tolerated-as-dominated by 2.
+- The Challenger/Outsider attack on "v2 already has everything durable" was TESTED
+  MID-REVIEW and CONFIRMED: 1.0 holds 934,203 pre-split rows, v2 retains 265,863
+  (~28%); PK sample 282/1000. Assessment corrected in place (⚠ CORRECTION section).
+  The 1.0 DB is the only complete original of the pre-split record — the verified-
+  archive conditions are load-bearing.
+- Convergent conditions: test-restore before delete · two checksummed copies, two
+  failure domains · epoch-stamp the 06-15 engine boundary in v2 (metadata-only, never
+  publish blended rates across it unsegmented) · manifest + provenance README + signed
+  disposition record · standing import ban (scratch-restore only) · founder executes
+  the destroy · retirement runbook · non-destructive steps NOW (zero backups exist).
+- AWAITING CHAIRMAN RULING per option.
