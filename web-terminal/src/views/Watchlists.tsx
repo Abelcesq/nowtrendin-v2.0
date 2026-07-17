@@ -15,7 +15,7 @@ interface Live { det: number; conf: number; label: string; kind: WatchKind }
 function gapMicro(det: number, conf: number) {
   const W = 70, x = (v: number) => 4 + (v / 100) * (W - 8)
   const lo = Math.min(det, conf), hi = Math.max(det, conf)
-  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#9A9AA2'
+  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#aab4c1'
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`}>
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />

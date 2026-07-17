@@ -112,8 +112,8 @@ export function Methodology() {
         {/* The N factor — separate from the Gradient Score */}
         <section className="mth-sec">
           <h3>The N factor — Now Trending (platform indicator)</h3>
-          <div className="mth-card" style={{ borderColor: '#B1122655', background: '#B112260C' }}>
-            <div className="mth-tag" style={{ color: '#B11226' }}>● N · Now Trending</div>
+          <div className="mth-card" style={{ borderColor: '#EE6A2A55', background: '#EE6A2A0C' }}>
+            <div className="mth-tag" style={{ color: '#EE6A2A' }}>● N · Now Trending</div>
             <p className="mth-p">
               <b>N</b> is our <b>platform-tracking</b> signal — how often a topic is triggered and
               surfaced as a tracked topic across the Now TrendIn platform (its feeds, queries, and
@@ -146,8 +146,8 @@ export function Methodology() {
         {/* Anomalies */}
         <section className="mth-sec">
           <h3>Anomalies</h3>
-          <div className="mth-card" style={{ borderColor: '#6B4FA055', background: '#6B4FA00C' }}>
-            <div className="mth-tag" style={{ color: '#6B4FA0' }}>● Anomaly</div>
+          <div className="mth-card" style={{ borderColor: '#8B5CF655', background: '#8B5CF60C' }}>
+            <div className="mth-tag" style={{ color: '#8B5CF6' }}>● Anomaly</div>
             <p className="mth-p">
               An <b>anomaly</b> is a topic whose <b>Detection score is running ahead of its Confidence
               score</b> by a clear margin (a signed lead of <b>16+ points</b>) — strong early-edge

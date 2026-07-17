@@ -24,7 +24,7 @@ const MVERDICTS = ['', 'CONFIRMED', 'NOT_CONFIRMED', 'NO_MOVE'] as const
 const MVLABEL: Record<string, string> = {
   '': 'All', CONFIRMED: 'Confirmed', NOT_CONFIRMED: 'Not confirmed', NO_MOVE: 'No move',
 }
-const flowCol = (f?: string) => f === 'inflow' ? 'var(--conf, #2E7D5B)' : f === 'outflow' ? '#B11226' : '#8A8F9C'
+const flowCol = (f?: string) => f === 'inflow' ? 'var(--conf, #00C896)' : f === 'outflow' ? '#DC2626' : '#94A3B8'
 const flowLabel = (f?: string) => f === 'inflow' ? '▲ inflow' : f === 'outflow' ? '▼ outflow' : '• neutral'
 
 function fmtDate(s?: string) {
@@ -240,7 +240,7 @@ export function Ledger() {
                     <td className="r"><span className="muted">{fmtDate(r.detection_date)}</span></td>
                     <td className="r"><span className={'gapnum ' + ((r.price_change_pct ?? 0) >= 0 ? 'wide' : 'neg')}>{r.price_change_pct != null ? `${r.price_change_pct > 0 ? '+' : ''}${r.price_change_pct}%` : '—'}</span></td>
                     <td className="r"><span className="muted">{r.lead_time_days != null ? `${r.lead_time_days}d` : '—'}</span></td>
-                    <td><span className="verdict" style={{ color: r.verdict === 'CONFIRMED' ? 'var(--conf,#2E7D5B)' : r.verdict === 'NOT_CONFIRMED' ? '#B11226' : '#8A8F9C' }}>{r.verdict || '—'}</span></td>
+                    <td><span className="verdict" style={{ color: r.verdict === 'CONFIRMED' ? 'var(--conf,#00C896)' : r.verdict === 'NOT_CONFIRMED' ? '#DC2626' : '#94A3B8' }}>{r.verdict || '—'}</span></td>
                     <td className="r"><span className="muted">{fmtDate(r.validated_at)}</span></td>
                   </tr>
                 ))}
@@ -293,7 +293,7 @@ export function Ledger() {
                     <td className="r"><span className={'gapnum ' + (lead != null && lead > 0 ? 'wide' : 'neg')}>{lead != null ? `${lead > 0 ? '+' : ''}${lead}d` : '—'}</span></td>
                     <td>
                       <span className={'verdict ' + (pre ? 'PRE_BROKEN' : (r.verdict || ''))}
-                            style={pre ? { color: '#8A8F9C', background: 'rgba(148,163,184,.12)' } : undefined}
+                            style={pre ? { color: '#94A3B8', background: 'rgba(148,163,184,.12)' } : undefined}
                             title={pre ? 'Breakout occurred >7d before our first sighting — the topic entered tracking already post-breakout (never a race). Counted in the honest rate; excluded from the tracked-race rate.' : undefined}>
                         {pre ? 'PRE-BROKEN' : (r.verdict || '—')}
                       </span>

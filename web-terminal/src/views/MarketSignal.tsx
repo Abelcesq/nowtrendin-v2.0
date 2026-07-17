@@ -46,7 +46,7 @@ function ageLabel(m: number) { return m >= 1440 ? `${Math.round(m / 1440)}d` : m
 function gapMicro(det: number, conf: number) {
   const W = 78, x = (v: number) => 4 + (v / 100) * (W - 8)
   const lo = Math.min(det, conf), hi = Math.max(det, conf)
-  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#9A9AA2'
+  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#aab4c1'
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`}>
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />
@@ -188,7 +188,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.name}</div>
-            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.v2 && flowChip(row.flow)}{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#F1F1F4', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
+            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.v2 && flowChip(row.flow)}{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -224,12 +224,12 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       </div>
       <div className="sect">
         {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
-          <div className="narr" style={{ marginBottom: 8, background: '#F1F1F4', border: '1px solid #ECECEC', color: '#3C4663', borderRadius: 8, padding: '8px 10px' }}>
+          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
             ℹ <b>Macro theme.</b> A market-wide theme has no single ticker, so smart-money positioning (FINRA short interest · 13F) and company fundamentals are <b>not applicable</b> — the score reflects only the macro / cross-market inputs that <i>can</i> be measured ({mg.total_inputs} applicable factor{mg.total_inputs === 1 ? '' : 's'}).
           </div>
         )}
         {row.lane !== 'macro_theme' && mg.data_coverage === 'insufficient' && (
-          <div className="narr" style={{ marginBottom: 8, background: '#FAF5E9', border: '1px solid #E2C275', color: '#7A6427', borderRadius: 8, padding: '8px 10px' }}>
+          <div className="narr" style={{ marginBottom: 8, background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
             ⚠ <b>Insufficient positioning data.</b> Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this instrument yet{mg.absent_inputs != null ? ` (${mg.absent_inputs}/${mg.total_inputs} inputs absent)` : ''}, so it sits near baseline by default — <i>not</i> a confirmed quiet market.
           </div>
         )}
@@ -644,7 +644,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                     <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
                     <td>{r.dc === 'insufficient'
-                      ? <span className="tier" style={{ color: MC.muted, background: '#F1F1F4' }} title="Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this item yet — limited coverage, not a confirmed quiet market.">LTD DATA</span>
+                      ? <span className="tier" style={{ color: MC.muted, background: '#EEF0F2' }} title="Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this item yet — limited coverage, not a confirmed quiet market.">LTD DATA</span>
                       : <span className={'tier ' + r.tier}>{r.tier}</span>}</td>
                     <td className="r"><span className={'pct ' + (r.pct == null ? 'na' : r.pct > 0 ? 'up' : r.pct < 0 ? 'down' : 'flat')}>{r.pct == null ? '—' : `${r.pct > 0 ? '+' : ''}${Math.round(r.pct)}%`}</span></td>
                     <td className="r"><span className="muted">{r.lev == null ? '—' : Math.round(r.lev)}</span></td>

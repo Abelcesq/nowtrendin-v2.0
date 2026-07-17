@@ -16,7 +16,7 @@ import { fetchMe, logout, getDashboard, saveFavorites, type User, type Favorite 
 
 const DEFAULT_FAVORITES: Favorite[] = [
   { id: 'f_break', label: 'Breakouts', section: 'trends', filter: 'breakout', color: 'var(--bk-t)' },
-  { id: 'f_anom', label: 'Anomalies', section: 'trends', filter: 'anomalies', color: '#6B4FA0' },
+  { id: 'f_anom', label: 'Anomalies', section: 'trends', filter: 'anomalies', color: '#8B5CF6' },
   { id: 'f_elev', label: 'Elevated risk', section: 'market', filter: 'elevated', color: 'var(--down)' },
 ]
 
