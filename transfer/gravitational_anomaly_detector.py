@@ -6587,10 +6587,10 @@ def _ledger_epoch_stamp() -> dict:
         out = {}
         for epoch, cmp_op in (("v1_engine", "<"), ("v2_engine", ">=")):
             rows = conn.execute(f"""
-                SELECT verdict, COUNT(*) FROM accuracy_ledger
+                SELECT verdict AS v, COUNT(*) AS n FROM accuracy_ledger
                 WHERE detection_date {cmp_op} ? GROUP BY verdict
             """, (ENGINE_EPOCH_BOUNDARY,)).fetchall()
-            counts = {(r[0] or "").upper(): r[1] for r in rows}
+            counts = {(r["v"] or "").upper(): r["n"] for r in rows}
             resolved = sum(counts.values())
             led = counts.get("LED", 0)
             out[epoch] = {"resolved": resolved, "led": led,
