@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { titleCaseTopic } from '../lib/mobileTheme'
 import { api } from '../lib/api'
 import {
   listWatchlists, createWatchlist, deleteWatchlist, updateWatchlist,
@@ -49,7 +50,7 @@ export function Watchlists({ onOpenDetail }: { onOpenDetail?: (key: string, kind
       const map: Record<string, Live> = {}
       for (const t of (topics.topics || [])) {
         const det = Math.round(t.detection_score ?? 0), conf = Math.round(t.confidence_score ?? 0)
-        map[liveKey('topic', t.topic_key)] = { det, conf, label: t.topic_display || t.topic_key, kind: 'topic' }
+        map[liveKey('topic', t.topic_key)] = { det, conf, label: titleCaseTopic(t.topic_display || t.topic_key), kind: 'topic' }
       }
       for (const r of (risk.results || [])) {
         const mg = r.market_gradient || {}

@@ -217,10 +217,18 @@ The enterprise **web terminal** (`web-terminal/`, React+Vite, Heroku app
 `nowtrendin-terminal`) and the **desktop** app (`tauri-desktop/`, Tauri over the
 same web build) are the institutional surfaces; the **mobile app** (`frontend/`)
 is consumer/business. The trend **signal-detail** and **market-analysis** pages
-present the SAME sections, data points, and color scheme on all three (web may add
-MORE — denser filters, extra columns). Mobile color scheme mirrored for the web
-detail rails in `web-terminal/src/lib/mobileTheme.ts` (Detection #2D7EEF,
-Confidence #00C896, stage/tier/maturity/feed palettes). The avatar opens a full
+present the SAME sections and data points on all three (web may add MORE — denser
+filters, extra columns). **COLOR PARITY IS SEMANTIC, NOT LITERAL (founder ruling
+2026-07-16/17, "one brand, two dialects"):** hue MEANINGS are contractual on every
+surface — blue = Detection, green = Confidence, orange = emphasis/N, red = loss/error
+ONLY (one meaning per hue family) — but hue VALUES are per-surface. Web/desktop =
+the vivid institutional dialect (`web-terminal/src/lib/mobileTheme.ts` is the WEB's
+own authority: Detection #2D7EEF, Confidence #00C896, orange #df7a36; dark
+`*Text` twins wherever the hue is TEXT, per WCAG). Mobile = the calm jewel Aurora
+dialect (`frontend/DESIGN_SYSTEM.md`). NEVER restore jewel tones to web data colors;
+NEVER copy vivid hexes into mobile; the Frontend Consistency agent enforces hue
+MEANING and section parity, never hex equality. Web contract:
+`web-terminal/WEB_DESIGN_SYSTEM.md`. The avatar opens a full
 Account view (edit profile, change password, **Authorized Users** = the Enterprise
 5-seat / 100,000 shared-token entitlement, admin identified). Parity is enforced by
 the **Frontend Consistency** agent (`/frontend-consistency`).

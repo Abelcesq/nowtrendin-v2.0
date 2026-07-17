@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, Trash2, Plus, Minus } from 'lucide-react'
+import { titleCaseTopic } from '../lib/mobileTheme'
 import { api } from '../lib/api'
 import { listAlerts, createAlert, updateAlert, removeAlert, type AlertT } from '../lib/auth'
 
@@ -81,7 +82,7 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
             <div className="al-card" key={a.id}>
               <span className="al-ico"><Bell size={16} color="var(--conf)" /></span>
               <div className="al-body">
-                <div className="al-topic link" onClick={() => open(a)} title="Open detail page">{a.topic_display || a.topic_key}</div>
+                <div className="al-topic link" onClick={() => open(a)} title="Open detail page">{titleCaseTopic(a.topic_display || a.topic_key)}</div>
                 <div className="al-meta">When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}</div>
                 {a.last_triggered_at && <div className="al-fired">🔔 Triggered {new Date(a.last_triggered_at).toLocaleDateString()}</div>}
               </div>

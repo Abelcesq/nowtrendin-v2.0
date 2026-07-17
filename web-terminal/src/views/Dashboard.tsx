@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TrendingUp, Flame, DollarSign, Bitcoin, Scale, LineChart, GripVertical, X, Plus, Pencil, Check } from 'lucide-react'
+import { titleCaseTopic } from '../lib/mobileTheme'
 import { api, type TopicRow, type RiskRow, type CryptoCoin } from '../lib/api'
 import { getDashboard, saveDashboard, type DashTile } from '../lib/auth'
 import type { NavKey } from '../components/Shell'
@@ -92,7 +93,7 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
 
   // ── derived data ─────────────────────────────────────────────
   const T = useMemo(() => topics.map((t) => ({
-    key: t.topic_key, name: t.topic_display || t.topic_key, det: r0(t.detection_score),
+    key: t.topic_key, name: titleCaseTopic(t.topic_display || t.topic_key), det: r0(t.detection_score),
     conf: r0(t.confidence_score), n: r0(t.nowtrendin_score), stage: t.current_stage,
     category: (t.category || '').toLowerCase(),
   })), [topics])

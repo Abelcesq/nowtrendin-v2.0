@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { TrendingUp, TrendingDown, Minus, RotateCcw, Sparkles, X } from 'lucide-react'
 import { api, type HistoryRow } from '../lib/api'
 import { ScoreChart, type ChartPoint } from '../components/ScoreChart'
+import { titleCaseTopic } from '../lib/mobileTheme'
 import { Disclaimer } from '../components/Disclaimer'
 
 // History — windowed list of recently-scored topics, plus a featured axed chart of
@@ -140,7 +141,7 @@ export function History({ initialQ }: { initialQ?: string }) {
         return (
           <div className="hv-feature">
             <div className="hv-feat-head">
-              <span className="hv-feat-name">{sel.topic_display}</span>
+              <span className="hv-feat-name">{titleCaseTopic(sel.topic_display)}</span>
               <span className="hv-trend" style={{ color, background: 'var(--line-2)' }}>{icon} {label}</span>
               <span className="hv-feat-scores"><b style={{ color: 'var(--det)' }}>DET {sel.det}</b> &nbsp; <b style={{ color: 'var(--conf)' }}>CONF {sel.conf}</b></span>
             </div>
@@ -170,7 +171,7 @@ export function History({ initialQ }: { initialQ?: string }) {
               const [icon, , color] = trendMeta(r.trend)
               return (
                 <div className={'hv-row' + (sel?.topic_key === r.topic_key ? ' sel' : '')} key={r.topic_key} onClick={() => pick(r)}>
-                  <span className="hv-nm">{r.topic_display}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
+                  <span className="hv-nm">{titleCaseTopic(r.topic_display)}{r.is_anomaly && <span className="hv-anom">ANOMALY</span>}</span>
                   <Spark pts={r.series.map((p) => p.overall)} color={color} />
                   <span className="hv-v" style={{ color: 'var(--det)' }}>{r.det}</span>
                   <span className="hv-v" style={{ color: 'var(--conf)' }}>{r.conf}</span>

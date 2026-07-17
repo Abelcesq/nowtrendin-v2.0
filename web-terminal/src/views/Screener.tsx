@@ -4,6 +4,7 @@ import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, stageColor, stageLabel, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
+import { titleCaseTopic, catLabel } from '../lib/mobileTheme'
 import { ScoreChart } from '../components/ScoreChart'
 import { Disclaimer } from '../components/Disclaimer'
 import { SignalAnalysisPanel } from '../components/SignalAnalysis'
@@ -47,7 +48,7 @@ function ageLabel(m: number) { return m >= 1440 ? `${Math.round(m / 1440)}d` : m
 function gapMicro(det: number, conf: number) {
   const W = 78, x = (v: number) => 4 + (v / 100) * (W - 8)
   const lo = Math.min(det, conf), hi = Math.max(det, conf)
-  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#aab4c1'
+  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#9A9AA2'
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`}>
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />
@@ -198,7 +199,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this topic.')
   const onExport = () => exportEntityCsv(`${row.topic_key}_nowtrendin.csv`, [
     ['Topic', row.topic_display], ['Detection', det], ['Confidence', conf], ['Gap', gap],
-    ['N (Now Trending)', N], ['Stage', row.stage], ['Category', row.category || ''],
+    ['N (Now Trending)', N], ['Stage', row.stage], ['Category', catLabel(row.category)],
     ['Mentions', row.total_mentions ?? ''], ['Updated (min ago)', row.ageMin],
   ])
   const ntgD = r.nowtrending_gradient_detection, ntgC = r.nowtrending_gradient_confidence
@@ -215,8 +216,8 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       <div className="detail-head">
         <div className="detail-top">
           <div>
-            <div className="detail-name">{row.topic_display}</div>
-            <div className="detail-cat">{row.category || '—'} · <span style={{ color: scol, fontWeight: 700 }}>{stageLabel(row.stage)}</span></div>
+            <div className="detail-name">{titleCaseTopic(row.topic_display)}</div>
+            <div className="detail-cat">{catLabel(row.category) || '—'} · <span style={{ color: scol, fontWeight: 700 }}>{stageLabel(row.stage)}</span></div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -232,7 +233,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
             <span className="m-badge" style={{ background: maturityColor(matClass) + '1A', color: maturityColor(matClass) }}>{matBadge || matClass}</span>
             <span className="m-kicker">Topic maturity</span>
           </div>
-          <div className="m-reason">{matReason || ''}</div>
+          <div className="m-reason">{/backfill|fallback|lifecycle-rule/i.test(matReason || '') ? '' : (matReason || '')}</div>
           <div className="m-foot">Lifecycle stage from the calibration engine · re-evaluated each scoring cycle</div>
         </div>
       )}
@@ -251,11 +252,11 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       {/* Dual Gradient Score — mobile colors (Detection blue / Confidence green) */}
       <div className="gauges">
         <div className="gauge det">{ring(det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">speed · early / leading read</div></div>
-        <div className="gauge conf">{ring(conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">precision · &lt;9% FP</div></div>
+        <div className="gauge conf">{ring(conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: (MC as any).confidenceText || MC.confidence }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">precision · &lt;9% FP</div></div>
       </div>
 
-      {/* AI Context */}
-      <div className="sect">
+      {/* AI Context — renders ONLY while loading or when a definition exists (§17) */}
+      {(ex?.short || exLoading) && <div className="sect">
         <h4>AI Context</h4>
         {ex?.short ? (
           <div className="ai-ctx">
@@ -266,10 +267,10 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
             )}
           </div>
         ) : (
-          <div className="narr muted">{exLoading ? 'Generating a source-aware definition…' : 'No AI definition yet — it generates on first view and is cached.'}</div>
+          <div className="narr muted">Generating a source-aware definition…</div>
         )}
         {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
-      </div>
+      </div>}
 
       {/* Now TrendIn (N) + Now Trending Gradient (demand-inclusive) + Convergence */}
       <div className="sect">
@@ -421,7 +422,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
           <h4>Entity Group</h4>
           {(d.entity_group.constituents || []).map((c: any, i: number) => (
             <div className="var-row" key={i}>
-              <span className="var-name">{c.topic_display || c.topic_key}</span>
+              <span className="var-name">{titleCaseTopic(c.topic_display || c.topic_key)}</span>
               {c.signal_stage && <span className="var-tier" style={{ color: stageColor(c.signal_stage) }}>{stageLabel(c.signal_stage)}</span>}
               <span className="var-sc">{Math.round(c.detection_score ?? 0)}/{Math.round(c.confidence_score ?? 0)}</span>
             </div>
@@ -726,7 +727,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                   <tr key={r.topic_key} className={r.topic_key === sel ? 'sel' : ''} onClick={() => select(r.topic_key)}>
                     <td>
                       <div className="topic-name">
-                        {r.topic_display}
+                        {titleCaseTopic(r.topic_display)}
                         {(r.entity_group?.grouped_keys?.length ?? 0) > 0 && (
                           <span className="eg-badge" title={`Grouped entity — includes ${r.entity_group!.grouped_keys!.join(', ')} (each keeps its own score)`}>
                             ⊞ {r.entity_group!.grouped_keys!.length + 1}
@@ -740,7 +741,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                     <td className="r"><span className="score-cell conf">{r.conf}</span></td>
                     <td className="r"><div className="gapviz">{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
                     <td><span className={'stage ' + r.stage}>{stageLabel(r.stage)}</span></td>
-                    <td><span className="muted" style={{ textTransform: 'capitalize' }}>{r.category || '—'}</span></td>
+                    <td><span className="muted">{catLabel(r.category) || '—'}</span></td>
                     <td style={{ textAlign: 'center' }}><span style={{ color: dirColor, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{dirIcon}</span></td>
                     <td className="r"><span className="muted">{r.total_mentions ?? '—'}</span></td>
                     <td className="r"><span className="muted">{ageLabel(r.ageMin)}</span></td>
