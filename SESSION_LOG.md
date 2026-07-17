@@ -2036,3 +2036,17 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - GATE REMAINING: founder walk of staging rev 4 -> "merge" -> Executioner
   sequence (merge --no-ff, gh-pages with rollback SHA, mirror sync, parity +
   consistency checks).
+
+### 2026-07-17 (cont. 2) — AURORA HYBRID MERGED + DEPLOYED TO PRODUCTION
+- Executioner sequence executed on founder's go: merge --no-ff (14 files) ->
+  main build -> ROLLBACK POINTER recorded (gh-pages pre-deploy SHA
+  30c6255e5e1ec580a13d0575f12d37299c24ad03; rollback = repush that SHA, ~2 min)
+  -> gh-pages deployed (0d0eb23) -> PARITY VERIFIED: GH Pages prod + Heroku
+  mirror both serve the exact merged bundle index-BsGJsFnP.js -> smoke: fonts
+  self-hosted (woff2 HTTP 200, zero googleapis refs), all 3 surfaces up.
+- Branch aurora-web-redesign deleted (fully merged; board records were already
+  on main). The web terminal now ships the founder-ruled hybrid: Aurora
+  structure/typography/midnight chrome + original vivid data palette, text-twins
+  for WCAG, semantic-parity docs, P0 polish, Ledger disclaimer, epoch stamp.
+- The web design contract is web-terminal/WEB_DESIGN_SYSTEM.md; cross-platform
+  color parity is SEMANTIC (CLAUDE.md §12; /frontend-consistency re-pointed).
