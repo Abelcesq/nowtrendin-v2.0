@@ -1997,3 +1997,17 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - Record: audits/board/BOARD_aurora-web-redesign_2026-07-16.md (memos verbatim).
 - GATE: founder walk of the 13 authenticated staging views + ruling on open items
   (font self-hosting disagreement · casing dictionary · off-white canvas · dark mode).
+
+### 2026-07-17 — Aurora rev 3 HYBRID board re-review (6 memos, 5 verified staging live)
+- Founder ruled rev 2 "too monotone" -> rev 3 hybrid: Aurora structure/typography/
+  midnight chrome + ORIGINAL vivid data palette (orange N/search/wordmark, det
+  #2D7EEF, conf #00C896, bright stage pills). Ruling RESTORES one-meaning-per-hue.
+- Board verdict: hybrid liked (the institutional instrument); merge gated on
+  Chairman rulings: (1) bright-hue TEXT contrast (conf text 2.16:1 — true of
+  production too; text-twins recommended), (2) font self-hosting (4 memos pre-merge).
+- Fixed during review on the branch: Ledger view was MISSING the mandatory verbatim
+  disclaimer (added top+bottom); 3 ghost hexes (.g-lev #10B981, .lg-stg.aligned,
+  stale comments). Rev 3.1 staged.
+- Doc trio required WITH merge: CLAUDE.md §12 -> semantic parity; mobileTheme.ts
+  header; /frontend-consistency re-point (else the watchdog reverts the ruling).
+- Record: audits/board/BOARD_aurora-hybrid-rev3_2026-07-17.md (memos verbatim).
