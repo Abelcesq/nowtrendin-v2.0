@@ -8,7 +8,7 @@
      reads the SAME color on every surface â€” and so the table matches its own detail
      rails (which already use the mobile palette). Stage-pill text is a readable dark
      shade of each mobile hue; the gauge/score data colors are the exact mobile hex.
-     Detection #2A5B9E (blue) Â· Confidence #2E7D5B (green) Â· Breakout green Â· Strong
+     Detection #2D7EEF (blue) Â· Confidence #00C896 (green) Â· Breakout green Â· Strong
      blue Â· Emerging gold Â· Watching orange Â· Monitoring slate. The dark --ink chrome
      above is intentional institutional identity (not a meaning color) and stays. */
   --det:#2D7EEF; --det-soft:#e8f1fd;
@@ -335,7 +335,7 @@ td.r{text-align:right}
 .g-ring{display:flex; flex-direction:column; align-items:center; gap:5px}
 .g-rl{font-size:11px; font-weight:700; color:var(--text)}
 .g-rf{font-size:9px; color:var(--text-3)}
-.g-lev{font-size:11px; font-weight:700; color:#2E7D5B; text-align:center; margin-bottom:8px}
+.g-lev{font-size:11px; font-weight:700; color:#10B981; text-align:center; margin-bottom:8px}
 .g-gapband{border:1px solid; border-radius:9px; padding:8px 11px; font-size:12.5px; margin-bottom:10px}
 .g-action{font-size:15px; font-weight:900; margin-bottom:6px}
 .g-h{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin:14px 0 8px; font-weight:700}
@@ -440,7 +440,7 @@ td.r{text-align:right}
 .lg-gn.wide{color:var(--early)}
 .lg-stg{font-size:9.5px; font-weight:700; letter-spacing:.05em; padding:3px 8px; border-radius:5px; text-transform:uppercase; min-width:74px; text-align:center}
 .lg-stg.early{background:rgba(223,122,54,.14); color:var(--early)}
-.lg-stg.aligned{background:rgba(42,91,158,.14); color:#8FA0C6}
+.lg-stg.aligned{background:rgba(42,91,158,.14); color:#7aa6f5}
 .lg-leg{display:flex; align-items:center; gap:18px; margin-top:13px; font-size:11px; color:var(--ink-text-2)}
 .lg-leg span{display:flex; align-items:center; gap:6px}
 .lg-dot{width:8px;height:8px;border-radius:50%}
@@ -656,10 +656,13 @@ td.r{text-align:right}
 
 
 /* ══ AURORA OVERRIDES (2026-07-16 redesign · board-conditions rev 2) ══
-   Aurora component language on the institutional terminal. Board conditions
-   applied: one meaning per hue (red = loss/error/alarm ONLY; emphasis =
-   midnight; dark-chrome accents = accentSoft #F0758A), WCAG-shade pill text,
-   neutral search fields, true-monospace numerals. Flows unchanged. */
+   FOUNDER HYBRID (rev 3, Chairman ruling 2026-07-16): Aurora structure,
+   typography (Plus Jakarta Sans), midnight chrome + white canvas + ink text +
+   pill components — with the ORIGINAL vivid data palette (orange emphasis
+   #df7a36, Detection #2D7EEF, Confidence #00C896, bright stage pairs; red
+   #DC2626 = down/error ONLY). One meaning per hue. Parity with mobile is
+   SEMANTIC, not literal — never restore jewel tones to web data colors.
+   True-monospace numerals. Flows unchanged. */
 body{font-size:13px}
 .btn{border-radius:999px;border-color:transparent;background:#F1F1F4;color:#3C4663;font-weight:700}
 .btn:hover{background:#E9EAEF;border-color:transparent}
