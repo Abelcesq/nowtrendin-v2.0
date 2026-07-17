@@ -2011,3 +2011,28 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - Doc trio required WITH merge: CLAUDE.md §12 -> semantic parity; mobileTheme.ts
   header; /frontend-consistency re-point (else the watchdog reverts the ruling).
 - Record: audits/board/BOARD_aurora-hybrid-rev3_2026-07-17.md (memos verbatim).
+
+### 2026-07-17 (cont.) — ALL founder rulings landed (rev 4 staged + engine epoch stamp live)
+- (1b) TEXT-TWINS: vivid hues stay for fills/rings/dots/charts; dark twins where
+  hue is TEXT (--det-text/#1b5fc4 --conf-text/#007a5a --early-text/#b35a18; score
+  columns, statcards, LED pill, conf gauge, cal-chip, fav CTAs); 3 stage pills
+  nudged to >=4.5:1. (2) Jakarta SELF-HOSTED via @fontsource (15 woff2 bundled,
+  Google links removed, 0 external font requests verified live). (3) DOCS TRIO:
+  CLAUDE.md §12 -> SEMANTIC parity (two-dialects); mobileTheme.ts header = web's
+  own authority; WEB_DESIGN_SYSTEM.md contract shipped; /frontend-consistency
+  re-pointed to hue-MEANING parity. (4) P0: catLabel() (Current_events -> Current
+  Events), engine-room maturity strings suppressed, AI Context hides when absent
+  (dead spinner gone, §17), Ledger referee glyphs labeled. (5) titleCase acronym
+  dictionary (AI/AGI/ASI/LLM/IPO/NATO/FIFA + small words). Rev 4 on staging
+  (nowtrendin-terminal); branch aurora-web-redesign; gh-pages prod untouched.
+- ENGINE-EPOCH STAMP LIVE (f74e1cb, board condition): /accuracy/ledger now serves
+  epochBoundary=2026-06-15 + byEpoch (v1_engine 72 resolved/9.7% vs v2_engine 21
+  resolved/4.8% — the blended 9.2% DID span two engines); /accuracy/ledger/detail
+  rows carry per-row epoch. Metadata-only, fail-open (first deploy hit the
+  RealDictCursor tuple-index gotcha — fixed with aliased dict access).
+- Post-merge queue status: favorites hexes AUTO-RESOLVED by rev 3 (original
+  palette is current again); warm-band chart separation + token unification +
+  off-white A/B + dark mode = roadmap per rulings.
+- GATE REMAINING: founder walk of staging rev 4 -> "merge" -> Executioner
+  sequence (merge --no-ff, gh-pages with rollback SHA, mirror sync, parity +
+  consistency checks).
