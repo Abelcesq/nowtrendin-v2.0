@@ -11,15 +11,15 @@
      Detection #2D7EEF (blue) Â· Confidence #00C896 (green) Â· Breakout green Â· Strong
      blue Â· Emerging gold Â· Watching orange Â· Monitoring slate. The dark --ink chrome
      above is intentional institutional identity (not a meaning color) and stays. */
-  --det:#2D7EEF; --det-soft:#e8f1fd;
-  --conf:#00C896; --conf-soft:#e0f5ec;
-  --early:#df7a36; --early-soft:#fbecdc;
+  --det:#2D7EEF; --det-soft:#e8f1fd; --det-text:#1b5fc4;
+  --conf:#00C896; --conf-soft:#e0f5ec; --conf-text:#007a5a;
+  --early:#df7a36; --early-soft:#fbecdc; --early-text:#b35a18;
   --up:#00C896; --down:#DC2626;
   --bk-t:#007a5a; --bk-b:#e0f5ec;
   --st-t:#1b5fc4; --st-b:#e8f1fd;
-  --em-t:#8a6d0f; --em-b:#fbf1d6;
-  --wa-t:#c0431a; --wa-b:#fcebe0;
-  --mo-t:#6b7280; --mo-b:#f1f4f7;
+  --em-t:#7d630d; --em-b:#fbf1d6;
+  --wa-t:#b23e18; --wa-b:#fcebe0;
+  --mo-t:#5f6774; --mo-b:#f1f4f7;
   --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
   --sans:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
@@ -137,7 +137,7 @@ body{
 .tier.WATCH,.tier.UNUSUAL{background:#F7E4E7; color:#B11226}
 .pct{font-family:var(--mono); font-size:12px; font-weight:600}
 .pct.up{color:var(--up)} .pct.down{color:var(--down)} .pct.flat,.pct.na{color:var(--text-3)}
-.cal-chip{margin-left:7px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--early); background:var(--early-soft); border:1px solid #f1d6bd; padding:1px 6px; border-radius:5px; vertical-align:middle}
+.cal-chip{margin-left:7px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--early-text); background:var(--early-soft); border:1px solid #f1d6bd; padding:1px 6px; border-radius:5px; vertical-align:middle}
 .cal-banner{display:flex; align-items:center; gap:8px; background:var(--early-soft); border-bottom:1px solid #f1d6bd; color:#8a4a1c; font-size:11.5px; padding:9px 20px; line-height:1.4}
 .cal-banner b{font-weight:700}
 .chip{flex:0 0 auto; height:28px; padding:0 13px; border-radius:15px; border:1px solid var(--line); background:var(--surface); font-size:12px; color:var(--text-2); cursor:pointer; display:flex; align-items:center; gap:7px; white-space:nowrap}
@@ -163,8 +163,8 @@ td.r{text-align:right}
 .topic-cat{font-size:10.5px; color:var(--text-3); margin-top:1px}
 .eg-badge{display:inline-block; margin-left:6px; padding:1px 6px; border-radius:8px; font-size:9.5px; font-weight:700; letter-spacing:.04em; color:#6B4FA0; background:#6B4FA014; border:1px solid #6B4FA033; vertical-align:1px}
 .score-cell{font-family:var(--mono); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums}
-.score-cell.det{color:var(--det)}
-.score-cell.conf{color:var(--conf)}
+.score-cell.det{color:var(--det-text)}
+.score-cell.conf{color:var(--conf-text)}
 .stage{display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px}
 .stage.BREAKOUT{color:var(--bk-t); background:var(--bk-b)}
 .stage.STRONG{color:var(--st-t); background:var(--st-b)}
@@ -182,7 +182,7 @@ td.r{text-align:right}
 
 /* verdict pills (ledger) */
 .verdict{display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px}
-.verdict.LED{color:var(--conf); background:var(--conf-soft)}
+.verdict.LED{color:var(--conf-text); background:var(--conf-soft)}
 .verdict.SAME_DAY{color:var(--st-t); background:var(--st-b)}
 .verdict.LAGGED{color:var(--wa-t); background:var(--wa-b)}
 .verdict.FALSE_POSITIVE{color:var(--down); background:#fbe6e6}
@@ -192,7 +192,7 @@ td.r{text-align:right}
 .statcard{background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:13px 15px}
 .statcard .sl{font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--text-3); font-weight:600}
 .statcard .sv{font-family:var(--mono); font-size:26px; font-weight:700; margin-top:5px; letter-spacing:-.01em}
-.statcard .sv.good{color:var(--conf)} .statcard .sv.early{color:var(--early)} .statcard .sv.det{color:var(--det)}
+.statcard .sv.good{color:var(--conf-text)} .statcard .sv.early{color:var(--early-text)} .statcard .sv.det{color:var(--det-text)}
 .statcard .sf{font-size:10.5px; color:var(--text-3); margin-top:3px}
 
 /* Right rail */
@@ -687,3 +687,6 @@ tbody tr{border-bottom:1px solid #ECECEC}
 input,select,textarea{font-family:var(--sans)}
 /* dark-chrome accents: accentSoft on midnight grounds */
 ::selection{background:#df7a3633}
+/* founder ruling 1(b): CTA fills carrying white text use the deep twin */
+.fav-savebtn,.fav-save{background:var(--early-text)}
+.fav-chip.on{background:var(--early-text);border-color:var(--early-text)}

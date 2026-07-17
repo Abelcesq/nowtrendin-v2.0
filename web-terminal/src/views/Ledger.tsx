@@ -202,7 +202,7 @@ export function Ledger() {
             <div className="statcard"><div className="sl">Tracked-race hit rate</div><div className="sv early">{summary?.trackedRaceHitRate != null ? summary.trackedRaceHitRate.toFixed(1) + '%' : '—'}</div><div className="sf">LED ÷ races actually run ({summary?.trackedRaceSample ?? '—'}; pre-broken excluded)</div></div>
             <div className="statcard"><div className="sl">Median lead time</div><div className="sv early">{med}d</div><div className="sf">days ahead of Google Trends breakout</div></div>
             <div className="statcard"><div className="sl">Led / Same / Near / Pre-broken / FP</div><div className="sv">{summary?.led ?? 0}/{summary?.sameDay ?? 0}/{summary?.laggedNear ?? summary?.lagged ?? 0}/{summary?.preBroken ?? 0}/{summary?.falsePositives ?? 0}</div><div className="sf">outcome breakdown (near + pre-broken = lagged)</div></div>
-            <div className="statcard"><div className="sl">LED referee check</div><div className="sv">{summary?.ledCorroborated ?? 0}✓ · {summary?.ledUncorroborated ?? 0}– · {summary?.ledUnchecked ?? 0}·</div><div className="sf">Wikipedia-corroborated · not corroborated · unchecked</div></div>
+            <div className="statcard"><div className="sl">LED referee check</div><div className="sv">✓{summary?.ledCorroborated ?? 0} · ✗{summary?.ledUncorroborated ?? 0} · —{summary?.ledUnchecked ?? 0}</div><div className="sf">Wikipedia-corroborated · not corroborated · unchecked</div></div>
             <div className="statcard"><div className="sl">Resolved · pending</div><div className="sv">{resolved}·{summary?.pending ?? 0}</div><div className="sf">{summary?.smallSample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
           </div>
         </>

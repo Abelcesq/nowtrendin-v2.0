@@ -1,10 +1,19 @@
-// Mobile-app color scheme, mirrored for the web TREND and MARKET detail pages so
-// the two surfaces read identically (authority: frontend/lib/signals.ts +
-// risk/[key].tsx + tailwind.config.js / CLAUDE.md §3.1).
+// THE WEB TERMINAL'S OWN color authority (founder ruling 2026-07-16/17 — the
+// "one brand, two dialects" contract). Cross-platform parity with mobile is
+// SEMANTIC, not literal: hue MEANINGS are contractual on every surface
+// (blue = Detection, green = Confidence, orange = emphasis/N, red = loss/error
+// ONLY, one meaning per hue family) — hue VALUES are per-surface. The web is
+// the vivid institutional dialect (this file); mobile is the calm jewel Aurora
+// dialect (frontend/DESIGN_SYSTEM.md). NEVER "fix" the web back to jewel tones
+// and NEVER copy these vivid hexes into mobile. Vivid hues are used where color
+// is a SURFACE (rings/fills/dots/charts); the *Text twins below are used where
+// the hue is TEXT (WCAG). Full contract: web-terminal/WEB_DESIGN_SYSTEM.md.
 
 export const MC = {
-  detection: '#2D7EEF',   // Detection — earliness (blue)
-  confidence: '#00C896',  // Confidence — confirmation (green)
+  detection: '#2D7EEF',
+  detectionText: '#1b5fc4',   // dark twin — where the hue is TEXT (founder ruling 1b)   // Detection — earliness (blue)
+  confidence: '#00C896',
+  confidenceText: '#007a5a',  // dark twin — where the hue is TEXT  // Confidence — confirmation (green)
   orange: '#EE6A2A',      // brand "Now"
   maroon: '#B5341B',      // brand "TrendIn"
   gold: '#D4A017',
@@ -96,9 +105,23 @@ export const BASELINE_META: Record<string, { color: string; label: string }> = {
 // ── Aurora Title Case (DESIGN_SYSTEM.md §2): trend/topic names render Title
 // Case; words already ALL-CAPS or with interior capitals are preserved
 // ("quantum LLMs" -> "Quantum LLMs", "AI" -> "AI"). Display-only.
+const TC_ACRONYMS = new Set(['ai', 'agi', 'asi', 'llm', 'llms', 'ipo', 'ipos',
+  'nato', 'fifa', 'ufc', 'nba', 'nfl', 'nhl', 'mlb', 'gdp', 'etf', 'etfs',
+  'cpi', 'imf', 'ecb', 'un', 'eu', 'uk', 'nyc', 'uae', 'f1', 'ev', 'evs'])
+const TC_SMALL = new Set(['of', 'the', 'and', 'for', 'in', 'on', 'at', 'to', 'vs', 'de', 'a'])
 export function titleCaseTopic(topic: string): string {
   return (topic || '')
     .split(' ')
-    .map((w) => (/[A-Z]/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .map((w, i) => {
+      const lw = w.toLowerCase()
+      if (TC_ACRONYMS.has(lw)) return lw.toUpperCase()
+      if (i > 0 && TC_SMALL.has(lw)) return lw
+      return /[A-Z]/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)
+    })
     .join(' ')
+}
+
+// Category labels: raw engine keys ("current_events") -> display ("Current Events").
+export function catLabel(c?: string | null): string {
+  return c ? titleCaseTopic(c.replace(/_/g, ' ')) : ''
 }
