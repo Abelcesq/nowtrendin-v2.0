@@ -2084,3 +2084,22 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - DEFERRED (honest): falls-below alerts (backend migration), FlashList + single-
   topic endpoint, eas.json/dev-client + the payments-model decision (web-signup
   rec), CLAUDE.md §3/§11 palette doc-debt.
+
+### 2026-07-17 (cont. 5) — BOARD review of the proposed Scoring Assessor agent
+- Six memos on the externally-authored assessor/teacher (payment portal on hold
+  pending proven accuracy). UNANIMOUS: concept right (teaching layer + work queue
+  + trend-over-time = a real fleet gap) — but DO NOT RUN AS-IS (4/6 reject the
+  design as written). Record: audits/board/BOARD_scoring-assessor_2026-07-17.md.
+- Convergent blockers: variants "fix" prescribes the Board-REJECTED score-time
+  alias merge (rulings registry required); stale 1.0-era signatures hardcoded
+  (45/67 bands; frozen-74 already fixed — forensically verified); mainstream-
+  referee check measures FAME not MOTION (would teach score inflation);
+  "circularity by courier" via the work-queue JSON (held-out stamps, task classes,
+  diagnose-never-tune, engine-referee correlation drift alarm); readiness % is a
+  Goodhart trap (internal-only rename; LEDGER tracked-race stays THE number and
+  the portal gate); lifecycle classifier fat-tail fragile; cp1252 crash;
+  unwatermarked demo work queues.
+- Approved rebuild shape: /scoring-assessor SKILL over existing endpoints (6/10
+  adapter methods already served), aggregator-over-the-fleet, fixed stratified
+  cohort, append-only + git snapshots, feed param, free sources only.
+  AWAITING CHAIRMAN RULING (rebuild ~half a day).
