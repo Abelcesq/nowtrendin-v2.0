@@ -123,6 +123,7 @@ export default function AccuracyLedger() {
 
   return (
     <Screen scroll>
+      <Disclaimer />
       <TouchableOpacity onPress={() => router.back()} className="mt-4 mb-2 self-start flex-row items-center gap-1">
         <ChevronLeft size={22} color="#3C4663" />
         <Text className="text-textSecondary text-sm">Profile</Text>
@@ -134,7 +135,7 @@ export default function AccuracyLedger() {
       <Text className="text-textMuted text-sm mb-4 leading-5">
         {priceMode
           ? `A separate ledger: ${mode === 'crypto' ? 'crypto money-movement reads validated against realized coin price direction' : 'money-movement reads validated against realized end-of-day price direction'} — a retrospective measurement, not a forecast.`
-          : 'Documented lead time — how many days Now TrendIn detected a topic before it broke out on Google Trends. The auditable proof that the Gradient Score leads the market.'}
+          : 'Documented lead time — how many days Now TrendIn detected a topic before it broke out on Google Trends. The auditable proof that the Gradient Score leads Google Trends attention.'}
       </Text>
 
       {/* LEDGER mode chips (web parity) */}
@@ -306,7 +307,7 @@ export default function AccuracyLedger() {
           <Text className="text-textPrimary font-bold text-base mt-3 text-center">No validated predictions yet</Text>
           <Text className="text-textMuted text-sm mt-2 text-center leading-5">
             The ledger fills in once a Google Trends provider (Apify) is connected and your detections are
-            checked for breakout. Each entry records the days you led the market — the proof asset for
+            checked for breakout. Each entry records the days you led the Google Trends breakout — the proof asset for
             institutional clients.
           </Text>
         </View>

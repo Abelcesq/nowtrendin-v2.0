@@ -29,9 +29,14 @@ export function useSignals(): SignalsResult {
     retry: 1,
   });
 
-  // Auto-advance through the remaining pages as soon as each arrives.
+  // Auto-advance through pages — CAPPED (board perf condition 2026-07-17): the
+  // old loop eagerly fetched the ENTIRE feed (~30 requests/open). 10 pages
+  // (1,000 rows) covers all realistic browsing of the windowed list; full
+  // virtualization + on-demand deep fetch is the next-sprint item.
+  const EAGER_PAGE_CAP = 10;
   useEffect(() => {
-    if (q.hasNextPage && !q.isFetchingNextPage) q.fetchNextPage();
+    const pages = q.data?.pages.length ?? 0;
+    if (q.hasNextPage && !q.isFetchingNextPage && pages < EAGER_PAGE_CAP) q.fetchNextPage();
   }, [q.hasNextPage, q.isFetchingNextPage, q.data]);
 
   const loaded = q.data?.pages.flatMap((p) => p.signals) ?? [];
@@ -95,7 +100,9 @@ export function useCrypto() {
     queryFn: fetchCrypto,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    refetchInterval: (query) => (query.state.data?.status === 'warming' ? 4000 : false),
+    // Jitter (board perf condition 2026-07-17): a fixed 4s poll herds every
+    // client onto the same beat after a deploy — randomize 4.0–5.5s.
+    refetchInterval: (query) => (query.state.data?.status === 'warming' ? 4000 + Math.floor(Math.random() * 1500) : false),
   });
   return {
     coins: q.data?.coins ?? [],

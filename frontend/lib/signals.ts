@@ -407,7 +407,7 @@ export function gapBandIndex(gap: number): number {
 export function gapInsight(gap: number): { text: string; agree: boolean } {
   return gap <= 15
     ? { text: 'Scores aligned — agreement on where this sits, not that it’s strong', agree: true }
-    : { text: 'Confirmation building — 24–72h to alignment', agree: false };
+    : { text: 'Confirmation building — the gap typically narrows as confirmation accumulates', agree: false };
 }
 
 const MIN = 60 * 1000;
@@ -416,16 +416,16 @@ const now = Date.now();
 
 // Offline fallback dataset (used if the live engine is unreachable).
 export const MOCK_SIGNALS: Signal[] = [
-  { id: '1', topic: 'quantum LLMs',       category: 'Technology', score: 94, detection: 96, confidence: 91, stage: 'VIRAL',      createdAt: now - 22 * MIN },
-  { id: '2', topic: 'agentic coding',     category: 'Technology', score: 87, detection: 88, confidence: 84, stage: 'BREAKOUT',   createdAt: now - 48 * MIN },
-  { id: '3', topic: 'stablecoin bill',    category: 'Business',   score: 81, detection: 83, confidence: 78, stage: 'STRONG',     createdAt: now - 1.5 * HOUR },
-  { id: '4', topic: 'mcp servers',        category: 'Technology', score: 72, detection: 74, confidence: 69, stage: 'STRONG',     createdAt: now - 3 * HOUR },
-  { id: '5', topic: 'rag pipelines',      category: 'Technology', score: 66, detection: 68, confidence: 61, stage: 'EMERGING',   createdAt: now - 6 * HOUR },
-  { id: '6', topic: 'creator economy',    category: 'Business',   score: 59, detection: 62, confidence: 55, stage: 'EMERGING',   createdAt: now - 11 * HOUR },
-  { id: '7', topic: 'vector databases',   category: 'Technology', score: 64, detection: 66, confidence: 60, stage: 'MARGINAL',   createdAt: now - 13 * HOUR },
-  { id: '8', topic: 'climate tech',       category: 'Business',   score: 57, detection: 59, confidence: 52, stage: 'MARGINAL',   createdAt: now - 14 * HOUR },
-  { id: '9', topic: 'longevity drugs',    category: 'Health',     score: 53, detection: 55, confidence: 48, stage: 'MONITORING', createdAt: now - 26 * HOUR },
-  { id: '10', topic: 'spatial computing', category: 'Technology', score: 49, detection: 51, confidence: 44, stage: 'MONITORING', createdAt: now - 38 * HOUR },
+  { id: '1', topic: 'quantum LLMs',       category: 'Technology', score: 94, detection: 96, confidence: 91, stage: 'VIRAL',      createdAt: 0 },
+  { id: '2', topic: 'agentic coding',     category: 'Technology', score: 87, detection: 88, confidence: 84, stage: 'BREAKOUT',   createdAt: 0 },
+  { id: '3', topic: 'stablecoin bill',    category: 'Business',   score: 81, detection: 83, confidence: 78, stage: 'STRONG',     createdAt: 0 },
+  { id: '4', topic: 'mcp servers',        category: 'Technology', score: 72, detection: 74, confidence: 69, stage: 'STRONG',     createdAt: 0 },
+  { id: '5', topic: 'rag pipelines',      category: 'Technology', score: 66, detection: 68, confidence: 61, stage: 'EMERGING',   createdAt: 0 },
+  { id: '6', topic: 'creator economy',    category: 'Business',   score: 59, detection: 62, confidence: 55, stage: 'EMERGING',   createdAt: 0 },
+  { id: '7', topic: 'vector databases',   category: 'Technology', score: 64, detection: 66, confidence: 60, stage: 'MARGINAL',   createdAt: 0 },
+  { id: '8', topic: 'climate tech',       category: 'Business',   score: 57, detection: 59, confidence: 52, stage: 'MARGINAL',   createdAt: 0 },
+  { id: '9', topic: 'longevity drugs',    category: 'Health',     score: 53, detection: 55, confidence: 48, stage: 'MONITORING', createdAt: 0 },
+  { id: '10', topic: 'spatial computing', category: 'Technology', score: 49, detection: 51, confidence: 44, stage: 'MONITORING', createdAt: 0 },
 ];
 
 export interface SignalFeed {
@@ -455,6 +455,7 @@ export function findSignal(list: Signal[], id: string): Signal | undefined {
 }
 
 export function ageLabel(createdAt: number): string {
+  if (!createdAt) return 'sample';   // mock rows carry no real timestamp (board ruling)
   const ms = Date.now() - createdAt;
   if (ms < HOUR) return `${Math.max(1, Math.round(ms / MIN))}m ago`;
   if (ms < 24 * HOUR) return `${Math.round(ms / HOUR)}h ago`;
@@ -498,12 +499,21 @@ export const stageLabel = (s?: string) =>
 // Capitalizes the first letter of each word but PRESERVES words that already carry
 // an interior capital or are all-caps — so acronyms/brands stay intact
 // ("quantum LLMs" → "Quantum LLMs", "AI" → "AI", "stablecoin bill" → "Stablecoin Bill").
+const TC_ACRONYMS = new Set(['ai', 'agi', 'asi', 'llm', 'llms', 'ipo', 'ipos',
+  'nato', 'fifa', 'ufc', 'nba', 'nfl', 'nhl', 'mlb', 'gdp', 'etf', 'etfs',
+  'cpi', 'imf', 'ecb', 'un', 'eu', 'uk', 'nyc', 'uae', 'f1', 'ev', 'evs']);
+const TC_SMALL = new Set(['of', 'the', 'and', 'for', 'in', 'on', 'at', 'to', 'vs', 'de', 'a']);
 export function titleCaseTopic(s?: string): string {
   if (!s) return '';
+  let wordIndex = -1;
   return s
     .split(/(\s+)/)
     .map((w) => {
       if (!w.trim()) return w; // keep whitespace runs
+      wordIndex += 1;
+      const lw = w.toLowerCase();
+      if (TC_ACRONYMS.has(lw)) return lw.toUpperCase();
+      if (wordIndex > 0 && TC_SMALL.has(lw)) return lw;
       if (w === w.toUpperCase() || /[A-Z]/.test(w.slice(1))) {
         return w.charAt(0).toUpperCase() + w.slice(1);
       }
@@ -529,34 +539,23 @@ const ACTIONS: Record<Stage, { title: string; body: string }> = {
   MONITORING: { title: 'Background signal.', body: 'Low-intensity background activity, below the emerging threshold.' },
   DECAY: { title: 'Attention falling.', body: 'Attention for this topic is declining from its peak.' },
 };
+// Imperative-title guard (board ruling 2026-07-17): engine what_to_do copy is
+// used only when it reads as DESCRIPTION; anything imperative/trade-flavored
+// falls back to the local neutral ACTIONS (measurement, not advice).
+const IMPERATIVE = /^\s*(buy|sell|trade|invest|short|long|act|jump|get|grab|enter|exit|bet|hurry|don'?t miss)\b/i;
 export function actionFor(s: Signal) {
-  if (s.whatToDo?.action) {
+  if (s.whatToDo?.action && !IMPERATIVE.test(s.whatToDo.action)) {
     return { title: s.whatToDo.action, body: s.whatToDo.instruction || s.whatToDo.detail || '' };
   }
   return ACTIONS[s.stage] ?? ACTIONS.MONITORING;
 }
 
-// Fallback synthetic breakdown (used only when live groups are absent).
+// Board ruling 2026-07-17 (no-fabrication principle): ONLY engine-computed
+// component groups render. The old arithmetic fallback (Velocity=score+6 etc.)
+// invented numbers and displayed them as real measurements — deleted. Absent
+// components render NOTHING (CLAUDE.md §17).
 export function breakdownGroups(s: Signal): BreakdownGroup[] {
-  if (s.groups && s.groups.length) return s.groups;
-  const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
-  return [
-    { title: 'Signal Quality', items: [
-      { label: 'Detection', value: s.detection },
-      { label: 'Confidence', value: s.confidence },
-      { label: 'Source spread', value: clamp((s.detection + s.confidence) / 2 - 4) },
-    ] },
-    { title: 'Signal Momentum', items: [
-      { label: 'Velocity', value: clamp(s.score + 6) },
-      { label: 'Acceleration', value: clamp(s.score - 8) },
-      { label: 'Volume', value: clamp(s.detection - 3) },
-    ] },
-    { title: 'Signal Context', items: [
-      { label: 'Cross-platform', value: clamp(s.confidence + 5) },
-      { label: 'Novelty', value: clamp(100 - s.score + 20) },
-      { label: 'Saturation', value: clamp(s.score - 15) },
-    ] },
-  ];
+  return s.groups && s.groups.length ? s.groups : [];
 }
 
 export function nextTier(tier: TierID): TierID | null {
@@ -565,8 +564,12 @@ export function nextTier(tier: TierID): TierID | null {
   return null;
 }
 
+// Board ruling 2026-07-17: derived from the CONTRACT gates in constants/tiers
+// (the old hand-coded "1h+"/"30m+" labels understated the real 24h/12h windows
+// 24x — a false display). Single source of truth, like LockedSignalsBanner.
 export function dataWindowLabel(tier: TierID): string {
-  if (tier === 'enterprise') return 'Live + full history';
-  if (tier === 'business') return '30m+ data';
-  return '1h+ data';
+  const ms = TIERS[tier].dataFreshness;
+  if (!ms) return 'Live + full history';
+  const h = Math.round(ms / 3600000);
+  return `data on a ${h}h+ delay`;
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import { Zap, Briefcase, Building2, Check, X } from 'lucide-react-native';
 import { Button } from '../ui/Button';
 import { TIERS, TierID } from '../../constants/tiers';
@@ -72,9 +72,18 @@ function TierCard({
         ))}
       </View>
 
-      <Button variant={tierId} size="md" onPress={onAction}>
-        {`Start ${tier.name} Plan`}
-      </Button>
+      {tierId === 'enterprise' ? (
+        // Board ruling 2026-07-17: the $250k tier is NEVER self-serve on mobile —
+        // provisioned by the team after a sales conversation.
+        <Button variant={tierId} size="md"
+          onPress={() => Linking.openURL('mailto:sales@nowtrendin.com?subject=NowTrendIn%20Enterprise%20access')}>
+          Contact Sales
+        </Button>
+      ) : (
+        <Button variant={tierId} size="md" onPress={onAction}>
+          {`Start ${tier.name} Plan`}
+        </Button>
+      )}
     </TouchableOpacity>
   );
 }

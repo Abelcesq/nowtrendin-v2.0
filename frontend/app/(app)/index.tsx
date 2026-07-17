@@ -17,6 +17,7 @@ import { GradeTool } from '../../components/trends/GradeTool';
 import { useAuthStore } from '../../store/auth.store';
 import { TIERS, TierID, isDataAccessible } from '../../constants/tiers';
 import { dataWindowLabel, actionLine, ageLabel, titleCaseTopic, CATEGORY_DEFS, CONTENT_CATEGORIES, contentCategoryMeta, feedOrder } from '../../lib/signals';
+import { Disclaimer } from '../../components/ui/Disclaimer';
 import { MARKET_LANES, MARKET_TIER_FILTERS, MARKET_DIRECTION_FILTERS, laneOf } from '../../lib/marketCategories';
 import { useTierFeed, useRiskScores, useCrypto } from '../../hooks/useSignals';
 
@@ -212,7 +213,7 @@ export default function Dashboard() {
               </Text>
             ) : (
               <Text className="text-textPrimary text-[32px] font-extrabold mt-2.5" style={{ letterSpacing: -1.1, lineHeight: 36 }}>
-                {ranked.length.toLocaleString()} {ranked.length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
+                {ranked.filter((s) => s.detection >= 55).length.toLocaleString()} {ranked.filter((s) => s.detection >= 55).length === 1 ? 'Trend Is' : 'Trends Are'} <Text style={{ color: '#B11226' }}>Heating Up!</Text>
               </Text>
             )}
             <View className="flex-row items-center gap-2.5 mt-3.5">
@@ -221,7 +222,7 @@ export default function Dashboard() {
                 <Text className="text-textPrimary text-[12px] font-extrabold tracking-[1.6px] uppercase">{cfg.name}</Text>
               </View>
               <Text className="text-[12px] font-bold" style={{ color: '#D6D6DC' }}>·</Text>
-              <Text className="text-textMuted text-[12px] font-bold tracking-[1.4px] uppercase">Updated {lastUpdated}</Text>
+              <Text className="text-textMuted text-[12px] font-bold tracking-[1.4px] uppercase">{isSample ? 'SAMPLE DATA' : `Updated ${lastUpdated}`}</Text>
             </View>
           </View>
         </Rise>
@@ -233,7 +234,7 @@ export default function Dashboard() {
             return (
               <TouchableOpacity key={t.k} onPress={() => setMode(t.k as typeof mode)} activeOpacity={0.7}
                 style={{ paddingBottom: 11, marginBottom: -1.5, borderBottomWidth: on ? 2.5 : 0, borderBottomColor: '#B11226' }}>
-                <Text className="text-xs uppercase" style={{ letterSpacing: 1.8, fontWeight: on ? '800' : '700', color: on ? '#16264A' : '#B6B6BD' }}>{t.label}</Text>
+                <Text className="text-xs uppercase" style={{ letterSpacing: 1.8, fontWeight: on ? '800' : '700', color: on ? '#16264A' : '#71788C' }}>{t.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -242,8 +243,11 @@ export default function Dashboard() {
         {mode === 'attention' && (
           <>
             <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
-              What's gaining attention across every platform right now — ranked by our Gradient Score, surfaced before it hits the mainstream.
+              {isNRanked ? 'What is gaining attention across platforms — ranked by N, our on-platform tracking signal (ties keep feed order).' : 'What is gaining attention across platforms — ranked by Detection.'} {tier === 'enterprise' ? 'Live data.' : `Your plan serves ${dataWindowLabel(tier)}.`}
             </Text>
+            <TouchableOpacity onPress={() => router.push('/profile/accuracy')} activeOpacity={0.7}>
+              <Text className="text-[12px] font-bold mt-2" style={{ color: '#2A5B9E' }}>Our track record — the Accuracy Ledger →</Text>
+            </TouchableOpacity>
             {topPick && (
               <Rise delay={90}>
                 <TouchableOpacity activeOpacity={0.93} onPress={() => router.push(`/signal/${topPick.id}`)} className="rounded-3xl overflow-hidden mt-5"
@@ -251,13 +255,13 @@ export default function Dashboard() {
                   <LinearGradient colors={['#1B3066', '#0C1B3A', '#1A1442']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: 24 }}>
                     <View style={{ position: 'absolute', right: -34, top: -30, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(201,162,75,0.13)' }} />
                     <View style={{ position: 'absolute', left: -44, bottom: -54, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(177,18,38,0.16)' }} />
-                    <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 2.2 }}>TODAY'S #1 · NOWTRENDIN PICK</Text>
+                    <Text style={{ color: '#F0758A', fontSize: 12, fontWeight: '800', letterSpacing: 2.2 }}>{isSample ? 'ILLUSTRATIVE · SAMPLE DATA' : "TODAY'S #1 · NOWTRENDIN SIGNAL"}</Text>
                     <Text numberOfLines={2} style={{ color: '#FBF4E4', fontSize: 28, fontWeight: '800', letterSpacing: -0.5, marginTop: 11, lineHeight: 33 }}>{titleCaseTopic(topPick.topic)}</Text>
                     <View className="flex-row items-end justify-between" style={{ marginTop: 16 }}>
                       <Text style={{ color: '#B9C4E0', fontSize: 12, fontWeight: '500', maxWidth: 175, lineHeight: 18 }}>{actionLine(topPick.stage)}</Text>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: '#E2C275', fontSize: 44, fontWeight: '800', lineHeight: 46, letterSpacing: -1.5 }}>{metricOf(topPick)}</Text>
-                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>{metricLabel}</Text>
+                        <Text style={{ color: '#C9A24B', fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 3 }}>{isNRanked && metricOf(topPick) === 100 ? 'N · MAX' : metricLabel}</Text>
                       </View>
                     </View>
                     <View className="flex-row items-center self-start" style={{ backgroundColor: '#B11226', borderRadius: 980, paddingVertical: 12, paddingHorizontal: 22, marginTop: 20 }}>
@@ -316,8 +320,9 @@ export default function Dashboard() {
             <Text className="text-textMuted text-[12px] mt-2 mb-3">Tap any trend to open its full breakdown.</Text>
 
             {isSample && (
-              <View className="rounded-lg px-3 py-2 mb-4 bg-card">
-                <Text className="text-textMuted text-[12px]">Showing sample data — live engine unreachable.</Text>
+              <View className="rounded-lg px-3 py-2.5 mb-4" style={{ backgroundColor: '#B112261A' }}>
+                <Text className="text-[12px] font-bold" style={{ color: '#7A0D1A' }}>SAMPLE DATA — the live engine is unreachable.</Text>
+                <Text className="text-[12px] mt-0.5" style={{ color: '#3C4663' }}>Every row below is illustrative, not a live measurement.</Text>
               </View>
             )}
 
@@ -383,7 +388,9 @@ export default function Dashboard() {
           </>
         )}
 
-        {mode === 'grade' && <View className="mt-6"><GradeTool /></View>}
+        {mode === 'grade' && <View className="mt-6"><GradeTool /><Disclaimer /></View>}
+        {/* Verbatim founder disclaimer — dashboard-wide (board gap fix 2026-07-17) */}
+        <Disclaimer />
 
         {mode === 'risk' && (
           <>

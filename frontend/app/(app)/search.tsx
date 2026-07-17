@@ -1,4 +1,5 @@
 import { titleCaseTopic } from "../../lib/signals";
+import { Disclaimer } from '../../components/ui/Disclaimer';
 import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Search as SearchIcon, TrendingUp, Activity, Globe, X } from 'lucide-react-native';
@@ -50,6 +51,7 @@ export default function Search() {
       {tab === 'trends' && <TrendsSearch tier={tier} />}
       {tab === 'market' && <MarketSearch tier={tier} />}
       {tab === 'graded' && <GradedSearch />}
+      <Disclaimer />
     </Screen>
   );
 }

@@ -7,9 +7,9 @@
     "scheme": "nowtrendin",
     "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.nowtrendin.app"
     },
     "android": {

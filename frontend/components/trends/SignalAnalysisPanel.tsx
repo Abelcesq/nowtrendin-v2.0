@@ -42,16 +42,16 @@ export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' |
 
   if (state === 'empty') return null;
   return (
-    <View className="mb-5 rounded-2xl border border-border bg-surface px-4 py-3.5">
+    <View className="mb-5 rounded-3xl bg-card px-4 py-4">
       <View className="flex-row items-center gap-2 mb-2">
-        <Activity size={16} color="#00C896" />
+        <Activity size={16} color="#16264A" />
         <Text className="text-textPrimary font-semibold">Signal Analysis</Text>
-        {a?.headline ? <Text className="text-textMuted text-[11px] flex-1" numberOfLines={1}> · {a.headline}</Text> : null}
+        {a?.headline ? <Text className="text-textMuted text-[12px] flex-1" numberOfLines={1}> · {a.headline}</Text> : null}
       </View>
 
       {state === 'loading' ? (
         <View className="flex-row items-center gap-2 py-2">
-          <ActivityIndicator size="small" color="#9AA3B0" />
+          <ActivityIndicator size="small" color="#9A9AA2" />
           <Text className="text-textSecondary text-xs">Composing analysis…</Text>
         </View>
       ) : (
@@ -59,8 +59,8 @@ export function SignalAnalysisPanel({ kind, item }: { kind: 'trend' | 'market' |
           {a?.facts && a.facts.length > 0 ? (
             <View className="flex-row flex-wrap gap-1.5 mb-3">
               {a.facts.map((f, i) => (
-                <View key={i} className="rounded-md border border-border bg-bg px-2 py-1">
-                  <Text className="text-[10px] text-textSecondary">
+                <View key={i} className="rounded-lg bg-cardAlt px-2 py-1">
+                  <Text className="text-[12px] text-textSecondary">
                     <Text className="font-bold text-textPrimary">{f.label}</Text> {f.value}
                   </Text>
                 </View>

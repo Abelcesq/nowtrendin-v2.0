@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Search } from 'lucide-react-native';
@@ -170,6 +171,7 @@ export default function CategoryPage() {
         Now TrendIn provides signal analysis for informational purposes only — not financial,
         investment, or legal advice. All decisions are your own.
       </Text>
+      <Disclaimer />
     </Screen>
   );
 }

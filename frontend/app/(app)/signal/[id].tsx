@@ -16,7 +16,7 @@ import { DarkMatterPanel } from '../../../components/trends/DarkMatterPanel';
 import { MethodologyExplainer } from '../../../components/trends/MethodologyExplainer';
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
-import { useSignal } from '../../../hooks/useSignals';
+import { useSignal, useSignals } from '../../../hooks/useSignals';
 import { ageLabel, stageColor, stageLabel, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex, titleCaseTopic } from '../../../lib/signals';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -66,6 +66,7 @@ export default function SignalDetail() {
   const router = useRouter();
   const goBack = () => { if (from) router.replace(from as any); else router.back(); };
   const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Trends';
+  const { isSample } = useSignals();
   const { signal, isLoading } = useSignal(String(id));
 
   if (isLoading) {
@@ -117,6 +118,13 @@ export default function SignalDetail() {
           {signal.platforms?.[0] ?? 'Multi-Platform'} · {ageLabel(signal.createdAt)}
         </Text>
       </View>
+
+      {/* Sample-mode honesty (board ruling 2026-07-17): detail inherits the banner */}
+      {isSample && (
+        <View className="rounded-lg px-3 py-2.5 mt-3" style={{ backgroundColor: '#B112261A' }}>
+          <Text className="text-[12px] font-bold" style={{ color: '#7A0D1A' }}>SAMPLE DATA — illustrative, not a live measurement.</Text>
+        </View>
+      )}
 
       {/* Legal disclaimer — top of the panel (founder rule: top AND bottom) */}
       <Disclaimer className="mt-3 mb-0 px-0 text-left" />
@@ -246,7 +254,7 @@ export default function SignalDetail() {
           </Section>
         )}
 
-        <Section title="Score breakdown" hint="The components behind the score">
+        {groups.length > 0 && <Section title="Score breakdown" hint="The components behind the score">
           {groups.map((g) => (
             <View key={g.title} className="mb-4">
               <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{g.title}</Text>
@@ -265,7 +273,7 @@ export default function SignalDetail() {
               ))}
             </View>
           ))}
-        </Section>
+        </Section>}
 
         <Section title="Research & variations" hint="Plain-English context for this trend">
           {!!signal.scoreExplanation && (
