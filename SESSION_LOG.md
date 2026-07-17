@@ -2103,3 +2103,21 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   adapter methods already served), aggregator-over-the-fleet, fixed stratified
   cohort, append-only + git snapshots, feed param, free sources only.
   AWAITING CHAIRMAN RULING (rebuild ~half a day).
+
+### 2026-07-17 (cont. 6) — Scoring Assessor v2 REBUILT + first live snapshot
+- Rebuilt per the board spec (tools/scoring_assessor.py + /scoring-assessor skill,
+  mirrored to docs/skills/). All board conditions implemented: endpoints-only,
+  hashed check manifest, rulings registry, task classes, held-out stamps + drift
+  alarm, surge-not-fame referee, quantile WARN-only lifecycle, outside-recall
+  module, internal-only %s with the LEDGER as THE headline, demo watermarks.
+- CHAIRMAN DIRECTIVE built in: snapshots born UNVERIFIED_PENDING_BOARD_REVIEW;
+  the skill's mandatory BOARD ANALYSIS GATE (independent critique + fresh
+  outside-data cross-check + verify/refute per item) precedes any teaching or
+  implementation; Chairman final say always.
+- FIRST LIVE SNAPSHOT committed (audits/assessor/ASSESSOR_2026-07-17.*): ledger
+  tracked-race 24.2% (n=33) anchored as THE number; internal pass 70.6% / floor
+  50%; findings: 19 high-volatility scores (spain/mamdani/white_house/shutting),
+  2/10 external trending recall (sports matchups missing — rangers/braves, tom
+  brady, piastri, dodgers/yankees), spain FADING-vs-BREAKOUT look. 21-item
+  UNVERIFIED queue — NEXT STEP: run the board gate on snapshot #1, then Chairman
+  ruling.
