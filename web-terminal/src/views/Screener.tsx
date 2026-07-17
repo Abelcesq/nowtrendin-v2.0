@@ -4,6 +4,7 @@ import { api, type TopicRow } from '../lib/api'
 import { pullTrends } from '../lib/auth'
 import { addToWatchlist, exportEntityCsv } from '../lib/actions'
 import { MC, stageColor, stageLabel, maturityColor, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../lib/mobileTheme'
+import { titleCaseTopic } from '../lib/mobileTheme'
 import { ScoreChart } from '../components/ScoreChart'
 import { Disclaimer } from '../components/Disclaimer'
 import { SignalAnalysisPanel } from '../components/SignalAnalysis'
@@ -47,7 +48,7 @@ function ageLabel(m: number) { return m >= 1440 ? `${Math.round(m / 1440)}d` : m
 function gapMicro(det: number, conf: number) {
   const W = 78, x = (v: number) => 4 + (v / 100) * (W - 8)
   const lo = Math.min(det, conf), hi = Math.max(det, conf)
-  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#aab4c1'
+  const wide = Math.abs(det - conf) >= 20, col = wide ? 'var(--early)' : '#9A9AA2'
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`}>
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />
@@ -215,7 +216,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       <div className="detail-head">
         <div className="detail-top">
           <div>
-            <div className="detail-name">{row.topic_display}</div>
+            <div className="detail-name">{titleCaseTopic(row.topic_display)}</div>
             <div className="detail-cat">{row.category || '—'} · <span style={{ color: scol, fontWeight: 700 }}>{stageLabel(row.stage)}</span></div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
@@ -421,7 +422,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
           <h4>Entity Group</h4>
           {(d.entity_group.constituents || []).map((c: any, i: number) => (
             <div className="var-row" key={i}>
-              <span className="var-name">{c.topic_display || c.topic_key}</span>
+              <span className="var-name">{titleCaseTopic(c.topic_display || c.topic_key)}</span>
               {c.signal_stage && <span className="var-tier" style={{ color: stageColor(c.signal_stage) }}>{stageLabel(c.signal_stage)}</span>}
               <span className="var-sc">{Math.round(c.detection_score ?? 0)}/{Math.round(c.confidence_score ?? 0)}</span>
             </div>
@@ -726,7 +727,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
                   <tr key={r.topic_key} className={r.topic_key === sel ? 'sel' : ''} onClick={() => select(r.topic_key)}>
                     <td>
                       <div className="topic-name">
-                        {r.topic_display}
+                        {titleCaseTopic(r.topic_display)}
                         {(r.entity_group?.grouped_keys?.length ?? 0) > 0 && (
                           <span className="eg-badge" title={`Grouped entity — includes ${r.entity_group!.grouped_keys!.join(', ')} (each keeps its own score)`}>
                             ⊞ {r.entity_group!.grouped_keys!.length + 1}

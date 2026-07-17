@@ -8,12 +8,12 @@ function GapMicro({ det, conf }: { det: number; conf: number }) {
   const lo = Math.min(det, conf), hi = Math.max(det, conf), W = 78
   const x = (v: number) => 4 + (v / 100) * (W - 8)
   const wide = Math.abs(det - conf) >= 20
-  const col = wide ? '#df7a36' : '#5e718a'
+  const col = wide ? '#E8551C' : '#6F7FA8'
   return (
     <svg width={W} height="16" viewBox={`0 0 ${W} 16`} aria-hidden="true">
       <line x1={x(lo)} y1="8" x2={x(hi)} y2="8" stroke={col} strokeWidth={wide ? 2.5 : 1.5} />
-      <circle cx={x(det)} cy="8" r="3.2" fill="#2D7EEF" />
-      <circle cx={x(conf)} cy="8" r="3.2" fill="#00C896" />
+      <circle cx={x(det)} cy="8" r="3.2" fill="#2A5B9E" />
+      <circle cx={x(conf)} cy="8" r="3.2" fill="#2E7D5B" />
     </svg>
   )
 }
@@ -89,9 +89,9 @@ export function Login({ onAuthed }: { onAuthed: (u: User) => void }) {
       <section className="lg-auth">
         <a className="lg-brand" href="#" aria-label="Now TrendIn home">
           <svg className="lg-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <rect width="32" height="32" rx="7" fill="#13233a" />
-            <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#df7a36" />
-            <path d="M19 9l4-3-1 5z" fill="#2f6fed" />
+            <rect width="32" height="32" rx="7" fill="#0C1B3A" />
+            <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#E8551C" />
+            <path d="M19 9l4-3-1 5z" fill="#2A5B9E" />
           </svg>
           <div>
             <div className="lg-name">Now<b>TrendIn</b></div>

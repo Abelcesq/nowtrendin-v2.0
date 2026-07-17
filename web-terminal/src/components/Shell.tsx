@@ -21,7 +21,7 @@ const FAV_OPTIONS: Record<string, { k: string; label: string }[]> = {
   ],
   watchlist: [{ k: '', label: 'My watchlists' }],
 }
-const FAV_COLORS = ['var(--bk-t)', '#8B5CF6', 'var(--down)', 'var(--det)', 'var(--em-t)', 'var(--conf)']
+const FAV_COLORS = ['var(--bk-t)', '#6B4FA0', 'var(--down)', 'var(--det)', 'var(--em-t)', 'var(--conf)']
 let _favc = 0
 
 export type NavKey =
@@ -115,9 +115,9 @@ export function Shell({
       <header className="topbar">
         <div className="brand">
           <svg className="mark" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="7" fill="#13233a" />
-            <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#df7a36" />
-            <path d="M19 9l4-3-1 5z" fill="#2f6fed" />
+            <rect width="32" height="32" rx="7" fill="#0C1B3A" />
+            <path d="M9 21c2-1 3-3 3-6 1 2 2 3 4 3 0-3 1-5 3-7-1 5 4 6 4 10 0 3-3 5-7 5s-8-2-7-6 1-3 0-5z" fill="#E8551C" />
+            <path d="M19 9l4-3-1 5z" fill="#2A5B9E" />
           </svg>
           <div>
             <div className="name">Now<b>TrendIn</b></div>

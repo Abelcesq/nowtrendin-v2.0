@@ -10,7 +10,7 @@ import { Disclaimer } from '../components/Disclaimer'
 // free), Graded (all members' graded topics, free). The result page carries the
 // three required reads: AI Context definition, Signal Quality analysis, N score.
 
-const GOLD = '#D4A017'
+const GOLD = '#C9A24B'
 type Tab = 'new' | 'history' | 'graded'
 
 function timeAgo(iso: string) {
@@ -69,7 +69,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
       {/* Graded topic name + how it was graded — so the user always sees WHAT was
           graded and understands the (up to) three independent reads below. */}
       <div className="g-graded-title" style={{ fontSize: 22, fontWeight: 800, color: MC.text, marginBottom: 4, textTransform: 'capitalize' }}>{gradedName}</div>
-      <div className="g-grade-explain" style={{ fontSize: 12.5, lineHeight: 1.5, color: MC.textSec, background: '#F7F8FA', border: '1px solid #E4E7EC', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+      <div className="g-grade-explain" style={{ fontSize: 12.5, lineHeight: 1.5, color: MC.textSec, background: '#F7F8FA', border: '1px solid #ECECEC', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
         <div style={{ marginBottom: 6 }}>
           <b style={{ color: MC.text }}>How this topic is graded.</b>{' '}
           {measured
@@ -102,7 +102,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
             </div>
             {ms.leverage_health != null && <div className="g-lev">Leverage Health {Math.round(ms.leverage_health)}/100 (high = lower debt)</div>}
             {ms.data_coverage === 'insufficient' ? (
-              <div className="narr" style={{ background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
+              <div className="narr" style={{ background: '#FAF5E9', border: '1px solid #E2C275', color: '#7A6427', borderRadius: 8, padding: '8px 10px' }}>
                 ⚠ <b>Insufficient positioning data.</b> Smart-money &amp; short-interest sources (FINRA short interest / 13F holdings) aren’t populated for this instrument yet{ms.absent_inputs != null ? ` (${ms.absent_inputs}/${ms.total_inputs} inputs absent)` : ''}, so this sits near baseline. Treat as limited coverage — <i>not</i> a confirmed quiet market.
               </div>
             ) : (ms.interpretation && <div className="narr">{ms.interpretation}</div>)}

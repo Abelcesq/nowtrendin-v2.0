@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { api, type SignalAnalysis } from '../lib/api'
 import { MC } from '../lib/mobileTheme'
 
-const SURFACE = '#FFFFFF', BORDER = '#E4E7EC', BG = '#F4F5F7'
+const SURFACE = '#FFFFFF', BORDER = '#ECECEC', BG = '#F4F5F8'
 
 // Render **bold** spans (the descriptor bolds each metric name).
 function renderBody(text: string) {

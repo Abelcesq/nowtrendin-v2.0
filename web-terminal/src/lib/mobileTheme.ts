@@ -3,26 +3,26 @@
 // risk/[key].tsx + tailwind.config.js / CLAUDE.md §3.1).
 
 export const MC = {
-  detection: '#2D7EEF',   // Detection — earliness (blue)
-  confidence: '#00C896',  // Confidence — confirmation (green)
-  orange: '#EE6A2A',      // brand "Now"
-  maroon: '#B5341B',      // brand "TrendIn"
-  gold: '#D4A017',
-  red: '#CF2A1B',
-  amber: '#E85A1E',
-  purple: '#8B5CF6',
-  slate: '#94A3B8',
-  muted: '#9AA3B0',
-  text: '#1A1A2E',
-  textSec: '#5B6472',
+  detection: '#2A5B9E',   // Detection — earliness (blue)
+  confidence: '#2E7D5B',  // Confidence — confirmation (green)
+  orange: '#B11226',      // brand "Now"
+  maroon: '#7A0D1A',      // brand "TrendIn"
+  gold: '#C9A24B',
+  red: '#B11226',
+  amber: '#A8456A',
+  purple: '#6B4FA0',
+  slate: '#8A8F9C',
+  muted: '#9A9AA2',
+  text: '#16264A',
+  textSec: '#3C4663',
 }
 
 // Signal stage → color (frontend STAGE_COLORS).
 export const STAGE_COLOR: Record<string, string> = {
-  VIRAL: '#CF2A1B', BREAKOUT: '#00C896', STRONG: '#2D7EEF', EMERGING: '#D4A017',
-  MARGINAL: '#E85A1E', WATCHING: '#E85A1E', WATCH: '#E85A1E', MONITORING: '#9AA3B0', DECAY: '#94A3B8',
+  VIRAL: '#B11226', BREAKOUT: '#2E7D5B', STRONG: '#2A5B9E', EMERGING: '#C9A24B',
+  MARGINAL: '#A8456A', WATCHING: '#A8456A', WATCH: '#A8456A', MONITORING: '#9A9AA2', DECAY: '#8A8F9C',
 }
-export const stageColor = (s?: string) => STAGE_COLOR[(s || '').toUpperCase()] ?? '#9AA3B0'
+export const stageColor = (s?: string) => STAGE_COLOR[(s || '').toUpperCase()] ?? '#9A9AA2'
 
 // Display rename: the "EMERGING" signal stage is shown to users as "INDICATING".
 // Internal keys stay EMERGING (engine queries, colors, CSS classes) — display only.
@@ -31,29 +31,29 @@ export const stageLabel = (s?: string) =>
 
 // Topic maturity → color (frontend maturityColourHex).
 export const MATURITY_COLOR: Record<string, string> = {
-  RESURGENT: '#D4A017', EMERGING: '#00C896', NEW: '#2D7EEF',
-  ESTABLISHED: '#94A3B8', MONITORING: '#9AA3B0',
+  RESURGENT: '#C9A24B', EMERGING: '#2E7D5B', NEW: '#2A5B9E',
+  ESTABLISHED: '#8A8F9C', MONITORING: '#9A9AA2',
 }
-export const maturityColor = (c?: string) => MATURITY_COLOR[(c || '').toUpperCase()] ?? '#5B6472'
+export const maturityColor = (c?: string) => MATURITY_COLOR[(c || '').toUpperCase()] ?? '#3C4663'
 
 // Market tier → color (risk/[key].tsx MARKET_TIER_COLOR).
 export const MARKET_TIER_COLOR: Record<string, string> = {
-  ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017',
-  ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+  ELEVATED: '#B11226', ACTIVE: '#A8456A', MODERATE: '#C9A24B', BUILDING: '#C9A24B',
+  ROUTINE: '#2A5B9E', DORMANT: '#9A9AA2',
 }
-export const marketTierColor = (t?: string) => MARKET_TIER_COLOR[(t || '').toUpperCase()] ?? '#9AA3B0'
+export const marketTierColor = (t?: string) => MARKET_TIER_COLOR[(t || '').toUpperCase()] ?? '#9A9AA2'
 
 // Which score a market factor feeds → color.
 export const FEEDS_COLOR: Record<string, string> = {
-  detection: '#2D7EEF', confidence: '#00C896', both: '#8B5CF6',
+  detection: '#2A5B9E', confidence: '#2E7D5B', both: '#6B4FA0',
 }
 
 // Detection–Confidence gap interpretation bands (frontend GAP_BANDS).
 export const GAP_BANDS = [
-  { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#00C896' },
-  { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#D4A017' },
-  { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#CF2A1B' },
-  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#8B5CF6' },
+  { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#2E7D5B' },
+  { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#C9A24B' },
+  { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#B11226' },
+  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#6B4FA0' },
 ]
 export function gapBandIndex(gap: number): number {
   const i = GAP_BANDS.findIndex((b) => Math.abs(gap) <= b.max)
@@ -62,8 +62,8 @@ export function gapBandIndex(gap: number): number {
 
 // Who uses which score (frontend SCORE_ROLES).
 export const SCORE_ROLES = {
-  detection: { color: '#2D7EEF', tag: 'Speed', who: 'Content creators, brand managers, trend-forward marketers. Optimized for speed — surfaces signals early, accepting more false alarms in exchange.' },
-  confidence: { color: '#00C896', tag: 'Precision', who: 'Institutional analysts, investors, strategic planners. Optimized for precision — fewer false alarms, confirmed before it commits.' },
+  detection: { color: '#2A5B9E', tag: 'Speed', who: 'Content creators, brand managers, trend-forward marketers. Optimized for speed — surfaces signals early, accepting more false alarms in exchange.' },
+  confidence: { color: '#2E7D5B', tag: 'Precision', who: 'Institutional analysts, investors, strategic planners. Optimized for precision — fewer false alarms, confirmed before it commits.' },
 }
 
 // Market intensity tiers — what the bands mean (risk/[key].tsx MARKET_TIERS).
@@ -85,9 +85,20 @@ export const RISK_PIPELINE = [
 ]
 
 export const BASELINE_META: Record<string, { color: string; label: string }> = {
-  SPIKE_VS_SELF: { color: '#CF2A1B', label: 'Spike vs. own baseline' },
-  ELEVATED_VS_SELF: { color: '#E85A1E', label: 'Elevated vs. own baseline' },
-  AT_BASELINE: { color: '#00C896', label: 'At its own baseline' },
-  BELOW_BASELINE: { color: '#9AA3B0', label: 'Below its own baseline' },
-  INSUFFICIENT_HISTORY: { color: '#9AA3B0', label: 'Building baseline' },
+  SPIKE_VS_SELF: { color: '#B11226', label: 'Spike vs. own baseline' },
+  ELEVATED_VS_SELF: { color: '#A8456A', label: 'Elevated vs. own baseline' },
+  AT_BASELINE: { color: '#2E7D5B', label: 'At its own baseline' },
+  BELOW_BASELINE: { color: '#9A9AA2', label: 'Below its own baseline' },
+  INSUFFICIENT_HISTORY: { color: '#9A9AA2', label: 'Building baseline' },
+}
+
+
+// ── Aurora Title Case (DESIGN_SYSTEM.md §2): trend/topic names render Title
+// Case; words already ALL-CAPS or with interior capitals are preserved
+// ("quantum LLMs" -> "Quantum LLMs", "AI" -> "AI"). Display-only.
+export function titleCaseTopic(topic: string): string {
+  return (topic || '')
+    .split(' ')
+    .map((w) => (/[A-Z]/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ')
 }
