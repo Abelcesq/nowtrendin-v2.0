@@ -2068,3 +2068,19 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   decision (web-signup rec vs Apple 3.1.1) + small config; kill Capacitor.
 - Praise: profile/accuracy.tsx "the most honest retail ledger" — surface it on
   the dashboard. AWAITING CHAIRMAN RULING per item.
+
+### 2026-07-17 (cont. 4) — MOBILE board fixes ALL LANDED (founder: "fix all of them")
+- P0 false displays fixed: dataWindowLabel now derived from TIERS (24h/12h truth);
+  breakdownGroups fabrication deleted; mock fallback quarantined (no fabricated
+  freshness, garnet SAMPLE banners on dashboard + detail, ILLUSTRATIVE hero);
+  truthful rank copy + N·MAX marker; Enterprise self-grant closed (Contact Sales);
+  §8 clause verbatim at signup. P1 advice-copy pass landed (SIGNAL, Google-Trends-
+  true ledger copy, stage-true headline, tier-true intro, forecast removed,
+  imperative guard, dashboard track-record link). P2 hygiene (panel retrofit —
+  last banned hex gone; disclaimer gaps + contrast; casing dictionary). P3 code
+  (Capacitor killed, app.json light/no-tablet, prefetch cap, poll jitter).
+- Verified: hex/label/fabrication sweeps 0; expo web export clean; new copy
+  confirmed in bundle; preview redeployed a0ed686 (gate + PIN intact).
+- DEFERRED (honest): falls-below alerts (backend migration), FlashList + single-
+  topic endpoint, eas.json/dev-client + the payments-model decision (web-signup
+  rec), CLAUDE.md §3/§11 palette doc-debt.
