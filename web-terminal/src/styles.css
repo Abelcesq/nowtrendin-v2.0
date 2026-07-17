@@ -13,14 +13,14 @@
      above is intentional institutional identity (not a meaning color) and stays. */
   --det:#2A5B9E; --det-soft:#E9EEF6;
   --conf:#2E7D5B; --conf-soft:#E8F1EC;
-  --early:#B11226; --early-soft:#F7E4E7;
+  --early:#1B3066; --early-soft:#E9EDF6;
   --up:#2E7D5B; --down:#B11226;
   --bk-t:#2E7D5B; --bk-b:#E8F1EC;
   --st-t:#2A5B9E; --st-b:#E9EEF6;
   --em-t:#6B4FA0; --em-b:#6B4FA01A;
   --wa-t:#A8456A; --wa-b:#A8456A14;
   --mo-t:#8A8F9C; --mo-b:#F1F1F4;
-  --mono:"Plus Jakarta Sans",ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,monospace;
   --sans:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -40,14 +40,14 @@ body{
 .brand{display:flex; align-items:center; gap:9px; min-width:188px}
 .mark{width:24px;height:24px;flex:0 0 auto}
 .brand .name{font-weight:700; letter-spacing:.02em; font-size:15px; color:#fff}
-.brand .name b{color:var(--early)}
+.brand .name b{color:#E8551C}
 .brand .tag{font-size:8.5px; letter-spacing:.16em; color:var(--ink-text-3); text-transform:uppercase; margin-top:1px}
 .search{flex:1; max-width:560px; position:relative}
 /* Light-orange fill so the search bar stands out against the dark topbar
    (was --ink-2 dark-on-dark and blended in). Dark text for readability. */
 .search input{width:100%; height:32px; background:var(--early-soft); border:1px solid var(--early); border-radius:7px; color:var(--text); padding:0 64px 0 32px; font-size:12.5px; font-family:var(--sans)}
 .search input::placeholder{color:#A7808C}
-.search input:focus{outline:none; border-color:var(--early); background:#F9EDEF; box-shadow:0 0 0 3px rgba(177,18,38,.30)}
+.search input:focus{outline:none; border-color:var(--early); background:#F9EDEF; box-shadow:0 0 0 3px rgba(27,48,102,.18)}
 .search .ico{position:absolute; left:10px; top:8px; color:var(--early)}
 .search .kbd{position:absolute; right:8px; top:7px; font-size:10px; color:#A7808C; border:1px solid #E7C9CF; border-radius:4px; padding:1px 6px; font-family:var(--mono)}
 .top-right{margin-left:auto; display:flex; align-items:center; gap:16px}
@@ -57,7 +57,7 @@ body{
 .bell{position:relative; color:var(--ink-text-2); cursor:pointer}
 .bell .dot{position:absolute; top:-5px; right:-6px; background:var(--early); color:#fff; font-size:9px; font-weight:700; min-width:15px; height:15px; border-radius:8px; display:grid; place-items:center; padding:0 3px}
 .plan{font-size:9.5px; font-weight:700; letter-spacing:.07em; color:#CFE4DA; background:rgba(46,125,91,.12); border:1px solid rgba(46,125,91,.28); padding:4px 9px; border-radius:5px}
-.avatar{width:28px;height:28px;border-radius:50%; background:linear-gradient(135deg,#2f6fed,#2E7D5B); color:#fff; font-size:11px; font-weight:700; display:grid; place-items:center; cursor:pointer}
+.avatar{width:28px;height:28px;border-radius:50%; background:linear-gradient(135deg,#2A5B9E,#2E7D5B); color:#fff; font-size:11px; font-weight:700; display:grid; place-items:center; cursor:pointer}
 
 /* Body grid */
 .body{display:grid; grid-template-columns:240px 1fr; min-height:0; background:var(--canvas)}
@@ -125,7 +125,7 @@ body{
 .chip-label{flex:0 0 auto; min-width:64px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; color:var(--text-3)}
 .chip-search{flex:0 0 auto; height:28px; width:180px; margin-left:auto; border:1px solid var(--early); border-radius:8px; padding:0 11px; font-size:12px; font-family:var(--sans); color:var(--text); background:var(--early-soft)}
 .chip-search::placeholder{color:#A7808C}
-.chip-search:focus{outline:none; border-color:var(--early); background:#F9EDEF; box-shadow:0 0 0 3px rgba(177,18,38,.30)}
+.chip-search:focus{outline:none; border-color:var(--early); background:#F9EDEF; box-shadow:0 0 0 3px rgba(27,48,102,.18)}
 
 /* ---------- Market Signal ---------- */
 .tier{font-size:9.5px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:5px; text-transform:uppercase}
@@ -137,7 +137,7 @@ body{
 .tier.WATCH,.tier.UNUSUAL{background:#F7E4E7; color:#B11226}
 .pct{font-family:var(--mono); font-size:12px; font-weight:600}
 .pct.up{color:var(--up)} .pct.down{color:var(--down)} .pct.flat,.pct.na{color:var(--text-3)}
-.cal-chip{margin-left:7px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--early); background:var(--early-soft); border:1px solid #EFD3D9; padding:1px 6px; border-radius:5px; vertical-align:middle}
+.cal-chip{margin-left:7px; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#7A6427; background:#FAF5E9; border:1px solid #E2C275; padding:1px 6px; border-radius:5px; vertical-align:middle}
 .cal-banner{display:flex; align-items:center; gap:8px; background:var(--early-soft); border-bottom:1px solid #EFD3D9; color:#7A2534; font-size:11.5px; padding:9px 20px; line-height:1.4}
 .cal-banner b{font-weight:700}
 .chip{flex:0 0 auto; height:28px; padding:0 13px; border-radius:15px; border:1px solid var(--line); background:var(--surface); font-size:12px; color:var(--text-2); cursor:pointer; display:flex; align-items:center; gap:7px; white-space:nowrap}
@@ -379,7 +379,7 @@ td.r{text-align:right}
 .lg-brand{display:flex; align-items:center; gap:10px; text-decoration:none}
 .lg-mark{width:30px;height:30px;flex:0 0 auto}
 .lg-name{font-weight:700; letter-spacing:.01em; font-size:17px; color:var(--text)}
-.lg-name b{color:var(--early)}
+.lg-name b{color:#E8551C}
 .lg-tag{font-size:8.5px; letter-spacing:.18em; color:var(--text-3); text-transform:uppercase; margin-top:2px}
 .lg-body{flex:1; display:flex; flex-direction:column; justify-content:center; max-width:380px; width:100%; margin:0 auto; padding:36px 0}
 .lg-body h1{font-size:23px; font-weight:700; letter-spacing:-.01em; margin-bottom:5px; color:var(--text)}
@@ -439,7 +439,7 @@ td.r{text-align:right}
 .lg-gn{font-family:var(--mono); font-size:12.5px; font-weight:600; min-width:26px; text-align:right; color:var(--ink-text-2)}
 .lg-gn.wide{color:var(--early)}
 .lg-stg{font-size:9.5px; font-weight:700; letter-spacing:.05em; padding:3px 8px; border-radius:5px; text-transform:uppercase; min-width:74px; text-align:center}
-.lg-stg.early{background:rgba(177,18,38,.14); color:var(--early)}
+.lg-stg.early{background:rgba(27,48,102,.12); color:var(--early)}
 .lg-stg.aligned{background:rgba(42,91,158,.14); color:#8FA0C6}
 .lg-leg{display:flex; align-items:center; gap:18px; margin-top:13px; font-size:11px; color:var(--ink-text-2)}
 .lg-leg span{display:flex; align-items:center; gap:6px}
@@ -655,12 +655,11 @@ td.r{text-align:right}
 .hidden{display:none!important}
 
 
-/* ══ AURORA OVERRIDES (2026-07-16 redesign, branch aurora-web-redesign) ══
-   Aurora component language on the institutional terminal: white canvas,
-   borderless soft-fill cards, pill chips/buttons (active = colored fill +
-   white text; inactive = #F1F1F4 + #3C4663), hairline row dividers, jewel
-   stage tints ({color}1A + colored text), negative tracking on big numbers.
-   Layout, views, and user flows are UNCHANGED. */
+/* ══ AURORA OVERRIDES (2026-07-16 redesign · board-conditions rev 2) ══
+   Aurora component language on the institutional terminal. Board conditions
+   applied: one meaning per hue (red = loss/error/alarm ONLY; emphasis =
+   midnight; dark-chrome accents = accentSoft #F0758A), WCAG-shade pill text,
+   neutral search fields, true-monospace numerals. Flows unchanged. */
 body{font-size:13px}
 .btn{border-radius:999px;border-color:transparent;background:#F1F1F4;color:#3C4663;font-weight:700}
 .btn:hover{background:#E9EAEF;border-color:transparent}
@@ -670,22 +669,35 @@ body{font-size:13px}
 .chip:hover{border-color:transparent;background:#E9EAEF}
 .chip.active{background:#16264A;border-color:#16264A;color:#fff}
 .stage{border-radius:999px;font-weight:800;letter-spacing:.04em}
-.stage.BREAKOUT{color:#2E7D5B;background:#2E7D5B1A}
-.stage.STRONG{color:#2A5B9E;background:#2A5B9E1A}
-.stage.EMERGING{color:#6B4FA0;background:#6B4FA01A}
-.stage.WATCHING,.stage.MARGINAL{color:#A8456A;background:#A8456A1A}
-.stage.MONITORING{color:#8A8F9C;background:#8A8F9C1A}
+.stage.BREAKOUT{color:#246B4A;background:#2E7D5B1A}
+.stage.STRONG{color:#1F4478;background:#2A5B9E1A}
+.stage.EMERGING{color:#533C82;background:#6B4FA01A}
+.stage.WATCHING,.stage.MARGINAL{color:#8A3757;background:#A8456A1A}
+.stage.MONITORING{color:#565D6E;background:#8A8F9C1A}
 .tier{border-radius:999px;font-weight:800}
 .verdict{border-radius:999px;font-weight:800}
-.m-card,.statcard,.rail-card,.dash-tile,.g-box,.mth-card,.al-card,.hv-item,
-.n-card,.wl-card,.cal-banner,.hv-feature{border-color:transparent;border-radius:16px}
+.m-card,.statcard,.rail-card,.dash-tile,.g-card,.grade-result,.mth-card,.al-card,
+.n-card,.cal-banner,.hv-feature,.wl-notify{border-color:transparent;border-radius:16px}
+.rail-card{background:var(--surface)}
 .rail,.sect{border-color:#F1F1F4}
-thead th{color:#9A9AA2;font-weight:700;letter-spacing:.08em}
+thead th{color:#6E7689;font-weight:700;letter-spacing:.08em}
 tbody tr{border-bottom:1px solid #ECECEC}
 .topic-name{color:#16264A;letter-spacing:-0.2px}
 .score-cell{font-weight:800;letter-spacing:-0.4px}
 .main-title,h2,h3{letter-spacing:-0.3px}
-.search input{border-radius:12px}
-.search input:focus{box-shadow:0 0 0 2px #B1122633}
+/* neutral search (no error-look at rest); midnight focus */
+.search input,.chip-search,.hv-search{background:#F1F1F4;border-color:transparent;border-radius:12px}
+.search input:focus,.chip-search:focus,.hv-search:focus{border-color:#1B3066;background:#FFFFFF;box-shadow:0 0 0 3px rgba(27,48,102,.14)}
+.search .ico{color:#9A9AA2}
+.search .kbd{color:#9A9AA2;border-color:#E3E5EC}
+input::placeholder{color:#9A9AA2}
 input,select,textarea{font-family:var(--sans)}
+/* dark-chrome accents: accentSoft on midnight grounds */
+.nav-item.active .ni{color:#F0758A}
+.bell .dot{background:#F0758A;color:#16264A}
+.fav-savebtn,.fav-save{background:#F0758A;color:#16264A}
+.fav-chip.on{background:#F0758A;border-color:#F0758A;color:#16264A}
+.fav-add:hover{color:#F0758A}
+.fav-select:focus,.fav-input:focus{border-color:#8FA0C6}
+.fav-picked{border-color:#8FA0C6}
 ::selection{background:#1B306622}
