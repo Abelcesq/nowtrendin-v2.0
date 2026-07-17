@@ -1982,3 +1982,18 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   Disposition record marked EXECUTED. Board conditions all satisfied; import ban +
   epoch-boundary rules remain in force. Live www.nowtrendin.com unaffected
   (external EC2, verified segregated).
+
+### 2026-07-16 (cont. 6) — Aurora web redesign: built, board-reviewed, rev 2 staged
+- Branch aurora-web-redesign: token-level Aurora retheme of the terminal (Jakarta,
+  white canvas, borderless cards, jewel stages, midnight chrome, ink pills, Title
+  Case; flows byte-identical; banned palette purged). Staged on nowtrendin-terminal;
+  gh-pages prod untouched.
+- DESIGN BOARD (6 memos, 3 verified staging live): direction unanimous-positive;
+  CONVERGENT DEFECT found + fixed same-day (rev 2): garnet was double-booked as
+  emphasis AND loss/error (~17 semantics; positive deltas rendered red) -> one
+  meaning per hue (red=loss/alarm only, emphasis=midnight, wordmark=brand orange,
+  dark-chrome accents=accentSoft), WCAG pill shades, neutral search, true-mono
+  numerals, phantom override classes fixed, titleCase coverage extended.
+- Record: audits/board/BOARD_aurora-web-redesign_2026-07-16.md (memos verbatim).
+- GATE: founder walk of the 13 authenticated staging views + ruling on open items
+  (font self-hosting disagreement · casing dictionary · off-white canvas · dark mode).
