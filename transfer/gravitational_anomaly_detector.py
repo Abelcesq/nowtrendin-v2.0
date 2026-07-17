@@ -6572,6 +6572,44 @@ def risk_detail(risk_topic: str):
     return d
 
 
+ENGINE_EPOCH_BOUNDARY = os.getenv("ENGINE_EPOCH_BOUNDARY", "2026-06-15")
+
+
+def _ledger_epoch_stamp() -> dict:
+    """Engine-epoch segmentation of the RESOLVED ledger (metadata-only; board
+    condition from the 1.0-DB disposition review). Rows detected before the
+    2026-06-15 pg:copy split were enrolled/scored under the retired 1.0 engine
+    epoch. Read-only; never touches stored rows; fail-open (stamp absent on
+    error rather than blocking the report)."""
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        out = {}
+        for epoch, cmp_op in (("v1_engine", "<"), ("v2_engine", ">=")):
+            rows = conn.execute(f"""
+                SELECT verdict, COUNT(*) FROM accuracy_ledger
+                WHERE detection_date {cmp_op} ? GROUP BY verdict
+            """, (ENGINE_EPOCH_BOUNDARY,)).fetchall()
+            counts = {(r[0] or "").upper(): r[1] for r in rows}
+            resolved = sum(counts.values())
+            led = counts.get("LED", 0)
+            out[epoch] = {"resolved": resolved, "led": led,
+                          "hit_rate_pct": round(100.0 * led / resolved, 1) if resolved else None}
+        return {"epochBoundary": ENGINE_EPOCH_BOUNDARY, "byEpoch": out,
+                "epochNote": ("Rows detected before the boundary were enrolled under the "
+                              "retired 1.0 engine epoch (pg:copy split); rates spanning "
+                              "the boundary must be read segmented.")}
+    except Exception as _ee:
+        print(f"[accuracy] epoch stamp skipped: {_ee}")
+        return {}
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 @app.get("/accuracy/ledger")
 def accuracy_ledger_report():
     """The Accuracy Ledger — documented lead time vs Google Trends breakout.
@@ -6623,6 +6661,13 @@ def accuracy_ledger_report():
                     "earlyDetectionHitRate": h.get("early_detection_hit_rate_pct"),
                     "earlyDetectionSample": h.get("early_detection_sample"),
                     "maturityCoverage": h.get("maturity_coverage"),
+                    # ── ENGINE-EPOCH stamp (board condition, 1.0-DB disposition review
+                    # 2026-07-16): v2's DB was seeded from the 1.0 engine via pg:copy on
+                    # 2026-06-15 — rows detected BEFORE that boundary were scored by the
+                    # retired engine epoch and sit in the live window until mid-2027.
+                    # Measurement METADATA only (no score/row change): a published rate
+                    # must be segmentable across the boundary, never silently blended. ──
+                    **_ledger_epoch_stamp(),
                 }
             # No resolved rows yet — surface the pending count so the empty
             # state can honestly say "N calls in flight".
@@ -6854,8 +6899,14 @@ def accuracy_ledger_detail(limit: int = Query(300, ge=1, le=1000),
                 r.get("verdict") == "LAGGED"
                 and r.get("lead_time_days") is not None
                 and r["lead_time_days"] < -_grace)
+            # engine-epoch stamp (metadata-only; board condition 2026-07-16):
+            # detections before the pg:copy split were the retired 1.0 engine's.
+            r["epoch"] = ("v1_engine"
+                          if (r.get("detection_date") or "") < ENGINE_EPOCH_BOUNDARY
+                          else "v2_engine")
         return {"status": "ok", "count": len(rows), "rows": rows,
-                "pre_broken_grace_days": _grace}
+                "pre_broken_grace_days": _grace,
+                "epoch_boundary": ENGINE_EPOCH_BOUNDARY}
     except Exception as e:
         return {"status": "empty", "count": 0, "rows": [], "note": str(e)[:140]}
 
