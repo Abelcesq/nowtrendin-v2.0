@@ -1,0 +1,171 @@
+{
+ "run_at": "2026-07-17T22:34:22+00:00",
+ "param_version": "assessor-v2.b95dabebb4",
+ "mode": "DEMO \u2014 SYNTHETIC DATA (never act on this)",
+ "status": "UNVERIFIED_PENDING_BOARD_REVIEW",
+ "board_gate": "REQUIRED before any finding teaches or is implemented: the advisory board independently critiques these findings, cross-checks them against freshly-obtained outside data (current trending items, market/crypto movers), and verifies or refutes each. The CHAIRMAN has final say before any implementation.",
+ "accuracy_headline": {
+  "note": "THE accuracy number is the held-out ledger, not this tool"
+ },
+ "operational_check_pass_pct": 60.0,
+ "worst_module_floor_pct": 0.0,
+ "internal_only": "never publish these percentages externally (catch-all-% rule)",
+ "modules": {
+  "A_SOURCES": {
+   "grade": "D",
+   "passed": 1,
+   "graded": 2,
+   "insufficient": 0,
+   "severity_weighted_score": 0.25
+  },
+  "B_MOVEMENT": {
+   "grade": "F",
+   "passed": 0,
+   "graded": 1,
+   "insufficient": 0,
+   "severity_weighted_score": 0.0
+  },
+  "C_ACCURACY": {
+   "grade": "A",
+   "passed": 1,
+   "graded": 1,
+   "insufficient": 1,
+   "severity_weighted_score": 1.0
+  },
+  "D_LIFECYCLE": {
+   "grade": "N/A",
+   "passed": 0,
+   "graded": 0,
+   "insufficient": 1
+  },
+  "E_OUTSIDE": {
+   "grade": "A",
+   "passed": 1,
+   "graded": 1,
+   "insufficient": 0,
+   "severity_weighted_score": 1.0
+  }
+ },
+ "cohort_spec": "DEMO",
+ "findings": [
+  {
+   "check": "A.freshness",
+   "status": "PASS",
+   "subject": "demo-source",
+   "evidence": "DEMO synthetic pass",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  },
+  {
+   "check": "A.silent_absence",
+   "status": "FAIL",
+   "subject": "demo-guardian",
+   "evidence": "DEMO: configured source with zero signals",
+   "gap": "DEMO gap",
+   "solution": "DEMO diagnostic",
+   "severity": "high",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  },
+  {
+   "check": "B.freeze",
+   "status": "FAIL",
+   "subject": "demo_frozen",
+   "evidence": "DEMO: Detection identical 6 cycles while mentions changed",
+   "gap": "DEMO gap",
+   "solution": "DEMO diagnostic",
+   "severity": "high",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  },
+  {
+   "check": "C.gap_arithmetic",
+   "status": "PASS",
+   "subject": "demo",
+   "evidence": "DEMO synthetic pass",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  },
+  {
+   "check": "C.referee_surge",
+   "status": "INSUFFICIENT",
+   "subject": "demo",
+   "evidence": "DEMO: referee not simulated",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
+   "ruling_id": ""
+  },
+  {
+   "check": "D.lifecycle",
+   "status": "INSUFFICIENT",
+   "subject": "demo",
+   "evidence": "DEMO: lifecycle not simulated",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
+   "ruling_id": ""
+  },
+  {
+   "check": "E.trending_recall",
+   "status": "PASS",
+   "subject": "demo",
+   "evidence": "DEMO synthetic pass",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  }
+ ],
+ "work_queue": [
+  {
+   "check": "A.silent_absence",
+   "status": "FAIL",
+   "subject": "demo-guardian",
+   "evidence": "DEMO: configured source with zero signals",
+   "gap": "DEMO gap",
+   "solution": "DEMO diagnostic",
+   "severity": "high",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  },
+  {
+   "check": "B.freeze",
+   "status": "FAIL",
+   "subject": "demo_frozen",
+   "evidence": "DEMO: Detection identical 6 cycles while mentions changed",
+   "gap": "DEMO gap",
+   "solution": "DEMO diagnostic",
+   "severity": "high",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": ""
+  }
+ ]
+}
