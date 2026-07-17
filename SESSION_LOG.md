@@ -2050,3 +2050,21 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   for WCAG, semantic-parity docs, P0 polish, Ledger disclaimer, epoch stamp.
 - The web design contract is web-terminal/WEB_DESIGN_SYSTEM.md; cross-platform
   color parity is SEMANTIC (CLAUDE.md §12; /frontend-consistency re-pointed).
+
+### 2026-07-17 (cont. 3) — MOBILE board review complete (6 memos, source-verified)
+- Verdict spread: design APPROVE/AWC ("honest bones, mania dressing"); display
+  integrity up to REJECT (Challenger) on FOUR FALSE DISPLAYS; store-readiness
+  gated. Record: audits/board/BOARD_mobile-aurora_2026-07-17.md (memos verbatim).
+- P0 convergent (all small fixes, none touch the engine): dataWindowLabel "1h+"
+  vs the real 24h/12h gates (4 independent confirmations, billing-adjacent);
+  breakdownGroups fabricated component values on rows lacking engine groups;
+  mock-fallback quarantine (fabricated freshness, detail ignores isSample);
+  "ranked by Gradient Score" copy over the N-ranked default; monetization
+  integrity (self-select grants any tier free; §8 clause absent from signup).
+- P1 advice-crossing copy (PICK->SIGNAL, "leads the market"->"leads Google
+  Trends attention", urgency headline, unsupported 24-72h forecast). P2 Aurora
+  hygiene (SignalAnalysisPanel fossil retrofit spec; disclaimer gaps; 12px muted
+  contrast). P3 store path closer than assumed — blockers are the payments-model
+  decision (web-signup rec vs Apple 3.1.1) + small config; kill Capacitor.
+- Praise: profile/accuracy.tsx "the most honest retail ledger" — surface it on
+  the dashboard. AWAITING CHAIRMAN RULING per item.
