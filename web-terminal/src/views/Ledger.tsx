@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { titleCaseTopic } from '../lib/mobileTheme'
 import { api, type LedgerSummary, type LedgerRow, type MarketLedgerSummary, type MarketLedgerRow } from '../lib/api'
 import { SignalAnalysisPanel } from '../components/SignalAnalysis'
+import { Disclaimer } from '../components/Disclaimer'
 
 type SortKey = 'topic_display' | 'detection_score' | 'lead_time_days' | 'verdict' | 'validated_at'
 
@@ -141,6 +142,7 @@ export function Ledger() {
 
   return (
     <>
+      <Disclaimer style={{ margin: '10px 0 4px' }} />
       <div className="main-head">
         <div className="main-title-row">
           <div className="main-title">Accuracy Ledger</div>
@@ -323,6 +325,7 @@ export function Ledger() {
           </table>
         )}
       </div>
+      <Disclaimer style={{ margin: '12px 0' }} />
     </>
   )
 }
