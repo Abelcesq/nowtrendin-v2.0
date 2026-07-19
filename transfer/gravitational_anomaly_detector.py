@@ -351,7 +351,8 @@ def _refresh_context_categories(window_hours: int = 120, max_rows: int = 200000,
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
             rows = conn.execute(
-                "SELECT ts.topic_key AS tk, ts.topic AS topic, rs.title AS title "
+                "SELECT ts.topic_key AS tk, ts.topic AS topic, ts.platform AS platform, "
+                "rs.title AS title "
                 "FROM topic_signals ts JOIN raw_signals rs ON rs.id = ts.signal_id "
                 "WHERE ts.extracted_at >= ? AND rs.title IS NOT NULL AND rs.title <> '' "
                 "ORDER BY ts.extracted_at DESC LIMIT ?",
@@ -361,18 +362,29 @@ def _refresh_context_categories(window_hours: int = 120, max_rows: int = 200000,
                 conn.close()
             except Exception:
                 pass
-        heads, disp = defaultdict(list), {}
+        # F1 (founder-approved 2026-07-18, taco_bell category review): TIER-WEIGHT the
+        # titles. Social post text (bluesky/lemmy/mastodon/reddit) is chatter, not
+        # reporting — six recent posts were outvoting 19 news outlets because only the
+        # newest titles reached the classifier. Publication-grade titles govern when
+        # present; social text is the fallback only when a topic has no publication
+        # titles in the window.
+        SOCIAL_TEXT_PLATFORMS = {"bluesky", "lemmy", "mastodon", "reddit"}
+        heads_pub, heads_soc, disp = defaultdict(list), defaultdict(list), {}
         for r in rows:
             tk = r["tk"] if hasattr(r, "keys") else r[0]
             if not tk:
                 continue
             if tk not in disp:
                 disp[tk] = (r["topic"] if hasattr(r, "keys") else r[1]) or tk.replace("_", " ")
-            lst = heads[tk]
+            plat = ((r["platform"] if hasattr(r, "keys") else r[2]) or "").lower()
+            lst = heads_soc[tk] if plat in SOCIAL_TEXT_PLATFORMS else heads_pub[tk]
             if len(lst) < heads_per_topic:
-                lst.append((r["title"] if hasattr(r, "keys") else r[2]) or "")
+                lst.append((r["title"] if hasattr(r, "keys") else r[3]) or "")
         out = {}
-        for tk, titles in heads.items():
+        for tk in set(heads_pub) | set(heads_soc):
+            titles = heads_pub.get(tk) or heads_soc.get(tk) or []
+            if not titles:
+                continue
             try:
                 res = classify_topic(disp.get(tk, ""), text=" | ".join(titles))
             except Exception:
@@ -385,7 +397,8 @@ def _refresh_context_categories(window_hours: int = 120, max_rows: int = 200000,
             _CONTEXT_CAT = out
             _persist_category_snapshot("context", out)          # warm-on-boot next restart
         print(f"[context-cat] refreshed: {len(out)} topic→category from headlines "
-              f"({len(heads)} topics with titles)")
+              f"({len(set(heads_pub) | set(heads_soc))} topics with titles; "
+              f"publication-tier preferred, social fallback)")
         return len(out)
     except Exception as e:
         print(f"[context-cat] refresh skipped: {e}")
@@ -8630,7 +8643,8 @@ def monitor_quality():
 
 @app.get("/monitor/catmaps")
 def monitor_catmaps(clean_poisoned: bool = Query(False),
-                    restore_maturation_row: bool = Query(False)):
+                    restore_maturation_row: bool = Query(False),
+                    explain: str = Query("", description="topic_key — show which layer decides its category")):
     """Category override-map WARMTH + PROVENANCE status (Board-ruled 2026-07-11) — a FAST
     (no topic scan) view of the warm/cold + snapshot state so the display-category health is
     trackable at fleet scale: in-memory entry counts, per-map source (empty|snapshot|live)
@@ -8649,6 +8663,34 @@ def monitor_catmaps(clean_poisoned: bool = Query(False),
         "situation": {"entries": len(_SITUATION_CAT), **(meta.get("situation") or {})},
         "context": {"entries": len(_CONTEXT_CAT), **(meta.get("context") or {})},
     }
+    if (explain or "").strip():
+        # F4 (founder-approved 2026-07-18, taco_bell category review): per-topic
+        # category PROVENANCE — which layer decides. Read-only, in-memory + one
+        # tiny display lookup; the probe this review needed and didn't have.
+        tk = explain.strip().lower().replace(" ", "_")
+        disp = tk.replace("_", " ")
+        try:
+            _c2 = get_db(DB_PATH)
+            try:
+                row = _c2.execute("SELECT topic_display FROM velocity_scores "
+                                  "WHERE topic_key=? ORDER BY scored_at DESC LIMIT 1",
+                                  (tk,)).fetchone()
+                if row and (row["topic_display"] if hasattr(row, "keys") else row[0]):
+                    disp = row["topic_display"] if hasattr(row, "keys") else row[0]
+            finally:
+                _c2.close()
+        except Exception:
+            pass
+        sit = _SITUATION_CAT.get(tk)
+        ctx = _CONTEXT_CAT.get(tk)
+        bare = _topic_category(disp)
+        decided = _category_for(tk, disp)
+        layer = ("situation" if sit and sit not in _CATCHALL_CATS else
+                 "context" if ctx and ctx not in _CATCHALL_CATS else "bare-lexicon")
+        out["explain"] = {"topic_key": tk, "topic_display": disp,
+                          "situation_entry": sit, "context_entry": ctx,
+                          "bare_lexicon": bare, "decided": decided,
+                          "deciding_layer": layer}
     conn = None
     try:
         conn = get_db(DB_PATH)

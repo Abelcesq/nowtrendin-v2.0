@@ -237,9 +237,20 @@ _LEX = {
 }
 
 # Tie-break priority: more specific / higher-signal categories win ties.
-_PRIORITY = ["sports", "technology", "health", "fashion", "religion",
+# F3 (founder-approved 2026-07-18, taco_bell category review): health ABOVE
+# technology — a public-health story must not lose a tie to an incidental "app".
+_PRIORITY = ["sports", "health", "technology", "fashion", "religion",
              "education", "entertainment", "economy", "business",
              "politics", "current_events", "news"]
+
+# F2 (founder-approved 2026-07-18, taco_bell category review): platform-name terms
+# are correct for classifying the TOPIC ITSELF ("youtube" the topic IS technology)
+# but poisonous when matched inside CONTEXT TEXT — social chatter mentions these
+# words incidentally ("saw it on bluesky", "the app", "google reviews"), which
+# stamped chatter-fed topics Technology (taco_bell during a health outbreak).
+# These terms therefore match ONLY against the topic string, never the text blob.
+_TOPIC_ONLY_TERMS = {"google", "youtube", "whatsapp", "reddit", "bsky", "bluesky",
+                     "meta", "asi"}
 
 
 def _count_hits(text: str, terms: list[str]) -> tuple[int, list[str]]:
@@ -266,6 +277,7 @@ def classify_topic(topic: str, text: str = "", hints=None) -> dict:
 
     Returns: {category, label, confidence (0-1), matched: [...]}
     """
+    topic_l = (topic or "").lower().strip()
     blob = f"{topic} {text}".lower().strip()
     if not blob:
         return {"category": "general", "label": "General", "confidence": 0.0, "matched": []}
@@ -274,7 +286,14 @@ def classify_topic(topic: str, text: str = "", hints=None) -> dict:
     matched: dict[str, list[str]] = {}
     for cat, (strong, weak) in _LEX.items():
         s_n, s_hits = _count_hits(blob, strong)
-        w_n, w_hits = _count_hits(blob, weak)
+        # F2: topic-only terms never match inside context text (chatter bias).
+        w_blob_terms = [t for t in weak if t not in _TOPIC_ONLY_TERMS]
+        w_topic_terms = [t for t in weak if t in _TOPIC_ONLY_TERMS]
+        w_n, w_hits = _count_hits(blob, w_blob_terms)
+        if w_topic_terms and topic_l:
+            tn, th = _count_hits(topic_l, w_topic_terms)
+            w_n += tn
+            w_hits += th
         score = s_n * 3 + w_n
         if score:
             scores[cat] = score
