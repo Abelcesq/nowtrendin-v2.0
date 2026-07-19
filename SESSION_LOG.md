@@ -2121,3 +2121,37 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   brady, piastri, dodgers/yankees), spain FADING-vs-BREAKOUT look. 21-item
   UNVERIFIED queue — NEXT STEP: run the board gate on snapshot #1, then Chairman
   ruling.
+
+### 2026-07-18 — Assessor snapshot #1: board gate run + ALL Chairman-ruled fixes landed
+- BOARD GATE (6 memos, fresh outside data; record audits/board/BOARD_assessor-2026-07-17.md):
+  instrument compliant 6/6; items 1-19 verified as a CLASS/refuted as 19 tickets; item 20's
+  2/10 refuted (cohort-only scan + substring matcher, verified at source; misses refuted by
+  referee — Brady flat, Piastri declining); item 21 refuted 6/6 (Spain pageviews ~3x rising;
+  BREAKOUT was correct — D-module shadow-scorecard entry #1). New: N1 blind assessor referee,
+  N2 epoch mismatch (93!=87), N3-N6 hygiene. Chairman: "proceed with the fixes."
+- DIAGNOSTIC (audits/assessor/VOLATILITY_DIAG_2026-07-18.md, read-only): the 19 flags are
+  BURST-PLATEAU-CLIFF dynamics, not flapping (17/19 <=2 sign-flips; only america alternates);
+  co-movement partial/staggered = input-recency rolloff after the 07-16/17 news wave, NOT one
+  bad cycle. Open engine questions (SCORE_AFFECTING if ever acted on): Q1 cliff decay (60-79pt
+  single-cycle drops), Q2 identical plateaus (values repeat to 0.01 across rescores). Found:
+  score_history serves total_mentions=null (per-cycle volume diagnostic impossible from
+  endpoints; B.freeze null-condition blind — cause-coded).
+- ASSESSOR v2.1 (tools/scoring_assessor.py; param assessor-v2.1.dfc882cac9 = NEW comparable
+  series): shape-aware volatility (sign-flips + magnitude floor; bursts PASS as expected
+  dynamics), wiki referee FIXED via opensearch fallback (19/20 resolve vs 2/20; truthful
+  cause codes on every INSUFFICIENT), E-check rebuilt (full-feed scan w/ pinned denominator,
+  entity matching, matchup class excluded, 10k traffic floor, referee-confirmed misses only),
+  min-n letter grades, Wilson interval + 0-FP-by-construction disclosure, drift-alarm series
+  persisted (REFEREE_CORR_SERIES.json; first point rho=0.142 n=19 — low, thesis-right),
+  D.lifecycle WARNs require a non-INSUFFICIENT referee. Verification run ASSESSOR_2026-07-19:
+  queue EMPTY, pass 100%, honest N/A grades on tiny-n modules.
+- ENGINE (v247): byEpoch reconciled — shares the headline C1 resolved definition
+  (LATE_REDETECTION excluded + disclosed) + per-epoch tracked-race. Verified live:
+  67+20=87 == headline; v1 35.0% (n=20) / v2 7.7% (n=13) tracked-race now visible.
+- ENGINE LED REFEREE VERIFIED HONEST (no change): re-ran corroboration locally with the
+  engine's own logic on all 8 LED wins — 7/8 resolve (Spain/Mexico/White House fine); the
+  stored 0s are honest "no wiki arrival" refutations, NOT instrument failure. Footnotes:
+  "court rulings"->:'Court Ellingson' (tangential resolve), "socialists" fails lexical guard.
+- Closeout: snapshot #1 stamped BOARD_VERIFIED / CHAIRMAN_RULED 2026-07-18 (+ disposition in
+  json/md); docs/GLOSSARY.md (N6 plain-English one-pager); shutting/trump_fires routed to the
+  topic-quality worklist (N5).
