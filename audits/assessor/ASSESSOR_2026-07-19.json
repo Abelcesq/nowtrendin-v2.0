@@ -2,7 +2,7 @@
  "run_at": "2026-07-19T02:55:42+00:00",
  "param_version": "assessor-v2.1.1.4018144e78",
  "mode": "LIVE",
- "status": "UNVERIFIED_PENDING_BOARD_REVIEW",
+ "status": "BOARD_VERIFIED \u00b7 CHAIRMAN_RULED 2026-07-19",
  "board_gate": "REQUIRED before any finding teaches or is implemented: the advisory board independently critiques these findings, cross-checks them against freshly-obtained outside data (current trending items, market/crypto movers), and verifies or refutes each. The CHAIRMAN has final say before any implementation.",
  "accuracy_headline": {
   "note": "THE accuracy number is the held-out ledger, not this tool",
@@ -1686,5 +1686,12 @@
    "ruling_id": "",
    "cause": ""
   }
- ]
+ ],
+ "board_annotation": {
+  "board_record": "audits/board/BOARD_estimator-fdm-snapshot2_2026-07-19.md",
+  "chairman_ruling": "2026-07-19 \u2014 R2+R3 fixes ordered (D3-D6); D1 estimator build separately ruled; D8 pending its own gate",
+  "item_1_final_del_mundial": "Observation VERIFIED / finding REFUTED as written (6/6). Frozen quantity = the blend-input stack by design: peak-hold attention_magnitude (36.8 x8 cycles), breadth saturated >=4 platforms, M/I/P confirmed pinned by the D3 component pull (M=80.0, I=12.4, P=73.0 byte-identical; arithmetic reproduces 62.59 exactly). Mentions are not a w=1.0 formula argument. Reclassed off HIGH/SCORE_AFFECTING; closed as mechanism instance #2 (the 07-19T03 cliff = median catch-up on the 7th cycle, out-of-sample).",
+  "item_2_britain": "VERIFIED \u2014 w-boundary flap (75.5->24.0->75.6, w 1.0->0.0->1.0) caught by the new B.asymmetry shadow check on its first live run; held into the D1 estimator evidence. Note: magnitude constant through the dip -> duplicate-cycle window-composition glitch is the prime suspect (board D2 diagnostic).",
+  "instrument": "v2.1.1 conduct APPROVED 6/6. v2.1.2 patch ordered + shipped: formula-arguments freeze null, known-mechanism ruling tags (2026-07-18-median-w-flip), B.dup_cycles hygiene shadow check, flip-gated burst label, floor provenance registered, full-corpus E scan, LED-corroboration + young-races disclosures in the headline."
+ }
 }

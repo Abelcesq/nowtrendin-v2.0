@@ -6633,7 +6633,12 @@ def _ledger_epoch_stamp() -> dict:
                               "retired 1.0 engine epoch (pg:copy split); rates spanning "
                               "the boundary must be read segmented. resolved = "
                               "LED+SAME_DAY+LAGGED+FALSE_POSITIVE (LATE_REDETECTION "
-                              "excluded, count disclosed) — same C1 gate as the headline.")}
+                              "excluded, count disclosed) — same C1 gate as the headline. "
+                              "CAVEAT (board D6, 2026-07-19): v2-epoch rates are dominated "
+                              "by YOUNG races — pending detections under the 365-day "
+                              "patience window resolve toward fast Google breakouts first "
+                              "(adverse selection), so early per-epoch rates read low by "
+                              "construction; read as a series, not a point.")}
     except Exception as _ee:
         print(f"[accuracy] epoch stamp skipped: {_ee}")
         return {}

@@ -96,7 +96,10 @@ ENGINE = os.getenv("ASSESSOR_ENGINE_URL",
                    "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com")
 UA = "NowTrendInAssessor/2.0 (read-only instrument; abelc.esq@gmail.com)"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(REPO, "audits", "assessor")
+# ASSESSOR_OUT_DIR override (v2.1.2): verification runs write to a scratch dir so a
+# same-day BOARD_VERIFIED snapshot in the repo is never clobbered by a fresh
+# UNVERIFIED run (the 2026-07-19 stamped-snapshot collision).
+OUT_DIR = os.getenv("ASSESSOR_OUT_DIR") or os.path.join(REPO, "audits", "assessor")
 
 # ── CHECK MANIFEST (registered; hash -> param_version; SHADOW = excluded from %) ──
 # Board condition (Economist P2): every check states its NULL HYPOTHESIS and its
@@ -133,6 +136,12 @@ CHECK_MANIFEST = {
                       "coverage gauge ONLY — never an accuracy KPI (catch-all-% rule)"},
     "E.crypto_agreement": {"module": "E_OUTSIDE",   "shadow": True,
         "null": "no 20% movers = nothing to grade (honest INSUFFICIENT)"},
+    # v2.1.2 (board R3 patch, Chairman-ruled 2026-07-19):
+    "B.dup_cycles":       {"module": "B_MOVEMENT",  "shadow": True,
+        "null": "one scoring row per cycle slot; duplicate same-hour rows shorten the "
+                "12-row baseline window in TIME and can transiently move the median "
+                "(the britain 07-18T10 glitch suspect)",
+        "provenance": "Executioner finding, BOARD_estimator-fdm-snapshot2_2026-07-19"},
     # v2.1.1 shadow checks (board Q1/Q2 session, Chairman-ruled item 7, 2026-07-18):
     "B.asymmetry":        {"module": "B_MOVEMENT",  "shadow": True,
         "null": "Kindleberger: attention decay is asymmetric (down faster than up) but "
@@ -158,17 +167,29 @@ THRESHOLDS = {
     "VOL_PCTL": 0.9,             # dispersion threshold percentile over the cohort
     "MIN_GRADED_N": 5,           # no letter grade below this many graded checks
     "RECALL_TRAFFIC_FLOOR": 10000,   # grade only external items >= this approx_traffic
-    "RECALL_SCAN_CAP": 2000,     # full-feed scan page cap (denominator pinned in evidence)
+    "RECALL_SCAN_CAP": 4000,     # full-corpus scan (board R3 condition 2026-07-19: was
+                                 # 2000/3353 — a miss in the tail was structurally invisible)
     # v2.1.1 (board item 7):
     "ASYM_STEP": 30.0,           # single-cycle step >= this counts as an instant transition
+                                 # PROVENANCE (registered 2026-07-19): matches the replay's
+                                 # |Δdet|>=30 transition definition (MEDIAN_REPLAY_2026-07-18)
     "SAT_PIN": 99.5,             # detection/confidence >= this counts as cap-pinned
     "SAT_TOP_DECILE_WARN": 0.2,  # shadow-WARN when >20% of the top decile is pinned
+    # v2.1.2 (board R3 patch, 2026-07-19):
+    "W_MOVE_MIN": 0.3,           # blend-weight move >= this at a big-delta cycle = the
+                                 # confirmed median-w-flip mechanism signature
 }
+# RECALL_TRAFFIC_FLOOR provenance (registered 2026-07-19): board condition "grade only
+# the tail that matters" (Economist, Taleb/Extremistan) — 10k chosen as the smallest
+# Google approx_traffic tier that excludes scheduled-fixture/ephemera days observed
+# 2026-07-17..19 (all items 500+–2000+). Change = new comparable series.
 _manifest_hash = hashlib.sha256(
     json.dumps({"checks": CHECK_MANIFEST, "thresholds": THRESHOLDS},
                sort_keys=True).encode()).hexdigest()[:10]
-PARAM_VERSION = f"assessor-v2.1.1.{_manifest_hash}"  # v2.1.1 adds SHADOW checks only (board item 7);
-                                                     # graded series unchanged from v2.1 (shadows excluded from %)
+PARAM_VERSION = f"assessor-v2.1.2.{_manifest_hash}"  # v2.1.2 = board R3 patch (Chairman-ruled
+                                                     # 2026-07-19): formula-arguments freeze null,
+                                                     # known-mechanism ruling tags, dup-cycle
+                                                     # hygiene, flip-gated burst label
 
 # ── RULINGS REGISTRY (Chairman rulings a solution must NEVER contradict) ──
 RULINGS = [
@@ -386,8 +407,12 @@ def assess_movement(cohort: dict, live: bool) -> list:
                            gap="DEMO gap", solution="DEMO diagnostic", severity="high"))
         return out
     # PASS 1 — collect every topic's window (so the threshold can be derived from
-    # the cohort's OWN dispersion, board condition: no universal constant across strata)
+    # the cohort's OWN dispersion, board condition: no universal constant across strata).
+    # v2.1.2: rows carry the BLEND ARGUMENTS (w, magnitude, n_mainstream, M/I/P) so the
+    # freeze null tests inputs-vs-inputs, and rows are DEDUPED per cycle slot (hour) —
+    # duplicate same-hour rows are counted for the B.dup_cycles hygiene check.
     windows, n_checked = [], 0
+    dup_examples, dup_total = [], 0
     for row in cohort["topics"][:THRESHOLDS["COHORT_MOVEMENT"]]:
         key = row.get("topic_key")
         try:
@@ -398,53 +423,119 @@ def assess_movement(cohort: dict, live: bool) -> list:
             continue
         time.sleep(0.25)
         hist = d.get("score_history") or []
-        dets = [h.get("detection_score") for h in hist if h.get("detection_score") is not None]
-        if len(dets) < THRESHOLDS["FREEZE_CYCLES"]:
+        rows6, seen_slots, dups_here = [], set(), 0
+        for h in hist:                                  # newest-first
+            if not isinstance(h, dict) or h.get("detection_score") is None:
+                continue
+            slot = str(h.get("scored_at") or "")[:13]   # hour bucket = cycle slot
+            if slot in seen_slots:
+                dups_here += 1
+                continue                                # dedupe: keep the newest per slot
+            seen_slots.add(slot)
+            rows6.append({
+                "ts": slot,
+                "det": h.get("detection_score"),
+                "w": h.get("mainstream_ratio"),
+                "pathway": h.get("detection_pathway"),
+                "mag": h.get("attention_magnitude"),
+                "nplat": h.get("n_mainstream_platforms"),
+                "mentions": h.get("total_mentions"),
+                "M": h.get("platform_diversity"),
+                "I": h.get("inertia_score"),
+                "P": h.get("persistence_score"),
+            })
+            if len(rows6) >= THRESHOLDS["FREEZE_CYCLES"]:
+                break
+        if dups_here:
+            dup_total += dups_here
+            if len(dup_examples) < 6:
+                dup_examples.append(f"{key}(+{dups_here})")
+        if len(rows6) < THRESHOLDS["FREEZE_CYCLES"]:
             continue
         n_checked += 1
-        tail = dets[:THRESHOLDS["FREEZE_CYCLES"]]      # history is newest-first
-        mentions = [h.get("total_mentions") for h in hist[:THRESHOLDS["FREEZE_CYCLES"]]
-                    if isinstance(h, dict)]
-        mentions = [m for m in (mentions or []) if m is not None]
-        windows.append((key, tail, mentions))
-    stds = sorted(statistics.pstdev(t) for _, t, _ in windows
-                  if max(t) - min(t) > 0)
+        windows.append((key, rows6))
+    stds = sorted(statistics.pstdev([r["det"] for r in rows6])
+                  for _, rows6 in windows
+                  if max(r["det"] for r in rows6) - min(r["det"] for r in rows6) > 0)
     p90_std = stds[int(THRESHOLDS["VOL_PCTL"] * (len(stds) - 1))] if stds else 0.0
     vol_threshold = max(THRESHOLDS["HIGH_VOL_STD"], p90_std)
 
-    # PASS 2 — classify. SHAPE RULE (v2.1, from VOLATILITY_DIAG_2026-07-18): count
-    # sign-flips of first differences oldest->newest. Bursty attention steps and
-    # cliffs (<=2 flips) are EXPECTED dynamics; only ALTERNATORS are flap candidates.
-    for key, tail, mentions in windows:
-        series = list(reversed(tail))                  # oldest -> newest
+    # Known-mechanism signature (board-confirmed 2026-07-18, ruled 2026-07-19): a big
+    # single-cycle |Δdet| whose cycle also moved the blend weight w (or flipped the
+    # pathway) is the median-of-12 w-flip mechanism — a TRACKED instance citing the
+    # ruling, never a fresh page-one alarm.
+    _MECH_RULING = "2026-07-18-median-w-flip"
+    def _mechanism_cycles(series_rows):
+        hits = 0
+        for i in range(1, len(series_rows)):
+            a, b = series_rows[i - 1], series_rows[i]
+            if a["det"] is None or b["det"] is None:
+                continue
+            if abs(b["det"] - a["det"]) >= THRESHOLDS["ASYM_STEP"]:
+                wa, wb = a.get("w"), b.get("w")
+                w_moved = (wa is not None and wb is not None
+                           and abs(float(wb) - float(wa)) >= THRESHOLDS["W_MOVE_MIN"])
+                if w_moved or (a.get("pathway") != b.get("pathway")):
+                    hits += 1
+        return hits
+
+    # PASS 2 — classify. SHAPE RULE (v2.1) + v2.1.2 formula-arguments freeze null,
+    # known-mechanism tagging, and the flip-gated burst label.
+    for key, rows6 in windows:
+        tail = [r["det"] for r in rows6]               # newest-first
+        series_rows = list(reversed(rows6))            # oldest -> newest
+        series = [r["det"] for r in series_rows]
+        mentions = [r["mentions"] for r in rows6 if r["mentions"] is not None]
         if max(tail) - min(tail) == 0:
-            # NULL CONDITION (board): a frozen score is only a defect if the
-            # INPUTS moved. Static inputs -> static score is correct behavior.
-            inputs_moved = len(set(mentions)) > 1 if mentions else None
-            if inputs_moved:
-                out.append(Finding("B.freeze", "FAIL", key,
-                    f"Detection identical at {tail[0]} for {len(tail)} cycles while "
-                    f"mentions varied {min(mentions)}–{max(mentions)}",
-                    gap="score not responding to changing inputs (possible cached "
-                        "serve or saturated components)",
-                    solution="check INV-1 serve-stored rules + serve_payload freshness "
-                             "for this row; inspect component values in the detail; "
-                             "report findings to the founder before any scoring change",
-                    severity="high", task_class="SCORE_AFFECTING"))
-            elif mentions:
+            # v2.1.2 NULL (board R2 ruling): a freeze is judged against the FORMULA'S
+            # ARGUMENTS (w, magnitude, n_mainstream, M/I/P), never against raw mention
+            # counts (not an input of the w=1.0 pathway — the final_del_mundial lesson).
+            def _static(field):
+                vals = [r.get(field) for r in rows6 if r.get(field) is not None]
+                return (len(set(round(float(v), 2) for v in vals)) <= 1) if vals else None
+            args = {f: _static(f) for f in ("w", "mag", "nplat", "M", "I", "P")}
+            known = [f for f, s in args.items() if s is not None]
+            if known and all(args[f] for f in known):
+                mnote = (f"; mentions varied {min(mentions)}–{max(mentions)} (context only "
+                         f"— not a formula argument)") if mentions and len(set(mentions)) > 1 else ""
                 out.append(Finding("B.freeze", "INSUFFICIENT", key,
-                    f"score static {len(tail)} cycles but inputs static too — no verdict",
-                    cause="inputs_static"))
+                    f"score static {len(tail)} cycles with ALL formula arguments static "
+                    f"({', '.join(known)}) — deterministic recompute, expected behavior"
+                    f"{mnote}",
+                    cause="formula_args_static"))
+            elif known:
+                moved = [f for f in known if not args[f]]
+                # Saturation-awareness (board R2 condition): platform-count movement
+                # entirely ABOVE the breadth saturation knee (>=4) while w is pinned at
+                # 1.0 cannot reach the formula — the derived breadth term is 1.0
+                # throughout. Not a defect; the argument moved in a dead zone.
+                nplats = [r.get("nplat") for r in rows6 if r.get("nplat") is not None]
+                ws = [r.get("w") for r in rows6 if r.get("w") is not None]
+                sat_dead_zone = (moved == ["nplat"] and nplats and min(nplats) >= 4
+                                 and ws and all(abs(float(w) - 1.0) < 0.01 for w in ws))
+                if sat_dead_zone:
+                    out.append(Finding("B.freeze", "INSUFFICIENT", key,
+                        f"score static {len(tail)} cycles; only nplat moved "
+                        f"({min(nplats):g}–{max(nplats):g}) — entirely above the breadth "
+                        f"saturation knee (>=4) with w pinned 1.0, so the movement cannot "
+                        f"reach the formula (saturation dead zone; expected)",
+                        cause="formula_args_static"))
+                else:
+                    out.append(Finding("B.freeze", "FAIL", key,
+                        f"Detection identical at {tail[0]} for {len(tail)} cycles while "
+                        f"formula arguments MOVED ({', '.join(moved)})",
+                        gap="score not responding to its own moving inputs",
+                        solution="inspect the blend wiring for this topic; report to the "
+                                 "founder before any scoring change",
+                        severity="high", task_class="SCORE_AFFECTING"))
             else:
                 out.append(Finding("B.freeze", "INSUFFICIENT", key,
-                    f"score static {len(tail)} cycles; score_history carries no "
-                    f"mention counts, so the inputs-moved null cannot be tested",
-                    cause="mentions_unavailable"))
+                    f"score static {len(tail)} cycles; no formula-argument fields "
+                    f"served for this topic — null untestable",
+                    cause="args_unavailable"))
             continue
         vol = statistics.pstdev(tail)
         raw_diffs = [series[i + 1] - series[i] for i in range(len(series) - 1)]
-        # sub-VOL_DIFF_MIN wobbles are noise, not flip legs (the 'scrolling'
-        # 14.7->14.2->15.6 false-alternator case from the v2.1 verification run)
         diffs = [d if abs(d) >= THRESHOLDS["VOL_DIFF_MIN"] else 0 for d in raw_diffs]
         moves = [d for d in diffs if d != 0]
         flips = sum(1 for i in range(len(moves) - 1)
@@ -453,22 +544,34 @@ def assess_movement(cohort: dict, live: bool) -> list:
                  else "burst-step" if vol > THRESHOLDS["HIGH_VOL_STD"]
                  else "normal")
         sr = ",".join(f"{v:g}" for v in series)
+        mech = _mechanism_cycles(series_rows)
+        mech_note = (f" — KNOWN MECHANISM ({mech} transition(s) coincide with the blend "
+                     f"weight/pathway moving; board {_MECH_RULING}); tracked instance, "
+                     f"not a new alarm") if mech else ""
         if shape == "ALTERNATOR" and vol > vol_threshold:
-            out.append(Finding("B.volatility", "WARN", key,
+            f = Finding("B.volatility", "WARN", key,
                 f"ALTERNATING movement: {flips} sign-flips, per-cycle std {vol:.1f} "
                 f"over {len(tail)} cycles (threshold {vol_threshold:.1f} = cohort p90; "
-                f"series oldest->newest: {sr})",
-                gap="score swings exceed plausible attention dynamics — sawtooth "
-                    "alternation is a flap candidate, not a burst",
-                solution="verify input integrity per cycle for this topic (which sources "
-                         "were present each cycle); score_history lacks mention counts, "
-                         "so this needs an engine-side look — diagnose only",
-                severity="medium"))
+                f"series oldest->newest: {sr}){mech_note}",
+                gap=("boundary flap of the confirmed w-flip mechanism — evidence for "
+                     "the held estimator item" if mech else
+                     "score swings exceed plausible attention dynamics — sawtooth "
+                     "alternation is a flap candidate, not a burst"),
+                solution="hold for the estimator work (board D1); no change outside "
+                         "its gates" if mech else
+                         "verify input integrity per cycle for this topic — diagnose only",
+                severity="low" if mech else "medium")
+            if mech:
+                f.ruling_id = _MECH_RULING
+            out.append(f)
         elif shape == "burst-step":
+            # v2.1.2 flip-gate (Challenger): "monotone" only when flips == 0.
+            label = ("monotone step/cliff, expected for bursty attention" if flips == 0
+                     else f"large-dispersion series with {flips} flip(s) — NOT monotone")
             out.append(Finding("B.volatility", "PASS", key,
                 f"burst dynamics (std {vol:.1f}, {flips} flips, range "
-                f"{min(tail):g}–{max(tail):g}; series: {sr}) — monotone step/cliff, "
-                f"expected for bursty attention"))
+                f"{min(tail):g}–{max(tail):g}; series: {sr}) — {label}{mech_note}",
+                ruling_id=_MECH_RULING if mech else ""))
         elif vol < 1.0:
             out.append(Finding("B.volatility", "PASS", key,
                 f"near-static (std {vol:.1f}, range {min(tail):g}–{max(tail):g}) — "
@@ -479,13 +582,27 @@ def assess_movement(cohort: dict, live: bool) -> list:
                 f"{min(tail):g}–{max(tail):g}, {flips} flips)"))
     out.append(Finding("B.freeze", "PASS" if n_checked else "INSUFFICIENT",
                        "cohort", f"{n_checked} topics had >= {THRESHOLDS['FREEZE_CYCLES']} cycles of history"))
+    # B.dup_cycles (SHADOW, v2.1.2): duplicate same-hour rows found while collecting.
+    out.append(Finding("B.dup_cycles",
+        "WARN" if dup_total else "PASS",
+        "cycle-slot hygiene",
+        (f"{dup_total} duplicate same-hour history rows across the cohort "
+         f"(e.g. {', '.join(dup_examples)}) — deduped before analysis here, but they "
+         f"shorten the engine's 12-row baseline window in time" if dup_total else
+         f"no duplicate cycle-slot rows in the cohort's served history"),
+        gap="" if not dup_total else
+            "double-scored cycles distort the median baseline (britain-glitch class)",
+        solution="" if not dup_total else
+            "read-only dedup diagnostic first (board D2); any engine-side dedup is a "
+            "query-level fix, never a row deletion",
+        severity="low"))
 
     # B.asymmetry (SHADOW — Kindleberger audit, board item 7): instant transitions in
     # BOTH directions inside one window = window/estimator-artifact signature. Genuine
     # attention may crash fast (revulsion) — but it does not also ARRIVE in one cycle.
     inst_up = inst_down = both = 0
-    for key, tail, _m in windows:
-        series = list(reversed(tail))
+    for key, rows6 in windows:
+        series = [r["det"] for r in reversed(rows6)]
         diffs = [series[i + 1] - series[i] for i in range(len(series) - 1)]
         up = max(diffs) if diffs else 0
         dn = min(diffs) if diffs else 0
@@ -938,8 +1055,21 @@ def run(live: bool) -> dict:
                 "false_positives": L.get("falsePositives"),
                 "false_positives_note": ("structurally 0 until the 365d patience window "
                                          "matures rows — not a quality signal yet"),
+                # D6 (board 2026-07-19): corroboration status travels WITH the rate.
+                "led_referee": {
+                    "corroborated": L.get("ledCorroborated"),
+                    "uncorroborated": L.get("ledUncorroborated"),
+                    "unchecked": L.get("ledUnchecked"),
+                    "note": ("uncorroborated = the independent Wikipedia referee found no "
+                             "confirming surge (verified honest refutations, 2026-07-18 "
+                             "re-run) — the wins stand on Google Trends alone"),
+                },
                 "epoch_boundary": L.get("epochBoundary"),
                 "by_epoch": L.get("byEpoch"),
+                "by_epoch_note": ("v2-epoch rates are dominated by YOUNG races: 1,100+ "
+                                  "pending under the 365d patience window resolve toward "
+                                  "fast Google breakouts first (adverse selection). Read "
+                                  "as a series, not a point."),
             }
         except Exception:
             ledger_headline = {"error": "ledger fetch failed"}
@@ -989,6 +1119,15 @@ def render_md(r: dict) -> str:
     if ah.get("false_positives") == 0:
         L.append("*(false positives: 0 — structurally guaranteed until the 365d patience "
                  "window matures rows; not a quality signal yet)*")
+        L.append("")
+    lr = ah.get("led_referee") or {}
+    if lr and lr.get("corroborated") is not None:
+        L.append(f"*(LED referee corroboration: {lr.get('corroborated')} corroborated · "
+                 f"{lr.get('uncorroborated')} uncorroborated · {lr.get('unchecked')} "
+                 f"unchecked — {lr.get('note')})*")
+        L.append("")
+    if ah.get("by_epoch"):
+        L.append(f"*(per-epoch note: {ah.get('by_epoch_note')})*")
         L.append("")
     L.append(f"Internal operational checks: pass {r['operational_check_pass_pct']}% · "
              f"worst-module floor {r['worst_module_floor_pct']}% (internal-only; "
