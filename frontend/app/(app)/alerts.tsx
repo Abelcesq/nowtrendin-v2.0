@@ -30,6 +30,9 @@ export default function Alerts() {
     params.key ? { key: String(params.key), display: String(params.topic ?? params.key), kind: (params.kind === 'market' ? 'market' : 'topic') } : null
   );
   const [scoreType, setScoreType] = useState<string>('detection');
+  // falls-below alerts (2026-07-19): 'above' = original rises-past behavior;
+  // 'below' = watch a held topic losing signal.
+  const [direction, setDirection] = useState<'above' | 'below'>('above');
   const [threshold, setThreshold] = useState(75);
   const [push, setPush] = useState(true);
   const [email, setEmail] = useState(true);
@@ -59,6 +62,7 @@ export default function Alerts() {
         topic_display: picked.display,
         kind: picked.kind,
         score_type: scoreType,
+        direction,
         threshold,
         notify_push: push,
         notify_email: email,
@@ -102,7 +106,7 @@ export default function Alerts() {
             <TouchableOpacity className="flex-1 pr-2" onPress={() => openDetail(a)} activeOpacity={0.6}>
               <Text className="text-textPrimary font-semibold">{a.topic_display || a.topic_key}</Text>
               <Text className="text-textMuted text-xs mt-0.5">
-                {a.kind === 'market' ? 'Market' : 'Trend'} · when {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
+                {a.kind === 'market' ? 'Market' : 'Trend'} · when {a.score_type} {a.direction === 'below' ? '≤' : '≥'} {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}
               </Text>
               {a.last_triggered_at && (
                 <Text className="text-[12px] font-bold mt-1" style={{ color: '#246B4A' }}>
@@ -162,7 +166,21 @@ export default function Alerts() {
           })}
         </View>
 
-        <Text className="text-textMuted text-[12px] mb-1">Alert when score reaches</Text>
+        <Text className="text-textMuted text-[12px] mb-1">Direction</Text>
+        <View className="flex-row gap-2 mb-3">
+          {(['above', 'below'] as const).map((d) => {
+            const active = direction === d;
+            return (
+              <TouchableOpacity key={d} onPress={() => setDirection(d)} className="px-3 py-1.5 rounded-full" style={{ backgroundColor: active ? '#2E7D5B' : '#FFFFFF', borderColor: active ? '#2E7D5B' : '#ECECEC' }}>
+                <Text className="text-xs font-semibold" style={{ color: active ? '#FFFFFF' : '#3C4663' }}>
+                  {d === 'above' ? 'Rises above' : 'Falls below'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text className="text-textMuted text-[12px] mb-1">{direction === 'below' ? 'Alert when score falls to' : 'Alert when score reaches'}</Text>
         <View className="flex-row items-center gap-4 mb-3">
           <TouchableOpacity onPress={() => bump(-5)} className="w-9 h-9 rounded-full items-center justify-center">
             <Minus size={16} color="#3C4663" />

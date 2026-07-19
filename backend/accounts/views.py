@@ -443,13 +443,16 @@ def _notify_alert(alert, current):
     verified phone — otherwise SMS is silently skipped."""
     user = alert.user
     label = alert.topic_display or alert.topic_key
+    below = getattr(alert, 'direction', 'above') == 'below'
     if alert.notify_email and user.email:
         try:
             send_mail(
-                subject=f"Now TrendIn alert: {label} hit {current}",
+                subject=f"Now TrendIn alert: {label} {'fell to' if below else 'hit'} {current}",
                 message=(
-                    f"'{label}' just reached a {alert.score_type} Gradient Score of {current} "
-                    f"(your threshold was {alert.threshold}).\n\n"
+                    f"'{label}' just {'dropped to' if below else 'reached'} a {alert.score_type} "
+                    f"Gradient Score of {current} "
+                    f"(your threshold was {alert.threshold}, direction: "
+                    f"{'falls below' if below else 'rises above'}).\n\n"
                     f"Open Now TrendIn to see the full signal."
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
@@ -542,7 +545,10 @@ class EvaluateAlertsView(APIView):
                 if not s:
                     continue
                 current = s.get(alert.score_type, s['detection'])
-            crossed = current >= alert.threshold
+            # falls-below alerts (2026-07-19): 'below' fires when the score drops to
+            # or under the threshold; 'above' keeps the original >= behavior.
+            crossed = (current <= alert.threshold if getattr(alert, 'direction', 'above') == 'below'
+                       else current >= alert.threshold)
             fresh = alert.last_triggered_at is None or alert.last_triggered_at < cooldown
             if crossed and fresh:
                 alert.last_triggered_at = now

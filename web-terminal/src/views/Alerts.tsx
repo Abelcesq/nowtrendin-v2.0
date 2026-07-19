@@ -18,6 +18,9 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
   const [topicKey, setTopicKey] = useState('')
   const [topicKind, setTopicKind] = useState<'topic' | 'market'>('topic')
   const [scoreType, setScoreType] = useState<string>('detection')
+  // falls-below alerts (2026-07-19): 'above' = original rises-past; 'below' = watch a
+  // held topic losing signal. Parity with mobile (frontend-consistency).
+  const [direction, setDirection] = useState<'above' | 'below'>('above')
   const [threshold, setThreshold] = useState(75)
   const [push, setPush] = useState(true)
   const [email, setEmail] = useState(true)
@@ -54,7 +57,7 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
     try {
       await createAlert({
         topic_key: topicKey, kind: topicKind,
-        topic_display: topicDisplay.trim(), score_type: scoreType, threshold,
+        topic_display: topicDisplay.trim(), score_type: scoreType, direction, threshold,
         notify_push: push, notify_email: email, notify_sms: sms,
       })
       setTopicDisplay(''); setTopicKey(''); setTopicKind('topic'); reload()
@@ -83,7 +86,7 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
               <span className="al-ico"><Bell size={16} color="var(--conf)" /></span>
               <div className="al-body">
                 <div className="al-topic link" onClick={() => open(a)} title="Open detail page">{titleCaseTopic(a.topic_display || a.topic_key)}</div>
-                <div className="al-meta">When {a.score_type} ≥ {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}</div>
+                <div className="al-meta">When {a.score_type} {(a as any).direction === 'below' ? '≤' : '≥'} {a.threshold} · {[a.notify_push && 'Push', a.notify_email && 'Email', a.notify_sms && 'Text'].filter(Boolean).join(' + ') || 'No channel'}</div>
                 {a.last_triggered_at && <div className="al-fired">🔔 Triggered {new Date(a.last_triggered_at).toLocaleDateString()}</div>}
               </div>
               <button className={'al-toggle' + (a.active ? ' on' : '')} onClick={() => toggle(a)} title={a.active ? 'Active' : 'Paused'} />
@@ -111,7 +114,13 @@ export function Alerts({ onOpenDetail }: { onOpenDetail?: (key: string, kind: 't
           <button key={st} className={'al-chip' + (scoreType === st ? ' on' : '')} onClick={() => setScoreType(st)} style={{ textTransform: 'capitalize' }}>{st}</button>
         ))}</div>
 
-        <label className="al-lbl">Alert when score reaches</label>
+        <label className="al-lbl">Direction</label>
+        <div className="al-chips">
+          <button className={'al-chip' + (direction === 'above' ? ' on' : '')} onClick={() => setDirection('above')}>Rises above</button>
+          <button className={'al-chip' + (direction === 'below' ? ' on' : '')} onClick={() => setDirection('below')}>Falls below</button>
+        </div>
+
+        <label className="al-lbl">{direction === 'below' ? 'Alert when score falls to' : 'Alert when score reaches'}</label>
         <div className="al-step">
           <button onClick={() => bump(-5)} title="−5"><Minus size={16} /></button>
           <span className="al-thr">{threshold}</span>

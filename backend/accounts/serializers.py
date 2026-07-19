@@ -81,7 +81,7 @@ class AlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Alert
         fields = [
-            'id', 'topic_key', 'topic_display', 'kind', 'score_type', 'threshold',
+            'id', 'topic_key', 'topic_display', 'kind', 'score_type', 'direction', 'threshold',
             'notify_email', 'notify_push', 'notify_sms', 'active', 'last_triggered_at', 'created_at',
         ]
         read_only_fields = ['id', 'last_triggered_at', 'created_at']

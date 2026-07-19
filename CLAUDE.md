@@ -53,6 +53,17 @@ Push alerts: expo-notifications
 
 ## 3. DESIGN SYSTEM — EXACT VALUES ONLY
 
+> **⚠ RECONCILIATION NOTE (2026-07-19, closes the standing doc-debt):** the palette below is
+> the ORIGINAL v2.0 token set and is now the WEB-TERMINAL lineage only. The authorities are
+> per-surface (founder ruling §12, "one brand, two dialects"): **mobile = the Aurora contract**
+> (`frontend/DESIGN_SYSTEM.md` — midnight `#1B3066` ink, jewel stage colors; `#00C896`,
+> `#2D7EEF`, `#E85A1E`/`#EE6A2A`, `#DC2626` are BANNED in new mobile UI); **web/desktop =
+> `web-terminal/WEB_DESIGN_SYSTEM.md`** with `web-terminal/src/lib/mobileTheme.ts` as the web's
+> own token authority (vivid institutional dialect + dark `*Text` twins for WCAG). Cross-platform
+> parity is SEMANTIC (hue MEANINGS contractual, hue VALUES per-surface). Do not copy hexes from
+> the table below into NEW mobile code; use the Aurora tokens. The table remains for the web
+> lineage and for reading legacy code.
+
 ### 3.1 Color Tokens (tailwind.config.js)
 
 ```js
@@ -207,7 +218,13 @@ If any answer is NO — stop and fix.
 
 ---
 
-## 11. THEME — light (matches v1.0). bg #F4F5F7, surface #FFFFFF (white cards w/ soft shadow),
+## 11. THEME — ⚠ SUPERSEDED FOR MOBILE (see §3 reconciliation note, 2026-07-19). The paragraph
+below describes the ORIGINAL v1.0-matching light theme and survives only as the web lineage /
+legacy-code reference. Mobile theme authority = the Aurora contract (`frontend/DESIGN_SYSTEM.md`:
+white canvas, borderless `#F4F5F8` cards, midnight `#1B3066`/`#16264A` ink, `#B11226` accent,
+jewel stage colors; `#00C896` is BANNED in new mobile UI). Web theme authority =
+`web-terminal/WEB_DESIGN_SYSTEM.md`. Wordmark + flame logo rules remain in force on all surfaces.
+*(Legacy text:)* light (matches v1.0). bg #F4F5F7, surface #FFFFFF (white cards w/ soft shadow),
 dark text #1A1A2E. Green #00C896 = accents/active states. Wordmark: "Now" brandOrange + "TrendIn"
 brandMaroon. Flame logo preserved from v1.0 — rendered via components/ui/Logo.tsx (SVG stand-in;
 swap for the original logo.png in assets/ when available). StatusBar = dark-content.

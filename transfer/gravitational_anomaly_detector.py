@@ -9423,12 +9423,29 @@ def get_topic_detail(topic_key: str):
     return result
 
 
+# ── Scale-debt fix (board item 8 → founder-ordered 2026-07-19): the history route
+# re-runs live calibration on every RECENT row per request — an O(history) compute
+# amplifier on the fragile read path. A small per-topic TTL response cache bounds
+# it to one build per topic per TTL. Read-only cache of a read-only route; INV-1
+# semantics unchanged (stale rows already serve stored inside the build).
+# Rollback: HISTORY_ROUTE_CACHE_TTL_S=0 disables. Cap guards memory.
+_HIST_ROUTE_CACHE: dict = {}
+HISTORY_ROUTE_CACHE_TTL_S = int(os.getenv("HISTORY_ROUTE_CACHE_TTL_S", "300"))
+_HIST_ROUTE_CACHE_MAX = int(os.getenv("HISTORY_ROUTE_CACHE_MAX", "600"))
+
+
 @app.get("/scores/{topic_key}/score-history")
 def get_topic_score_history(topic_key: str, limit: int = 30):
     """
     Per-collection-run scoring events for a topic (newest first).
     Each row is a real scoring event from velocity_scores.
     """
+    import time as _t
+    if HISTORY_ROUTE_CACHE_TTL_S > 0:
+        _ck = (topic_key, int(limit))
+        _hit = _HIST_ROUTE_CACHE.get(_ck)
+        if _hit and (_t.time() - _hit[0]) < HISTORY_ROUTE_CACHE_TTL_S:
+            return _hit[1]
     conn = get_db(DB_PATH)
     # Select full rows so the SAME serve-time calibration applied to the headline
     # score can be applied to each historical row — otherwise the history shows
@@ -9511,10 +9528,16 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
             "dark_matter": round(s.get("dark_matter_score") or 0),
             "served_stored": bool(row_stale),
         })
-    return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True,
-            "stale_rows_served_stored": stored_served,
-            "history_inv1": _hist_inv1,
-            "input_freshness": _if}
+    _resp = {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True,
+             "stale_rows_served_stored": stored_served,
+             "history_inv1": _hist_inv1,
+             "input_freshness": _if}
+    if HISTORY_ROUTE_CACHE_TTL_S > 0:
+        import time as _t
+        if len(_HIST_ROUTE_CACHE) >= _HIST_ROUTE_CACHE_MAX:
+            _HIST_ROUTE_CACHE.clear()      # simple bound; refill is one build per key
+        _HIST_ROUTE_CACHE[(topic_key, int(limit))] = (_t.time(), _resp)
+    return _resp
 
 
 HISTORY_FULL_CAP = int(os.getenv("HISTORY_FULL_CAP", "2000"))

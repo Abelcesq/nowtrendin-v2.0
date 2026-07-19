@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchCrypto, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
+import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchSignalByKey, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchCrypto, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -57,7 +57,23 @@ export function useTierFeed(tier: TierID) {
 
 export function useSignal(id: string) {
   const { signals, isLoading, isError, isSample } = useSignals();
-  return { signal: findSignal(signals, id), isLoading, isError, isSample };
+  const fromList = findSignal(signals, id);
+  // Single-topic fallback (mobile-board deferred item, 2026-07-19): a deep link to a
+  // topic outside the loaded pages resolves via the detail endpoint instead of
+  // showing "Signal not found". Only fires when the list is loaded and missed.
+  const solo = useQuery({
+    queryKey: ['signal-solo', id],
+    queryFn: () => fetchSignalByKey(id),
+    enabled: !!id && !isLoading && !fromList && !isSample,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+  return {
+    signal: fromList ?? solo.data ?? undefined,
+    isLoading: isLoading || (!fromList && solo.isLoading && solo.fetchStatus !== 'idle'),
+    isError,
+    isSample,
+  };
 }
 
 export function useScoreHistory(topicKey: string | undefined) {

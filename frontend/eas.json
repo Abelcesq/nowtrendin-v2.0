@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://nowtrendin-backend-acb79c396814.herokuapp.com",
+        "EXPO_PUBLIC_GRADIENT_API": "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://nowtrendin-backend-acb79c396814.herokuapp.com",
+        "EXPO_PUBLIC_GRADIENT_API": "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://nowtrendin-backend-acb79c396814.herokuapp.com",
+        "EXPO_PUBLIC_GRADIENT_API": "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

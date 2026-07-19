@@ -48,11 +48,16 @@ class GradeHistory(models.Model):
 class Alert(models.Model):
     SCORE_TYPES = [('detection', 'detection'), ('confidence', 'confidence'), ('overall', 'overall')]
     KINDS = [('topic', 'topic'), ('market', 'market')]
+    # falls-below alerts (mobile-board deferred item, founder-ordered 2026-07-19):
+    # 'above' = fire when score >= threshold (the original behavior, default);
+    # 'below' = fire when score <= threshold (watch a held topic losing signal).
+    DIRECTIONS = [('above', 'above'), ('below', 'below')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='alerts')
     topic_key = models.CharField(max_length=120)
     topic_display = models.CharField(max_length=160, blank=True)
     kind = models.CharField(max_length=12, choices=KINDS, default='topic')  # topic (trend) or market signal
     score_type = models.CharField(max_length=12, choices=SCORE_TYPES, default='detection')
+    direction = models.CharField(max_length=6, choices=DIRECTIONS, default='above')
     threshold = models.IntegerField(default=75)
     notify_email = models.BooleanField(default=True)
     notify_push = models.BooleanField(default=False)
@@ -62,7 +67,8 @@ class Alert(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.topic_display or self.topic_key} >= {self.threshold} ({self.user.email})"
+        op = "<=" if self.direction == 'below' else ">="
+        return f"{self.topic_display or self.topic_key} {op} {self.threshold} ({self.user.email})"
 
 
 class Watchlist(models.Model):

@@ -174,6 +174,22 @@ export async function fetchScoresPage(limit = SCORES_PAGE_SIZE, offset = 0): Pro
   return { signals, total: Number(data?.total ?? results.length) };
 }
 
+// Single-topic fetch (mobile-board deferred item, 2026-07-19): resolve ONE topic by
+// key via the detail endpoint's `rich` parity row (the mobile /scores shape) instead
+// of paging the whole feed. Deep links to topics outside the loaded pages now
+// resolve correctly. Returns null on 404 (topic unknown).
+export async function fetchSignalByKey(topicKey: string): Promise<Signal | null> {
+  const res = await fetch(`${GRADIENT_API}/scores/${encodeURIComponent(topicKey)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Gradient API ${res.status}`);
+  const d = await res.json();
+  const rich = d?.rich;
+  if (!rich || typeof rich !== 'object') return null;
+  return mapSignal(rich);
+}
+
 // Fetch ALL scored topics, 100 at a time (never one giant payload). Used by direct
 // callers (favorites/watchlist search). The live feed uses the progressive hook.
 export async function fetchScores(): Promise<Signal[]> {
