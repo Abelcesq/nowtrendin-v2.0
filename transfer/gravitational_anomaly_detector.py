@@ -6797,10 +6797,12 @@ def _situation_public(s: dict) -> dict:
 # /backtest/estimator/report aggregates the registered gate table. Touches no score,
 # no serve path, no ledger. Full spec + registration: transfer/estimator_replay.py.
 @app.get("/backtest/estimator/step")
-def backtest_estimator_step(batch: int = Query(10, ge=1, le=25)):
+def backtest_estimator_step(batch: int = Query(10, ge=1, le=25),
+                            prefilter: int = Query(0, ge=0, le=8000)):
     try:
         import estimator_replay
-        return estimator_replay.step(get_db, DB_PATH, batch)
+        return estimator_replay.step(get_db, DB_PATH, batch,
+                                     gate=_is_quality_topic, prefilter=prefilter)
     except Exception as e:
         return {"status": "error", "error": str(e)[:200]}
 

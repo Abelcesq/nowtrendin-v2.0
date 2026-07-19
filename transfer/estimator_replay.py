@@ -186,8 +186,11 @@ CANDIDATES = {
 }
 
 
-def step(get_db, db_path, batch: int = 10):
-    """Process up to `batch` unprocessed topics. Single-flight; bounded; returns progress."""
+def step(get_db, db_path, batch: int = 10, gate=None, prefilter: int = 0):
+    """Process up to `batch` unprocessed topics. Single-flight; bounded; returns progress.
+    gate: the engine's _is_quality_topic — the corpus is the SERVED universe, so topics
+    failing the quality gate are marked skipped (never replayed). prefilter>0: instead of
+    replaying, bulk-mark up to N gate-failing candidates as skipped (fast junk drain)."""
     batch = max(1, min(int(batch), 25))
     if not _LOCK.acquire(blocking=False):
         return {"status": "busy"}
@@ -201,13 +204,45 @@ def step(get_db, db_path, batch: int = 10):
             conn.commit()
             from datetime import timedelta
             cutoff = (datetime.now(timezone.utc) - timedelta(days=ACTIVE_DAYS)).isoformat()
-            todo = [r["topic_key"] if hasattr(r, "keys") else r[0] for r in conn.execute(
-                """SELECT v.topic_key FROM velocity_scores v
-                   LEFT JOIN estimator_replay_results e ON e.topic_key = v.topic_key
-                   WHERE e.topic_key IS NULL
-                   GROUP BY v.topic_key
-                   HAVING COUNT(*) >= ? AND MAX(v.scored_at) >= ?
-                   LIMIT ?""", (MIN_ROWS, cutoff, batch)).fetchall()]
+
+            def _candidates(limit):
+                return [( (r["topic_key"] if hasattr(r, "keys") else r[0]),
+                          (r["disp"] if hasattr(r, "keys") else r[1]) or "" )
+                        for r in conn.execute(
+                    """SELECT v.topic_key, MAX(v.topic_display) AS disp
+                       FROM velocity_scores v
+                       LEFT JOIN estimator_replay_results e ON e.topic_key = v.topic_key
+                       WHERE e.topic_key IS NULL
+                       GROUP BY v.topic_key
+                       HAVING COUNT(*) >= ? AND MAX(v.scored_at) >= ?
+                       LIMIT ?""", (MIN_ROWS, cutoff, limit)).fetchall()]
+
+            def _mark_skipped(keys, reason):
+                now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                for tk in keys:
+                    conn.execute("DELETE FROM estimator_replay_results WHERE topic_key=?", (tk,))
+                    conn.execute("INSERT INTO estimator_replay_results "
+                                 "(topic_key, cycles, payload, computed_at) VALUES (?,0,?,?)",
+                                 (tk, json.dumps({"skipped": reason}), now))
+                conn.commit()
+
+            if prefilter:
+                cands = _candidates(max(100, min(int(prefilter), 8000)))
+                junk = [tk for tk, disp in cands
+                        if gate is not None and not gate(disp or tk.replace("_", " "))]
+                _mark_skipped(junk, "quality_gate")
+                return {"status": "ok", "prefiltered": len(cands),
+                        "junk_marked": len(junk),
+                        "quality_seen": len(cands) - len(junk)}
+
+            todo = []
+            for tk, disp in _candidates(batch * 4):
+                if gate is not None and not gate(disp or tk.replace("_", " ")):
+                    _mark_skipped([tk], "quality_gate")
+                    continue
+                todo.append(tk)
+                if len(todo) >= batch:
+                    break
             done_ct = conn.execute(
                 "SELECT COUNT(*) AS c FROM estimator_replay_results").fetchone()
             done_ct = done_ct["c"] if hasattr(done_ct, "keys") else done_ct[0]
