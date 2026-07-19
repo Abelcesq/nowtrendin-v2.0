@@ -2240,3 +2240,28 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   glitch suspect) -> dedup diagnostic first. R2 refuted-as-written 6/6 (peak-hold magnitude by
   design; close as mechanism instance). R3 instrument approved 6/6 + v2.1.2 patch list.
   Decision table D1-D11 AWAITING CHAIRMAN RULING.
+
+### 2026-07-19 (cont.) — R2+R3 fixes EXECUTED (Chairman-ruled D3-D6); all verified live
+- D3: component pull CONFIRMED the Challenger residue — final_del_mundial M=80.0/I=12.4/P=73.0
+  byte-identical across all 6 frozen cycles; 36.8*0.55+28+8.0+1.24+5.11 = 62.59 exactly.
+  R2 fully accounted for; closed as mechanism instance #2.
+- D4: assessor v2.1.2 shipped (param .c9ebdc0c06, dec613e): formula-arguments freeze null
+  (inputs-vs-inputs, w/mag/nplat/M/I/P; mentions demoted to context) + SATURATION DEAD-ZONE
+  refinement (nplat moving entirely >=4 with w pinned 1.0 cannot reach the formula — caught
+  live when the first verification run flagged agi as a false positive); known-mechanism ruling
+  tags (2026-07-18-median-w-flip -> LOW tracked instances, never page-one alarms); B.dup_cycles
+  shadow check; flip-gated burst label ("monotone" only at 0 flips); ASYM_STEP + traffic-floor
+  provenance registered; RECALL_SCAN_CAP 2000->4000 (full corpus); ASSESSOR_OUT_DIR env so
+  verification runs never clobber a stamped same-day snapshot.
+  VERIFICATION RUN (scratch dir): queue all LOW/OPERATIONAL — dup-hygiene found 20 duplicate
+  same-hour rows FLEET-WIDE (mamdani/mexico/fifa/england/canada/cyclospora...) = strong D2
+  evidence; flap instances correctly tagged known-mechanism and held for D1; agi resolves to
+  the dead-zone null; zero HIGH, zero SCORE_AFFECTING items.
+- D5: snapshot #2 (ASSESSOR_2026-07-19) stamped BOARD_VERIFIED / CHAIRMAN_RULED 2026-07-19
+  with full disposition in json+md.
+- D6: disclosures live BOTH sides — assessor headline now prints LED referee corroboration
+  (0 corroborated / 6 uncorroborated / 2 unchecked, honest-refutation note) + the per-epoch
+  young-races note; engine epochNote carries the young-races adverse-selection caveat
+  (deployed ef5bac4, verified live on /accuracy/ledger).
+- Open after this: D1 estimator build+backtest (awaiting Chairman go), D2 dedup diagnostic
+  (now with the assessor's 20-dup evidence), D7 §17 display quartet, D8 (own gate), D9/D10.
