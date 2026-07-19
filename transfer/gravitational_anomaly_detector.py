@@ -6791,6 +6791,29 @@ def _situation_public(s: dict) -> dict:
     }
 
 
+# ── D1 ROUND-2 estimator replay (Chairman-commissioned 2026-07-19; held-out) ──────
+# Chunked read-only replay job: /backtest/estimator/step processes a BOUNDED batch of
+# topics per call (single-flight, batch-paced); results persist to its own table only;
+# /backtest/estimator/report aggregates the registered gate table. Touches no score,
+# no serve path, no ledger. Full spec + registration: transfer/estimator_replay.py.
+@app.get("/backtest/estimator/step")
+def backtest_estimator_step(batch: int = Query(10, ge=1, le=25)):
+    try:
+        import estimator_replay
+        return estimator_replay.step(get_db, DB_PATH, batch)
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
+
+
+@app.get("/backtest/estimator/report")
+def backtest_estimator_report():
+    try:
+        import estimator_replay
+        return estimator_replay.report(get_db, DB_PATH)
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
+
+
 @app.get("/situations/preview", dependencies=[Depends(_require_internal)])
 def situations_preview(window_hours: int = 120, min_doc_freq: int = 5,
                        min_jaccard: float = 0.18, limit: int = 60, category: str = None):
