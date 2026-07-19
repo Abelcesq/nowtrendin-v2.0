@@ -491,6 +491,20 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="disc">Signal analysis only — not financial, investment, or legal advice.</div>
       </div>
 
+      {/* Input freshness — facts only (board item 5, 2026-07-18): signal ages and
+          window counts from the engine; explains post-burst reads without touching
+          or reinterpreting the score. */}
+      {d?.input_freshness?.newest_signal_age_h != null && (
+        <div className="sect">
+          <h4>Input Freshness</h4>
+          <div className="kv"><span>Newest input</span><b>{d.input_freshness.newest_signal_age_h < 1 ? 'under 1h ago' : `${Math.round(d.input_freshness.newest_signal_age_h)}h ago`}</b></div>
+          <div className="kv"><span>Signals in the 72h scoring window</span><b>{d.input_freshness.signals_in_window_72h}</b></div>
+          {d.input_freshness.newest_signal_age_h > 24 && (
+            <div className="narr" style={{ marginTop: 6 }}>The newest contributing input is over {Math.floor(d.input_freshness.newest_signal_age_h)}h old — this topic is being scored on its post-surge input state.</div>
+          )}
+        </div>
+      )}
+
       {/* Scoring history (lazy) */}
       {Array.isArray(hist?.rows) && hist.rows.length > 1 && (
         <div className="sect">

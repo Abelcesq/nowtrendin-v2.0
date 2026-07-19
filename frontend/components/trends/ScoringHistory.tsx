@@ -5,7 +5,7 @@ import { useScoreHistory } from '../../hooks/useSignals';
 
 // Per-collection-run scoring events for a topic (live from the engine).
 export function ScoringHistory({ signal }: { signal: Signal }) {
-  const { rows, isLoading } = useScoreHistory(signal.id);
+  const { rows, freshness, isLoading } = useScoreHistory(signal.id);
 
   // Fall back to the current score until the engine has accumulated runs.
   const data =
@@ -44,6 +44,23 @@ export function ScoringHistory({ signal }: { signal: Signal }) {
       <Text className="text-textMuted text-[12px] mt-1.5">
         Each row is a real scoring event from a collection run. Scores change as new signals are collected.
       </Text>
+      {/* Input freshness — facts only (board item 5, 2026-07-18): explains post-burst
+          reads (a surge whose inputs aged out) without reinterpreting the score. */}
+      {freshness && freshness.newestSignalAgeH != null && (
+        <View className="bg-card rounded-2xl px-4 py-3 mt-3">
+          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-1">Input freshness</Text>
+          <Text className="text-textSecondary text-sm font-medium">
+            Newest input {freshness.newestSignalAgeH < 1 ? 'under 1h' : `${Math.round(freshness.newestSignalAgeH)}h`} ago
+            · {Number(freshness.signalsInWindow72h).toLocaleString()} signals in the 72h scoring window
+          </Text>
+          {freshness.newestSignalAgeH > 24 && (
+            <Text className="text-textMuted text-[12px] mt-1">
+              The newest contributing input is over {Math.floor(freshness.newestSignalAgeH)}h old — this topic is
+              scored on its post-surge input state.
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }

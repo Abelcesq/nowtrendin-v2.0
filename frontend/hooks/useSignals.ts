@@ -68,7 +68,7 @@ export function useScoreHistory(topicKey: string | undefined) {
     staleTime: 60 * 1000,
     retry: 1,
   });
-  return { rows: q.data ?? [], isLoading: q.isLoading };
+  return { rows: q.data?.rows ?? [], freshness: q.data?.freshness ?? null, isLoading: q.isLoading };
 }
 
 export function useMacroLeverage() {

@@ -9400,6 +9400,30 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
         """,
         (topic_key, limit),
     ).fetchall()
+    # Board item 5 (2026-07-18): the same input-freshness FACTS the detail serves —
+    # here because the mobile Scoring History panel is this route's consumer and the
+    # cliff/plateau context belongs next to the curve it explains. Facts only.
+    _if = None
+    try:
+        _fr = conn.execute(
+            "SELECT MAX(extracted_at) AS newest, COUNT(*) AS n FROM topic_signals "
+            "WHERE topic_key = ? AND extracted_at >= ?",
+            (topic_key,
+             (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat())).fetchone()
+        _newest = _fr["newest"] if _fr else None
+        _age_h = None
+        if _newest:
+            try:
+                _ndt = datetime.fromisoformat(str(_newest).replace("Z", "+00:00"))
+                if _ndt.tzinfo is None:
+                    _ndt = _ndt.replace(tzinfo=timezone.utc)
+                _age_h = round((datetime.now(timezone.utc) - _ndt).total_seconds() / 3600, 1)
+            except Exception:
+                _age_h = None
+        _if = {"newest_signal_age_h": _age_h,
+               "signals_in_window_72h": (_fr["n"] if _fr else 0) or 0}
+    except Exception:
+        _if = None
     conn.close()
     # Board item 4 (founder-ruled 2026-07-18, 5/6 memos flagged it): extend the
     # INV-1 stale-serve rule to the history path. Re-running live calibration
@@ -9447,7 +9471,8 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
         })
     return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True,
             "stale_rows_served_stored": stored_served,
-            "history_inv1": _hist_inv1}
+            "history_inv1": _hist_inv1,
+            "input_freshness": _if}
 
 
 HISTORY_FULL_CAP = int(os.getenv("HISTORY_FULL_CAP", "2000"))

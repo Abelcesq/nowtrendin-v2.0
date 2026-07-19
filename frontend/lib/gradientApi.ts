@@ -203,14 +203,30 @@ export interface ScoreHistoryRow {
 }
 
 // Per-collection-run scoring events for a topic (newest first).
-export async function fetchScoreHistory(topicKey: string): Promise<ScoreHistoryRow[]> {
+// Input-freshness FACTS served alongside the history (board item 5, 2026-07-18):
+// signal ages + window counts only — explains post-burst reads, never reinterprets them.
+export interface InputFreshness {
+  newestSignalAgeH: number | null;
+  signalsInWindow72h: number;
+}
+
+export async function fetchScoreHistory(
+  topicKey: string,
+): Promise<{ rows: ScoreHistoryRow[]; freshness: InputFreshness | null }> {
   const res = await fetch(`${GRADIENT_API}/scores/${encodeURIComponent(topicKey)}/score-history`, {
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Gradient API ${res.status}`);
   const d = await res.json();
+  const freshness: InputFreshness | null = d?.input_freshness
+    ? {
+        newestSignalAgeH:
+          d.input_freshness.newest_signal_age_h != null ? Number(d.input_freshness.newest_signal_age_h) : null,
+        signalsInWindow72h: Number(d.input_freshness.signals_in_window_72h ?? 0),
+      }
+    : null;
   const rows = Array.isArray(d?.rows) ? d.rows : [];
-  return rows.map((r: any) => ({
+  const mapped = rows.map((r: any) => ({
     scoredAt: Date.parse(r.scored_at) || Date.now(),
     detection: Math.round(Number(r.detection ?? 0)),
     confidence: Math.round(Number(r.confidence ?? 0)),
@@ -222,6 +238,7 @@ export async function fetchScoreHistory(topicKey: string): Promise<ScoreHistoryR
     inertia: r.inertia != null ? Math.round(Number(r.inertia)) : undefined,
     darkMatter: r.dark_matter != null ? Math.round(Number(r.dark_matter)) : undefined,
   }));
+  return { rows: mapped, freshness };
 }
 
 export interface RiskScore {
