@@ -6580,25 +6580,47 @@ def _ledger_epoch_stamp() -> dict:
     condition from the 1.0-DB disposition review). Rows detected before the
     2026-06-15 pg:copy split were enrolled/scored under the retired 1.0 engine
     epoch. Read-only; never touches stored rows; fail-open (stamp absent on
-    error rather than blocking the report)."""
+    error rather than blocking the report).
+
+    Board fix 2026-07-18 (assessor-gate Challenger finding N2): the original
+    GROUP-BY counted EVERY verdict, so byEpoch resolved summed to 93 while the
+    headline counts 87 — the headline's C1 gate excludes LATE_REDETECTION.
+    Both figures now share ONE resolved definition (LED+SAME_DAY+LAGGED+
+    FALSE_POSITIVE), the excluded count is disclosed, and each epoch carries
+    its own tracked-race rate (LED over races actually run, same grace as the
+    honest report) so the blended headline can never mask a per-epoch read."""
     conn = None
     try:
         conn = get_db(DB_PATH)
+        _grace = int(os.getenv("LEDGER_PRE_BROKEN_DAYS", "7"))
+        _RES = ("LED", "SAME_DAY", "LAGGED", "FALSE_POSITIVE")
         out = {}
         for epoch, cmp_op in (("v1_engine", "<"), ("v2_engine", ">=")):
-            rows = conn.execute(f"""
-                SELECT verdict AS v, COUNT(*) AS n FROM accuracy_ledger
-                WHERE detection_date {cmp_op} ? GROUP BY verdict
-            """, (ENGINE_EPOCH_BOUNDARY,)).fetchall()
-            counts = {(r["v"] or "").upper(): r["n"] for r in rows}
-            resolved = sum(counts.values())
-            led = counts.get("LED", 0)
-            out[epoch] = {"resolved": resolved, "led": led,
-                          "hit_rate_pct": round(100.0 * led / resolved, 1) if resolved else None}
+            rows = [dict(r) for r in conn.execute(f"""
+                SELECT verdict AS v, lead_time_days AS ld FROM accuracy_ledger
+                WHERE detection_date {cmp_op} ?
+            """, (ENGINE_EPOCH_BOUNDARY,)).fetchall()]
+            verd = [(str(r["v"] or "").upper(), r["ld"]) for r in rows]
+            res = [x for x in verd if x[0] in _RES]
+            led = sum(1 for v, _ in res if v == "LED")
+            same = sum(1 for v, _ in res if v == "SAME_DAY")
+            fp = sum(1 for v, _ in res if v == "FALSE_POSITIVE")
+            lag_near = sum(1 for v, ld in res
+                           if v == "LAGGED" and not (ld is not None and ld < -_grace))
+            races = led + same + lag_near + fp
+            out[epoch] = {
+                "resolved": len(res), "led": led,
+                "hit_rate_pct": round(100.0 * led / len(res), 1) if res else None,
+                "tracked_race_hit_rate_pct": round(100.0 * led / races, 1) if races else None,
+                "tracked_race_sample": races,
+                "late_redetection_excluded": len(verd) - len(res),
+            }
         return {"epochBoundary": ENGINE_EPOCH_BOUNDARY, "byEpoch": out,
                 "epochNote": ("Rows detected before the boundary were enrolled under the "
                               "retired 1.0 engine epoch (pg:copy split); rates spanning "
-                              "the boundary must be read segmented.")}
+                              "the boundary must be read segmented. resolved = "
+                              "LED+SAME_DAY+LAGGED+FALSE_POSITIVE (LATE_REDETECTION "
+                              "excluded, count disclosed) — same C1 gate as the headline.")}
     except Exception as _ee:
         print(f"[accuracy] epoch stamp skipped: {_ee}")
         return {}

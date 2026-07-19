@@ -1,7 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-scoring_assessor.py — v2 (board-rebuilt, 2026-07-17)
-====================================================
+scoring_assessor.py — v2.1 (board-gate fixes, Chairman-ruled 2026-07-18)
+========================================================================
+v2.1 (per BOARD_assessor-2026-07-17.md + the Chairman's "proceed" ruling; the
+manifest change bumps param_version and STARTS A NEW COMPARABLE SERIES):
+  * B.volatility is SHAPE-AWARE: sign-flip discriminator separates ALTERNATOR
+    (real flap candidate -> WARN) from burst step/cliff dynamics (expected for
+    bursty attention -> PASS with the shape named). Threshold is the max of the
+    registered floor and the cohort's own p90 dispersion. Raw series stored in
+    the finding. (The 2026-07-18 diagnostic: 17/19 flagged topics were
+    burst-plateau-cliff, only 1 true alternator — see VOLATILITY_DIAG_2026-07-18.md.)
+  * Wikipedia referee TITLE RESOLUTION fixed (lowercase common-noun keys failed
+    silently as "thin pageview history") via MediaWiki opensearch fallback; every
+    INSUFFICIENT now carries a truthful CAUSE CODE (resolution_failed /
+    fetch_error / thin_history / mentions_unavailable ...).
+  * E.trending_recall rebuilt: full-feed scan (paginated, capped + denominator
+    pinned in the evidence), phrase/single-topic token matching (the substring-
+    blob matcher produced false hits), "X vs Y" matchup class registered and
+    excluded, traffic floor registered, and misses only count when the
+    independent Wikipedia referee confirms attention actually arrived.
+  * Letter grades suppressed below MIN_GRADED_N (an "A" on 2/20 is not a grade).
+  * Ledger headline now carries the Wilson 95% interval on the tracked-race rate
+    and the 0-false-positives-by-construction disclosure (365d patience window).
+  * Engine–referee rank correlation persisted append-only to
+    audits/assessor/REFEREE_CORR_SERIES.json (the drift alarm needs a baseline);
+    3 consecutive rises -> WARN.
+  * D.lifecycle WARNs require a non-INSUFFICIENT referee for the topic (an
+    instrument-blind referee must not leave lifecycle looks un-refereeable).
 The ASSESSOR/TEACHER: grades the live system on the founder's four questions and,
 for every failure, emits the GAP and a DIAGNOSTIC next step. Rebuilt to the
 six-memo board specification (audits/board/BOARD_scoring-assessor_2026-07-17.md)
@@ -74,17 +99,40 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO, "audits", "assessor")
 
 # ── CHECK MANIFEST (registered; hash -> param_version; SHADOW = excluded from %) ──
+# Board condition (Economist P2): every check states its NULL HYPOTHESIS and its
+# threshold PROVENANCE here, in the manifest, so the hash covers them.
 CHECK_MANIFEST = {
-    "A.freshness":        {"module": "A_SOURCES",   "shadow": False},
-    "A.silent_absence":   {"module": "A_SOURCES",   "shadow": False},
-    "B.freeze":           {"module": "B_MOVEMENT",  "shadow": False},
-    "B.volatility":       {"module": "B_MOVEMENT",  "shadow": False},
-    "C.gap_arithmetic":   {"module": "C_ACCURACY",  "shadow": False},
-    "C.alias_families":   {"module": "C_ACCURACY",  "shadow": False},
-    "C.referee_surge":    {"module": "C_ACCURACY",  "shadow": True},   # shadow: first snapshot
-    "D.lifecycle":        {"module": "D_LIFECYCLE", "shadow": True},   # WARN-only until it beats the null
-    "E.trending_recall":  {"module": "E_OUTSIDE",   "shadow": False},
-    "E.crypto_agreement": {"module": "E_OUTSIDE",   "shadow": True},
+    "A.freshness":        {"module": "A_SOURCES",   "shadow": False,
+        "null": "collectors report HEALTHY; DEFERRED sources are decisions, not failures"},
+    "A.silent_absence":   {"module": "A_SOURCES",   "shadow": False,
+        "null": "no configured source silently absent"},
+    "B.freeze":           {"module": "B_MOVEMENT",  "shadow": False,
+        "null": "a static score on static inputs is CORRECT behavior (no verdict)"},
+    "B.volatility":       {"module": "B_MOVEMENT",  "shadow": False,
+        "null": "bursty attention IS volatile: monotone surge steps and post-burst "
+                "cliff rolloff are EXPECTED dynamics, not defects. Only ALTERNATING "
+                "(sawtooth) movement above the dispersion threshold is a flap candidate.",
+        "provenance": "threshold = max(HIGH_VOL_STD floor, cohort p90 dispersion); "
+                      "shape rule from VOLATILITY_DIAG_2026-07-18 (17/19 flags were bursts)"},
+    "C.gap_arithmetic":   {"module": "C_ACCURACY",  "shadow": False,
+        "null": "served gap equals |Detection-Confidence| within GAP_TOL"},
+    "C.alias_families":   {"module": "C_ACCURACY",  "shadow": False,
+        "null": "alias queue pending is normal; only humans merge (display-only ruling)"},
+    "C.referee_surge":    {"module": "C_ACCURACY",  "shadow": True,   # shadow: probation
+        "null": "engine Detection and the held-out pageview referee agree on SURGE "
+                "(motion), never graded on fame level",
+        "provenance": "SURGE_MULT/SURGE_FLOOR follow the referee_wikipedia convention"},
+    "D.lifecycle":        {"module": "D_LIFECYCLE", "shadow": True,   # WARN-only until it beats the null
+        "null": "STEADY-monkey: a bursty topic's dip is not an ending (RECURRENT); "
+                "no WARN without a non-INSUFFICIENT referee for the same topic"},
+    "E.trending_recall":  {"module": "E_OUTSIDE",   "shadow": False,
+        "null": "most daily-trending queries are ephemeral noise (Malkiel); a miss "
+                "counts only when the independent referee confirms attention arrived; "
+                "scheduled matchups (X vs Y) are excluded by class",
+        "provenance": "RECALL_TRAFFIC_FLOOR registered 2026-07-18 (board condition); "
+                      "coverage gauge ONLY — never an accuracy KPI (catch-all-% rule)"},
+    "E.crypto_agreement": {"module": "E_OUTSIDE",   "shadow": True,
+        "null": "no 20% movers = nothing to grade (honest INSUFFICIENT)"},
 }
 THRESHOLDS = {
     "FREEZE_CYCLES": 6, "HIGH_VOL_STD": 12.0, "GAP_TOL": 0.6,
@@ -92,11 +140,18 @@ THRESHOLDS = {
     "LIFE_REF_QUANTILE": 0.9, "LIFE_ABS_FLOOR": 200,
     "FADE_RATIO": 0.5, "ENDED_RATIO": 0.25, "MIN_N": 5,
     "COHORT_MOVEMENT": 60, "COHORT_REFEREE": 20, "RECALL_TOP": 10,
+    # v2.1 (Chairman-ruled 2026-07-18):
+    "VOL_FLIPS_MIN": 3,          # sign-flips >= this = ALTERNATOR (flap candidate)
+    "VOL_DIFF_MIN": 2.0,         # |cycle diff| below this is noise, not a flip leg
+    "VOL_PCTL": 0.9,             # dispersion threshold percentile over the cohort
+    "MIN_GRADED_N": 5,           # no letter grade below this many graded checks
+    "RECALL_TRAFFIC_FLOOR": 10000,   # grade only external items >= this approx_traffic
+    "RECALL_SCAN_CAP": 2000,     # full-feed scan page cap (denominator pinned in evidence)
 }
 _manifest_hash = hashlib.sha256(
     json.dumps({"checks": CHECK_MANIFEST, "thresholds": THRESHOLDS},
                sort_keys=True).encode()).hexdigest()[:10]
-PARAM_VERSION = f"assessor-v2.{_manifest_hash}"
+PARAM_VERSION = f"assessor-v2.1.{_manifest_hash}"   # v2.1 = new comparable series (Chairman-ruled 2026-07-18)
 
 # ── RULINGS REGISTRY (Chairman rulings a solution must NEVER contradict) ──
 RULINGS = [
@@ -135,6 +190,9 @@ class Finding:
     held_out_derived: bool = False
     shadow: bool = False
     ruling_id: str = ""
+    cause: str = ""            # truthful cause code on INSUFFICIENT (board N1/N3:
+                               # resolution_failed | fetch_error | thin_history |
+                               # mentions_unavailable | referee_unavailable | ...)
 
     def finalize(self):
         self.shadow = CHECK_MANIFEST.get(self.check, {}).get("shadow", False)
@@ -172,6 +230,57 @@ def http_text(url: str, timeout: int = 45) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", "replace")
+
+
+# ── Wikipedia referee resolver (v2.1 — board finding N1: the blind referee) ──
+# The v2 path built the pageviews URL straight from topic_display; lowercase
+# common-noun keys ("spain", "japan", "fifa") 404 on the case-sensitive REST API
+# and the failure was mislabeled "thin pageview history". Resolution order:
+# as-is -> Title Case -> MediaWiki opensearch (free, no key). Returns
+# (views_list, resolved_title, cause) — cause is "" on success, else a truthful code.
+def _wiki_resolve_title(name: str) -> str | None:
+    q = urllib.parse.quote(name)
+    url = (f"https://en.wikipedia.org/w/api.php?action=opensearch&search={q}"
+           f"&limit=1&namespace=0&format=json")
+    try:
+        d = http_json(url, timeout=20)
+        titles = d[1] if isinstance(d, list) and len(d) > 1 else []
+        return titles[0] if titles else None
+    except Exception:
+        return None
+
+
+def _wiki_daily_series(name: str, days: int = 30):
+    end = datetime.now(timezone.utc).date() - timedelta(days=1)
+    start = end - timedelta(days=days)
+    fmt = "%Y%m%d"
+    candidates = [name.replace(" ", "_")]
+    tc = name.title().replace(" ", "_")
+    if tc not in candidates:
+        candidates.append(tc)
+    last_cause = "resolution_failed"
+    for attempt, cand in enumerate(candidates + ["__OPENSEARCH__"]):
+        if cand == "__OPENSEARCH__":
+            resolved = _wiki_resolve_title(name)
+            if not resolved:
+                return [], None, "resolution_failed"
+            cand = resolved.replace(" ", "_")
+        title = urllib.parse.quote(cand, safe="")
+        url = (f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/"
+               f"en.wikipedia/all-access/user/{title}/daily/"
+               f"{start.strftime(fmt)}00/{end.strftime(fmt)}00")
+        try:
+            d = http_json(url, timeout=30)
+            views = [it.get("views", 0) for it in d.get("items", [])]
+            if len(views) >= 10:
+                return views, cand, ""
+            last_cause = f"thin_history(n={len(views)})"
+        except urllib.error.HTTPError as e:
+            last_cause = "resolution_failed" if e.code == 404 else f"fetch_error({e.code})"
+        except Exception as e:
+            last_cause = f"fetch_error({type(e).__name__})"
+        time.sleep(0.3)
+    return [], None, last_cause
 
 
 # ═════════════════════════════ A · SOURCE TRACKING ═══════════════════════════
@@ -259,13 +368,16 @@ def assess_movement(cohort: dict, live: bool) -> list:
                            "DEMO: Detection identical 6 cycles while mentions changed",
                            gap="DEMO gap", solution="DEMO diagnostic", severity="high"))
         return out
-    n_checked = 0
+    # PASS 1 — collect every topic's window (so the threshold can be derived from
+    # the cohort's OWN dispersion, board condition: no universal constant across strata)
+    windows, n_checked = [], 0
     for row in cohort["topics"][:THRESHOLDS["COHORT_MOVEMENT"]]:
         key = row.get("topic_key")
         try:
             d = http_json(f"{ENGINE}/scores/{urllib.parse.quote(key)}")
         except Exception:
-            out.append(Finding("B.freeze", "INSUFFICIENT", key, "detail fetch failed"))
+            out.append(Finding("B.freeze", "INSUFFICIENT", key, "detail fetch failed",
+                               cause="fetch_error"))
             continue
         time.sleep(0.25)
         hist = d.get("score_history") or []
@@ -277,6 +389,17 @@ def assess_movement(cohort: dict, live: bool) -> list:
         mentions = [h.get("total_mentions") for h in hist[:THRESHOLDS["FREEZE_CYCLES"]]
                     if isinstance(h, dict)]
         mentions = [m for m in (mentions or []) if m is not None]
+        windows.append((key, tail, mentions))
+    stds = sorted(statistics.pstdev(t) for _, t, _ in windows
+                  if max(t) - min(t) > 0)
+    p90_std = stds[int(THRESHOLDS["VOL_PCTL"] * (len(stds) - 1))] if stds else 0.0
+    vol_threshold = max(THRESHOLDS["HIGH_VOL_STD"], p90_std)
+
+    # PASS 2 — classify. SHAPE RULE (v2.1, from VOLATILITY_DIAG_2026-07-18): count
+    # sign-flips of first differences oldest->newest. Bursty attention steps and
+    # cliffs (<=2 flips) are EXPECTED dynamics; only ALTERNATORS are flap candidates.
+    for key, tail, mentions in windows:
+        series = list(reversed(tail))                  # oldest -> newest
         if max(tail) - min(tail) == 0:
             # NULL CONDITION (board): a frozen score is only a defect if the
             # INPUTS moved. Static inputs -> static score is correct behavior.
@@ -291,22 +414,52 @@ def assess_movement(cohort: dict, live: bool) -> list:
                              "for this row; inspect component values in the detail; "
                              "report findings to the founder before any scoring change",
                     severity="high", task_class="SCORE_AFFECTING"))
+            elif mentions:
+                out.append(Finding("B.freeze", "INSUFFICIENT", key,
+                    f"score static {len(tail)} cycles but inputs static too — no verdict",
+                    cause="inputs_static"))
             else:
                 out.append(Finding("B.freeze", "INSUFFICIENT", key,
-                    f"score static {len(tail)} cycles but inputs static too — no verdict"))
+                    f"score static {len(tail)} cycles; score_history carries no "
+                    f"mention counts, so the inputs-moved null cannot be tested",
+                    cause="mentions_unavailable"))
+            continue
+        vol = statistics.pstdev(tail)
+        raw_diffs = [series[i + 1] - series[i] for i in range(len(series) - 1)]
+        # sub-VOL_DIFF_MIN wobbles are noise, not flip legs (the 'scrolling'
+        # 14.7->14.2->15.6 false-alternator case from the v2.1 verification run)
+        diffs = [d if abs(d) >= THRESHOLDS["VOL_DIFF_MIN"] else 0 for d in raw_diffs]
+        moves = [d for d in diffs if d != 0]
+        flips = sum(1 for i in range(len(moves) - 1)
+                    if (moves[i] > 0) != (moves[i + 1] > 0))
+        shape = ("ALTERNATOR" if flips >= THRESHOLDS["VOL_FLIPS_MIN"]
+                 else "burst-step" if vol > THRESHOLDS["HIGH_VOL_STD"]
+                 else "normal")
+        sr = ",".join(f"{v:g}" for v in series)
+        if shape == "ALTERNATOR" and vol > vol_threshold:
+            out.append(Finding("B.volatility", "WARN", key,
+                f"ALTERNATING movement: {flips} sign-flips, per-cycle std {vol:.1f} "
+                f"over {len(tail)} cycles (threshold {vol_threshold:.1f} = cohort p90; "
+                f"series oldest->newest: {sr})",
+                gap="score swings exceed plausible attention dynamics — sawtooth "
+                    "alternation is a flap candidate, not a burst",
+                solution="verify input integrity per cycle for this topic (which sources "
+                         "were present each cycle); score_history lacks mention counts, "
+                         "so this needs an engine-side look — diagnose only",
+                severity="medium"))
+        elif shape == "burst-step":
+            out.append(Finding("B.volatility", "PASS", key,
+                f"burst dynamics (std {vol:.1f}, {flips} flips, range "
+                f"{min(tail):g}–{max(tail):g}; series: {sr}) — monotone step/cliff, "
+                f"expected for bursty attention"))
+        elif vol < 1.0:
+            out.append(Finding("B.volatility", "PASS", key,
+                f"near-static (std {vol:.1f}, range {min(tail):g}–{max(tail):g}) — "
+                f"see B.freeze null condition; NOT asserted as 'moving normally'"))
         else:
-            vol = statistics.pstdev(tail)
-            if vol > THRESHOLDS["HIGH_VOL_STD"]:
-                out.append(Finding("B.volatility", "WARN", key,
-                    f"per-cycle std {vol:.1f} over last {len(tail)} cycles "
-                    f"(range {min(tail)}–{max(tail)})",
-                    gap="a score this jumpy is hard to act on",
-                    solution="inspect input volume per cycle for this topic; diagnose "
-                             "whether a single flapping source drives it",
-                    severity="medium"))
-            else:
-                out.append(Finding("B.volatility", "PASS", key,
-                    f"moving normally (range {min(tail)}–{max(tail)}, std {vol:.1f})"))
+            out.append(Finding("B.volatility", "PASS", key,
+                f"within normal dispersion (std {vol:.1f}, range "
+                f"{min(tail):g}–{max(tail):g}, {flips} flips)"))
     out.append(Finding("B.freeze", "PASS" if n_checked else "INSUFFICIENT",
                        "cohort", f"{n_checked} topics had >= {THRESHOLDS['FREEZE_CYCLES']} cycles of history"))
     return out
@@ -364,27 +517,18 @@ def assess_referee_surge(cohort: dict, live: bool) -> list:
     out = []
     if not live:
         return [Finding("C.referee_surge", "INSUFFICIENT", "demo", "DEMO: referee not simulated")]
-    end = datetime.now(timezone.utc).date() - timedelta(days=1)
-    start = end - timedelta(days=30)
-    fmt = "%Y%m%d"
     corr_pairs = []
     subset = cohort["topics"][:THRESHOLDS["COHORT_REFEREE"]]
     for r in subset:
         disp = (r.get("topic_display") or r.get("topic_key") or "").strip()
-        title = urllib.parse.quote(disp.replace(" ", "_"))
-        url = (f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/"
-               f"en.wikipedia/all-access/user/{title}/daily/{start.strftime(fmt)}00/{end.strftime(fmt)}00")
-        try:
-            d = http_json(url, timeout=30)
-            views = [it.get("views", 0) for it in d.get("items", [])]
-        except Exception:
+        views, resolved, cause = _wiki_daily_series(disp, days=30)
+        if not views:
             out.append(Finding("C.referee_surge", "INSUFFICIENT", disp,
-                               "no en-wiki article resolved (fail-open)"))
+                               f"referee unavailable ({cause}) — fail-open, and the "
+                               f"cause is recorded truthfully (board N1)",
+                               cause=cause))
             continue
         time.sleep(0.3)
-        if len(views) < 10:
-            out.append(Finding("C.referee_surge", "INSUFFICIENT", disp, "thin pageview history"))
-            continue
         med = statistics.median(views[:-3]) or 0
         recent = statistics.fmean(views[-3:])
         surging = med >= 0 and recent >= max(THRESHOLDS["SURGE_FLOOR"],
@@ -418,20 +562,50 @@ def assess_referee_surge(cohort: dict, live: bool) -> list:
         ra, rb = ranks([p[0] for p in corr_pairs]), ranks([p[1] for p in corr_pairs])
         n = len(ra)
         rho = 1 - 6 * sum((a - b) ** 2 for a, b in zip(ra, rb)) / (n * (n * n - 1))
-        out.append(Finding("C.referee_surge", "PASS", "drift-alarm datapoint",
-            f"engine-referee rank correlation rho={rho:.2f} on n={n} (tracked across "
-            f"snapshots; a RISING trend = converging on a lagging fame index — alarm)",
+        # v2.1 (board N4): PERSIST the series append-only — the drift alarm needs a
+        # baseline. Three consecutive rises -> WARN (converging on a lagging fame index).
+        series_path = os.path.join(OUT_DIR, "REFEREE_CORR_SERIES.json")
+        series = []
+        try:
+            with open(series_path, encoding="utf-8") as fh:
+                series = json.load(fh)
+        except Exception:
+            series = []
+        series.append({"date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                       "rho": round(rho, 3), "n": n, "param_version": PARAM_VERSION})
+        os.makedirs(OUT_DIR, exist_ok=True)
+        with open(series_path, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(series, fh, indent=1)
+        rhos = [s.get("rho") for s in series if isinstance(s.get("rho"), (int, float))]
+        rising = len(rhos) >= 4 and all(rhos[-i] > rhos[-i - 1] for i in (1, 2, 3))
+        out.append(Finding("C.referee_surge", "WARN" if rising else "PASS",
+            "drift-alarm datapoint",
+            f"engine-referee rank correlation rho={rho:.2f} on n={n} "
+            f"(series length {len(rhos)}; persisted to REFEREE_CORR_SERIES.json; "
+            f"a RISING trend = converging on a lagging fame index — alarm)",
+            gap="" if not rising else
+                "rho has risen 3 consecutive snapshots — the system may be converging "
+                "toward the lagging fame index (the opposite of the thesis)",
+            solution="" if not rising else
+                "escalate to the founder; audit recent scoring/source changes for "
+                "anything that couples the score to mainstream fame level",
+            severity="high" if rising else "low",
             held_out_derived=True))
     return out
 
 
 # ═════════════════════════════ D · TREND LIFECYCLE (WARN-only v1) ════════════
-def assess_lifecycle(cohort: dict, live: bool) -> list:
+def assess_lifecycle(cohort: dict, live: bool, referee_findings: list = None) -> list:
     """Quantile-referenced, abs-floored, RECURRENT-aware. WARN-only until it beats
-    the STEADY-monkey null across 3 snapshots (board condition)."""
+    the STEADY-monkey null across 3 snapshots (board condition). v2.1: a WARN
+    requires a non-INSUFFICIENT referee for the same topic (board condition — an
+    instrument-blind referee must not leave lifecycle looks un-refereeable; the
+    2026-07-17 spain WARN was refuted by the referee the tool itself couldn't reach)."""
     out = []
     if not live:
         return [Finding("D.lifecycle", "INSUFFICIENT", "demo", "DEMO: lifecycle not simulated")]
+    ref_status = {f.subject: f.status for f in (referee_findings or [])
+                  if f.check == "C.referee_surge"}
     # v1 uses the engine's own score_history shape as the motion series (external
     # referee series at scale is deferred; referee surge above covers the outside view)
     for r in cohort["topics"][:15]:
@@ -463,14 +637,23 @@ def assess_lifecycle(cohort: dict, live: bool) -> list:
             phase = "STEADY"
         stage = (r.get("signal_stage") or "?").upper()
         if phase in ("ENDED?", "FADING") and stage in ("BREAKOUT", "STRONG"):
-            out.append(Finding("D.lifecycle", "WARN", key,
-                f"internal motion {phase} (recent {recent:.0f} vs p90 {ref:.0f}) while "
-                f"stage still {stage}",
-                gap="possible stale-active read; NOTE bursty topics can re-surge "
-                    "(RECURRENT) — treat as a look, not a verdict",
-                solution="compare against the referee surge check + freshness inputs; "
-                         "no stage rule change without founder + backtest",
-                severity="low"))
+            disp = (r.get("topic_display") or key or "").strip()
+            rstat = ref_status.get(disp) or ref_status.get(key)
+            if rstat is None or rstat == "INSUFFICIENT":
+                out.append(Finding("D.lifecycle", "INSUFFICIENT", key,
+                    f"internal motion {phase} (recent {recent:.0f} vs p90 {ref:.0f}) "
+                    f"while stage {stage} — but the referee is unavailable for this "
+                    f"topic, so no look is emitted (board condition)",
+                    cause="referee_unavailable"))
+            else:
+                out.append(Finding("D.lifecycle", "WARN", key,
+                    f"internal motion {phase} (recent {recent:.0f} vs p90 {ref:.0f}) while "
+                    f"stage still {stage} (referee status for this topic: {rstat})",
+                    gap="possible stale-active read; NOTE bursty topics can re-surge "
+                        "(RECURRENT) — treat as a look, not a verdict",
+                    solution="compare against the referee surge check + freshness inputs; "
+                             "no stage rule change without founder + backtest",
+                    severity="low"))
         else:
             out.append(Finding("D.lifecycle", "PASS", key, f"{phase} — stage {stage} consistent"))
     return out
@@ -481,38 +664,107 @@ def assess_outside(cohort: dict, live: bool) -> list:
     out = []
     if not live:
         return [Finding("E.trending_recall", "PASS", "demo", "DEMO synthetic pass")]
-    # 1) Google daily-trending RSS (free) — do today's top external topics exist in our feed?
+    # 1) Google daily-trending RSS (free) — COVERAGE gauge, never an accuracy KPI.
+    # v2.1 rebuild (board-ruled): full-feed scan with a pinned denominator; phrase /
+    # single-topic token matching (the v2 substring-blob matcher produced false hits:
+    # "boston" credited for "aliyah boston"); "X vs Y" matchup class registered and
+    # EXCLUDED; registered traffic floor; a miss only counts when the independent
+    # Wikipedia referee confirms attention actually arrived (the null: most daily-
+    # trending queries are noise — Brady flat / Piastri declining refuted the v2 misses).
     try:
         xml = http_text("https://trends.google.com/trending/rss?geo=US", timeout=30)
-        titles = re.findall(r"<title>(.*?)</title>", xml)[1:THRESHOLDS["RECALL_TOP"] + 1]
-        served = " ".join((r.get("topic_display") or "") + " " + (r.get("topic_key") or "")
-                          for r in cohort["topics"]).lower()
-        # broaden with a larger served sample
-        misses, hits = [], []
-        for t in titles:
-            words = [w for w in re.split(r"\W+", t.lower()) if len(w) > 3]
-            if words and any(w in served for w in words):
-                hits.append(t)
-            else:
-                misses.append(t)
-        denom = len(titles)
-        if denom >= THRESHOLDS["MIN_N"]:
-            status = "PASS" if len(misses) <= denom * 0.4 else "WARN"
-            out.append(Finding("E.trending_recall", status, "google daily trending",
-                f"{len(hits)}/{denom} of today's top external trends have a matching served "
-                f"topic (misses: {', '.join(misses[:4])[:90]})",
-                gap="" if status == "PASS" else
-                    "external top-trending items missing from the served feed — recall gap",
-                solution="" if status == "PASS" else
-                    "check the discovery collectors for the missed terms; candidates for "
-                    "the catch-all/lexicon worklist",
-                severity="medium" if status == "WARN" else "low"))
-        else:
+        raw_titles = re.findall(r"<title>(.*?)</title>", xml)[1:THRESHOLDS["RECALL_TOP"] + 1]
+        traffics = re.findall(r"<ht:approx_traffic>([\d,+]+)", xml)
+        def _traffic(i):
+            try:
+                return int(traffics[i].replace(",", "").replace("+", ""))
+            except Exception:
+                return 0
+        items = [(t, _traffic(i)) for i, t in enumerate(raw_titles)]
+
+        # full-feed scan, batch-paced, denominator PINNED in the evidence
+        topics_scanned, total_served = [], None
+        off = 0
+        while off < THRESHOLDS["RECALL_SCAN_CAP"]:
+            d = http_json(f"{ENGINE}/scores?limit=100&offset={off}")
+            rows = d.get("results") or []
+            total_served = d.get("total")
+            topics_scanned += [
+                ((r.get("topic_key") or "").replace("_", " ") + " " +
+                 (r.get("topic_display") or "")).lower().strip()
+                for r in rows]
+            off += 100
+            if not rows or (total_served is not None and off >= total_served):
+                break
+            time.sleep(0.25)
+
+        STOP = {"2026", "2025", "with", "from", "what", "when", "will", "this", "that"}
+        def _matches(title: str) -> bool:
+            tl = re.sub(r"\W+", " ", title.lower()).strip()
+            toks = [w for w in tl.split() if len(w) > 3 and w not in STOP]
+            for s in topics_scanned:
+                if tl and tl in s:                       # whole phrase in ONE topic
+                    return True
+                if toks and all(re.search(r"\b" + re.escape(w), s) for w in toks):
+                    return True                          # all tokens in ONE topic
+            return False
+
+        matchups = [t for t, _ in items if re.search(r"\b(vs|v)\b", t.lower())]
+        graded = [(t, tr) for t, tr in items
+                  if t not in matchups and tr >= THRESHOLDS["RECALL_TRAFFIC_FLOOR"]]
+        below_floor = [t for t, tr in items
+                       if t not in matchups and tr < THRESHOLDS["RECALL_TRAFFIC_FLOOR"]]
+        scan_note = (f"scanned {len(topics_scanned)}/{total_served} served topics; "
+                     f"{len(matchups)} matchup-class excluded; {len(below_floor)} below "
+                     f"the {THRESHOLDS['RECALL_TRAFFIC_FLOOR']:,} traffic floor")
+        if not graded:
             out.append(Finding("E.trending_recall", "INSUFFICIENT", "google daily trending",
-                               f"only {denom} items parsed from the RSS"))
+                f"no external items qualified today ({scan_note}) — an honest no-grade "
+                f"day, like the crypto check's 'no 20% movers'",
+                cause="no_qualifying_items"))
+        else:
+            hits, confirmed_misses, unconfirmed = [], [], []
+            for t, tr in graded:
+                if _matches(t):
+                    hits.append(t)
+                    continue
+                views, resolved, cause = _wiki_daily_series(t, days=21)
+                time.sleep(0.3)
+                if views:
+                    med = statistics.median(views[:-3]) or 0
+                    recent = statistics.fmean(views[-3:])
+                    if recent >= max(THRESHOLDS["SURGE_FLOOR"],
+                                     THRESHOLDS["SURGE_MULT"] * max(med, 1)):
+                        confirmed_misses.append(t)       # referee says attention ARRIVED
+                    else:
+                        unconfirmed.append(f"{t} (no referee surge — the null won)")
+                else:
+                    unconfirmed.append(f"{t} (referee {cause})")
+            denom = len(hits) + len(confirmed_misses)
+            if denom == 0:
+                out.append(Finding("E.trending_recall", "INSUFFICIENT",
+                    "google daily trending",
+                    f"0 gradable items after referee confirmation ({scan_note}; "
+                    f"unconfirmed: {'; '.join(unconfirmed[:3])[:120]})",
+                    cause="no_referee_confirmed_items"))
+            else:
+                status = "PASS" if len(confirmed_misses) <= denom * 0.4 else "WARN"
+                out.append(Finding("E.trending_recall", status, "google daily trending",
+                    f"{len(hits)}/{denom} referee-confirmed external trends have a "
+                    f"matching served topic ({scan_note}; confirmed misses: "
+                    f"{', '.join(confirmed_misses[:4])[:90]})",
+                    gap="" if status == "PASS" else
+                        "referee-confirmed attention arrivals missing from the served "
+                        "feed — a genuine coverage gap (internal gauge only)",
+                    solution="" if status == "PASS" else
+                        "check the discovery collectors for the missed terms; candidates "
+                        "for the catch-all/lexicon worklist; any NEW SOURCE goes through "
+                        "the §16 five-gate onboarding protocol",
+                    severity="medium" if status == "WARN" else "low",
+                    held_out_derived=True))
     except Exception as e:
         out.append(Finding("E.trending_recall", "INSUFFICIENT", "google daily trending",
-                           f"fetch failed: {str(e)[:60]}"))
+                           f"fetch failed: {str(e)[:60]}", cause="fetch_error"))
     # 2) crypto movers agreement — our own served feed (free)
     try:
         c = http_json(f"{ENGINE}/crypto")
@@ -557,6 +809,14 @@ def grade(findings: list) -> dict:
             modules[mod] = {"grade": "N/A", "passed": 0, "graded": 0, "insufficient":
                             sum(1 for f in fs if f.status == "INSUFFICIENT")}
             continue
+        if len(graded) < THRESHOLDS["MIN_GRADED_N"]:
+            # v2.1 (board): a letter on a tiny denominator is not a grade ("A" on 2/20
+            # abstentions flattered a broken referee). Counts only, no letter, no floor.
+            modules[mod] = {"grade": f"N/A (n={len(graded)}<{THRESHOLDS['MIN_GRADED_N']})",
+                            "passed": sum(1 for f in graded if f.status == "PASS"),
+                            "graded": len(graded),
+                            "insufficient": sum(1 for f in fs if f.status == "INSUFFICIENT")}
+            continue
         wsum = sum(SEV_W[f.severity] for f in graded)
         wbad = sum(SEV_W[f.severity] * (1.0 if f.status == "FAIL" else 0.5 if f.status == "WARN" else 0)
                    for f in graded)
@@ -580,8 +840,9 @@ def run(live: bool) -> dict:
     cohort = build_cohort(live)
     findings += assess_movement(cohort, live)
     findings += assess_accuracy(cohort, live)
-    findings += assess_referee_surge(cohort, live)
-    findings += assess_lifecycle(cohort, live)
+    referee_findings = assess_referee_surge(cohort, live)
+    findings += referee_findings
+    findings += assess_lifecycle(cohort, live, referee_findings)
     findings += assess_outside(cohort, live)
     findings = [f.finalize() for f in findings]
 
@@ -593,10 +854,25 @@ def run(live: bool) -> dict:
     if live:
         try:
             L = http_json(f"{ENGINE}/accuracy/ledger")
+            # v2.1 (board N6): the rate always ships with its Wilson 95% interval —
+            # on n=33 most of the number is interval (Bernstein: risk is what remains).
+            led, sample = L.get("led"), L.get("trackedRaceSample")
+            interval = None
+            if isinstance(led, int) and isinstance(sample, int) and sample > 0:
+                z = 1.959964
+                p = led / sample
+                den = 1 + z * z / sample
+                ctr = (p + z * z / (2 * sample)) / den
+                hw = z * ((p * (1 - p) / sample + z * z / (4 * sample * sample)) ** 0.5) / den
+                interval = [round(100 * (ctr - hw), 1), round(100 * (ctr + hw), 1)]
             ledger_headline = {
                 "tracked_race_hit_rate_pct": L.get("trackedRaceHitRate"),
-                "tracked_race_sample": L.get("trackedRaceSample"),
+                "tracked_race_sample": sample,
+                "tracked_race_wilson95_pct": interval,
                 "blended_hit_rate_pct": L.get("hitRate"),
+                "false_positives": L.get("falsePositives"),
+                "false_positives_note": ("structurally 0 until the 365d patience window "
+                                         "matures rows — not a quality signal yet"),
                 "epoch_boundary": L.get("epochBoundary"),
                 "by_epoch": L.get("byEpoch"),
             }
@@ -639,10 +915,16 @@ def render_md(r: dict) -> str:
     L.append(f"> **BOARD GATE:** {r['board_gate']}")
     L.append("")
     ah = r["accuracy_headline"]
+    w = ah.get("tracked_race_wilson95_pct")
     L.append(f"**THE ACCURACY NUMBER (held-out ledger):** tracked-race "
-             f"{ah.get('tracked_race_hit_rate_pct')}% (n={ah.get('tracked_race_sample')}) · "
+             f"{ah.get('tracked_race_hit_rate_pct')}% (n={ah.get('tracked_race_sample')}"
+             f"{'; 95% interval ' + str(w[0]) + '–' + str(w[1]) + '%' if w else ''}) · "
              f"blended {ah.get('blended_hit_rate_pct')}% · epoch-segmented at {ah.get('epoch_boundary')}")
     L.append("")
+    if ah.get("false_positives") == 0:
+        L.append("*(false positives: 0 — structurally guaranteed until the 365d patience "
+                 "window matures rows; not a quality signal yet)*")
+        L.append("")
     L.append(f"Internal operational checks: pass {r['operational_check_pass_pct']}% · "
              f"worst-module floor {r['worst_module_floor_pct']}% (internal-only; "
              f"cohort: {r['cohort_spec']})")
