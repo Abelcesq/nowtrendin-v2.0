@@ -82,3 +82,27 @@ window is composition-sensitive and its lexicon is chatter-biased.
 **Nothing implemented** — this is the review the founder asked for. F1–F3 are small,
 display-only, and testable against this exact case (taco_bell should flip to Health at the
 next context refresh after F1/F2; lettuce_taco must stay Health as the regression check).
+
+---
+
+## IMPLEMENTED + VERIFIED (founder-approved, deployed engine faee2b3, 2026-07-19 ~03:45 UTC)
+
+All four fixes shipped display-only; scoring untouched:
+- **F1** tier-weighted context builder (publication-grade titles govern; social text
+  = fallback only; `SOCIAL_TEXT_PLATFORMS = bluesky/lemmy/mastodon/reddit`).
+- **F2** `_TOPIC_ONLY_TERMS` (google/youtube/whatsapp/reddit/bsky/bluesky/meta/asi)
+  match the topic string only, never context text.
+- **F3** health above technology in `_PRIORITY`.
+- **F4** `/monitor/catmaps?explain=<topic_key>` provenance probe (layer + all three
+  entries + decision).
+
+**Local regression suite: 8/8** (chatter de-biased; news→health; platform-as-topic
+still tech; nvidia headline unaffected; mamdani politics unchanged).
+
+**Live verification after the boot refresh (03:38 UTC map, new builder):**
+`taco_bell → health (context layer)` — the detail endpoint serves category=health;
+`taco → health`; `taco_bell_lettuce → health`; `tacoma → general` (honest bare-lexicon
+fallback, no longer false Technology); regressions `lettuce_taco → health` and
+`youtube → technology (situation)` hold. The explain probe also retro-confirmed D1:
+`situation_entry: null` for taco_bell — the context layer was the deciding layer, as
+diagnosed.

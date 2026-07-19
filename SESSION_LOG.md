@@ -2198,3 +2198,17 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   web-terminal/ — its cleanup step deleted the web-terminal source tree and committed the
   deletions LOCALLY. Nothing was pushed; recovered fully via git reset + checkout (rebuild
   produced the byte-identical bundle). Lesson: deploy steps use ABSOLUTE paths, always.
+
+### 2026-07-18 (cont. 2) — taco_bell category review -> fixes F1-F4 shipped + verified
+- Founder flagged Taco Bell under Technology while the AI Context correctly described the
+  cyclosporiasis/lettuce outbreak. Diagnosis (audits/CATEGORY_REVIEW_taco-bell_2026-07-18.md):
+  DISPLAY-ONLY defect; bare lexicon returns general; maps live+fresh; root cause = context
+  builder classifying the 6 MOST-RECENT titles (bluesky chatter with incidental ai/app/google
+  outvoting 19 news outlets) + platform words in the tech weak lexicon matching inside text +
+  technology-above-health tie-break. Demonstrated concretely against the deployed classifier.
+- Fixes (founder-approved, engine faee2b3, display-only): F1 tier-weighted context builder
+  (publication titles govern, social fallback); F2 _TOPIC_ONLY_TERMS (platform words match
+  topic string only); F3 health>technology tie-break; F4 /monitor/catmaps?explain= provenance
+  probe. Local suite 8/8; LIVE verified post-refresh: taco_bell/taco/taco_bell_lettuce ->
+  health (context), tacoma -> honest general, lettuce_taco + youtube regressions hold; detail
+  serves category=health. Explain probe retro-confirmed context (not situation) was deciding.
