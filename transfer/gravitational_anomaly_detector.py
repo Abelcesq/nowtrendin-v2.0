@@ -9082,11 +9082,17 @@ def get_topic_detail(topic_key: str):
     if not latest:
         raise HTTPException(404, f"No scores found for topic: {topic_key}")
 
+    # Board item 2 (Chairman-ruled 2026-07-18): per-cycle INPUT columns added so the
+    # median-of-12 baseline replay + input-volume diagnostics run from endpoints
+    # (heroku run is broken on the founder's box; endpoints are the only window).
+    # Values serve as stored — null stays null, never coerced to 0.
     history = conn.execute("""
         SELECT scored_at, overall_score, detection_score, confidence_score,
                persistence_score, gradient_strength, inertia_score,
                platform_diversity, dark_matter_score, confidence_decay,
-               heisenberg_gap, signal_stage
+               heisenberg_gap, signal_stage,
+               total_mentions, attention_magnitude, n_mainstream_platforms,
+               mainstream_ratio, detection_pathway
         FROM velocity_scores
         WHERE topic_key = ?
         ORDER BY scored_at DESC LIMIT 30
@@ -9095,6 +9101,42 @@ def get_topic_detail(topic_key: str):
     lc = conn.execute(
         "SELECT * FROM topic_lifecycle WHERE topic_key = ?", (topic_key,)
     ).fetchone()
+
+    # Board item 5 (Chairman-ruled 2026-07-18): INPUT-FRESHNESS FACTS for the
+    # post-burst annotation. Facts only — signal ages and window counts, no
+    # interpretation, no score impact (Smith price-integrity rule: label the
+    # inputs' state, never repaint the number). Two indexed single-topic reads.
+    _input_freshness = None
+    try:
+        _fr = conn.execute(
+            "SELECT MAX(extracted_at) AS newest, COUNT(*) AS n FROM topic_signals "
+            "WHERE topic_key = ? AND extracted_at >= ?",
+            (topic_key,
+             (datetime.now(timezone.utc) - timedelta(hours=72)).isoformat())).fetchone()
+        _newest_any = conn.execute(
+            "SELECT MAX(extracted_at) AS newest FROM topic_signals WHERE topic_key = ?",
+            (topic_key,)).fetchone()
+        _newest = (_fr["newest"] if _fr and _fr["newest"] else
+                   (_newest_any["newest"] if _newest_any else None))
+        _age_h = None
+        if _newest:
+            try:
+                _ndt = datetime.fromisoformat(str(_newest).replace("Z", "+00:00"))
+                if _ndt.tzinfo is None:
+                    _ndt = _ndt.replace(tzinfo=timezone.utc)
+                _age_h = round((datetime.now(timezone.utc) - _ndt).total_seconds() / 3600, 1)
+            except Exception:
+                _age_h = None
+        _input_freshness = {
+            "newest_signal_at": _newest,
+            "newest_signal_age_h": _age_h,
+            "signals_in_window_72h": (_fr["n"] if _fr else 0) or 0,
+            "note": ("Facts about the inputs currently inside the scoring window. "
+                     "A topic whose surge inputs have aged out is scored on its "
+                     "post-surge state."),
+        }
+    except Exception as _ife:
+        print(f"[detail] input_freshness skipped: {_ife}")
 
     # N detail (queries 30d / 24h / daily rate): velocity_scores never persisted
     # these (schema has only nowtrendin_score), so reading them off the row was
@@ -9265,6 +9307,9 @@ def get_topic_detail(topic_key: str):
 
         # ── SCORE HISTORY ────────────────────────────────────────
         "score_history": [dict(h) for h in history],
+
+        # ── INPUT FRESHNESS (facts only — board item 5, 2026-07-18) ──
+        "input_freshness": _input_freshness,
     }
 
     # ── Separate "Now Trending Gradient Score" (demand-inclusive what-if) ──
@@ -9356,10 +9401,24 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
         (topic_key, limit),
     ).fetchall()
     conn.close()
+    # Board item 4 (founder-ruled 2026-07-18, 5/6 memos flagged it): extend the
+    # INV-1 stale-serve rule to the history path. Re-running live calibration
+    # (today's maturity state + AI floor) on rows of ANY age made served history
+    # a re-derivation that mutates with calibration releases — the exact
+    # 'coding agent' 35.6→100 divergence class INV-1 stopped on /scores.
+    # Rows older than SERVE_LIVECAL_MAX_AGE_H now serve STORED values; recent
+    # rows keep live calibration for headline consistency. Flag-gated:
+    # HISTORY_SERVE_STORED=0 restores the old always-live behavior (rollback).
+    _hist_inv1 = os.getenv("HISTORY_SERVE_STORED", "1") == "1"
     out = []
+    stored_served = 0
     for r in rows:
         s = _parse_json_fields(dict(r))
-        s = _calibrate_score_fields(s)   # same calibration as /scores
+        row_stale = _hist_inv1 and _serve_row_is_stale(s.get("scored_at"))
+        if row_stale:
+            stored_served += 1
+        else:
+            s = _calibrate_score_fields(s)   # same calibration as /scores
         det = round(s.get("detection_score") or 0)
         conf = round(s.get("confidence_score") or 0)
         # Per-cycle FACTORS that explain why the score moved between points — surfaced
@@ -9370,20 +9429,25 @@ def get_topic_score_history(topic_key: str, limit: int = 30):
                 pa = json.loads(pa or "[]")
             except Exception:
                 pa = []
+        _m = s.get("total_mentions")
         out.append({
             "scored_at": s.get("scored_at"),
             "detection": det,
             "confidence": conf,
             "overall": round(s.get("overall_score") or 0),
             "gap": abs(det - conf),
-            # explanatory factors (best-effort; null when a column is absent)
-            "mentions": int(s.get("total_mentions") or 0),
+            # explanatory factors — null when absent, never a fabricated 0
+            # (board condition, Challenger 2026-07-18)
+            "mentions": int(_m) if _m is not None else None,
             "platforms": len(pa) if isinstance(pa, list) else 0,
             "stage": s.get("signal_stage") or "",
             "inertia": round(s.get("inertia_score") or 0),
             "dark_matter": round(s.get("dark_matter_score") or 0),
+            "served_stored": bool(row_stale),
         })
-    return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True}
+    return {"topic_key": topic_key, "count": len(out), "rows": out, "calibrated": True,
+            "stale_rows_served_stored": stored_served,
+            "history_inv1": _hist_inv1}
 
 
 HISTORY_FULL_CAP = int(os.getenv("HISTORY_FULL_CAP", "2000"))
