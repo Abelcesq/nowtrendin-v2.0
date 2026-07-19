@@ -2155,3 +2155,46 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - Closeout: snapshot #1 stamped BOARD_VERIFIED / CHAIRMAN_RULED 2026-07-18 (+ disposition in
   json/md); docs/GLOSSARY.md (N6 plain-English one-pager); shutting/trump_fires routed to the
   topic-quality worklist (N5).
+
+### 2026-07-18 (cont.) — Q1/Q2 board session + ALL ruled items landed (#6 HELD by Chairman)
+- BOARD (6 memos, record audits/board/BOARD_q1q2-cliff-plateau_2026-07-18.md): the Executioner
+  ran the discriminating diagnostic LIVE and named the mechanism — the dual-pathway blend weight
+  w (integer MEDIAN-of-12-cycles baseline, sorted[len//2]) flips discretely ~cycle 7 after a
+  step-up, releasing the full pathway gap in one cycle. Q2 = cause (i) verified (identical raw
+  stored values; calibration pass-through; INV-1 not implicated). Wikimedia framing corrected
+  (level-vs-gradient category error). 5/6 independently found the history-route INV-1 gap.
+  Unanimous forbidden list: no output smoothing/EMA, no jitter, no history rewrites, no INV-1
+  weakening, no silent enrollment shifts, no tuning-to-quiet-flags.
+- CHAIRMAN RULING: item 6 (baseline-estimator continuity+hysteresis, SCORE_AFFECTING) HELD;
+  items 1-5,7,8 proceed. All landed + verified:
+  (1) Confirmation sweep: cause (i) confirmed on white_house/shutting/jordan/andy_burnham
+      (raw stored values themselves identical; served = rounding only). Q2 CLOSED cohort-wide.
+  (2) Engine v248/v249: embedded score_history now serves per-cycle total_mentions,
+      attention_magnitude, n_mainstream_platforms, mainstream_ratio (w), detection_pathway
+      (null-not-zero).
+  (3) COHORT REPLAY (audits/assessor/MEDIAN_REPLAY_2026-07-18.md): 49/50 of the >=30pt
+      single-cycle transitions coincide EXACTLY with stored w snapping (1.0<->0.0) / pathway
+      flipping — mechanism CONFIRMED (spain's 4 toggles all w flips; tillis cliff = magnitude
+      median catching up 5.56->99.71; google = 8 w transitions in 30 cycles). One honest
+      exception (japan 07-18T04, mainstream-internal). 07-19T10/T16 cliff PREDICTIONS PENDING
+      (mamdani/taco/cyclosporiasis_outbreak; russia) — check after 07-19T17 UTC.
+  (4) INV-1 STALE-SERVE GUARD live on /scores/{key}/score-history (HISTORY_SERVE_STORED=1,
+      flag rollback): verified with before/after diff — 20 of 110 stale rows were being
+      re-colored by live calibration (canada stored 33/61 served as 26/57); now serve stored.
+  (5) INPUT-FRESHNESS FACTS (post-burst annotation) live on ALL surfaces: engine detail
+      input_freshness{newest_signal_age_h, signals_in_window_72h} + standalone history route;
+      web terminal Screener section (gh-pages 7e17149, bundle index-BfmU0H0M verified live;
+      rollback pointer 0d0eb23); mobile ScoringHistory card (Aurora-compliant; preview
+      aa46142, PIN gate verified intact). Facts only — never reinterprets the score.
+  (7) Assessor v2.1.1 (param .4018144e78): B.asymmetry (Kindleberger audit) + C.saturation_gauge
+      (Bernstein) as SHADOW checks — live run verified: britain flagged as the one true
+      both-ways alternator; 0/6 top-decile pinned. SECOND-ORDER WIN: mentions-in-history made
+      B.freeze's null testable — immediately caught final_del_mundial (det frozen 62.59 x6
+      cycles while mentions varied 10-16; SCORE_AFFECTING, UNVERIFIED -> next board gate).
+  (8) SCALE-DEBT LOGGED: the history route re-runs full calibration per row at serve time —
+      O(history) compute amplifier on the fragile read path; design a precomputed/cached
+      history lane (INV-1-consistent) BEFORE 100x volume forces it. No deadline; deliberate.
+- OPS NOTE (honest record): one gh-pages deploy attempt ran with the shell cwd left in
+  web-terminal/ — its cleanup step deleted the web-terminal source tree and committed the
+  deletions LOCALLY. Nothing was pushed; recovered fully via git reset + checkout (rebuild
+  produced the byte-identical bundle). Lesson: deploy steps use ABSOLUTE paths, always.

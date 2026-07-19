@@ -133,6 +133,18 @@ CHECK_MANIFEST = {
                       "coverage gauge ONLY — never an accuracy KPI (catch-all-% rule)"},
     "E.crypto_agreement": {"module": "E_OUTSIDE",   "shadow": True,
         "null": "no 20% movers = nothing to grade (honest INSUFFICIENT)"},
+    # v2.1.1 shadow checks (board Q1/Q2 session, Chairman-ruled item 7, 2026-07-18):
+    "B.asymmetry":        {"module": "B_MOVEMENT",  "shadow": True,
+        "null": "Kindleberger: attention decay is asymmetric (down faster than up) but "
+                "CONTINUOUS. Instant transitions BOTH ways, quantized to cycle boundaries, "
+                "is the standing signature of a measurement-window/estimator artifact — "
+                "not of the attention process.",
+        "provenance": "Economist prescription 4, BOARD_q1q2-cliff-plateau_2026-07-18"},
+    "C.saturation_gauge": {"module": "C_ACCURACY",  "shadow": True,
+        "null": "Bernstein: variance destroyed by clamps is measurement error you are "
+                "choosing not to see. Top-decile topics pinned at caps/floors cannot be "
+                "ranked where clients look hardest.",
+        "provenance": "Economist prescription 5, BOARD_q1q2-cliff-plateau_2026-07-18"},
 }
 THRESHOLDS = {
     "FREEZE_CYCLES": 6, "HIGH_VOL_STD": 12.0, "GAP_TOL": 0.6,
@@ -147,11 +159,16 @@ THRESHOLDS = {
     "MIN_GRADED_N": 5,           # no letter grade below this many graded checks
     "RECALL_TRAFFIC_FLOOR": 10000,   # grade only external items >= this approx_traffic
     "RECALL_SCAN_CAP": 2000,     # full-feed scan page cap (denominator pinned in evidence)
+    # v2.1.1 (board item 7):
+    "ASYM_STEP": 30.0,           # single-cycle step >= this counts as an instant transition
+    "SAT_PIN": 99.5,             # detection/confidence >= this counts as cap-pinned
+    "SAT_TOP_DECILE_WARN": 0.2,  # shadow-WARN when >20% of the top decile is pinned
 }
 _manifest_hash = hashlib.sha256(
     json.dumps({"checks": CHECK_MANIFEST, "thresholds": THRESHOLDS},
                sort_keys=True).encode()).hexdigest()[:10]
-PARAM_VERSION = f"assessor-v2.1.{_manifest_hash}"   # v2.1 = new comparable series (Chairman-ruled 2026-07-18)
+PARAM_VERSION = f"assessor-v2.1.1.{_manifest_hash}"  # v2.1.1 adds SHADOW checks only (board item 7);
+                                                     # graded series unchanged from v2.1 (shadows excluded from %)
 
 # ── RULINGS REGISTRY (Chairman rulings a solution must NEVER contradict) ──
 RULINGS = [
@@ -462,6 +479,32 @@ def assess_movement(cohort: dict, live: bool) -> list:
                 f"{min(tail):g}–{max(tail):g}, {flips} flips)"))
     out.append(Finding("B.freeze", "PASS" if n_checked else "INSUFFICIENT",
                        "cohort", f"{n_checked} topics had >= {THRESHOLDS['FREEZE_CYCLES']} cycles of history"))
+
+    # B.asymmetry (SHADOW — Kindleberger audit, board item 7): instant transitions in
+    # BOTH directions inside one window = window/estimator-artifact signature. Genuine
+    # attention may crash fast (revulsion) — but it does not also ARRIVE in one cycle.
+    inst_up = inst_down = both = 0
+    for key, tail, _m in windows:
+        series = list(reversed(tail))
+        diffs = [series[i + 1] - series[i] for i in range(len(series) - 1)]
+        up = max(diffs) if diffs else 0
+        dn = min(diffs) if diffs else 0
+        u = up >= THRESHOLDS["ASYM_STEP"]
+        d = -dn >= THRESHOLDS["ASYM_STEP"]
+        inst_up += bool(u); inst_down += bool(d)
+        if u and d:
+            both += 1
+            out.append(Finding("B.asymmetry", "WARN", key,
+                f"instant transitions BOTH ways in one window (max up {up:.1f}, max down "
+                f"{dn:.1f} in single cycles) — artifact signature, not attention dynamics",
+                gap="quantized bistability: the estimator, not the phenomenon, is moving",
+                solution="hold for the cohort replay verification (board Q1/Q2 item 3); "
+                         "no estimator change without founder + backtest (item 6 HELD)",
+                severity="low"))
+    out.append(Finding("B.asymmetry", "PASS", "cohort asymmetry profile",
+        f"{inst_up} topics with instant up-steps, {inst_down} with instant down-steps, "
+        f"{both} with BOTH in one window (n={len(windows)}; step floor "
+        f"{THRESHOLDS['ASYM_STEP']})"))
     return out
 
 
@@ -508,6 +551,28 @@ def assess_accuracy(cohort: dict, live: bool) -> list:
                            severity="low"))
     except Exception as e:
         out.append(Finding("C.alias_families", "INSUFFICIENT", "alias endpoint", str(e)[:80]))
+
+    # C.saturation_gauge (SHADOW — Bernstein gauge, board item 7): share of the
+    # top decile pinned at caps/floors. Pinned scores cannot rank the leaders.
+    dets = sorted((r for r in rows if r.get("detection_score") is not None),
+                  key=lambda r: -float(r["detection_score"]))
+    top = dets[:max(1, len(dets) // 10)]
+    pinned = [r["topic_key"] for r in top
+              if float(r.get("detection_score") or 0) >= THRESHOLDS["SAT_PIN"]
+              or float(r.get("confidence_score") or 0) >= THRESHOLDS["SAT_PIN"]]
+    ratio = len(pinned) / len(top) if top else 0
+    out.append(Finding("C.saturation_gauge",
+        "WARN" if ratio > THRESHOLDS["SAT_TOP_DECILE_WARN"] else "PASS",
+        "top-decile cap pinning",
+        f"{len(pinned)}/{len(top)} top-decile topics at >= {THRESHOLDS['SAT_PIN']} "
+        f"({', '.join(pinned[:5])})" if pinned else
+        f"0/{len(top)} top-decile topics pinned at caps",
+        gap="" if ratio <= THRESHOLDS["SAT_TOP_DECILE_WARN"] else
+            "ranking resolution destroyed where clients look hardest (cap saturation)",
+        solution="" if ratio <= THRESHOLDS["SAT_TOP_DECILE_WARN"] else
+            "quantify the flat segment over stored history before any curve change "
+            "(SCORE_AFFECTING; founder + backtest)",
+        severity="low"))
     return out
 
 

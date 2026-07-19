@@ -1,6 +1,6 @@
 {
- "run_at": "2026-07-19T02:02:10+00:00",
- "param_version": "assessor-v2.1.dfc882cac9",
+ "run_at": "2026-07-19T02:55:42+00:00",
+ "param_version": "assessor-v2.1.1.4018144e78",
  "mode": "LIVE",
  "status": "UNVERIFIED_PENDING_BOARD_REVIEW",
  "board_gate": "REQUIRED before any finding teaches or is implemented: the advisory board independently critiques these findings, cross-checks them against freshly-obtained outside data (current trending items, market/crypto movers), and verifies or refutes each. The CHAIRMAN has final say before any implementation.",
@@ -18,19 +18,25 @@
   "epoch_boundary": "2026-06-15",
   "by_epoch": {
    "v1_engine": {
-    "resolved": 72,
+    "resolved": 67,
     "led": 7,
-    "hit_rate_pct": 9.7
+    "hit_rate_pct": 10.4,
+    "tracked_race_hit_rate_pct": 35.0,
+    "tracked_race_sample": 20,
+    "late_redetection_excluded": 5
    },
    "v2_engine": {
-    "resolved": 21,
+    "resolved": 20,
     "led": 1,
-    "hit_rate_pct": 4.8
+    "hit_rate_pct": 5.0,
+    "tracked_race_hit_rate_pct": 7.7,
+    "tracked_race_sample": 13,
+    "late_redetection_excluded": 1
    }
   }
  },
- "operational_check_pass_pct": 100.0,
- "worst_module_floor_pct": 100.0,
+ "operational_check_pass_pct": 98.6,
+ "worst_module_floor_pct": 94.4,
  "internal_only": "never publish these percentages externally (catch-all-% rule)",
  "modules": {
   "A_SOURCES": {
@@ -43,9 +49,9 @@
   "B_MOVEMENT": {
    "grade": "A",
    "passed": 51,
-   "graded": 51,
-   "insufficient": 1,
-   "severity_weighted_score": 1.0
+   "graded": 52,
+   "insufficient": 0,
+   "severity_weighted_score": 0.944
   },
   "C_ACCURACY": {
    "grade": "N/A (n=2<5)",
@@ -72,7 +78,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "github",
-   "evidence": "6420 signals 217m ago",
+   "evidence": "6024 signals 10m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -86,7 +92,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "hackernews",
-   "evidence": "152 signals 217m ago",
+   "evidence": "135 signals 10m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -100,7 +106,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "blogs",
-   "evidence": "1664 signals 210m ago",
+   "evidence": "1690 signals 2m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -114,7 +120,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "newsapi_org",
-   "evidence": "215 signals 217m ago",
+   "evidence": "195 signals 10m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -128,7 +134,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "newsapi_ai",
-   "evidence": "563 signals 217m ago",
+   "evidence": "568 signals 10m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -142,7 +148,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "newsdata_io",
-   "evidence": "45 signals 217m ago",
+   "evidence": "52 signals 9m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -156,7 +162,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "bluesky",
-   "evidence": "553 signals 216m ago",
+   "evidence": "471 signals 7m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -170,7 +176,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "lemmy",
-   "evidence": "397 signals 216m ago",
+   "evidence": "324 signals 7m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -184,7 +190,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "mastodon",
-   "evidence": "143 signals 215m ago",
+   "evidence": "139 signals 7m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -198,7 +204,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "google_trends",
-   "evidence": "949 signals 91m ago",
+   "evidence": "949 signals 145m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -212,7 +218,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "youtube",
-   "evidence": "12 signals 212m ago",
+   "evidence": "12 signals 3m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -226,7 +232,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "gdelt",
-   "evidence": "288 signals 212m ago",
+   "evidence": "145 signals 4m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -240,7 +246,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "creators",
-   "evidence": "273 signals 212m ago",
+   "evidence": "273 signals 3m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -254,7 +260,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "broadcast",
-   "evidence": "2696 signals 212m ago",
+   "evidence": "2714 signals 3m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -268,7 +274,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "risk",
-   "evidence": "1512 signals 207m ago",
+   "evidence": "1514 signals 32m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -282,7 +288,7 @@
    "check": "A.freshness",
    "status": "PASS",
    "subject": "alphavantage",
-   "evidence": "16 signals 207m ago",
+   "evidence": "16 signals 32m ago",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -296,7 +302,7 @@
    "check": "A.freshness",
    "status": "DEFERRED",
    "subject": "reddit",
-   "evidence": "DEGRADED \u2014 founder-deferred credentials (ran 218m ago but 0 signals)",
+   "evidence": "DEGRADED \u2014 founder-deferred credentials (ran 12m ago but 0 signals)",
    "gap": "",
    "solution": "",
    "severity": "low",
@@ -938,17 +944,17 @@
   },
   {
    "check": "B.freeze",
-   "status": "INSUFFICIENT",
+   "status": "FAIL",
    "subject": "final_del_mundial",
-   "evidence": "score static 6 cycles; score_history carries no mention counts, so the inputs-moved null cannot be tested",
-   "gap": "",
-   "solution": "",
-   "severity": "low",
-   "task_class": "OPERATIONAL",
+   "evidence": "Detection identical at 62.59 for 6 cycles while mentions varied 10\u201316",
+   "gap": "score not responding to changing inputs (possible cached serve or saturated components)",
+   "solution": "check INV-1 serve-stored rules + serve_payload freshness for this row; inspect component values in the detail; report findings to the founder before any scoring change",
+   "severity": "high",
+   "task_class": "SCORE_AFFECTING",
    "held_out_derived": false,
    "shadow": false,
    "ruling_id": "",
-   "cause": "mentions_unavailable"
+   "cause": ""
   },
   {
    "check": "B.volatility",
@@ -1049,6 +1055,34 @@
    "cause": ""
   },
   {
+   "check": "B.asymmetry",
+   "status": "WARN",
+   "subject": "britain",
+   "evidence": "instant transitions BOTH ways in one window (max up 51.6, max down -51.5 in single cycles) \u2014 artifact signature, not attention dynamics",
+   "gap": "quantized bistability: the estimator, not the phenomenon, is moving",
+   "solution": "hold for the cohort replay verification (board Q1/Q2 item 3); no estimator change without founder + backtest (item 6 HELD)",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
+   "ruling_id": "",
+   "cause": ""
+  },
+  {
+   "check": "B.asymmetry",
+   "status": "PASS",
+   "subject": "cohort asymmetry profile",
+   "evidence": "19 topics with instant up-steps, 2 with instant down-steps, 1 with BOTH in one window (n=51; step floor 30.0)",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
+   "ruling_id": "",
+   "cause": ""
+  },
+  {
    "check": "C.gap_arithmetic",
    "status": "PASS",
    "subject": "60 rows",
@@ -1073,6 +1107,20 @@
    "task_class": "OPERATIONAL",
    "held_out_derived": false,
    "shadow": false,
+   "ruling_id": "",
+   "cause": ""
+  },
+  {
+   "check": "C.saturation_gauge",
+   "status": "PASS",
+   "subject": "top-decile cap pinning",
+   "evidence": "0/6 top-decile topics pinned at caps",
+   "gap": "",
+   "solution": "",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
    "ruling_id": "",
    "cause": ""
   },
@@ -1609,5 +1657,34 @@
    "cause": ""
   }
  ],
- "work_queue": []
+ "work_queue": [
+  {
+   "check": "B.freeze",
+   "status": "FAIL",
+   "subject": "final_del_mundial",
+   "evidence": "Detection identical at 62.59 for 6 cycles while mentions varied 10\u201316",
+   "gap": "score not responding to changing inputs (possible cached serve or saturated components)",
+   "solution": "check INV-1 serve-stored rules + serve_payload freshness for this row; inspect component values in the detail; report findings to the founder before any scoring change",
+   "severity": "high",
+   "task_class": "SCORE_AFFECTING",
+   "held_out_derived": false,
+   "shadow": false,
+   "ruling_id": "",
+   "cause": ""
+  },
+  {
+   "check": "B.asymmetry",
+   "status": "WARN",
+   "subject": "britain",
+   "evidence": "instant transitions BOTH ways in one window (max up 51.6, max down -51.5 in single cycles) \u2014 artifact signature, not attention dynamics",
+   "gap": "quantized bistability: the estimator, not the phenomenon, is moving",
+   "solution": "hold for the cohort replay verification (board Q1/Q2 item 3); no estimator change without founder + backtest (item 6 HELD)",
+   "severity": "low",
+   "task_class": "OPERATIONAL",
+   "held_out_derived": false,
+   "shadow": true,
+   "ruling_id": "",
+   "cause": ""
+  }
+ ]
 }
