@@ -2212,3 +2212,31 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   probe. Local suite 8/8; LIVE verified post-refresh: taco_bell/taco/taco_bell_lettuce ->
   health (context), tacoma -> honest general, lettuce_taco + youtube regressions hold; detail
   serves category=health. Explain probe retro-confirmed context (not situation) was deciding.
+
+### 2026-07-19 — Batch: items 11/12/14/15 done + board session R1-R3 COMPLETE (awaiting Chairman)
+- ITEM 14: CLAUDE.md §3/§11 reconciled to the per-surface authorities (Aurora contract mobile /
+  WEB_DESIGN_SYSTEM web); legacy palette marked web-lineage-only. Doc-debt closed.
+- ITEM 11: /scores/{key}/score-history TTL response cache live (engine 4236024; 0.98s->0.34s
+  verified; HISTORY_ROUTE_CACHE_TTL_S=300, 0 disables). Scale-debt amplifier bounded.
+- ITEM 12: falls-below alerts LIVE end-to-end (backend v40, migration 0013_alert_direction
+  applied via release phase; direction on serializer + evaluation + email copy; mobile
+  Rises-above/Falls-below chips; web Alerts parity; preview 38cfc80 + gh-pages 43ce688).
+  Single-topic deep-link fetch (fetchSignalByKey + useSignal solo fallback). eas.json scaffold
+  (dev-client/preview/production). FlashList EVALUATED-AND-DEFERRED with reason: trends screen
+  is <Screen scroll>+windowed map; conversion = structural refactor (FlashList must own the
+  scroll container) — own session + regression pass required.
+- ITEM 15 (three held-out reports, audits/ledger-research/*_2026-07-19.md): (a) breadth-priority
+  M=80-vs-50 DOES NOT REPLICATE — real effect is enrollment EFFICIENCY (3x races/slot at flat
+  win rate); (b) fast-lane CANNOT flip verdicts (dates fixed pre-sweep; the 1-2day losses were
+  real) — re-scoped $0 latency+match-validity lane; referee contradicts 4/9 near-miss matches;
+  (c) floor-pin: 281/300 instruments render score-excluded 0.0, crypto all-pinned D=30 — 4
+  display-only §17 fixes + 1 backtest-gated score-side exclusion.
+- BOARD R1-R3 COMPLETE (6/6; record audits/board/BOARD_estimator-fdm-snapshot2_2026-07-19.md,
+  supersedes .PARTIAL): R1 un-hold into build+backtest 6/6 (estimator-family sweep: interpolated
+  quantile vs Executioner slew-limited median; Economist re-crossing-only Schmitt hysteresis
+  dissolves the symmetry dispute; gates G1-G5 + plateau-hours + median-catchup re-score);
+  3 of 4 predictions VOIDED by renewed expansion (escape clause), final_del_mundial = clean
+  out-of-sample win (mechanism 50/51); NEW: duplicate cycle rows in served history (britain
+  glitch suspect) -> dedup diagnostic first. R2 refuted-as-written 6/6 (peak-hold magnitude by
+  design; close as mechanism instance). R3 instrument approved 6/6 + v2.1.2 patch list.
+  Decision table D1-D11 AWAITING CHAIRMAN RULING.
