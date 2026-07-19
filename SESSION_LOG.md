@@ -2265,3 +2265,21 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   (deployed ef5bac4, verified live on /accuracy/ledger).
 - Open after this: D1 estimator build+backtest (awaiting Chairman go), D2 dedup diagnostic
   (now with the assessor's 20-dup evidence), D7 §17 display quartet, D8 (own gate), D9/D10.
+
+### 2026-07-19 (cont. 2) — D2 diagnostic + D1 backtest round 1: THE NULL WON (honest result)
+- D2 STEP 1 (audits/D2_DEDUP_DIAGNOSTIC_2026-07-19.md): off-cycle rows ENDEMIC (130/150
+  topics; 113 same-hour dups + 689 short-gap extras; biggest clusters within 90min of Heroku
+  releases -> boot-scoring; Pull-Trends also legit source). Root defect = ROW-count window
+  (LIMIT 12) silently time-warps on deploy days. BRITAIN REPLAY HONESTLY REFUTED the dup
+  hypothesis for her dip (raw and dedup windows identical: upper-median EQUALS cur mag 54.49
+  -> w=0 boundary case) — she stays genuine D1 hysteresis evidence.
+- D1 BACKTEST ROUND 1 (tools/estimator_backtest.py + audits/backtests/ESTIMATOR_BACKTEST_
+  2026-07-19.*): pre-registered candidates vs gates on 107 topics/2765 cycles. NO CANDIDATE
+  PASSES: C2 interpolated median (5-memo consensus) REFUTED (more flaps, cliff unfixed —
+  Executioner's bimodal argument empirically confirmed); C3 slew family kills the artifact
+  (cliff 78.7->14.7, flaps 0, plateau 95->27, zero delayed enrollments + 3 earlier) but FAILS
+  G2 no-inflation (mean +2.4..3.9 — serves stale highs longer) and G4 tails (1-4 slow
+  releases); hysteresis vacuous (registered H_MARGIN=0.0 degenerate). Reproduction gate 82.2%
+  vs 95 bar + 1789 skipped cycles -> round is DIRECTIONAL; ship-grade round 2 = ENGINE-SIDE
+  full-history replay with true components. INCUMBENT STANDS per the Malkiel null; the shipped
+  honesty layer (freshness facts + mechanism tags) does the explaining meanwhile.

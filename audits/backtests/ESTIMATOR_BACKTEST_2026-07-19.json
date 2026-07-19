@@ -1,0 +1,120 @@
+{
+ "run_at_utc": "2026-07-19T07:04:34",
+ "corpus_topics": 107,
+ "reproduction_pct": 82.2,
+ "h_margin_registered": 0.0,
+ "gates": {
+  "G1": "zero delayed 70/85 crossings",
+  "G2": "mean/p95 <= INC+0.5",
+  "G3": "flaps strictly < INC",
+  "G4": "tail_fail == 0",
+  "G5": "cliffMax <= 20",
+  "P": "plateau <= INC"
+ },
+ "results": {
+  "INC": {
+   "flaps": 5,
+   "cliff": 78.67,
+   "plateau": 95,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 0,
+   "mean": 49.21,
+   "p95": 61.34,
+   "uplift": 0.0,
+   "skipped": 1789,
+   "tail_fail": 0
+  },
+  "C1_dedup": {
+   "flaps": 5,
+   "cliff": 78.67,
+   "plateau": 95,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 0,
+   "mean": 49.21,
+   "p95": 61.34,
+   "uplift": 18.16,
+   "skipped": 1789,
+   "tail_fail": 0
+  },
+  "C2_interp": {
+   "flaps": 7,
+   "cliff": 79.17,
+   "plateau": 90,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 2,
+   "mean": 50.09,
+   "p95": 61.42,
+   "uplift": 78.67,
+   "skipped": 1789,
+   "tail_fail": 1
+  },
+  "C3a_slew16": {
+   "flaps": 1,
+   "cliff": 14.73,
+   "plateau": 27,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 3,
+   "mean": 53.11,
+   "p95": 61.89,
+   "uplift": 79.57000000000001,
+   "skipped": 1789,
+   "tail_fail": 4
+  },
+  "C3b_slew8": {
+   "flaps": 0,
+   "cliff": 14.73,
+   "plateau": 27,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 3,
+   "mean": 52.44,
+   "p95": 61.86,
+   "uplift": 79.57000000000001,
+   "skipped": 1789,
+   "tail_fail": 3
+  },
+  "C3c_slew4": {
+   "flaps": 2,
+   "cliff": 18.599999999999994,
+   "plateau": 19,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 2,
+   "mean": 51.61,
+   "p95": 61.59,
+   "uplift": 79.57000000000001,
+   "skipped": 1789,
+   "tail_fail": 1
+  },
+  "C2H_interp_hyst": {
+   "flaps": 7,
+   "cliff": 79.17,
+   "plateau": 90,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 2,
+   "mean": 50.09,
+   "p95": 61.42,
+   "uplift": 78.67,
+   "skipped": 1789,
+   "tail_fail": 1
+  },
+  "C3bH_slew8_hyst": {
+   "flaps": 0,
+   "cliff": 14.73,
+   "plateau": 27,
+   "delayed70": 0,
+   "delayed85": 0,
+   "earlier": 3,
+   "mean": 52.44,
+   "p95": 61.86,
+   "uplift": 79.57000000000001,
+   "skipped": 1789,
+   "tail_fail": 3
+  }
+ }
+}
