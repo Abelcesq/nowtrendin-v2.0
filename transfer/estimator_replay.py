@@ -38,6 +38,10 @@ H_MARGIN = 0.05
 REFRACTORY = 4
 ROW_CAP = 400          # most-recent rows per topic (365d retention can exceed this)
 MIN_ROWS = 15
+ACTIVE_DAYS = 30       # corpus = topics scored within the last N days (board corpus spec:
+                       # "every topic with >=12 cycles in the last 30 days"; the unfiltered
+                       # 365d tail is 43k+ topics — a full-tail panel needs a worker-side
+                       # run, registered as out of scope for round 2)
 
 _LOCK = threading.Lock()
 _RUNNING = {"flag": False}
@@ -195,12 +199,15 @@ def step(get_db, db_path, batch: int = 10):
         try:
             conn.execute(_TABLE)
             conn.commit()
+            from datetime import timedelta
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=ACTIVE_DAYS)).isoformat()
             todo = [r["topic_key"] if hasattr(r, "keys") else r[0] for r in conn.execute(
                 """SELECT v.topic_key FROM velocity_scores v
                    LEFT JOIN estimator_replay_results e ON e.topic_key = v.topic_key
                    WHERE e.topic_key IS NULL
-                   GROUP BY v.topic_key HAVING COUNT(*) >= ?
-                   LIMIT ?""", (MIN_ROWS, batch)).fetchall()]
+                   GROUP BY v.topic_key
+                   HAVING COUNT(*) >= ? AND MAX(v.scored_at) >= ?
+                   LIMIT ?""", (MIN_ROWS, cutoff, batch)).fetchall()]
             done_ct = conn.execute(
                 "SELECT COUNT(*) AS c FROM estimator_replay_results").fetchone()
             done_ct = done_ct["c"] if hasattr(done_ct, "keys") else done_ct[0]
@@ -272,8 +279,9 @@ def step(get_db, db_path, batch: int = 10):
                      SELECT v.topic_key FROM velocity_scores v
                      LEFT JOIN estimator_replay_results e ON e.topic_key = v.topic_key
                      WHERE e.topic_key IS NULL
-                     GROUP BY v.topic_key HAVING COUNT(*) >= ?) x""",
-                (MIN_ROWS,)).fetchone()
+                     GROUP BY v.topic_key
+                     HAVING COUNT(*) >= ? AND MAX(v.scored_at) >= ?) x""",
+                (MIN_ROWS, cutoff)).fetchone()
             remaining = remaining["c"] if hasattr(remaining, "keys") else remaining[0]
             return {"status": "ok", "processed": processed,
                     "done_before": done_ct, "remaining": remaining}
