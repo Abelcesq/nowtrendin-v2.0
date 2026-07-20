@@ -56,6 +56,21 @@ like a mis-calibrated tripwire than a genuine maturation event. Recommend the ne
 recalibrate T2 (e.g. watch `unmeasured_fraction`/`insufficient_coverage` crossing a threshold) or the founder
 rules whether to actually reopen D8's held-out backtest now. S1 correctly HOLDS at 0/3 episodes.
 
+**RESOLVED same session — founder ruled "proceed with 1 and 2" (both):**
+- **(1) H2b — T2 recalibrated (engine `af0e7c5`).** The tripwire now watches covered-lane
+  **`unmeasured_fraction < 0.5`** (majority-measured — a metric that starts ~1.0 cold and FALLS as
+  component history accrues), NOT `fully_degenerate_fraction` (~0 at baseline for large caps → fired
+  on the first read). **Live: 0.524 → `fire: false` (HOLD)** — it will now fire only on a genuine
+  conversion event. Updated in the census tripwire, `/monitor/deferred-triggers`, and DEFERRED_ITEMS T2.
+- **(2) D8 backtest REOPENED for review** (`audits/ledger-research/D8_DEGENERATE_EXCLUSION_BACKTEST_REOPEN_2026-07-20.md`).
+  Refreshed at current n: structural Δ=0 reconfirmed (enrollment still code-decoupled from mm; **0/12
+  resolved rows pinned at detection**; blended 6/12=50%, inflow 6/7, outflow 0/5 — identical to 07-19);
+  population breathed within cycle-sensitivity (mm→None 188→174, pin 189→175, all flow-neutral/
+  unenrollable); covered-lane coverage **not yet crossed** (unmeasured_fraction 0.524 ≥ 0.5). **Verdict:
+  the 07-19 defer-D8 conclusion STANDS** — no accuracy payoff by mechanism, exclusion still binds on
+  absence (D7 display covers it); reopen ≠ ship. Live reopen paths unchanged: T1 (founder truth-ruling)
+  or T2 (now correctly calibrated, HOLDS). Engine `af0e7c5`; origin `ebfaaf1`.
+
 ---
 
 ## Session 2026-06-26 (evening) — Signal Analysis · accuracy-ledger backlog + maturity · Apify audit + token rotation
