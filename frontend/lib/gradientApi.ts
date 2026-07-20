@@ -489,6 +489,8 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       lane: r.market_gradient.lane || undefined,
       laneLabel: r.market_gradient.lane_label || undefined,
       dataCoverage: r.market_gradient.data_coverage || undefined,
+      // E1 composite disclosure (board D8 session, 2026-07-19)
+      compositeNote: r.market_gradient.composite_note || undefined,
       naComponents: Array.isArray(r.market_gradient.na_components) ? r.market_gradient.na_components : undefined,
       modelVersion: r.market_gradient.model_version || undefined,
       flow: r.market_gradient.flow || undefined,

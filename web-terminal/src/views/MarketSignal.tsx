@@ -269,6 +269,8 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
             )
           })}
           <div className="div-legend"><span style={{ color: MC.detection }}>●</span> leading · <span style={{ color: MC.confidence }}>●</span> confirming · <span style={{ color: MC.purple }}>●</span> both · ✓ = scored vs own history</div>
+          {/* E1 composite disclosure (board D8 session, 2026-07-19) */}
+          {mg.composite_note && <div className="disc" style={{ marginTop: 6 }}>{mg.composite_note}</div>}
         </div>
       )}
 

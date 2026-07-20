@@ -170,6 +170,13 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "absent_inputs": sum(1 for s in scored.values()
                              if s.get("current", -1) == 0.0 or s.get("degenerate_baseline")),
         "total_inputs": len(scored) or 1,
+        # E1 COMPOSITE DISCLOSURE (Chairman-ruled 2026-07-19): same rule as equities.
+        "unmeasured_in_composite": sum(1 for s in scored.values()
+                                       if s.get("degenerate_baseline")),
+        "composite_note": ("Components without measured data are held at the neutral "
+                           "baseline in the composite score."
+                           if any(s.get("degenerate_baseline") for s in scored.values())
+                           else None),
         "price": ({k: price.get(k) for k in ("last_close", "change_7d_pct", "change_30d_pct", "trend", "as_of")}
                   if price and price.get("available") else None),
         "dark_matter": ({"coverage": (dm or {}).get("proxy_coverage"), "flow": (dm or {}).get("flow"),

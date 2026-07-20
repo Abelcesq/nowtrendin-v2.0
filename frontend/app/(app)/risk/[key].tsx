@@ -172,7 +172,7 @@ export default function RiskDetail() {
             {/* D7/§17 coverage parity (2026-07-19): the web shows LTD DATA when most
                 inputs are absent; mobile now does too — a flat read on missing data
                 must never present as a measured quiet market. */}
-            {(risk as any).dataCoverage === 'insufficient' && (
+            {(mg as any)?.dataCoverage === 'insufficient' && (
               <View className="rounded-lg px-3 py-2.5 mb-3" style={{ backgroundColor: '#B112261A' }}>
                 <Text className="text-[12px] font-bold" style={{ color: '#7A0D1A' }}>
                   LIMITED DATA — most market inputs are absent for this instrument. Scores reflect
@@ -207,6 +207,10 @@ export default function RiskDetail() {
                     </View>
                   );
                 })}
+                {/* E1 composite disclosure (board D8 session, 2026-07-19) */}
+                {!!(mg as any).compositeNote && (
+                  <Text className="text-textMuted text-[12px] mt-2 italic">{(mg as any).compositeNote}</Text>
+                )}
                 <Text className="text-textMuted text-[12px] mt-1">
                   <Text style={{ color: '#2A5B9E' }}>Blue</Text> = leading (Detection) · <Text style={{ color: '#2E7D5B' }}>Green</Text> = confirming · <Text style={{ color: '#6B4FA0' }}>Purple</Text> = both. ✓ base = scored vs this item's own history.
                 </Text>

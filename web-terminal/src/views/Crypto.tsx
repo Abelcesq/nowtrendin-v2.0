@@ -86,6 +86,8 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
             )
           })}
           <div className="div-legend"><span style={{ color: MC.detection }}>●</span> money movement · <span style={{ color: MC.confidence }}>●</span> market confirmation · ✓ = scored vs own history</div>
+          {/* E1 composite disclosure (board D8 session, 2026-07-19) */}
+          {(c as any).composite_note && <div className="disc" style={{ marginTop: 6 }}>{(c as any).composite_note}</div>}
         </div>
       )}
 

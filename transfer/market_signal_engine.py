@@ -287,6 +287,17 @@ def compute_market_signal(item_key: str, item_name: str,
         "data_coverage": ("insufficient" if zero_inputs > n_applicable // 2 else
                           "partial" if zero_inputs > 0 else "full"),
         "absent_inputs": zero_inputs, "total_inputs": n_applicable,
+        # E1 COMPOSITE DISCLOSURE (Chairman-ruled 2026-07-19, board D8 session): the
+        # composite still counts components the display honestly marks absent/degenerate
+        # (score-side exclusion is gated, E3). Convert the silent inclusion into a
+        # DISCLOSED method — the Guardian's minimum honest state.
+        "unmeasured_in_composite": sum(
+            1 for s in scored.values()
+            if s.get("degenerate_baseline")) + len(absent),
+        "composite_note": ("Components without measured data are held at the neutral "
+                           "baseline in the composite score."
+                           if (len(absent) or any(s.get("degenerate_baseline")
+                                                  for s in scored.values())) else None),
         # Lane = what data CAN exist for this instrument (covered / halted_microcap /
         # macro_theme). na_components are the structurally-inapplicable inputs excluded
         # from BOTH the score and the coverage denominator for this lane.
