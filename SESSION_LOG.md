@@ -2362,3 +2362,19 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   regardless); congress-net-sell base-flow candidate mechanism for the outflow failures
   (Executioner, L118 vs the L160 insider fix); degenerate census as the permanent expansion
   frontier metric (Expansionist). Decision table E1-E5 AWAITING CHAIRMAN RULING.
+
+### 2026-07-19/20 (cont. 7) — E1 SHIPPED + VERIFIED · E2 investigation relaunched
+- E1 COMPOSITE DISCLOSURE (Chairman-ruled, Guardian's minimum-honest-state): the composite
+  still counts absent/degenerate components at the neutral baseline (score-side exclusion is
+  gated, E3) — now DISCLOSED instead of silent. Engine (12cf9c1) adds unmeasured_in_composite
+  + composite_note to equity + crypto payloads; rendered on web MarketSignal + Crypto factor
+  blocks + mobile risk detail. Also fixed the D7 mobile banner reading dataCoverage from the
+  wrong object level (now mg.dataCoverage). VERIFIED LIVE: composite_note serves on 299/300
+  risk instruments + crypto (BTC 3 unmeasured); gh-pages e31dd05 (rollback 14f6178), preview
+  0c65cb2, both up + gated. The display-vs-composite contradiction the board flagged is closed
+  at zero score risk.
+- E2 OUTFLOW INVESTIGATION relaunched (first run hit the 11pm PT session limit after writing
+  the pre-registration): new held-out read-only item, pre-registered defect criterion (outflow
+  confirms <= regime base rate) + review threshold (n>=15 or 0-for-10); regime base-rate control
+  first, episode-collapse, congress-net-sell mechanism trace; report ->
+  audits/ledger-research/OUTFLOW_FLOWLOGIC_INVESTIGATION_2026-07-19.md. In progress.
