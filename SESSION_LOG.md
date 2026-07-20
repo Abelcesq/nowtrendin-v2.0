@@ -2378,3 +2378,30 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   confirms <= regime base rate) + review threshold (n>=15 or 0-for-10); regime base-rate control
   first, episode-collapse, congress-net-sell mechanism trace; report ->
   audits/ledger-research/OUTFLOW_FLOWLOGIC_INVESTIGATION_2026-07-19.md. In progress.
+
+### 2026-07-20 — E2 OUTFLOW INVESTIGATION complete (mechanism confirmed; no lane verdict at n=5)
+- audits/ledger-research/OUTFLOW_FLOWLOGIC_INVESTIGATION_2026-07-19.md. Read-only/held-out;
+  pre-registration intact (defect = outflow confirms <= regime base rate; conclude only at
+  n>=15 or 0-for-10).
+- MECHANISM CONFIRMED (code-certain): production serves dark_matter_inputs="congress+curated_13F"
+  -> AV_DARKPOS_ENABLED effectively OFF -> the L160 accumulation-only asymmetric fix never runs;
+  live outflow claim = positioning_intel L118 flow='outflow' if congress net(buys-sells)<-1.
+  All 5 outflow instruments sell-dominated (AAPL 6/14 net-8, GOOGL 4/9 -5, NVDA 6/11 -5) = the
+  exact degenerate-net class ruled noise for INSIDERS on 2026-06-26; congress base flow never
+  got the correction. Executioner's traced candidate = the live mechanism.
+- REGIME CONTROL FIRST (Challenger): local detection-window outflow-confirm base rate 18.8%
+  (these names rallied +8..19%); P(0-for-5|regime)=0.35 -> failures fully consistent with regime
+  alone at n=5; both lanes are the same rally bet pointed opposite ways. Ledger reproduced
+  independently from free Stooq closes (all 5 rows p0/p1/change/verdict exact).
+- EPISODE-COLLAPSE: 0-for-3 (AAPL x3 = one persistent claim).
+- VERDICT: NO lane verdict (n=5<15). Defect criterion technically met (0%<=18.8%) but
+  uninformative — regime confound not yet separable from degenerate-net noise. KEEP ENROLLING
+  UNCHANGED (never throttle the losing lane); track to n>=15.
+- SPEC S1 (do-not-implement): asymmetric outflow gate mirroring the L160 insider fix (routine
+  net-sell -> neutral unless corroborated) as a FUTURE SCORE_AFFECTING item behind its own
+  held-out, regime-adjusted, precision+recall backtest gate. Caveat: congress buys/sells are
+  current-state (no served positioning-history route); mechanism is time-invariant/code-certain
+  but exact per-row detection-instant counts aren't endpoint-recoverable.
+- E1+E2 both closed. Open docket: E3 (D8 defer-with-tripwires), E4 (hardening quartet incl. the
+  detection_score=None->intensity fallback fix), E5 (cold-start posture doc); S1 future gate;
+  D9 A/B accumulating (weekly stop-rule watch); D10 fast-lane live; GHOST_FEEDS trial to ~07-29.
