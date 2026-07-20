@@ -3,7 +3,58 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-06-26 (evening)_
+_Last updated: 2026-07-20_
+
+---
+
+## Session 2026-07-20 — Board hardenings review fixes H1–H8 / P1 / R1 + R2 principle-OR-n (all OPERATIONAL/doc; SHIPPED + VERIFIED LIVE)
+
+Implemented the Chairman-ruled decision table from `audits/board/BOARD_hardenings-review_2026-07-20.md`
+(6 independent memos on the E3/E4/E5 hardenings). Every item is OPERATIONAL or documentation — **no score
+surface was touched**; the two gated score-affecting items (D8, S1) stay deferred behind their written
+triggers. Engine deployed `fa0bbbc` (subtree → heroku-v2engine); origin `7e8114d`.
+
+- **P1 — regime-adjusted market ledger (the diligence-defensible read).** `market_accuracy_ledger.report()`
+  now serves `regime_adjusted`: ONE benchmark fetch (SPY, `MARKET_LEDGER_BENCHMARK`) over the union window,
+  each row's verdict = did the flow-direction move BEAT the benchmark past a ±2% deadband (excess return),
+  not an absolute ±5%. **Live read:** de-confounded, inflow still 6/6 (100%), outflow still 0/5 (0%),
+  row-level 54.5%; episodes 3/6. The regime adjustment did NOT collapse the inflow lane — but n is tiny
+  (6 resolved episodes), so R1 stands: neither lane is validated. This is now the ONLY market-ledger read
+  we cite; the absolute rates are demoted.
+- **R1 — symmetry ruling (standing).** `regime_caveat` in the payload + a DEFERRED_ITEMS section: a high
+  inflow rate is as regime-flattered as a low outflow rate ("the same coin landing heads because the market
+  went up"). Never cite either absolute lane rate as evidence the Money Gradient works; never publish any
+  market-ledger rate OR the census % externally while small_sample is true.
+- **H1 — census cold-cache honesty.** `/monitor/degenerate-census` returns `available:false` (equity + the
+  crypto branch) when the cache is cold, never a false 0 that would trip a reactivation trigger. **Live:**
+  crypto reads `available:false, reason:"crypto_full cache cold — unknown, not 0"` ✓.
+- **H2 — census tripwire made trendable.** D8-T2 now watches each LANE's `fully_degenerate_fraction`
+  (`by_lane`), not the global `any_unmeasured` which is saturated ~299/300 by the permanent-frontier rule.
+- **H3 — episode confirm-rate as a RANGE.** `report().episodes` serves `confirmed_range_pct [strict, any]`
+  + strict/majority/any + an aggregation_note; we never headline the optimistic ANY-rule (a MAX operator
+  that only inflates the winning lane). **Live:** covered episodes range [33.3, 50.0]%.
+- **H4 — durable, fleet-global gate-reject counter.** New `market_gate_rejects` table + `_flush_gate_rejects`
+  (flushed on any enrollment / sweep / report conn); a 0 with no history now reads as UNKNOWN, not "clean."
+- **H7 — witness NULL is guarded by a TEST, not a comment.** `transfer/test_market_ledger_witness.py`
+  (standalone, PASSES) asserts an absent `detection_score` stores NULL (never intensity×100) and a real
+  witness stores verbatim; the old tautology no-op was deleted.
+- **H5 / R2 — S1 reactivation = PRINCIPLE-OR-n (Expansionist resolution).** S1 reopens on EITHER a founder
+  insider-parity ruling (routine congress net-sell = degenerate noise, same as insiders got 2026-06-26) OR
+  n≥15 resolved **EPISODES** OR 0-for-10 EPISODES. Reopening = open the backtest, NOT ship. Keep enrolling
+  the outflow lane UNCHANGED — never throttle the losing lane.
+- **H6 — the scheduled reader (so a shelf doesn't become furniture).** New `/monitor/deferred-triggers`
+  evaluates every DEFERRED_ITEMS trigger and returns FIRE/HOLD; the weekly improve-system audit reads it
+  each run (checklist added). **Live.**
+- **H8 — cold-start enforcement.** `.githooks/commit-msg` gained a `[cold-start-stated]` gate on
+  universe-expansion-shaped commits; CLAUDE.md §16a got the enforcement note.
+
+**⚠ OPEN — surfaced for founder ruling (flag-never-force):** `/monitor/deferred-triggers` shows
+`D8_T2 fire:true` on first live read, because the covered lane's `fully_degenerate_fraction` is already 0.0
+(large-caps essentially never have ALL positioning components degenerate). Per the rule a FIRE means
+"open the D8 backtest for review," NOT ship — but the metric fires from the baseline state, so it reads more
+like a mis-calibrated tripwire than a genuine maturation event. Recommend the next board pass either
+recalibrate T2 (e.g. watch `unmeasured_fraction`/`insufficient_coverage` crossing a threshold) or the founder
+rules whether to actually reopen D8's held-out backtest now. S1 correctly HOLDS at 0/3 episodes.
 
 ---
 
