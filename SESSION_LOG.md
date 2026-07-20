@@ -2283,3 +2283,19 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   vs 95 bar + 1789 skipped cycles -> round is DIRECTIONAL; ship-grade round 2 = ENGINE-SIDE
   full-history replay with true components. INCUMBENT STANDS per the Malkiel null; the shipped
   honesty layer (freshness facts + mechanism tags) does the explaining meanwhile.
+
+### 2026-07-19 (cont. 3) — D1 ROUND 2 (engine-side, Chairman-commissioned): THE NULL WON AGAIN — D1 CLOSED
+- Engine-side chunked replay shipped (transfer/estimator_replay.py + /backtest/estimator/
+  step|report; read-only, single-flight, quality-gated corpus w/ junk prefilter). Driven to
+  completion over the FULL served universe: 32,989 topics, 30d-active, up to 400 cycles each.
+  REPRODUCTION GATE 95.5% (> 95 bar) — ship-grade evidence, unlike round 1.
+- VERDICT: EVERY candidate fails, including C1 dedup-window alone (10 delayed 70-crossings
+  — G1 zero-delay is absolute and nothing in the family clears it at 33k-topic scale). Slew
+  family: cliff 78.7->37.3 (still >20 bar), G2 inflation + G4 tails persist (C5 snap cuts
+  tail fails 167->44, not 0). Hysteresis immaterial. Round-1 directional reads confirmed.
+- DISPOSITION: D1 CLOSED — incumbent estimator stands per the Malkiel null (2 rounds, 8
+  candidates, full panel). The artifact class stays display-explained (freshness facts +
+  known-mechanism tags + D6 disclosures = the shipped fix). D2 step 2 (dedup-in-query)
+  WITHDRAWN on its own G1 failure. Future attempts = fundamentally different design (true
+  per-cycle component recompute from raw signals), own registered round, same gates.
+- Report: audits/backtests/ESTIMATOR_BACKTEST_ROUND2_2026-07-19.md + .json.
