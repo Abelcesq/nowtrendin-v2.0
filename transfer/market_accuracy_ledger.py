@@ -53,10 +53,42 @@ MOVE_THRESHOLD_PCT = float(os.getenv("MARKET_MOVE_THRESHOLD_PCT", "5.0"))
 MIN_INTENSITY = float(os.getenv("MARKET_LEDGER_MIN_INTENSITY", "0.25"))
 # Max calendar days to skip forward to find the first available close (weekends/holidays).
 _MAX_SKIP = 6
-# E4 (board D8 session, Economist P4): count directional-flow candidates the ledger
-# NEVER SEES — rejected at the enrollment gate — so the board can always compare what
-# enrolls against what was filtered. Since process start (reset on restart, honest gauge).
+# E4 / H4 (board 2026-07-19 + hardenings review 2026-07-20): count directional-flow
+# candidates the ledger NEVER SEES — rejected at the enrollment gate. The board found the
+# original module-global was per-process on a multi-dyno fleet, so a served 0 read as
+# "nothing filtered" when it meant "this process never enrolled". FIX: the in-memory dict
+# holds only UNFLUSHED deltas for THIS process; _flush_gate_rejects() upserts them into a
+# DURABLE table (fleet-global, boot-durable) on any connection we already open (enrollment /
+# sweep / report) — zero extra connections. report() serves the durable total + the note
+# that a durable 0 with no boot history still means "unknown".
 _GATE_REJECTS = {"nondirectional": 0, "weak_intensity": 0}
+
+
+def _flush_gate_rejects(conn):
+    """Upsert this-process unflushed reject deltas into the durable table, then zero them.
+    Best-effort: a monitoring counter must never break enrollment or a report."""
+    try:
+        deltas = {k: v for k, v in _GATE_REJECTS.items() if v}
+        if not deltas:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        for reason, d in deltas.items():
+            if db_compat.USE_PG:
+                conn.execute(
+                    "INSERT INTO market_gate_rejects (reason, count, updated_at) "
+                    "VALUES (%s,%s,%s) ON CONFLICT (reason) DO UPDATE SET "
+                    "count = market_gate_rejects.count + EXCLUDED.count, "
+                    "updated_at = EXCLUDED.updated_at", (reason, d, now))
+            else:
+                conn.execute(
+                    "INSERT INTO market_gate_rejects (reason, count, updated_at) "
+                    "VALUES (?,?,?) ON CONFLICT(reason) DO UPDATE SET "
+                    "count = count + excluded.count, updated_at = excluded.updated_at",
+                    (reason, d, now))
+            _GATE_REJECTS[reason] = 0
+        conn.commit()
+    except Exception as _fe:
+        print(f"[mkt-ledger] gate-reject flush skipped: {_fe}")
 
 
 def _connect(db_path: str = DB_PATH):
@@ -130,6 +162,11 @@ def init_market_ledger_db(db_path: str = DB_PATH):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mkt_pending_status ON market_pending_detections(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mkt_ledger_verdict ON market_accuracy_ledger(verdict)")
+    # H4 durable, fleet-global gate-reject counter (hardenings review 2026-07-20).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS market_gate_rejects (
+            reason TEXT PRIMARY KEY, count INTEGER DEFAULT 0, updated_at TEXT)
+    """)
     conn.commit()
     conn.close()
 
@@ -180,17 +217,14 @@ def record_market_detection(ticker, name, detection_date, flow, intensity,
             return  # too weak to be a real money-movement detection
     except (TypeError, ValueError):
         pass
-    # WITNESS-CORRUPTION FIX (board D8 session, Challenger finding, 2026-07-19):
-    # do NOT substitute intensity*100 when the money-movement detection is absent.
-    # detection_score is the stored AT-DETECTION WITNESS for this row (what the money
-    # score actually read when we enrolled); it is context only — never thresholded,
-    # never part of the verdict (which is realized price direction). A substituted
-    # intensity is a DIFFERENT quantity wearing the same column name, and under any
-    # future degenerate-exclusion (D8) that substitution would become common and
-    # silently corrupt the one honest at-detection record. Absent = NULL, never
-    # fabricated. The column is nullable and every downstream read tolerates NULL.
-    if detection_score is None:
-        detection_score = None   # explicit: absent witness stays absent
+    # WITNESS-CORRUPTION FIX (board D8 session, Challenger finding, 2026-07-19; H7 hardening
+    # 2026-07-20): detection_score is the stored AT-DETECTION WITNESS (what the money score
+    # read when we enrolled) — context only, never thresholded, never in the verdict. We must
+    # NEVER substitute intensity*100 when it is absent: that stores a DIFFERENT quantity under
+    # the same column name and (under a future D8) would silently corrupt the one honest
+    # at-detection record. So we simply do NOT touch it — absent stays NULL. Guarded by the
+    # regression test in test_market_ledger_witness.py (which is the real mechanism, not this
+    # comment). No substitution code here by design.
     # Canonicalize the detection date (§14) at the write boundary.
     try:
         from date_utils import to_iso_date
@@ -200,6 +234,7 @@ def record_market_detection(ticker, name, detection_date, flow, intensity,
     own = conn is None
     if own:
         conn = db_compat.connect(db_path)
+    _flush_gate_rejects(conn)   # H4: piggyback the durable flush on this enrollment's conn
     now = datetime.now(timezone.utc).isoformat()
     try:
         timeout_dt = (_parse(detection_date) + timedelta(days=MARKET_TIMEOUT_DAYS)).isoformat()
@@ -306,6 +341,7 @@ def sweep_market_pending(db_path=DB_PATH, fetch_price_fn=None, limit=None) -> di
     (still needs the price series to report the realized change, but never stays stuck)."""
     fetch = fetch_price_fn or _price_fetch
     conn = _connect(db_path)
+    _flush_gate_rejects(conn)   # H4: sweep always has a conn — flush any pending deltas
     q = ("SELECT * FROM market_pending_detections WHERE status='pending' "
          "ORDER BY (last_checked IS NULL) DESC, last_checked ASC")
     if limit:
@@ -393,11 +429,90 @@ def sweep_market_pending(db_path=DB_PATH, fetch_price_fn=None, limit=None) -> di
     return out
 
 
+# P1 (hardenings review 2026-07-20, Economist): regime-adjust the verdict. The absolute
+# ±5% verdict is regime-BLENDED in BOTH directions — in a broad rally inflow confirms and
+# outflow fails MECHANICALLY, with zero skill either way (both lanes are "the same rally
+# bet pointed opposite ways"). The honest read asks: did the instrument's flow-direction
+# move BEAT its concurrent benchmark? Reported ALONGSIDE the absolute verdict, never
+# replacing it. Measurement-only; the benchmark referee never feeds a score.
+BENCHMARK = os.getenv("MARKET_LEDGER_BENCHMARK", "SPY")
+REGIME_DEADBAND_PCT = float(os.getenv("MARKET_REGIME_DEADBAND_PCT", "2.0"))
+
+
+def _regime_adjusted(rows, fetch=None):
+    """For resolved rows with a realized move, classify EXCESS return vs the benchmark over
+    the SAME window. One benchmark fetch covers all rows (shared union window). Fail-open:
+    returns {available: False} if the benchmark series can't be fetched."""
+    fetch = fetch or _price_fetch
+    usable = [r for r in rows
+              if r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE")
+              and r.get("detection_date") and r.get("move_date")
+              and r.get("price_change_pct") is not None]
+    if not usable:
+        return {"available": False, "reason": "no rows with a realized move + date"}
+    try:
+        dates = [d for r in usable for d in (r["detection_date"], r["move_date"])]
+        frm = min(str(d)[:10] for d in dates)
+        to = max(str(d)[:10] for d in dates)
+        bpx = fetch(BENCHMARK, frm, to)
+        if not bpx:
+            return {"available": False, "reason": f"{BENCHMARK} series unavailable"}
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:80]}
+    reg = {"CONFIRMED": 0, "NOT_CONFIRMED": 0, "NO_MOVE": 0}
+    reg_flow = {"inflow": {"c": 0, "n": 0}, "outflow": {"c": 0, "n": 0}}
+    reg_ep = {}
+    computed = 0
+    for r in usable:
+        b0, _ = _close_on_or_after(bpx, str(r["detection_date"])[:10])
+        b1, _ = _close_on_or_after(bpx, str(r["move_date"])[:10])
+        if b0 is None or b1 is None or b0 <= 0:
+            continue
+        bench_change = (float(b1) - float(b0)) / float(b0) * 100.0
+        excess = float(r["price_change_pct"]) - bench_change
+        flow = r.get("flow")
+        if abs(excess) < REGIME_DEADBAND_PCT:
+            rv = "NO_MOVE"
+        elif (flow == "inflow" and excess > 0) or (flow == "outflow" and excess < 0):
+            rv = "CONFIRMED"
+        else:
+            rv = "NOT_CONFIRMED"
+        reg[rv] += 1
+        computed += 1
+        if flow in reg_flow:
+            reg_flow[flow]["n"] += 1
+            if rv == "CONFIRMED":
+                reg_flow[flow]["c"] += 1
+        k = ((r.get("ticker") or "").upper(), flow)
+        reg_ep.setdefault(k, []).append(rv)
+    if not computed:
+        return {"available": False, "reason": "benchmark closes not found for the windows"}
+    ep_conf = sum(1 for v in reg_ep.values() if any(x == "CONFIRMED" for x in v))
+    ep_strict = sum(1 for v in reg_ep.values() if v and all(x == "CONFIRMED" for x in v))
+    return {
+        "available": True, "benchmark": BENCHMARK, "deadband_pct": REGIME_DEADBAND_PCT,
+        "definition": "CONFIRMED = the instrument's flow-direction move BEAT the benchmark "
+                      "(excess return past the deadband) over the same window",
+        "computed": computed,
+        "confirmed": reg["CONFIRMED"], "not_confirmed": reg["NOT_CONFIRMED"],
+        "no_move": reg["NO_MOVE"],
+        "confirm_rate_pct": round(100.0 * reg["CONFIRMED"] / computed, 1),
+        "by_flow": {f: {"confirmed": reg_flow[f]["c"], "resolved": reg_flow[f]["n"],
+                        "confirm_rate_pct": round(100.0 * reg_flow[f]["c"] / reg_flow[f]["n"], 1)
+                        if reg_flow[f]["n"] else None} for f in ("inflow", "outflow")},
+        "episodes": {"resolved": len(reg_ep), "confirmed_any": ep_conf,
+                     "confirmed_strict": ep_strict},
+        "note": "de-confounds BOTH lanes vs market regime — this is the diligence-defensible "
+                "read; the absolute-threshold rate above is regime-BLENDED in both directions.",
+    }
+
+
 def report(db_path=DB_PATH) -> dict:
     """Honest accuracy report for the Money Gradient. hit_rate counts the misses
     (NOT_CONFIRMED + NO_MOVE), never just the wins. MEASUREMENT of our own accuracy —
     not a forecast or advice."""
     conn = _connect(db_path)
+    _flush_gate_rejects(conn)   # H4: flush this process's deltas before reading the durable total
     rows = [dict(r) for r in conn.execute("SELECT * FROM market_accuracy_ledger").fetchall()]
     # In-flight detections (recorded, awaiting a confirming move or the timeout) — proves
     # detections are being captured even before any verdict resolves.
@@ -407,6 +522,14 @@ def report(db_path=DB_PATH) -> dict:
         pending = (pending[0] if not isinstance(pending, dict) else list(pending.values())[0]) or 0
     except Exception:
         pending = 0
+    # H4: durable, fleet-global gate-reject totals (a 0 with no history still = unknown).
+    gate_durable = {"nondirectional": 0, "weak_intensity": 0}
+    try:
+        for gr in conn.execute("SELECT reason, count FROM market_gate_rejects").fetchall():
+            gate_durable[(gr["reason"] if hasattr(gr, "keys") else gr[0])] = \
+                (gr["count"] if hasattr(gr, "keys") else gr[1]) or 0
+    except Exception:
+        pass
     conn.close()
     confirmed = [r for r in rows if r.get("verdict") == "CONFIRMED"]
     not_conf = [r for r in rows if r.get("verdict") == "NOT_CONFIRMED"]
@@ -430,18 +553,37 @@ def report(db_path=DB_PATH) -> dict:
     for r in _res_rows:
         key = ((r.get("ticker") or "").upper(), r.get("flow"))
         _ep.setdefault(key, []).append(r)
-    ep_conf = sum(1 for v in _ep.values() if any(x.get("verdict") == "CONFIRMED" for x in v))
+    # H3 (hardenings review 2026-07-20, all six): "confirmed if ANY row confirmed" is a MAX
+    # operator that can only move the rate UP (it flattered inflow 6/7 rows -> 3/3 episodes,
+    # burying the miss). Serve THREE rollups — strict (all rows), majority, and the optimistic
+    # any — so the number cannot be gamed by aggregation; the episode confirm-rate KPI is
+    # reported as a RANGE [strict, any], never a single optimistic figure.
+    def _ep_rate(rule):
+        hits = sum(1 for v in _ep.values() if rule([x.get("verdict") == "CONFIRMED" for x in v]))
+        return hits, (round(100.0 * hits / len(_ep), 1) if _ep else None)
+    ep_any_n, ep_any = _ep_rate(any)
+    ep_strict_n, ep_strict = _ep_rate(all)
+    ep_maj_n, ep_maj = _ep_rate(lambda bs: sum(bs) * 2 > len(bs))
     episodes = {
-        "definition": "distinct (ticker, flow); an episode is CONFIRMED if any of its rows confirmed",
+        "definition": "distinct (ticker, flow); a persistent claim's re-enrollments = one episode",
         "resolved_episodes": len(_ep),
-        "confirmed_episodes": ep_conf,
-        "confirm_rate_pct": round(100.0 * ep_conf / len(_ep), 1) if _ep else None,
+        "aggregation_note": "confirm-rate reported as a RANGE across rollup rules; never "
+                            "headline the optimistic 'any' alone (it can only inflate)",
+        "confirmed_range_pct": [ep_strict, ep_any],
+        "confirm_rate_strict_pct": ep_strict,     # all rows in the episode confirmed
+        "confirm_rate_majority_pct": ep_maj,       # >half the rows confirmed
+        "confirm_rate_any_pct": ep_any,            # optimistic upper bound (any row)
+        "confirmed_episodes_any": ep_any_n,
+        "confirmed_episodes_strict": ep_strict_n,
         "by_flow": {f: {
             "episodes": sum(1 for (t, fl) in _ep if fl == f),
-            "confirmed": sum(1 for (k, v) in _ep.items() if k[1] == f
-                             and any(x.get("verdict") == "CONFIRMED" for x in v)),
+            "confirmed_any": sum(1 for (k, v) in _ep.items() if k[1] == f
+                                 and any(x.get("verdict") == "CONFIRMED" for x in v)),
+            "confirmed_strict": sum(1 for (k, v) in _ep.items() if k[1] == f
+                                    and v and all(x.get("verdict") == "CONFIRMED" for x in v)),
         } for f in ("inflow", "outflow")},
     }
+    regime = _regime_adjusted(rows)
     return {
         "ground_truth": "realized EOD close direction (FMP)",
         "distinct_from": "trends accuracy ledger (Google Trends breakout)",
@@ -456,7 +598,20 @@ def report(db_path=DB_PATH) -> dict:
         "median_lead_days": round(statistics.median(leads), 1) if leads else None,
         "by_flow": by_flow,
         "episodes": episodes,
-        "gate_rejects_since_boot": dict(_GATE_REJECTS),
+        # P1: regime-adjusted (vs benchmark) — the diligence-defensible read.
+        "regime_adjusted": regime,
+        # R1 SYMMETRY RULING (hardenings review 2026-07-20): the absolute-threshold rates
+        # (confirm_rate_pct, by_flow) are regime-BLENDED in BOTH directions. Neither lane is
+        # validated at this n — a high inflow rate is as regime-flattered as a low outflow
+        # rate ("the same coin landing heads because the market went up"). Read
+        # regime_adjusted above, not the absolute rates, and NEVER publish either externally
+        # while small_sample is true.
+        "regime_caveat": "absolute rates are regime-blended in BOTH directions; neither lane "
+                         "is validated at this n — see regime_adjusted; do not publish externally",
+        # H4: durable, fleet-global reject totals. A 0 with no updated_at history = UNKNOWN
+        # (this process may never have enrolled), NOT 'nothing filtered'.
+        "gate_rejects_durable": gate_durable,
+        "gate_rejects_this_process_unflushed": dict(_GATE_REJECTS),
         "small_sample": resolved < 20,
         "episode_small_sample": len(_ep) < 15,
         "note": "MEASUREMENT of the Money Gradient's own accuracy — did the realized market "

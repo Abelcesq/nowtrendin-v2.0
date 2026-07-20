@@ -508,6 +508,14 @@ degenerate-window handling, and it follows this fixed progression, never skippin
 The interim, diligence-defensible truth on an insufficient-coverage instrument is: the score
 is baseline-floor-informed and the display SAYS SO — never a fabricated read, never a silent 30.
 
+**ENFORCEMENT (hardenings review 2026-07-20):** like §16, this posture has TEETH — the
+`.githooks/commit-msg` COLD-START GATE blocks a universe-expansion-shaped commit (new
+`WATCHLIST_TICKERS` / `CRYPTO_COINS` / asset class / region) unless the message asserts
+`[cold-start-stated]`. "MUST state" without a gate is aspirational once more than one engineer
+adds universes. Reactivation of the gated stage-3 exclusion (D8) is checked on cadence by
+`/monitor/deferred-triggers` (read weekly by improve-system) — a shelf nobody is scheduled to
+walk becomes furniture.
+
 ## 17. SOURCE-DISPLAY RULE (detail sections — trend + market, ALL platforms)
 
 > **Hard rule:** a topic's detail view shows ONLY the sources, coverage, and components that

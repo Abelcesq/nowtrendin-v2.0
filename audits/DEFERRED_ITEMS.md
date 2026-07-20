@@ -26,10 +26,12 @@ absence) gives the exclusion something to bind on.
 **REACTIVATION TRIGGERS (any one reopens D8; T3 makes it MANDATORY-before):**
 - **T1 — founder truth-ruling:** the founder rules that served money_movement / tier must
   equal the displayed honest-absence state.
-- **T2 — coverage conversion:** `/monitor/degenerate-census` shows the degenerate class
-  SHRINKING (Finviz insider breadth / 13F expansion converting degenerate baselines to
-  measured) such that exclusion would bind on real data. Watch:
-  `instruments_with_unmeasured_components` trending down toward < half of scored.
+- **T2 — coverage conversion (H2 granularity fix, 2026-07-20):** watch each LANE's
+  `fully_degenerate_fraction` on `/monitor/degenerate-census` → `by_lane` fall — NOT the
+  global `any_unmeasured` count, which is saturated at ~299/300 and stays high FOREVER by the
+  permanent-frontier rule (E5/§16a), so it can never trend down even as a mature cohort
+  (e.g. covered-lane large caps) fully converts. The trigger reads the covered-lane fraction
+  crossing below 0.5. Evaluated on cadence by `/monitor/deferred-triggers` (H6).
 - **T3 — enrollment rewiring (MANDATORY):** ANY proposal to make ledger enrollment, a
   verdict, or any downstream consumer read money_movement or tier. This VOIDS the Δ=0
   shield — D8's ledger-neutrality is a property of *today's* wiring, not permanent
@@ -72,22 +74,58 @@ with market regime alone at n=5**; both lanes are the same rally bet pointed opp
 Episode-collapsed the lane is 0-for-3. Tuning a score to a 5-row, regime-confounded, losing
 lane is exactly the Goodhart / score-inflation the board forbids.
 
-**REACTIVATION TRIGGER:** the outflow lane reaches **n≥15 resolved episodes**, OR **0-for-10**
-(immediate). Until then: **keep enrolling the outflow lane UNCHANGED — never throttle the
-losing lane** (Taleb's cemetery — the losing rows ARE the evidence that will settle it). The
-mechanism is code-certain and time-invariant; only the *effect size vs regime* awaits n.
+**REACTIVATION TRIGGER (R2 — PRINCIPLE-OR-n, Chairman-ruled 2026-07-20, Expansionist resolution).**
+The S1 mechanism is a *principle* already ruled true for insiders on 2026-06-26 (routine net-sell
+= degenerate noise; net-buy = signal), which required NO ledger n. So S1 reopens on EITHER of:
+- **PRINCIPLE:** the founder rules that insider-parity governs — the congress base flow gets the
+  same accumulation-only asymmetry the insider path already has; OR
+- **n:** the outflow lane reaches **n≥15 resolved EPISODES** (H5 — the unit is EPISODES, the
+  declared honest n, not rows; rows run ~3× faster and would fire prematurely), OR **0-for-10
+  EPISODES** (immediate).
 
-**IF ITS TRIGGER FIRES:** S1 is a SCORE_AFFECTING item behind its own held-out,
-regime-adjusted, precision-AND-recall backtest gate + founder sign-off. It must NOT be tuned
-against the ledger it is measured by.
+Reopening means: open the held-out backtest — it does NOT mean ship. Until then: **keep enrolling
+the outflow lane UNCHANGED — never throttle the losing lane** (Taleb's cemetery — the losing rows
+ARE the evidence that will settle it).
+
+**IF REOPENED — ship gate (unchanged):** S1 is a SCORE_AFFECTING item behind its own held-out,
+**regime-adjusted** (vs benchmark — now available in `market_accuracy_ledger.report().regime_adjusted`),
+precision-AND-recall backtest + founder sign-off. It must NOT be tuned against the ledger it is
+measured by. Even the principle-reopen path passes this backtest before shipping.
+
+**TRIGGER UNIT (H5):** all S1 counts are EPISODES (distinct ticker×flow), read from
+`/market/accuracy` → `episodes` / `regime_adjusted.episodes`. The `/monitor/deferred-triggers`
+endpoint evaluates this on cadence (H6).
 
 ---
 
-## Standing reporting/monitoring hardenings SHIPPED (E4, 2026-07-20) — not deferred, recorded here for the trail
-- `market_accuracy_ledger.report()` now serves **episode-collapsed** rates (distinct
-  (ticker, flow)) alongside row rates — 12 rows were ~7 episodes; the episode counts are the
-  honest n. `episode_small_sample` flags < 15.
-- `gate_rejects_since_boot` surfaces directional candidates the ledger never sees.
-- `/monitor/degenerate-census` is the D8 T2 tripwire metric (coverage gauge, never published).
-- The `detection_score=None → intensity×100` fallback is FIXED: absent at-detection witness
-  now stores NULL, never a substituted quantity (would have corrupted the witness under D8).
+## R1 — SYMMETRY RULING (Chairman-adopted 2026-07-20; standing, not deferred)
+Neither market-ledger lane is validated at the current n. The absolute ±5% confirm rates are
+regime-BLENDED in BOTH directions: in a broad rally, inflow confirms and outflow fails
+MECHANICALLY, with zero skill either way ("the same coin landing heads because the market went
+up"). A high inflow rate (6/7 rows, 3/3 episodes) is as regime-flattered as the low outflow
+rate (0/5 rows, 0/3 episodes). **RULES:** (a) never cite either absolute lane rate as evidence
+the Money Gradient works — cite `report().regime_adjusted` (excess return vs benchmark); (b)
+never publish any market-ledger confirm rate OR the degenerate-census % on any external surface
+(pitch / demo / marketing) while `small_sample`/`episode_small_sample` is true — the payload
+flags protect the payload, not a slide.
+
+## Standing reporting/monitoring hardenings SHIPPED — recorded here for the trail
+**E4 (2026-07-19):** episode-collapse; gate-reject counter; `/monitor/degenerate-census`;
+witness-corruption fix (absent → NULL).
+**Hardenings review fixes (2026-07-20, this session):**
+- **H1** census cold cache (equity + crypto) → `available:false`/unknown, never a false 0.
+- **H2** census T2 = per-LANE `fully_degenerate_fraction` (trendable), global is saturated-by-design.
+- **H3** episode confirm-rate served as a RANGE [strict, any] + majority; never headline the
+  optimistic ANY-rule (a MAX operator that only inflates the winning lane).
+- **H4** gate-reject counter is now DURABLE + fleet-global (`market_gate_rejects` table,
+  flushed on any enrollment/sweep/report conn); a 0 with no history still = UNKNOWN.
+- **H7** the witness NULL behavior is guarded by `transfer/test_market_ledger_witness.py`
+  (the test is the mechanism, not the comment); the tautology no-op was deleted.
+- **P1** `report().regime_adjusted` — excess return vs benchmark (SPY), de-confounds BOTH lanes.
+- **R1** symmetry ruling above; `regime_caveat` in the payload.
+
+## SCHEDULED READER (H6 — so triggers fire by rule, not memory)
+`/monitor/deferred-triggers` evaluates every trigger here (D8 T2 via the census covered-lane
+fraction; S1 via the market-ledger EPISODE counts) and returns FIRE/HOLD per item. The weekly
+**improve-system** audit reads it each run (checklist item) and surfaces any FIRE. An
+un-scheduled shelf becomes furniture — this endpoint + the weekly read is the walk.

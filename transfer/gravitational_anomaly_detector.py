@@ -6439,51 +6439,131 @@ def monitor_degenerate_census():
     rather than absence. Congestion/coverage gauge ONLY — never an accuracy KPI, never
     published externally (same rule as the catch-all %). Reads the hot risk cache; no
     recompute, no score touched."""
+    # H1 (hardenings review 2026-07-20): a COLD cache must read UNKNOWN, never 0 — a
+    # gauge whose purpose is to detect the degenerate class SHRINKING must never emit a
+    # spurious 0 that looks like coverage improved (a false reactivation signal). The
+    # equity branch may recompute; if that fails, unavailable — not zero.
     full = _cache.get("risk_full")
     if full is None:
         try:
             full = _compute_risk_full()
             _cache.set("risk_full", full, CACHE_TTL_SCORES_FULL)
         except Exception as e:
-            return {"available": False, "error": str(e)[:120]}
+            return {"available": False, "reason": f"risk cache cold + recompute failed: {str(e)[:80]}"}
     rows = full.get("results") or []
-    n_inst = deg_any = absent_any = insufficient = total_unmeasured = 0
+    # H2: fraction-based (trendable) AND per-cohort SEGMENTED. A single global "has >=1
+    # unmeasured" ratio is 299/300 and stays saturated forever by the permanent-frontier
+    # rule (E5) — it can never signal a mature cohort converting. So we measure the
+    # COMPONENT FRACTION (unmeasured / all components) and the ALL-degenerate count, per
+    # LANE, so a cohort (e.g. covered-lane large caps) converting is visible even while
+    # the frontier keeps the global number high.
+    def _blank():
+        return {"instruments": 0, "unmeasured_components": 0, "total_components": 0,
+                "fully_degenerate_instruments": 0, "any_unmeasured_instruments": 0,
+                "insufficient_coverage": 0}
+    seg = {}
+    g = _blank()
     for r in rows:
         mg = r.get("market_gradient") or {}
         if not mg:
             continue
-        n_inst += 1
+        lane = mg.get("lane") or "unknown"
+        s = seg.setdefault(lane, _blank())
         um = mg.get("unmeasured_in_composite") or 0
-        total_unmeasured += um
-        if um:
-            deg_any += 1
-        if (mg.get("data_coverage") or "") == "insufficient":
-            insufficient += 1
-        comps = mg.get("components") or {}
-        if any((c or {}).get("absent") for c in comps.values()):
-            absent_any += 1
-    crypto_deg = None
-    try:
-        cr = _cache.get("crypto_full")
-        coins = (cr or {}).get("coins") or []
-        crypto_deg = {"coins": len(coins),
-                      "with_unmeasured": sum(1 for c in coins
-                                             if (c.get("unmeasured_in_composite") or 0) > 0)}
-    except Exception:
-        crypto_deg = None
+        tot = mg.get("total_inputs") or len(mg.get("components") or {}) or 0
+        insuff = 1 if (mg.get("data_coverage") or "") == "insufficient" else 0
+        for tgt in (g, s):
+            tgt["instruments"] += 1
+            tgt["unmeasured_components"] += um
+            tgt["total_components"] += tot
+            tgt["any_unmeasured_instruments"] += 1 if um else 0
+            tgt["fully_degenerate_instruments"] += 1 if (tot and um >= tot) else 0
+            tgt["insufficient_coverage"] += insuff
+
+    def _frac(d):
+        d = dict(d)
+        d["unmeasured_fraction"] = (round(d["unmeasured_components"] / d["total_components"], 3)
+                                    if d["total_components"] else None)
+        d["fully_degenerate_fraction"] = (round(d["fully_degenerate_instruments"] / d["instruments"], 3)
+                                          if d["instruments"] else None)
+        return d
+    global_stats = _frac(g)
+    by_lane = {k: _frac(v) for k, v in seg.items()}
+
+    # crypto — H1: cold crypto_full cache = UNKNOWN, never a 0 that looks converted.
+    cr = _cache.get("crypto_full")
+    if cr is None:
+        crypto_deg = {"available": False, "reason": "crypto_full cache cold — unknown, not 0"}
+    else:
+        coins = cr.get("coins") or []
+        crypto_um = sum(1 for c in coins if (c.get("unmeasured_in_composite") or 0) > 0)
+        crypto_deg = {"available": True, "coins": len(coins), "with_unmeasured": crypto_um,
+                      "fully_degenerate_fraction": (round(crypto_um / len(coins), 3)
+                                                    if coins else None)}
+    # Tripwire = a TRENDABLE fraction that can actually move as a cohort converts, per lane.
+    # (Watch each lane's fully_degenerate_fraction fall — the global stays high by frontier
+    # design and is NOT the trigger.)
+    covered = by_lane.get("covered") or {}
+    cov_frac = covered.get("fully_degenerate_fraction")
     return {
-        "note": "coverage/congestion gauge — NEVER an accuracy KPI; the D8 exclusion "
-                "tripwire (build when degenerate→measured conversion drives these down)",
-        "instruments_scored": n_inst,
-        "instruments_with_unmeasured_components": deg_any,
-        "instruments_with_absent_components": absent_any,
-        "instruments_insufficient_coverage": insufficient,
-        "total_unmeasured_components": total_unmeasured,
+        "note": "coverage/congestion gauge — NEVER an accuracy KPI, never published externally "
+                "(catch-all-% rule). D8 T2 tripwire = watch each LANE's fully_degenerate_fraction "
+                "fall (the global stays high by the permanent-frontier rule — do not watch it).",
+        "global": global_stats,
+        "by_lane": by_lane,
         "crypto": crypto_deg,
-        "tripwire": ("degenerate class dominant — exclusion would bind on ABSENCE (defer D8)"
-                     if n_inst and deg_any > n_inst // 2 else
-                     "degenerate class shrinking — reassess D8 when it clears"),
+        "tripwire_metric": "per-lane fully_degenerate_fraction (trendable); global is saturated by design",
+        "covered_lane_fully_degenerate_fraction": cov_frac,
+        "tripwire": ("covered-lane degenerate fraction still high — exclusion binds on ABSENCE (defer D8)"
+                     if (cov_frac is None or cov_frac > 0.5) else
+                     "covered-lane converting to measured — reassess D8 (T2 may be firing)"),
     }
+
+
+@app.get("/monitor/deferred-triggers")
+def monitor_deferred_triggers():
+    """H6 (hardenings review 2026-07-20): evaluate every reactivation trigger in
+    audits/DEFERRED_ITEMS.md on-demand so a deferred item reopens BY RULE, not by memory.
+    Read weekly by the improve-system audit. Read-only; touches no score/ledger. Returns
+    FIRE/HOLD per trigger — a FIRE means 'take it back to the board/founder', never an
+    auto-action (flag-never-force)."""
+    out = {"note": "deferred-item reactivation triggers (audits/DEFERRED_ITEMS.md); FIRE = "
+                   "reopen for review, never an auto-action", "triggers": {}}
+    # D8 T2 — covered-lane degenerate fraction (per-cohort, not the saturated global).
+    try:
+        census = monitor_degenerate_census()
+        cov = (census.get("by_lane") or {}).get("covered") or {}
+        frac = cov.get("fully_degenerate_fraction")
+        out["triggers"]["D8_T2_coverage_conversion"] = {
+            "metric": "covered-lane fully_degenerate_fraction",
+            "value": frac,
+            "fire": bool(frac is not None and frac <= 0.5),
+            "reading": "covered lane converting to measured — reopen D8" if
+                       (frac is not None and frac <= 0.5) else
+                       "covered lane still degenerate-dominant — hold D8",
+        }
+    except Exception as e:
+        out["triggers"]["D8_T2_coverage_conversion"] = {"error": str(e)[:100]}
+    # S1 — outflow lane, in EPISODES (H5).
+    try:
+        import market_accuracy_ledger as _mal
+        rep = _mal.report(DB_PATH)
+        ep = (rep.get("episodes") or {}).get("by_flow", {}).get("outflow", {})
+        out_ep = ep.get("episodes") or 0
+        out_conf = ep.get("confirmed_any") or 0
+        fire = (out_ep >= 15) or (out_ep >= 10 and out_conf == 0)
+        out["triggers"]["S1_outflow_gate"] = {
+            "metric": "outflow resolved EPISODES / confirmed",
+            "episodes": out_ep, "confirmed": out_conf,
+            "fire": bool(fire),
+            "reading": ("outflow n>=15 episodes OR 0-for-10 — reopen S1 backtest" if fire
+                        else f"outflow at {out_conf}/{out_ep} episodes — hold (need 15 or 0-for-10); "
+                             f"principle-reopen is the founder's call anytime"),
+        }
+    except Exception as e:
+        out["triggers"]["S1_outflow_gate"] = {"error": str(e)[:100]}
+    out["any_fire"] = any(t.get("fire") for t in out["triggers"].values() if isinstance(t, dict))
+    return out
 
 
 @app.get("/macro/leverage")
