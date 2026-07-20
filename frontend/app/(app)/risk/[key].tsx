@@ -169,6 +169,18 @@ export default function RiskDetail() {
               how early the move is. Measurement only — not financial advice.
             </Text>
 
+            {/* D7/§17 coverage parity (2026-07-19): the web shows LTD DATA when most
+                inputs are absent; mobile now does too — a flat read on missing data
+                must never present as a measured quiet market. */}
+            {(risk as any).dataCoverage === 'insufficient' && (
+              <View className="rounded-lg px-3 py-2.5 mb-3" style={{ backgroundColor: '#B112261A' }}>
+                <Text className="text-[12px] font-bold" style={{ color: '#7A0D1A' }}>
+                  LIMITED DATA — most market inputs are absent for this instrument. Scores reflect
+                  data coverage, not a measured quiet market.
+                </Text>
+              </View>
+            )}
+
             {/* Component breakdown — the seven market factors, colored by which
                 score they feed. ✓ = baseline-relative (scored vs this item's own
                 history); otherwise still calibrating on absolute scale. */}

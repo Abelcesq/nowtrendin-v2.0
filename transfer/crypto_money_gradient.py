@@ -138,8 +138,17 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "gap_state": interp["state"], "interpretation": _interp_text, "calibrating": any_calibrating,
         "flow": flow,
         # §17 source-display: only render components that contributed; show real value or n/a (never NaN).
+        # D7 (2026-07-19): a DEGENERATE zero-on-zero pin (all 12 coins served proxy D=30.0
+        # as if measured) serves score:null + a truthful flag; the weighted score is
+        # unchanged (score-side exclusion = D8, backtest-gated).
         "components": {
             CRYPTO_LABELS[c]: ({
+                "score": None,
+                "feeds": ("money_movement" if c in CRYPTO_MM_WEIGHTS else "market_confirmation"),
+                "absent": True, "degenerate_baseline": True,
+                "baseline_relative": False, "z": None,
+                "note": "no proxy positioning data yet (zero-variance baseline)",
+            } if c in scored and scored[c].get("degenerate_baseline") else {
                 "score": round(scored[c]["score"] * 100, 1),
                 "feeds": ("money_movement" if c in CRYPTO_MM_WEIGHTS else "market_confirmation"),
                 "baseline_relative": scored[c].get("baseline_relative", False),
@@ -149,6 +158,18 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
                 "baseline_relative": False, "z": None,
             }) for c in CRYPTO_LABELS
         },
+        # D7 coverage fields (were entirely missing from the coin payload — the UI had
+        # nothing to caveat on): same semantics as the equity Market Signal.
+        "data_coverage": ("insufficient"
+                          if sum(1 for s in scored.values()
+                                 if s.get("current", -1) == 0.0 or s.get("degenerate_baseline"))
+                          > (len(scored) or 1) // 2 else
+                          "partial"
+                          if any(s.get("current", -1) == 0.0 or s.get("degenerate_baseline")
+                                 for s in scored.values()) else "full"),
+        "absent_inputs": sum(1 for s in scored.values()
+                             if s.get("current", -1) == 0.0 or s.get("degenerate_baseline")),
+        "total_inputs": len(scored) or 1,
         "price": ({k: price.get(k) for k in ("last_close", "change_7d_pct", "change_30d_pct", "trend", "as_of")}
                   if price and price.get("available") else None),
         "dark_matter": ({"coverage": (dm or {}).get("proxy_coverage"), "flow": (dm or {}).get("flow"),

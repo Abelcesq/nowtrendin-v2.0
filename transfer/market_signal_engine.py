@@ -183,9 +183,17 @@ def score_component(current: float, baseline: Optional[dict]) -> dict:
         # support. Sample counts are uniform across an item's components (all recorded
         # each cycle), so an established name's deep baseline never false-triggers.
         calibrating = samples < MIN_BASELINE_TRUSTWORTHY
+        # D7/§17 (founder-ordered 2026-07-19, floor-pin research): a ZERO-ON-ZERO
+        # baseline is informationless — mean 0, stored stdev 0, current 0 yields
+        # z=0 -> 30.0 wearing the measured badge. Stamp it degenerate so the
+        # DISPLAY renders honest absence ("no data yet") and drops the ✓. The
+        # component still participates in the weighted score UNCHANGED — score-side
+        # exclusion (D8) stays backtest-gated.
+        degenerate = (mean == 0 and baseline.get("stdev") == 0 and current == 0.0)
         return {"score": round(_z_to_unit(z), 3), "z": round(z, 2),
-                "baseline_relative": not calibrating,
+                "baseline_relative": (not calibrating) and not degenerate,
                 "calibrating": calibrating,
+                "degenerate_baseline": degenerate,
                 "baseline_samples": samples, "current": current}
     return {"score": round(_norm(current) * 0.6, 3), "baseline_relative": False,
             "calibrating": True, "baseline_samples": samples, "current": current}
@@ -281,16 +289,33 @@ def compute_market_signal(item_key: str, item_name: str,
         # from BOTH the score and the coverage denominator for this lane.
         "lane": lane, "lane_label": LANE_LABELS.get(lane, lane),
         "na_components": sorted(COMPONENT_LABELS[c] for c in na),
+        # D7/§17 (2026-07-19): an ABSENT component (quarantined missing input) or a
+        # DEGENERATE zero-on-zero pin serves score:null + a truthful flag — never a
+        # numeric 0.0/30.0 wearing the measured badge. The weighted score above is
+        # UNTOUCHED (absent was already renormalized out; degenerate exclusion = D8,
+        # backtest-gated). UIs render "n/a — no data" exactly like not_applicable.
         "components": {
-            COMPONENT_LABELS[c]: ({
-                "score": round(scored[c]["score"] * 100, 1),
-                "feeds": _feeds(c),
-                "baseline_relative": scored[c].get("baseline_relative", False),
-                "z": scored[c].get("z"),
-            } if c in scored else {
-                "score": None, "feeds": "n/a", "not_applicable": True,
-                "baseline_relative": False, "z": None,
-            }) for c in COMPONENT_LABELS
+            COMPONENT_LABELS[c]: (
+                {
+                    "score": None, "feeds": _feeds(c), "absent": True,
+                    "baseline_relative": False, "z": None,
+                    "note": "no data for this instrument this cycle",
+                } if c in scored and c in absent else
+                {
+                    "score": None, "feeds": _feeds(c), "absent": True,
+                    "degenerate_baseline": True,
+                    "baseline_relative": False, "z": None,
+                    "note": "no positioning data yet (zero-variance baseline)",
+                } if c in scored and scored[c].get("degenerate_baseline") else
+                {
+                    "score": round(scored[c]["score"] * 100, 1),
+                    "feeds": _feeds(c),
+                    "baseline_relative": scored[c].get("baseline_relative", False),
+                    "z": scored[c].get("z"),
+                } if c in scored else {
+                    "score": None, "feeds": "n/a", "not_applicable": True,
+                    "baseline_relative": False, "z": None,
+                }) for c in COMPONENT_LABELS
         },
         "section": "Market Signal",
         "disclaimer": "Measurement of market-signal state relative to this item's "

@@ -5526,6 +5526,26 @@ def start_scheduler():
                        misfire_grace_time=600)
         print(f"[scheduler] LEDGER SWEEP job at {_sweep_slots}:45 UTC "
               f"(limit {os.getenv('LEDGER_SWEEP_LIMIT', '8')}/run, oldest-checked-first)")
+        # D10 fast-lane recheck (founder-ordered build 2026-07-19; FASTLANE_RECHECK=0
+        # default = INERT). Free sources only (Wikipedia referee + trending RSS), every
+        # 6h at :10 UTC — deliberately OFF the :30/:45 paid slot family. It never
+        # judges: it logs to fastlane_recheck_log and promotes <=2 pending rows into
+        # the existing paid rotation (last_checked=NULL). Spec:
+        # audits/ledger-research/FASTLANE_RECHECK_DESIGN_2026-07-19.md.
+        def _scheduled_fastlane():
+            try:
+                import fastlane_recheck
+                res = fastlane_recheck.run_once(get_db, DB_PATH)
+                if res.get("enabled"):
+                    print(f"[fastlane] scanned={res.get('scanned')} "
+                          f"triggered={res.get('triggered')} err={res.get('error')}")
+            except Exception as _fe:
+                print(f"[fastlane] skipped: {_fe}")
+        _sched.add_job(_scheduled_fastlane, "cron", hour="0,6,12,18", minute=10,
+                       id="fastlane_recheck", max_instances=1, coalesce=True,
+                       misfire_grace_time=600)
+        print(f"[scheduler] FASTLANE recheck job at 0,6,12,18:10 UTC "
+              f"(enabled={os.getenv('FASTLANE_RECHECK', '0') == '1'}; free sources only)")
         # X velocity-trigger scan every 6h over the top-N topics. The volume
         # scan (counts/recent) is FREE vs the post cap; deep author-gradient
         # pulls are spent only on movers AND capped by the monthly post budget.
@@ -6814,6 +6834,16 @@ def backtest_estimator_report():
         return estimator_replay.report(get_db, DB_PATH)
     except Exception as e:
         return {"status": "error", "error": str(e)[:200]}
+
+
+@app.get("/fastlane")
+def fastlane_status():
+    """D10 fast-lane recheck status (held-out; FASTLANE_RECHECK=0 = inert)."""
+    try:
+        import fastlane_recheck
+        return fastlane_recheck.status(get_db, DB_PATH)
+    except Exception as e:
+        return {"error": str(e)[:200]}
 
 
 @app.get("/situations/preview", dependencies=[Depends(_require_internal)])

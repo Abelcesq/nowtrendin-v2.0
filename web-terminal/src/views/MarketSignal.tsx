@@ -70,8 +70,12 @@ function toRow(r: RiskRow): MRow {
   const mg = r.market_gradient || {}
   const det = Math.round((mg.detection ?? r.detection_score ?? 0))
   const conf = Math.round((mg.confidence ?? r.confidence_score ?? 0))
+  // §17/D7 (2026-07-19): absent/degenerate components serve score:null — OMIT them
+  // from the compact list rather than coercing to a fabricated 0.
   const comps: [string, number, string][] = mg.components
-    ? Object.entries(mg.components).map(([k, v]) => [k, Math.round(v?.score ?? 0), v?.feeds || ''])
+    ? Object.entries(mg.components)
+        .filter(([, v]: any) => v?.score != null)
+        .map(([k, v]: any) => [k, Math.round(v.score), v?.feeds || ''])
     : []
   return {
     key: r.risk_topic, name: r.risk_display || r.risk_topic,
