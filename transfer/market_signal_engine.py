@@ -183,14 +183,16 @@ def score_component(current: float, baseline: Optional[dict]) -> dict:
         # support. Sample counts are uniform across an item's components (all recorded
         # each cycle), so an established name's deep baseline never false-triggers.
         calibrating = samples < MIN_BASELINE_TRUSTWORTHY
-        # D7/§17 (founder-ordered 2026-07-19, floor-pin research): a ZERO-VARIANCE
-        # baseline whose current equals its constant is informationless — z=0 ->
-        # 30.0 wearing the measured badge. Covers BOTH the zero-on-zero equity case
-        # (spacex-class) AND the constant-nonzero crypto proxy case (all 12 coins).
-        # A current that DEVIATES from a constant baseline is a real signal and is
-        # never stamped. Display-only: the component still participates in the
-        # weighted score UNCHANGED — score-side exclusion (D8) stays backtest-gated.
-        degenerate = (baseline.get("stdev") == 0 and current == mean)
+        # D7/§17 (founder-ordered 2026-07-19, floor-pin research): an INFORMATIONLESS
+        # constant-series read — z exactly 0 on a variance-at-floor baseline — must not
+        # wear the measured badge. Storage FLOORS stdev at 0.05 (line ~587), so a
+        # zero-variance history stores stdev == 0.05 exactly, never 0; and the stored
+        # mean is 3dp-rounded, so current == mean exact equality is effectively the
+        # constant-series signature (spacex-class zero-on-zero AND the crypto
+        # constant-proxy case). A current that deviates from the constant is a real
+        # signal and is never stamped. Display-only: the component still participates
+        # in the weighted score UNCHANGED — score-side exclusion (D8) stays gated.
+        degenerate = (baseline.get("stdev", 1.0) <= 0.05 and current == mean)
         return {"score": round(_z_to_unit(z), 3), "z": round(z, 2),
                 "baseline_relative": (not calibrating) and not degenerate,
                 "calibrating": calibrating,
