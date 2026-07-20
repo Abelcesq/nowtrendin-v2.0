@@ -2299,3 +2299,32 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   WITHDRAWN on its own G1 failure. Future attempts = fundamentally different design (true
   per-cycle component recompute from raw signals), own registered round, same gates.
 - Report: audits/backtests/ESTIMATOR_BACKTEST_ROUND2_2026-07-19.md + .json.
+
+### 2026-07-19 (cont. 4) — Docket 1-4 executed: D7 shipped · D8 deferred-on-evidence · D9 designed · D10 built inert
+- D7 (§17 quartet, display-only, engine 64c1acc + gh-pages 14f6178 + preview redeploy):
+  absent components serve score:null+absent:true (never a fabricated 0); DEGENERATE
+  zero-on-zero pins stamped + served as honest absence (spacex-class "30 ✓" ends); crypto
+  coin payload gains data_coverage/absent_inputs/total_inputs + degenerate proxy-D handling;
+  web MarketSignal compact list OMITS null components (factor rows were already n/a-safe);
+  mobile risk detail gains the LTD-DATA banner (was consuming no coverage at all). Weighted
+  scores UNTOUCHED (D8 gated). VERIFICATION NOTE: /risk/scores + /crypto serve precomputed
+  payloads — new shapes appear at the next worker market cycle (~22:4x UTC) / next prewarm
+  rebuild; frontends handle both shapes (null-safe) so the rollout is order-safe.
+- D8 (score-side degenerate exclusion): held-out backtest (audits/ledger-research/
+  D8_DEGENERATE_EXCLUSION_BACKTEST_2026-07-19.md) found the LEDGER NEVER READS money_movement
+  (enrollment gates on dark-positioning flow+intensity) — 0/12 resolved equity + 0/1 crypto
+  detections would change under exclusion; 0/12 were pinned at detection (values 32.4-70).
+  D8 DEFERRED on evidence: zero ledger payoff; D7 delivers the honesty. ADJACENT LEAD logged:
+  outflow lane 0-for-5 (rhymes with degenerate-net insider) -> future positioning_intel flow
+  item. Current-state back-projection proven invalid (trap documented).
+- D9 (enrollment A/B): registered design shipped (audits/ledger-research/
+  D9_ENROLLMENT_AB_DESIGN_2026-07-19.md): deterministic slot-parity arms, shared
+  LEDGER_ENROLL_NEW_CAP=3 (without it the cap never binds and the arms are identical —
+  the design's key catch), judge arm-blind, races-per-slot primary endpoint (97/arm ~8-10wk;
+  hit-rate registered UNPOWERED), socialists-class monitor, stop rules, ~55-line touch-point
+  described not implemented. Awaits founder go to build.
+- D10 (fast-lane): IMPLEMENTED INERT (transfer/fastlane_recheck.py + scheduler :10 job +
+  /fastlane status; FASTLANE_RECHECK=0 default). Free sources only; never judges; logs to
+  held-out fastlane_recheck_log; promotes <=2 pending rows/run into the existing paid
+  rotation (last_checked=NULL) with 72h cooldown. Verified live: /fastlane enabled:false,
+  caps served. Founder flip = set FASTLANE_RECHECK=1 (board gate on live evidence after).
