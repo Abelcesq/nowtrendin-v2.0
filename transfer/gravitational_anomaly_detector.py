@@ -6500,23 +6500,30 @@ def monitor_degenerate_census():
         crypto_deg = {"available": True, "coins": len(coins), "with_unmeasured": crypto_um,
                       "fully_degenerate_fraction": (round(crypto_um / len(coins), 3)
                                                     if coins else None)}
-    # Tripwire = a TRENDABLE fraction that can actually move as a cohort converts, per lane.
-    # (Watch each lane's fully_degenerate_fraction fall — the global stays high by frontier
-    # design and is NOT the trigger.)
+    # Tripwire (H2b recalibration, founder-ruled 2026-07-20). The FIRST H2 metric was
+    # covered-lane fully_degenerate_fraction (instruments with EVERY component degenerate) —
+    # but that is structurally ~0 for large caps (they almost always carry >=1 measured
+    # component), so it sat below 0.5 from the BASELINE state and fired on day one, crying
+    # wolf rather than signalling a conversion event. The genuinely TRENDABLE metric is
+    # covered-lane UNMEASURED_FRACTION (unmeasured components / total components): it starts
+    # near 1.0 when the lane is cold and FALLS as component history accrues, exactly the
+    # "data now binds" maturation the board modelled. It crosses BELOW 0.5 when the majority
+    # of covered-lane components are measured (currently ~0.524 — HOLDS, just above the line).
     covered = by_lane.get("covered") or {}
-    cov_frac = covered.get("fully_degenerate_fraction")
+    cov_frac = covered.get("unmeasured_fraction")
     return {
         "note": "coverage/congestion gauge — NEVER an accuracy KPI, never published externally "
-                "(catch-all-% rule). D8 T2 tripwire = watch each LANE's fully_degenerate_fraction "
-                "fall (the global stays high by the permanent-frontier rule — do not watch it).",
+                "(catch-all-% rule). D8 T2 tripwire = watch the COVERED LANE's unmeasured_fraction "
+                "fall below 0.5 (majority-measured); global stays high by the permanent-frontier rule.",
         "global": global_stats,
         "by_lane": by_lane,
         "crypto": crypto_deg,
-        "tripwire_metric": "per-lane fully_degenerate_fraction (trendable); global is saturated by design",
-        "covered_lane_fully_degenerate_fraction": cov_frac,
-        "tripwire": ("covered-lane degenerate fraction still high — exclusion binds on ABSENCE (defer D8)"
-                     if (cov_frac is None or cov_frac > 0.5) else
-                     "covered-lane converting to measured — reassess D8 (T2 may be firing)"),
+        "tripwire_metric": "covered-lane unmeasured_fraction (trendable, falls as coverage converts); "
+                           "NOT fully_degenerate_fraction (baseline ~0 for large caps — fires on day one)",
+        "covered_lane_unmeasured_fraction": cov_frac,
+        "tripwire": ("covered-lane majority still UNMEASURED — exclusion binds on ABSENCE (defer D8)"
+                     if (cov_frac is None or cov_frac >= 0.5) else
+                     "covered-lane now majority-MEASURED — reassess D8 (T2 firing)"),
     }
 
 
@@ -6529,18 +6536,22 @@ def monitor_deferred_triggers():
     auto-action (flag-never-force)."""
     out = {"note": "deferred-item reactivation triggers (audits/DEFERRED_ITEMS.md); FIRE = "
                    "reopen for review, never an auto-action", "triggers": {}}
-    # D8 T2 — covered-lane degenerate fraction (per-cohort, not the saturated global).
+    # D8 T2 — covered-lane UNMEASURED fraction (H2b recalibration, founder-ruled 2026-07-20).
+    # Fires when the covered lane crosses to majority-MEASURED (unmeasured_fraction < 0.5) —
+    # a real maturation event, unlike fully_degenerate_fraction which is ~0 at baseline for
+    # large caps and fired on day one. A cold/unavailable census reads UNKNOWN (no fire).
     try:
         census = monitor_degenerate_census()
         cov = (census.get("by_lane") or {}).get("covered") or {}
-        frac = cov.get("fully_degenerate_fraction")
+        frac = cov.get("unmeasured_fraction")
         out["triggers"]["D8_T2_coverage_conversion"] = {
-            "metric": "covered-lane fully_degenerate_fraction",
+            "metric": "covered-lane unmeasured_fraction (majority-measured => reopen)",
             "value": frac,
-            "fire": bool(frac is not None and frac <= 0.5),
-            "reading": "covered lane converting to measured — reopen D8" if
-                       (frac is not None and frac <= 0.5) else
-                       "covered lane still degenerate-dominant — hold D8",
+            "fire": bool(frac is not None and frac < 0.5),
+            "reading": "covered lane now majority-MEASURED — reopen D8 backtest for review" if
+                       (frac is not None and frac < 0.5) else
+                       (f"covered lane still majority-unmeasured ({frac}) — hold D8"
+                        if frac is not None else "census cold/unavailable — unknown, hold"),
         }
     except Exception as e:
         out["triggers"]["D8_T2_coverage_conversion"] = {"error": str(e)[:100]}

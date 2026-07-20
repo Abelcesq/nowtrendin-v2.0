@@ -26,12 +26,20 @@ absence) gives the exclusion something to bind on.
 **REACTIVATION TRIGGERS (any one reopens D8; T3 makes it MANDATORY-before):**
 - **T1 — founder truth-ruling:** the founder rules that served money_movement / tier must
   equal the displayed honest-absence state.
-- **T2 — coverage conversion (H2 granularity fix, 2026-07-20):** watch each LANE's
-  `fully_degenerate_fraction` on `/monitor/degenerate-census` → `by_lane` fall — NOT the
-  global `any_unmeasured` count, which is saturated at ~299/300 and stays high FOREVER by the
-  permanent-frontier rule (E5/§16a), so it can never trend down even as a mature cohort
-  (e.g. covered-lane large caps) fully converts. The trigger reads the covered-lane fraction
-  crossing below 0.5. Evaluated on cadence by `/monitor/deferred-triggers` (H6).
+- **T2 — coverage conversion (H2b recalibration, founder-ruled 2026-07-20):** watch the
+  COVERED LANE's **`unmeasured_fraction`** on `/monitor/degenerate-census` → `by_lane` fall
+  **below 0.5** (i.e. the majority of covered-lane components become MEASURED). The trigger
+  fires there — a genuine maturation event — and reopens D8's held-out backtest for review
+  (reopen ≠ ship). Evaluated on cadence by `/monitor/deferred-triggers` (H6).
+  - **Why NOT `fully_degenerate_fraction` (the original H2 metric, superseded):** it counts
+    instruments where EVERY component is degenerate, which is structurally ~0 for large caps
+    (they almost always carry ≥1 measured component). It sat below 0.5 from the BASELINE state
+    and fired on the FIRST live read (2026-07-20) — crying wolf, not signalling conversion.
+    `unmeasured_fraction` starts near 1.0 cold and falls as component history accrues, so it
+    crosses 0.5 only when the lane has genuinely matured (live 2026-07-20: 0.524 → HOLDS).
+  - **Why NOT the global `any_unmeasured` count (the pre-H2 metric):** saturated ~299/300 and
+    stays high FOREVER by the permanent-frontier rule (E5/§16a) — un-fireable in the FIRE
+    direction even as a mature cohort fully converts.
 - **T3 — enrollment rewiring (MANDATORY):** ANY proposal to make ledger enrollment, a
   verdict, or any downstream consumer read money_movement or tier. This VOIDS the Δ=0
   shield — D8's ledger-neutrality is a property of *today's* wiring, not permanent
@@ -114,7 +122,10 @@ flags protect the payload, not a slide.
 witness-corruption fix (absent → NULL).
 **Hardenings review fixes (2026-07-20, this session):**
 - **H1** census cold cache (equity + crypto) → `available:false`/unknown, never a false 0.
-- **H2** census T2 = per-LANE `fully_degenerate_fraction` (trendable), global is saturated-by-design.
+- **H2** census T2 = per-LANE fraction (trendable), global is saturated-by-design.
+  **H2b** (founder-ruled, same day): the per-lane metric is covered-lane `unmeasured_fraction`
+  (< 0.5 = majority-measured = reopen), NOT `fully_degenerate_fraction` — the latter is ~0 at
+  baseline for large caps and fired on the first live read (a mis-calibrated tripwire).
 - **H3** episode confirm-rate served as a RANGE [strict, any] + majority; never headline the
   optimistic ANY-rule (a MAX operator that only inflates the winning lane).
 - **H4** gate-reject counter is now DURABLE + fleet-global (`market_gate_rejects` table,
