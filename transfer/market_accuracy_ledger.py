@@ -53,6 +53,10 @@ MOVE_THRESHOLD_PCT = float(os.getenv("MARKET_MOVE_THRESHOLD_PCT", "5.0"))
 MIN_INTENSITY = float(os.getenv("MARKET_LEDGER_MIN_INTENSITY", "0.25"))
 # Max calendar days to skip forward to find the first available close (weekends/holidays).
 _MAX_SKIP = 6
+# E4 (board D8 session, Economist P4): count directional-flow candidates the ledger
+# NEVER SEES — rejected at the enrollment gate — so the board can always compare what
+# enrolls against what was filtered. Since process start (reset on restart, honest gauge).
+_GATE_REJECTS = {"nondirectional": 0, "weak_intensity": 0}
 
 
 def _connect(db_path: str = DB_PATH):
@@ -166,19 +170,27 @@ def record_market_detection(ticker, name, detection_date, flow, intensity,
     flow = (flow or "").lower().strip()
     tkr = (ticker or "").upper().strip()
     if flow not in ("inflow", "outflow"):
+        _GATE_REJECTS["nondirectional"] += 1   # E4 (board): count what the ledger never sees
         return  # only directional claims are falsifiable
     if not tkr:
         return
     try:
         if intensity is not None and float(intensity) < MIN_INTENSITY:
+            _GATE_REJECTS["weak_intensity"] += 1
             return  # too weak to be a real money-movement detection
     except (TypeError, ValueError):
         pass
+    # WITNESS-CORRUPTION FIX (board D8 session, Challenger finding, 2026-07-19):
+    # do NOT substitute intensity*100 when the money-movement detection is absent.
+    # detection_score is the stored AT-DETECTION WITNESS for this row (what the money
+    # score actually read when we enrolled); it is context only — never thresholded,
+    # never part of the verdict (which is realized price direction). A substituted
+    # intensity is a DIFFERENT quantity wearing the same column name, and under any
+    # future degenerate-exclusion (D8) that substitution would become common and
+    # silently corrupt the one honest at-detection record. Absent = NULL, never
+    # fabricated. The column is nullable and every downstream read tolerates NULL.
     if detection_score is None:
-        try:
-            detection_score = round(float(intensity) * 100.0, 1)
-        except (TypeError, ValueError):
-            detection_score = None
+        detection_score = None   # explicit: absent witness stays absent
     # Canonicalize the detection date (§14) at the write boundary.
     try:
         from date_utils import to_iso_date
@@ -408,6 +420,28 @@ def report(db_path=DB_PATH) -> dict:
                 ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
         by_flow[f] = {"confirmed": c, "resolved": n,
                       "confirm_rate_pct": round(100.0 * c / n, 1) if n else None}
+    # E4 EPISODE-COLLAPSE (board D8 session, Challenger): a persistent claim re-enrolls
+    # on later dates (AAPL outflow x3 = ONE ongoing signal, not 3 independent trials).
+    # Collapse resolved rows to distinct (ticker, flow) EPISODES so the reported rate
+    # isn't a denominator game — row-level rate is kept alongside for transparency, and
+    # the episode counts are the honest n for any interval/claim.
+    _res_rows = [r for r in rows if r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE")]
+    _ep = {}
+    for r in _res_rows:
+        key = ((r.get("ticker") or "").upper(), r.get("flow"))
+        _ep.setdefault(key, []).append(r)
+    ep_conf = sum(1 for v in _ep.values() if any(x.get("verdict") == "CONFIRMED" for x in v))
+    episodes = {
+        "definition": "distinct (ticker, flow); an episode is CONFIRMED if any of its rows confirmed",
+        "resolved_episodes": len(_ep),
+        "confirmed_episodes": ep_conf,
+        "confirm_rate_pct": round(100.0 * ep_conf / len(_ep), 1) if _ep else None,
+        "by_flow": {f: {
+            "episodes": sum(1 for (t, fl) in _ep if fl == f),
+            "confirmed": sum(1 for (k, v) in _ep.items() if k[1] == f
+                             and any(x.get("verdict") == "CONFIRMED" for x in v)),
+        } for f in ("inflow", "outflow")},
+    }
     return {
         "ground_truth": "realized EOD close direction (FMP)",
         "distinct_from": "trends accuracy ledger (Google Trends breakout)",
@@ -421,7 +455,10 @@ def report(db_path=DB_PATH) -> dict:
         "confirm_rate_pct": round(100.0 * len(confirmed) / resolved, 1) if resolved else None,
         "median_lead_days": round(statistics.median(leads), 1) if leads else None,
         "by_flow": by_flow,
+        "episodes": episodes,
+        "gate_rejects_since_boot": dict(_GATE_REJECTS),
         "small_sample": resolved < 20,
+        "episode_small_sample": len(_ep) < 15,
         "note": "MEASUREMENT of the Money Gradient's own accuracy — did the realized market "
                 "move match the detected money flow, and how many days after. NOT a forecast, "
                 "NOT advice, NOT a buy/sell signal.",

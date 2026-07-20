@@ -485,6 +485,29 @@ part 1 still in design.** Two coupled changes:
    source ADDITIONALLY requires **backtest-before-ship**: build it held-out, research the output,
    review, and only then integrate into any score.
 
+### 16a. COLD-START POSTURE (hard rule — 2026-07-19, D8 board; Expansionist)
+> The degenerate/zero-baseline class is not a bug coverage cures — it is the **permanent
+> frontier of expansion**: every new instrument, coin, region, or asset class enters the
+> universe with a zero-variance baseline and lives in the degenerate class until its own
+> history accumulates. So a codified cold-start posture is required, not a per-batch patch.
+
+Any universe expansion (new instruments / asset classes / regions) MUST state its
+degenerate-window handling, and it follows this fixed progression, never skipping a stage:
+1. **CALIBRATING** — under `MIN_BASELINE_TRUSTWORTHY` cycles: the component reads on the
+   absolute scale, stamped `calibrating`; the overall tier reads "baseline forming", never a
+   confident tier the data can't support.
+2. **HONEST ABSENCE (display, §17/D7)** — a zero-variance/constant baseline (`stdev` at floor
+   AND `current == mean`) is `degenerate_baseline` → served `score: null, absent: true`, never
+   a numeric floor value wearing the measured badge (the "30 ✓" defect). The composite still
+   counts it at the neutral baseline BUT discloses it (`composite_note`, E1) — display-only.
+3. **SCORE-SIDE EXCLUSION (gated, D8)** — excluding degenerate components from the *composite*
+   is SCORE_AFFECTING and stays deferred behind its written triggers (`audits/DEFERRED_ITEMS.md`)
+   until coverage growth makes exclusion bind on DATA rather than absence
+   (`/monitor/degenerate-census` is the tripwire). Never skip stages 1–2 to reach 3.
+
+The interim, diligence-defensible truth on an insufficient-coverage instrument is: the score
+is baseline-floor-informed and the display SAYS SO — never a fabricated read, never a silent 30.
+
 ## 17. SOURCE-DISPLAY RULE (detail sections — trend + market, ALL platforms)
 
 > **Hard rule:** a topic's detail view shows ONLY the sources, coverage, and components that

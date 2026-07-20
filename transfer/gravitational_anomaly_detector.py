@@ -6429,6 +6429,63 @@ def risk_scores(limit: int = Query(50, ge=1, le=300), offset: int = Query(0, ge=
             "offset": offset, "limit": limit, "results": page}
 
 
+@app.get("/monitor/degenerate-census")
+def monitor_degenerate_census():
+    """E4 / D8-tripwire (board 2026-07-19): read-only census of market-signal
+    components held at the neutral baseline because their data is ABSENT or their
+    baseline is DEGENERATE (zero-variance). This is the metric that decides when the
+    gated score-side exclusion (D8) becomes worth building — when coverage growth
+    converts degenerate→measured, these counts fall and exclusion would bind on DATA
+    rather than absence. Congestion/coverage gauge ONLY — never an accuracy KPI, never
+    published externally (same rule as the catch-all %). Reads the hot risk cache; no
+    recompute, no score touched."""
+    full = _cache.get("risk_full")
+    if full is None:
+        try:
+            full = _compute_risk_full()
+            _cache.set("risk_full", full, CACHE_TTL_SCORES_FULL)
+        except Exception as e:
+            return {"available": False, "error": str(e)[:120]}
+    rows = full.get("results") or []
+    n_inst = deg_any = absent_any = insufficient = total_unmeasured = 0
+    for r in rows:
+        mg = r.get("market_gradient") or {}
+        if not mg:
+            continue
+        n_inst += 1
+        um = mg.get("unmeasured_in_composite") or 0
+        total_unmeasured += um
+        if um:
+            deg_any += 1
+        if (mg.get("data_coverage") or "") == "insufficient":
+            insufficient += 1
+        comps = mg.get("components") or {}
+        if any((c or {}).get("absent") for c in comps.values()):
+            absent_any += 1
+    crypto_deg = None
+    try:
+        cr = _cache.get("crypto_full")
+        coins = (cr or {}).get("coins") or []
+        crypto_deg = {"coins": len(coins),
+                      "with_unmeasured": sum(1 for c in coins
+                                             if (c.get("unmeasured_in_composite") or 0) > 0)}
+    except Exception:
+        crypto_deg = None
+    return {
+        "note": "coverage/congestion gauge — NEVER an accuracy KPI; the D8 exclusion "
+                "tripwire (build when degenerate→measured conversion drives these down)",
+        "instruments_scored": n_inst,
+        "instruments_with_unmeasured_components": deg_any,
+        "instruments_with_absent_components": absent_any,
+        "instruments_insufficient_coverage": insufficient,
+        "total_unmeasured_components": total_unmeasured,
+        "crypto": crypto_deg,
+        "tripwire": ("degenerate class dominant — exclusion would bind on ABSENCE (defer D8)"
+                     if n_inst and deg_any > n_inst // 2 else
+                     "degenerate class shrinking — reassess D8 when it clears"),
+    }
+
+
 @app.get("/macro/leverage")
 def macro_leverage():
     """OFR Short-Term Funding Monitor — systemic leverage + funding-stress read
