@@ -600,11 +600,22 @@ def _record_top_detections(limit=20, min_detection=None):
                   else os.getenv("LEDGER_DETECTION_FLOOR", "10"))
     recent_days = int(os.getenv("LEDGER_ENROLL_RECENT_DAYS", "14"))
     first_seen_cut = (datetime.now(timezone.utc) - timedelta(days=recent_days)).isoformat()
+    # ── D9 A/B (founder-ordered 2026-07-19; registered design
+    # D9_ENROLLMENT_AB_DESIGN_2026-07-19.md; LEDGER_AB_D9=0 -> byte-identical). ──
+    _ab = os.getenv("LEDGER_AB_D9", "0") == "1"
+    _ab_cap = int(os.getenv("LEDGER_ENROLL_NEW_CAP", "3"))
+    if _ab:
+        import time as _t
+        _ts = int(_t.time())
+        _d, _s = _ts // 86400, (_ts % 86400) // 21600
+        _arm = "A" if (_d + _s) % 2 == 0 else "B"
+        limit = max(limit, 60)     # widen the raw fetch so ordering acts on NEW candidates
     conn = get_db(DB_PATH)
     n = 0
     try:
         _base_sql = """
             SELECT v.topic_key, v.topic_display, v.detection_score,
+                   v.platforms_active,
                    COALESCE(lc.first_detected_at, fs.first_at) AS det_date
             FROM velocity_scores v
             INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
@@ -633,22 +644,86 @@ def _record_top_detections(limit=20, min_detection=None):
             rows = conn.execute(_base_sql.format(tm_join="", tm_where=""),
                                 (floor, first_seen_cut, limit)).fetchall()
         import date_utils
-        for r in rows:
-            # Canonical PRIMARY date (§14): never raw [:10] — to_iso_date tries
-            # whole-string formats and returns None (skip) on an unparseable value
-            # rather than a corrupt/guessed date, so the ledger's detection_date
-            # (a canonical date-semantic column) stays a clean YYYY-MM-DD.
-            dd = date_utils.to_iso_date(r["det_date"])
-            if not dd:
-                continue
-            ledger_plus.record_detection(r["topic_key"], r["topic_display"], dd,
-                                         r["detection_score"] or 0, conn=conn)
-            n += 1
+        if not _ab:
+            for r in rows:
+                # Canonical PRIMARY date (§14): never raw [:10] — to_iso_date tries
+                # whole-string formats and returns None (skip) on an unparseable value
+                # rather than a corrupt/guessed date, so the ledger's detection_date
+                # (a canonical date-semantic column) stays a clean YYYY-MM-DD.
+                dd = date_utils.to_iso_date(r["det_date"])
+                if not dd:
+                    continue
+                ledger_plus.record_detection(r["topic_key"], r["topic_display"], dd,
+                                             r["detection_score"] or 0, conn=conn)
+                n += 1
+        else:
+            # ── D9 A/B path (registered design §7): candidates -> exclude already-
+            # enrolled (key + canonical date, mirroring record_detection's idempotency
+            # key) -> per-arm ordering -> shared LEDGER_ENROLL_NEW_CAP -> audit log.
+            # The judge (sweep/verdicts) is arm-blind and untouched.
+            cands = []
+            for r in rows:
+                dd = date_utils.to_iso_date(r["det_date"])
+                if not dd:
+                    continue
+                pa = r["platforms_active"]
+                if isinstance(pa, str):
+                    try:
+                        pa = json.loads(pa or "[]")
+                    except Exception:
+                        pa = []
+                breadth = len(pa) if isinstance(pa, list) else 0
+                cands.append({"key": r["topic_key"], "disp": r["topic_display"],
+                              "det": r["detection_score"] or 0, "dd": dd,
+                              "breadth": breadth})
+            new_cands = []
+            if cands:
+                keys = list({c["key"] for c in cands})
+                ph = ",".join(["?"] * len(keys))
+                enrolled = set()
+                for tbl in ("pending_detections", "accuracy_ledger"):
+                    try:
+                        for e in conn.execute(
+                                f"SELECT topic_key, detection_date FROM {tbl} "
+                                f"WHERE topic_key IN ({ph})", keys).fetchall():
+                            enrolled.add((e["topic_key"] if hasattr(e, "keys") else e[0],
+                                          str(e["detection_date"] if hasattr(e, "keys") else e[1])[:10]))
+                    except Exception:
+                        pass
+                new_cands = [c for c in cands if (c["key"], c["dd"]) not in enrolled]
+            if _arm == "B":
+                new_cands.sort(key=lambda c: (-c["breadth"], c["dd"], c["key"]))
+            # arm A keeps the query's first-seen DESC order verbatim
+            trimmed = max(0, len(new_cands) - _ab_cap)
+            take = new_cands[:_ab_cap]
+            for c in take:
+                ledger_plus.record_detection(c["key"], c["disp"], c["dd"], c["det"],
+                                             conn=conn, enroll_arm=_arm,
+                                             breadth_at_enroll=c["breadth"])
+                n += 1
+            try:
+                conn.execute("""CREATE TABLE IF NOT EXISTS enroll_ab_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, cycle_at TEXT, d INTEGER,
+                    s INTEGER, arm TEXT, candidates INTEGER, new_candidates INTEGER,
+                    enrolled INTEGER, trimmed INTEGER, detail TEXT)""")
+                conn.execute(
+                    "INSERT INTO enroll_ab_log (cycle_at, d, s, arm, candidates, "
+                    "new_candidates, enrolled, trimmed, detail) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (datetime.now(timezone.utc).isoformat(timespec="seconds"), _d, _s,
+                     _arm, len(cands), len(new_cands), len(take), trimmed,
+                     json.dumps([{"k": c["key"], "b": c["breadth"], "dd": c["dd"]}
+                                 for c in new_cands[:20]])))
+                conn.commit()
+            except Exception as _le:
+                print(f"[ledger-ab] log skipped: {_le}")
     except Exception as e:
         print(f"[ledger] record_top_detections error: {e}")
     finally:
         conn.close()
-    print(f"[ledger] recorded {n} pending detections")
+    if _ab:
+        print(f"[ledger] recorded {n} pending detections (D9 arm {_arm}, cap {_ab_cap})")
+    else:
+        print(f"[ledger] recorded {n} pending detections")
     return n
     print(f"[startup] google_trends_validation unavailable: {_acc_exc}")
 

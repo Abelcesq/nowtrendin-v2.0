@@ -90,9 +90,22 @@ def init_pending_db(db_path: str = DB_PATH):
                        # Board fix 2026-07-08: STAMP the measurement basis at resolution —
                        # never recompute published cohorts from prunable tables.
                        ("at_detection_days", "INTEGER"),
-                       ("pre_broken", "INTEGER")):
+                       ("pre_broken", "INTEGER"),
+                       # D9 A/B (founder-ordered 2026-07-19, registered design
+                       # D9_ENROLLMENT_AB_DESIGN_2026-07-19): nullable, forward-only.
+                       ("enroll_arm", "TEXT"),
+                       ("breadth_at_enroll", "INTEGER")):
         try:
             conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    for _col, _typ in (("enroll_arm", "TEXT"), ("breadth_at_enroll", "INTEGER")):
+        try:
+            conn.execute(f"ALTER TABLE pending_detections ADD COLUMN {_col} {_typ}")
             conn.commit()
         except Exception:
             try:
@@ -171,7 +184,8 @@ def _parse(date_str: str) -> datetime:
 
 
 def record_detection(topic_key, topic_display, detection_date, detection_score,
-                     timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None):
+                     timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None,
+                     enroll_arm=None, breadth_at_enroll=None):
     """Log a detection as PENDING the moment the engine flags it. Idempotent on
     (topic_key, detection_date).
 
@@ -218,10 +232,10 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
             conn.execute("""
                 INSERT OR IGNORE INTO pending_detections
                     (id, topic_key, topic_display, detection_date, detection_score,
-                     timeout_date, last_checked, status)
-                VALUES (?,?,?,?,?,?,?,'pending')
+                     timeout_date, last_checked, status, enroll_arm, breadth_at_enroll)
+                VALUES (?,?,?,?,?,?,?,'pending',?,?)
             """, (rec_id, topic_key, topic_display, detection_date,
-                  detection_score, timeout_dt, now))
+                  detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll))
             conn.commit()
     except Exception as e:
         print(f"[ledger] record_detection error: {e}")
@@ -255,22 +269,28 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
         pre_broken = 1 if lead_days < -LEDGER_PRE_BROKEN_DAYS_V else 0
     elif verdict in ("LED", "SAME_DAY"):
         pre_broken = 0
+    # D9 A/B carry-through (nullable; rows enrolled outside the test stay NULL).
+    _arm = p.get("enroll_arm") if hasattr(p, "get") else None
+    _brd = p.get("breadth_at_enroll") if hasattr(p, "get") else None
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
              breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
-             sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken,
+             enroll_arm, breadth_at_enroll)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
             validated_at=EXCLUDED.validated_at, provider=EXCLUDED.provider,
             sweep_query=EXCLUDED.sweep_query, query_ambiguous=EXCLUDED.query_ambiguous,
             referee_corroborated=EXCLUDED.referee_corroborated,
-            at_detection_days=EXCLUDED.at_detection_days, pre_broken=EXCLUDED.pre_broken
+            at_detection_days=EXCLUDED.at_detection_days, pre_broken=EXCLUDED.pre_broken,
+            enroll_arm=EXCLUDED.enroll_arm, breadth_at_enroll=EXCLUDED.breadth_at_enroll
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
           p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
-          sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken))
+          sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken,
+          _arm, _brd))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
