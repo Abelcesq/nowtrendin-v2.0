@@ -2328,3 +2328,14 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   held-out fastlane_recheck_log; promotes <=2 pending rows/run into the existing paid
   rotation (last_checked=NULL) with 72h cooldown. Verified live: /fastlane enabled:false,
   caps served. Founder flip = set FASTLANE_RECHECK=1 (board gate on live evidence after).
+
+### 2026-07-19 (cont. 5) — D7 VERIFIED LIVE (crypto); two stamp-rule fixes en route
+- The degenerate signature needed two corrections against REAL stored data (each caught by
+  verification, never shipped blind): (1) crypto pins are constant-NONZERO baselines, not
+  zero-on-zero; (2) storage FLOORS stdev at 0.05, so "stdev==0" can never occur in stored
+  baselines — final signature = stdev<=0.05 (at-floor) AND current==constant mean. Local
+  truth table 4/4 (spacex-class ✓, crypto-class ✓, real-deviation ✗, real-variance-at-mean ✗).
+- VERIFIED LIVE (engine efe20b5, post-prewarm): BTC proxy positioning serves score:null +
+  absent + degenerate_baseline with data_coverage=insufficient — the "measured 30 ✓" era on
+  crypto D is over. Equity /risk/scores flips at the next worker market cycle (~22:4x UTC),
+  same verified code path; frontends handle old+new shapes either way.
