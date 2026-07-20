@@ -2339,3 +2339,26 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
   absent + degenerate_baseline with data_coverage=insufficient — the "measured 30 ✓" era on
   crypto D is over. Equity /risk/scores flips at the next worker market cycle (~22:4x UTC),
   same verified code path; frontends handle old+new shapes either way.
+
+### 2026-07-19 (cont. 6) — D9 LIVE · D10 LIVE · D8 board complete (awaiting Chairman on E1-E5)
+- D9 A/B RUNNING (founder-ordered; engine 8626ecd, flags v260): LEDGER_AB_D9=1 live per the
+  registered design — deterministic (d+s)%2 arm assignment (formula smoke-verified), widened
+  candidate fetch + new-candidate filtering (key+canonical-date, mirrors record_detection
+  idempotency), arm B breadth-ordered, shared LEDGER_ENROLL_NEW_CAP=3 on BOTH arms,
+  enroll_ab_log audit table, arm/breadth carried pending->ledger (nullable forward-only
+  columns). Judge arm-blind; precondition LEDGER_SWEEP_NEWEST_SLOTS=2 confirmed. First arm
+  fires at the next enrollment cycle; weekly stop-rule monitoring per design §8.
+- D10 FAST-LANE ARMED (FASTLANE_RECHECK=1): /fastlane serves enabled:true, caps 40/2/72h/21d;
+  first scan at the next :10 slot. Free sources only; never judges; ledger reporting will
+  segment fastlane-triggered rows.
+- D8 BOARD COMPLETE (6 memos; record audits/board/BOARD_D8-degenerate-exclusion_2026-07-19.md):
+  unanimous — backtest verified (ledgers never read mm; Δ=0 exact), outflow lane = THE live
+  lead (open as NEW held-out item; regime control first; NEVER throttle outflow enrollment),
+  no back-projection. GENUINE SPLIT on the composite: Outsider build-now w/ conditions vs 3
+  defer-with-tripwires vs Guardian disclose-now + Economist narrow carve-out (mm->None only
+  when ALL components absent/degenerate; renormalized-survivor composites REJECTED — kills
+  half the original D8 spec). Unique finds: n=12 is ~7 independent episodes (Challenger);
+  regime confounding; detection_score=None->intensity x100 witness-corruption fallback (fix
+  regardless); congress-net-sell base-flow candidate mechanism for the outflow failures
+  (Executioner, L118 vs the L160 insider fix); degenerate census as the permanent expansion
+  frontier metric (Expansionist). Decision table E1-E5 AWAITING CHAIRMAN RULING.
