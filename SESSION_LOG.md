@@ -38,8 +38,13 @@ drift); market_confirmation (M) untouched.
 - **Mobile:** `gradientApi.ts` mappers thread `moneyDataAbsent` (money read → null); `risk/[key].tsx`,
   `crypto/[coin].tsx`, `RiskCard.tsx`, `CryptoCard.tsx` render n/a + "Market-Confirmation only",
   null-safe on the now-nullable `moneyMovement`/`lead`.
-- Commit `c0d0575`; engine deploy + `D8_MM_EXCLUDE=1` config var + web (gh-pages) + mobile preview
-  redeploy = the closeout steps.
+- Commit `c0d0575`; engine deploy `f169594` + `D8_MM_EXCLUDE=1` (config v266); web gh-pages `db7104f`;
+  mobile preview Heroku `9736288` (PIN gate intact). **VERIFIED LIVE:** after a `/risk/collect` +
+  `/crypto/collect` re-score, **166/300** flow-neutral equity rows serve the honest absent state,
+  **0 directional rows wrongly nulled** (Apple/Nvidia/etc. keep real mm), all **12 crypto coins**
+  serve `mm=null, tier=ABSENT` with market_confirmation preserved (BTC mc 49.1), and the **market
+  ledger is untouched** (12 resolved, 50% blended, regime 6/11) — ledger-neutral exactly as the
+  reopened backtest predicted.
 
 ---
 
