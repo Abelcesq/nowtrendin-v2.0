@@ -53,8 +53,9 @@ export default function CryptoDetail() {
   const tierColor = MARKET_TIER_COLOR[c.tier] ?? '#9A9AA2';
   const flow = c.flow ? (FLOW_META[c.flow] ?? { label: `• ${c.flow.toUpperCase()}`, color: '#9A9AA2' }) : null;
   const comps = Object.entries(c.components ?? {});
-  const gapAbs = Math.abs(Math.round(c.lead * 10) / 10);
-  const gapHead = c.calibrating ? 'CALIBRATING' : (c.gapState || '').replace(/_/g, ' ');
+  const gapAbs = c.lead == null ? null : Math.abs(Math.round(c.lead * 10) / 10);
+  const gapHead = c.moneyDataAbsent ? 'MARKET-CONFIRMATION ONLY'
+    : c.calibrating ? 'CALIBRATING' : (c.gapState || '').replace(/_/g, ' ');
 
   return (
     <Screen scroll>
@@ -85,9 +86,15 @@ export default function CryptoDetail() {
       <View className="bg-card rounded-3xl p-5 mt-2">
         <View className="flex-row justify-around">
           <View className="items-center">
-            <GradientScoreRing score={Math.round(c.moneyMovement)} color={MM_COLOR} size="lg" caption="/100" />
+            {c.moneyDataAbsent || c.moneyMovement == null ? (
+              <View style={{ width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
+                <Text className="text-textMuted text-3xl font-black">n/a</Text>
+              </View>
+            ) : (
+              <GradientScoreRing score={Math.round(c.moneyMovement)} color={MM_COLOR} size="lg" caption="/100" />
+            )}
             <Text className="text-textPrimary text-xs font-bold mt-2">MONEY MOVEMENT</Text>
-            <Text className="text-textMuted text-xs mt-0.5">informed money · D</Text>
+            <Text className="text-textMuted text-xs mt-0.5">{c.moneyDataAbsent ? 'no proxy money data' : 'informed money · D'}</Text>
           </View>
           <View className="items-center">
             <GradientScoreRing score={Math.round(c.marketConfirmation)} color={MC_COLOR} size="lg" caption="/100" />
@@ -102,7 +109,7 @@ export default function CryptoDetail() {
         <View className="bg-card rounded-3xl p-5 mt-4">
           {!!gapHead && (
             <Text style={{ color: tierColor, fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
-              {gapHead}{!c.calibrating ? ` · ${gapAbs}-pt gap` : ''}
+              {gapHead}{!c.calibrating && !c.moneyDataAbsent && gapAbs != null ? ` · ${gapAbs}-pt gap` : ''}
             </Text>
           )}
           {!!c.interpretation && (

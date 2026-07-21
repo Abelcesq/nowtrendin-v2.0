@@ -55,9 +55,16 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
 
       {/* Dual rings — Money Movement (D) / Market Confirmation (M), same layout as the stock page */}
       <div className="gauges">
-        <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed money · D</div></div>
+        {c.money_data_absent
+          ? <div className="gauge det">{ring(0, 'var(--line)')}<div className="gv" style={{ marginTop: -50, color: 'var(--muted)', fontSize: 15 }}>n/a</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">no proxy money data</div></div>
+          : <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed money · D</div></div>}
         <div className="gauge conf">{ring(c.market_confirmation ?? 0, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{c.market_confirmation ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MC_LABEL}</div><div className="gf">coin price · M</div></div>
       </div>
+      {c.money_data_absent && (
+        <div className="narr" style={{ margin: '8px 0', background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
+          ℹ <b>Market-Confirmation only.</b> No proxy money-positioning data exists for this coin yet — the Money Movement read is <b>absent, not zero</b>. Only the coin's own price confirmation (M) is shown.
+        </div>
+      )}
 
       {(c.gap_state || c.interpretation) && (
         <div className="sect">
@@ -143,6 +150,9 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
 
   const coins = feed?.coins || []
   const anyCalibrating = coins.some((c) => c.calibrating)
+  // D8: when every coin's money read is absent, the page is market-confirmation-only — do not
+  // headline a "Money Gradient" with zero money data on any coin.
+  const allMoneyAbsent = coins.length > 0 && coins.every((c) => c.money_data_absent)
   const dfl = CRYPTO_DIR_FILTERS.find((x) => x.k === dirFilter)
   const shown = dfl?.test ? coins.filter(dfl.test) : coins
   return (
@@ -151,8 +161,12 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
         <div className="main-title-row">
           <div className="main-title">Crypto</div>
           <div className="main-sub">
-            Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
-            vs Market Confirmation (the coin's own price). Measurement, not advice.
+            {allMoneyAbsent
+              ? <>Crypto <b>Market Confirmation</b> — proxy money-positioning data is not yet available
+                for any coin, so this view shows each coin's own price confirmation (M) only, not a
+                money read. Measurement, not advice.</>
+              : <>Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
+                vs Market Confirmation (the coin's own price). Measurement, not advice.</>}
           </div>
         </div>
         <div className="chips">
@@ -203,7 +217,7 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
                       <div className="topic-name">{c.item_name} <span style={{ color: 'var(--text-3)' }}>· {c.coin}</span>{c.calibrating && <span className="cal-chip">cal</span>}{flowChip(c.flow)}</div>
                       <div className="topic-cat">crypto</div>
                     </td>
-                    <td className="r"><span className="score-cell det">{c.money_movement}</span></td>
+                    <td className="r"><span className="score-cell det" style={c.money_data_absent ? { opacity: 0.4 } : undefined}>{c.money_data_absent ? 'n/a' : c.money_movement}</span></td>
                     <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>
                     <td className="r"><span className="muted">{c.gap != null ? `${c.gap > 0 ? '+' : ''}${c.gap}` : '—'}</span></td>
                     <td><span className="tier" style={{ color: marketTierColor(c.tier), background: marketTierColor(c.tier) + '18', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{c.tier}</span></td>

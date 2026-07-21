@@ -300,6 +300,10 @@ export interface RiskScore {
     // factual flow (IN/OUT) surfaces. Absent → v1 labels (flag off).
     modelVersion?: string;
     flow?: 'inflow' | 'outflow' | 'neutral';
+    // D8 (2026-07-20): every money-movement input absent/degenerate → money read served null;
+    // render "Market-Confirmation-only", never a money number wearing the measured badge.
+    moneyDataAbsent?: boolean;
+    compositeNote?: string;
     leverageFacts?: { company_leverage_health?: number | null; note?: string } | null;
   };
   // ── Positioning engine (baseline-relative; now a component of the above) ──
@@ -491,6 +495,8 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       dataCoverage: r.market_gradient.data_coverage || undefined,
       // E1 composite disclosure (board D8 session, 2026-07-19)
       compositeNote: r.market_gradient.composite_note || undefined,
+      // D8 (2026-07-20): money read absent → render Market-Confirmation-only, never a number.
+      moneyDataAbsent: Boolean(r.market_gradient.money_data_absent),
       naComponents: Array.isArray(r.market_gradient.na_components) ? r.market_gradient.na_components : undefined,
       modelVersion: r.market_gradient.model_version || undefined,
       flow: r.market_gradient.flow || undefined,
@@ -908,10 +914,11 @@ export async function fetchSignalAnalysis(
 export interface CryptoCoin {
   coin: string;                    // ticker, e.g. BTC
   name: string;                    // display name, e.g. Bitcoin
-  moneyMovement: number;           // D — informed money via crypto-exposure proxies
+  moneyMovement: number | null;    // D — informed money via crypto-exposure proxies (null when absent)
+  moneyDataAbsent?: boolean;       // D8: no proxy money data → render Market-Confirmation-only
   marketConfirmation: number;      // M — the coin's own price/volume confirmation
-  lead: number;                    // MM − MC (the web table's LEAD column)
-  tier: string;                    // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT
+  lead: number | null;             // MM − MC (the web table's LEAD column)
+  tier: string;                    // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT | ABSENT
   flow?: string;                   // inflow | outflow | neutral | divergent
   calibrating?: boolean;
   interpretation?: string;
@@ -934,9 +941,11 @@ export async function fetchCrypto(): Promise<CryptoFeed> {
   const coins: CryptoCoin[] = (d.coins ?? []).map((c: any) => ({
     coin: c.coin ?? '',
     name: c.item_name ?? c.name ?? c.coin ?? '',
-    moneyMovement: Math.round(Number(c.money_movement ?? c.detection ?? 0)),
+    moneyDataAbsent: Boolean(c.money_data_absent),
+    moneyMovement: (c.money_data_absent || c.money_movement == null)
+      ? null : Math.round(Number(c.money_movement ?? c.detection ?? 0)),
     marketConfirmation: Number(c.market_confirmation ?? c.confidence ?? 0),
-    lead: Number(c.gap ?? (Number(c.money_movement ?? 0) - Number(c.market_confirmation ?? 0))),
+    lead: (c.money_data_absent || c.gap == null) ? null : Number(c.gap),
     tier: c.tier ?? 'ROUTINE',
     flow: c.flow || undefined,
     calibrating: !!c.calibrating,

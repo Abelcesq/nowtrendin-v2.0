@@ -99,6 +99,14 @@ CONFIDENCE_FP = "broad market confirmation"
 # when MARKET_SIGNAL_V2=1 (default off; v1 weights above untouched). MARKET_SIGNAL_V2 also
 # implies the congress/13F dark-positioning blend (they are D inputs to Money Movement).
 MARKET_SIGNAL_V2 = os.getenv("MARKET_SIGNAL_V2", "0") == "1"
+# D8 (founder-ruled 2026-07-20; board BOARD_T1-principle-rulings_2026-07-20). Presentation-truth:
+# when EVERY money-movement component is absent (no data) or degenerate (zero-variance baseline),
+# serve money_movement=null + an honest ABSENT money read instead of the renormalized ~30 floor
+# that wears the measured badge while the display says "absent". Ruled spec: NULL only when ALL
+# money components are absent — NO renormalized-survivor recipe (no row-to-row recipe drift);
+# market_confirmation is untouched. Ledger-neutral by the reopened backtest (enrollment gates on
+# flow+intensity, never mm/tier — 0/12 resolved rows affected). Flag-gated + reversible.
+MONEY_MOVEMENT_EXCLUDE = os.getenv("D8_MM_EXCLUDE", "0") == "1"
 MONEY_MOVEMENT_WEIGHTS = {          # D — where early / informed money is moving
     "positioning_concentration": 0.55,   # smart-money 13F/insider/shorts (+ congress blend)
     "analyst_signal":            0.30,    # early analyst/coverage incl. quality finance YouTube
@@ -258,6 +266,7 @@ def compute_market_signal(item_key: str, item_name: str,
     # (detection/confidence become aliases of money_movement/market_confirmation). Movement +
     # ledger language — no prediction/advice.
     money_movement = market_confirmation = None
+    money_data_absent = False
     if MARKET_SIGNAL_V2:
         money_movement = round(_weighted(MONEY_MOVEMENT_WEIGHTS), 1)
         market_confirmation = round(_weighted(MARKET_CONFIRMATION_WEIGHTS), 1)
@@ -265,12 +274,37 @@ def compute_market_signal(item_key: str, item_name: str,
         gap = round(detection - confidence, 1)
         interp = _interpret_movement(money_movement, market_confirmation, gap,
                                      any_calibrating, zero_inputs, n_applicable)
+        # ── D8 exclusion (flag-gated) — serve NULL money read when no money component survives.
+        if MONEY_MOVEMENT_EXCLUDE:
+            mm_live = [c for c in MONEY_MOVEMENT_WEIGHTS
+                       if c in scored and c not in absent
+                       and not scored[c].get("degenerate_baseline")]
+            if not mm_live:
+                money_data_absent = True
+                money_movement = detection = None
+                gap = None
+
+    # Tier + detection level: with money data absent the money read is an honest ABSENT state
+    # (market_confirmation is still served), never a floor tier wearing a confident label.
+    if money_data_absent:
+        tier_val = "ABSENT"
+        detection_level_val = "ABSENT"
+        interp = {"state": "money_absent",
+                  "text": "No informed-money data for this instrument this cycle — "
+                          "showing market-confirmation only."}
+    else:
+        tier_val = _level((detection + confidence) / 2)
+        detection_level_val = _level(detection)
 
     return {
         "item_key": item_key, "item_name": item_name,
         "detection": detection, "confidence": confidence, "gap": gap,
-        "tier": _level((detection + confidence) / 2),
-        "detection_level": _level(detection), "confidence_level": _level(confidence),
+        "tier": tier_val,
+        "detection_level": detection_level_val, "confidence_level": _level(confidence),
+        # D8: true when EVERY money component is absent/degenerate → money_movement served null
+        # and the surface must render "Market-Confirmation-only", never a "Money Gradient"
+        # headline over zero money data. False on the default path (flag off / any live component).
+        "money_data_absent": money_data_absent,
         "detection_fp": (MONEY_MOVEMENT_FP if MARKET_SIGNAL_V2 else DETECTION_FP),
         "confidence_fp": (MARKET_CONFIRM_FP if MARKET_SIGNAL_V2 else CONFIDENCE_FP),
         "gap_state": interp["state"], "interpretation": interp["text"],
@@ -294,7 +328,10 @@ def compute_market_signal(item_key: str, item_name: str,
         "unmeasured_in_composite": sum(
             1 for s in scored.values()
             if s.get("degenerate_baseline")) + len(absent),
-        "composite_note": ("Components without measured data are held at the neutral "
+        "composite_note": ("No informed-money data for this instrument — showing "
+                           "market-confirmation only; the money read is absent, not zero."
+                           if money_data_absent else
+                           "Components without measured data are held at the neutral "
                            "baseline in the composite score."
                            if (len(absent) or any(s.get("degenerate_baseline")
                                                   for s in scored.values())) else None),

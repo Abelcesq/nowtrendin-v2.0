@@ -116,15 +116,31 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
 
     money_movement = round(_weighted(CRYPTO_MM_WEIGHTS), 1)
     market_confirmation = round(_weighted(CRYPTO_MC_WEIGHTS), 1)
-    gap = round(money_movement - market_confirmation, 1)
+    # D8 (founder-ruled 2026-07-20, flag-gated MONEY_MOVEMENT_EXCLUDE): every crypto MM component
+    # is proxy-degenerate on all 12 coins today → serve money_movement=null + "market-confirmation
+    # only", never a "Money Gradient" headline over zero money data. M is untouched.
+    money_data_absent = False
+    if getattr(mse, "MONEY_MOVEMENT_EXCLUDE", False):
+        mm_live = [c for c in CRYPTO_MM_WEIGHTS
+                   if c in scored and not scored[c].get("degenerate_baseline")]
+        if not mm_live:
+            money_data_absent = True
+            money_movement = None
+    gap = None if money_data_absent else round(money_movement - market_confirmation, 1)
     # Reuse the equity Money-Gradient interpretation (movement + facts language, no advice), then append
     # the rich crypto analysis walk (parity with the Market Signal's _market_analysis) — EXCEPT while
-    # calibrating, where the base line already explains the limited-data state.
-    interp = mse._interpret_movement(money_movement, market_confirmation, gap, any_calibrating)
-    _interp_text = interp["text"]
-    if not any_calibrating:
-        _interp_text = (_interp_text + "  "
-                        + _crypto_analysis(money_movement, market_confirmation, gap, flow)).strip()
+    # calibrating, or when the money read is absent (market-confirmation only).
+    if money_data_absent:
+        interp = {"state": "money_absent",
+                  "text": "No proxy money-positioning data for this coin this cycle — "
+                          "showing market-confirmation only."}
+        _interp_text = interp["text"]
+    else:
+        interp = mse._interpret_movement(money_movement, market_confirmation, gap, any_calibrating)
+        _interp_text = interp["text"]
+        if not any_calibrating:
+            _interp_text = (_interp_text + "  "
+                            + _crypto_analysis(money_movement, market_confirmation, gap, flow)).strip()
 
     return {
         "item_key": f"crypto:{coin}", "coin": coin, "item_name": name, "section": "Crypto",
@@ -132,8 +148,12 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         # dual-ring aliases (frontend renders detection/confidence rings)
         "detection": money_movement, "confidence": market_confirmation, "gap": gap,
         "money_movement": money_movement, "market_confirmation": market_confirmation,
-        "tier": mse._level((money_movement + market_confirmation) / 2),
-        "detection_level": mse._level(money_movement), "confidence_level": mse._level(market_confirmation),
+        # D8: null money read → render "Market-Confirmation-only", never a Money Gradient headline.
+        "money_data_absent": money_data_absent,
+        "tier": ("ABSENT" if money_data_absent
+                 else mse._level((money_movement + market_confirmation) / 2)),
+        "detection_level": ("ABSENT" if money_data_absent else mse._level(money_movement)),
+        "confidence_level": mse._level(market_confirmation),
         "detection_fp": mse.MONEY_MOVEMENT_FP, "confidence_fp": mse.MARKET_CONFIRM_FP,
         "gap_state": interp["state"], "interpretation": _interp_text, "calibrating": any_calibrating,
         "flow": flow,
@@ -173,7 +193,10 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         # E1 COMPOSITE DISCLOSURE (Chairman-ruled 2026-07-19): same rule as equities.
         "unmeasured_in_composite": sum(1 for s in scored.values()
                                        if s.get("degenerate_baseline")),
-        "composite_note": ("Components without measured data are held at the neutral "
+        "composite_note": ("No proxy money-positioning data for this coin — showing "
+                           "market-confirmation only; the money read is absent, not zero."
+                           if money_data_absent else
+                           "Components without measured data are held at the neutral "
                            "baseline in the composite score."
                            if any(s.get("degenerate_baseline") for s in scored.values())
                            else None),

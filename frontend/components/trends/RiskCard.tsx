@@ -40,7 +40,9 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
   const pos = risk.positioningScore ?? 0;
   const tier = tierOf(risk);
   const color = MARKET_TIER_COLOR[tier] ?? '#9A9AA2';
-  const mm = Math.round(risk.marketGradient?.detection ?? risk.detection ?? 0);
+  // D8: money read absent → show "n/a", never a floor number in the collapsed row.
+  const mmAbsent = Boolean((risk.marketGradient as any)?.moneyDataAbsent);
+  const mm = mmAbsent ? 'n/a' : Math.round(risk.marketGradient?.detection ?? risk.detection ?? 0);
   const stages = risk.stages ?? {};
   const counts = STAGES.map((s) => stages[s.key]?.count ?? 0);
   const maxStage = Math.max(1, ...counts);

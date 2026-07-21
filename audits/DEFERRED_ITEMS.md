@@ -64,7 +64,22 @@ coupling them manufactures circularity. Undocumented, it is how the next regress
 
 ---
 
-## S1 — asymmetric outflow gate (SPEC ONLY, gated 2026-07-20)
+## S1 — asymmetric outflow gate (PRINCIPLE ARM CLOSED 2026-07-20; n-arm remains)
+
+> **UPDATE 2026-07-20 (founder ruled "run the degeneracy test"; board Economist synthesis).**
+> The principle-reopen path was EXERCISED and **RESOLVED: REJECT parity (board branch S1-4).**
+> The ledger-independent degeneracy test
+> (`audits/ledger-research/S1_CONGRESS_NET_DEGENERACY_TEST_2026-07-20.md`) measured the distribution
+> of congress `net(buys−sells)` across the served universe: **7 net-BUY / 7 net-SELL, mean ≈ 0**
+> (clean net-buyers like 3/0, 5/0 present) — congress net **DISCRIMINATES**; it is NOT the
+> structurally-sell-dominated degenerate class insider net was (~15/15 all-sell). **The insider
+> parity does NOT transfer**, so the blanket accumulation-only asymmetry on the congress base flow
+> is NOT justified. `positioning_intel.py` L118 stays UNCHANGED. This CLOSES the PRINCIPLE arm of the
+> trigger below. The **n-arm remains open**: the outflow question is settled by DATA (n≥15 resolved
+> EPISODES or 0-for-10), never the parity shortcut and never the regime-confounded small-n rate.
+> Spin-off noted but NOT acted on: the 4 outflow mega-caps are two-sided (e.g. 6 buys / 14 sells) yet
+> fire "outflow" at saturated intensity 1.0 — a *conviction/intensity* calibration question, a NEW
+> item with its own investigation + backtest if pursued, NOT S1.
 
 **What it is:** the market-signal "outflow" flow claim is built (with `AV_DARKPOS_ENABLED`
 effectively off in production) purely from congress net-selling (`positioning_intel` L118:
@@ -82,14 +97,12 @@ with market regime alone at n=5**; both lanes are the same rally bet pointed opp
 Episode-collapsed the lane is 0-for-3. Tuning a score to a 5-row, regime-confounded, losing
 lane is exactly the Goodhart / score-inflation the board forbids.
 
-**REACTIVATION TRIGGER (R2 — PRINCIPLE-OR-n, Chairman-ruled 2026-07-20, Expansionist resolution).**
-The S1 mechanism is a *principle* already ruled true for insiders on 2026-06-26 (routine net-sell
-= degenerate noise; net-buy = signal), which required NO ledger n. So S1 reopens on EITHER of:
-- **PRINCIPLE:** the founder rules that insider-parity governs — the congress base flow gets the
-  same accumulation-only asymmetry the insider path already has; OR
+**REACTIVATION TRIGGER — n-ARM ONLY (the PRINCIPLE arm was tested and REJECTED 2026-07-20).**
+~~PRINCIPLE: insider-parity governs~~ — **CLOSED:** the degeneracy test rejected parity (congress net
+discriminates, see the update box above). The principle path does NOT reopen S1. The one live arm:
 - **n:** the outflow lane reaches **n≥15 resolved EPISODES** (H5 — the unit is EPISODES, the
   declared honest n, not rows; rows run ~3× faster and would fire prematurely), OR **0-for-10
-  EPISODES** (immediate).
+  EPISODES** (immediate). Evaluated on cadence by `/monitor/deferred-triggers` (H6).
 
 Reopening means: open the held-out backtest — it does NOT mean ship. Until then: **keep enrolling
 the outflow lane UNCHANGED — never throttle the losing lane** (Taleb's cemetery — the losing rows

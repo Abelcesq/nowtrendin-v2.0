@@ -6569,7 +6569,7 @@ def monitor_deferred_triggers():
             "fire": bool(fire),
             "reading": ("outflow n>=15 episodes OR 0-for-10 — reopen S1 backtest" if fire
                         else f"outflow at {out_conf}/{out_ep} episodes — hold (need 15 or 0-for-10); "
-                             f"principle-reopen is the founder's call anytime"),
+                             f"principle arm CLOSED 2026-07-20 (congress net discriminates — parity rejected)"),
         }
     except Exception as e:
         out["triggers"]["S1_outflow_gate"] = {"error": str(e)[:100]}

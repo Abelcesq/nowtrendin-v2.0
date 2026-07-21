@@ -20,6 +20,7 @@ interface MRow {
   interp: string; comps: [string, number, string][]
   lane: string; laneLabel: string   // coverage lane: covered / halted_microcap / macro_theme
   v2: boolean; flow: 'inflow' | 'outflow' | 'neutral' | null  // Money Gradient (v2): direction
+  mda: boolean   // D8: money_data_absent — no informed-money component; render market-confirmation only
   raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
 type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
@@ -90,6 +91,7 @@ function toRow(r: RiskRow): MRow {
     lane: mg.lane || '', laneLabel: mg.lane_label || '',
     v2: !!(mg.model_version || mg.money_movement != null || mg.flow),
     flow: (mg.flow as MRow['flow']) || null,
+    mda: !!mg.money_data_absent,
     comps, raw: r,
   }
 }
@@ -205,7 +207,9 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       <Disclaimer style={{ marginBottom: 10 }} />
       {/* Market Gradient — dual score, mobile colors */}
       <div className="gauges" style={mg.data_coverage === 'insufficient' ? { opacity: 0.55 } : undefined}>
-        <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MM_LABEL : 'Detection'}</div><div className="gf">{row.v2 ? 'informed money · D' : 'analysts + positioning'}</div></div>
+        {row.mda
+          ? <div className="gauge det">{ring(0, 'var(--line)')}<div className="gv" style={{ marginTop: -50, color: 'var(--muted)', fontSize: 15 }}>n/a</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">no informed-money data</div></div>
+          : <div className="gauge det">{ring(row.det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{row.det}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MM_LABEL : 'Detection'}</div><div className="gf">{row.v2 ? 'informed money · D' : 'analysts + positioning'}</div></div>}
         <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MC_LABEL : 'Confidence'}</div><div className="gf">{row.v2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
       </div>
 
@@ -232,9 +236,14 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
             ℹ <b>Macro theme.</b> A market-wide theme has no single ticker, so smart-money positioning (FINRA short interest · 13F) and company fundamentals are <b>not applicable</b> — the score reflects only the macro / cross-market inputs that <i>can</i> be measured ({mg.total_inputs} applicable factor{mg.total_inputs === 1 ? '' : 's'}).
           </div>
         )}
-        {row.lane !== 'macro_theme' && mg.data_coverage === 'insufficient' && (
+        {row.lane !== 'macro_theme' && !row.mda && mg.data_coverage === 'insufficient' && (
           <div className="narr" style={{ marginBottom: 8, background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
             ⚠ <b>Insufficient positioning data.</b> Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this instrument yet{mg.absent_inputs != null ? ` (${mg.absent_inputs}/${mg.total_inputs} inputs absent)` : ''}, so it sits near baseline by default — <i>not</i> a confirmed quiet market.
+          </div>
+        )}
+        {row.mda && (
+          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
+            ℹ <b>Market-Confirmation only.</b> No informed-money data exists for this instrument yet (every money-movement input is absent), so the Money Movement read is <b>absent — not zero</b>. Only the broad Market Confirmation (M) is shown.
           </div>
         )}
         <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
@@ -646,7 +655,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                 return (
                   <tr key={r.key} className={r.key === sel ? 'sel' : ''} onClick={() => select(r.key)}>
                     <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}{r.v2 && flowChip(r.flow)}</div><div className="topic-cat">{r.lane ? (LANE_SHORT[r.lane] || 'market') : (r.cls ? r.cls.toLowerCase() : 'market')}</div></td>
-                    <td className="r"><span className="score-cell det" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.det}</span></td>
+                    <td className="r"><span className="score-cell det" style={(r.mda || r.dc === 'insufficient') ? { opacity: 0.4 } : undefined}>{r.mda ? 'n/a' : r.det}</span></td>
                     <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
                     <td>{r.dc === 'insufficient'

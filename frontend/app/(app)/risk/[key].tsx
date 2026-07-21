@@ -135,9 +135,15 @@ export default function RiskDetail() {
                 </View>
                 <View className="flex-row justify-around items-start">
                   <View className="items-center">
-                    <GradientScoreRing score={Math.round(mg.detection)} color={MKT_DET} size="lg" caption="/100" />
+                    {(mg as any).moneyDataAbsent ? (
+                      <View style={{ width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text className="text-textMuted text-3xl font-black">n/a</Text>
+                      </View>
+                    ) : (
+                      <GradientScoreRing score={Math.round(mg.detection)} color={MKT_DET} size="lg" caption="/100" />
+                    )}
                     <Text className="text-textPrimary text-xs font-bold mt-2">{v2 ? 'MONEY MOVEMENT' : 'DETECTION'}</Text>
-                    <Text className="text-textMuted text-[12px]">{v2 ? 'informed money · D' : 'analysts + positioning'}</Text>
+                    <Text className="text-textMuted text-[12px]">{(mg as any).moneyDataAbsent ? 'no informed-money data' : (v2 ? 'informed money · D' : 'analysts + positioning')}</Text>
                   </View>
                   <View className="items-center">
                     <GradientScoreRing score={Math.round(mg.confidence)} color={MKT_CONF} size="lg" caption="/100" />
@@ -147,8 +153,9 @@ export default function RiskDetail() {
                 </View>
                 <View className="rounded-xl px-3 py-2 mt-4" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
                   <Text className="text-sm font-bold" style={{ color: tierCol }}>
-                    {mg.calibrating ? 'CALIBRATING' : (mg.gapState || `${gap}-pt gap`)}
-                    {!mg.calibrating && ` · ${gap}-pt gap`}
+                    {(mg as any).moneyDataAbsent ? 'MARKET-CONFIRMATION ONLY'
+                      : mg.calibrating ? 'CALIBRATING' : (mg.gapState || `${gap}-pt gap`)}
+                    {!(mg as any).moneyDataAbsent && !mg.calibrating && ` · ${gap}-pt gap`}
                   </Text>
                   {!!mg.interpretation && (
                     <Text className="text-textSecondary text-[14px] leading-5 mt-1">{mg.interpretation}</Text>

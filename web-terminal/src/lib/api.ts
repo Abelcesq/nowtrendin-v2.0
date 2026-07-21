@@ -127,6 +127,9 @@ export interface MarketGradient {
   model_version?: string
   money_movement?: number; market_confirmation?: number
   flow?: 'inflow' | 'outflow' | 'neutral'
+  // D8 (2026-07-20): true when EVERY money-movement input is absent/degenerate → money_movement
+  // served null; render "Market-Confirmation-only", never a money read wearing a measured badge.
+  money_data_absent?: boolean; composite_note?: string; unmeasured_in_composite?: number
   leverage_facts?: { company_leverage_health?: number | null; note?: string }
 }
 export interface RiskRow {
@@ -158,6 +161,7 @@ export interface CryptoCoin {
   tier?: string; detection_level?: string; confidence_level?: string
   gap_state?: string; interpretation?: string; calibrating?: boolean
   flow?: 'inflow' | 'outflow' | 'neutral' | 'no_data' | 'mixed' | 'divergent'
+  money_data_absent?: boolean; composite_note?: string   // D8: null money read → market-confirmation only
   components?: Record<string, CryptoComponent>
   price?: { last_close?: number; change_7d_pct?: number | null; change_30d_pct?: number | null; trend?: string; as_of?: string } | null
   dark_matter?: { coverage?: string; flow?: string; intensity?: number; proxies_covered?: number } | null

@@ -28,7 +28,7 @@ export function CryptoCard({ coin }: { coin: CryptoCoin }) {
   const [open, setOpen] = useState(false);
   const tierColor = MARKET_TIER_COLOR[coin.tier] ?? '#9A9AA2';
   const flow = coin.flow ? (FLOW_META[coin.flow] ?? { label: `• ${coin.flow.toUpperCase()}`, color: '#9A9AA2' }) : null;
-  const lead = Math.round(coin.lead * 10) / 10;
+  const lead = coin.lead == null ? null : Math.round(coin.lead * 10) / 10;
 
   const toggle = () => {
     LayoutAnimation.configureNext({
@@ -56,7 +56,7 @@ export function CryptoCard({ coin }: { coin: CryptoCoin }) {
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{coin.moneyMovement}</Text>
+            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{coin.moneyDataAbsent || coin.moneyMovement == null ? 'n/a' : coin.moneyMovement}</Text>
             <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>MM</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
@@ -71,7 +71,7 @@ export function CryptoCard({ coin }: { coin: CryptoCoin }) {
               </View>
               <View>
                 <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>LEAD</Text>
-                <Text style={{ color: '#16264A', fontSize: 18, fontWeight: '800', marginTop: 3 }}>{lead > 0 ? `+${lead}` : lead}</Text>
+                <Text style={{ color: '#16264A', fontSize: 18, fontWeight: '800', marginTop: 3 }}>{lead == null ? 'n/a' : lead > 0 ? `+${lead}` : lead}</Text>
               </View>
               {coin.priceClose != null && (
                 <View>

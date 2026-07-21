@@ -109,7 +109,18 @@ one thing worse than acting; the degeneracy test resolves it in days, not months
 
 ---
 
-## 6. Chairman decision block (to be filled)
-- **D8:** ☐ D8-1 HOLD ☐ D8-2 FULL T1 ☐ D8-3 equity-first · crypto label: ☐ relabel & ship ☐ defer crypto
-- **S1:** ☐ S1-1 HOLD ☐ rule principle + run degeneracy test ☐ S1-4 reject parity
-- Ruling logged in SESSION_LOG on decision.
+## 6. Chairman ruling (2026-07-20 — "implement all of them, sequence for accuracy and completion")
+- **D8: ☑ D8-2 FULL T1** — equity + crypto, flag-gated `D8_MM_EXCLUDE` (default off in code,
+  enabled via engine config var — reversible), crypto **relabeled Market-Confirmation-only** when the
+  D-ring is null. Shipped: `market_signal_engine.py` + `crypto_money_gradient.py` (serve
+  `money_movement: null` + `money_data_absent` + ABSENT tier when ALL money components absent/degenerate;
+  ruled spec = null-only, NO renormalized-survivor recipe) + web (MarketSignal/Crypto/api.ts) + mobile
+  (gradientApi mappers + risk/crypto screens + RiskCard/CryptoCard). Truth-table verified: flag-off
+  byte-identical; flag-on nulls only all-degenerate rows; one live component leaves the composite
+  untouched. Ledger-neutral by the reopened backtest.
+- **S1: ☑ rule principle + run degeneracy test → RESULT: S1-4 REJECT PARITY.** The ledger-independent
+  test (`audits/ledger-research/S1_CONGRESS_NET_DEGENERACY_TEST_2026-07-20.md`) found congress net
+  DISCRIMINATES (7 buy / 7 sell, mean ≈ 0), NOT the insider degenerate class → parity does not transfer
+  → **L118 unchanged.** The principle arm of the S1 trigger is CLOSED; the n-arm (n≥15 / 0-for-10
+  episodes) remains. The regime-confounded 0-for-5 was never used (unanimous red line honored).
+- Logged in SESSION_LOG 2026-07-20.
