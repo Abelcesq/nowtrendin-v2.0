@@ -7,6 +7,42 @@ _Last updated: 2026-07-20_
 
 ---
 
+## Session 2026-07-20 (cont.) — D8 SHIPPED (T1 presentation-truth) + S1 REJECT parity (degeneracy test)
+
+Founder ruled the board's T1/principle recommendations: "implement all of them, sequence for accuracy
+and completion." Board record: `audits/board/BOARD_T1-principle-rulings_2026-07-20.md` (6 memos).
+
+**S1 (ran FIRST — cheap, decides scope): PRINCIPLE arm TESTED → REJECTED.** The board's ledger-
+INDEPENDENT congress-net degeneracy test (Economist synthesis; `audits/ledger-research/
+S1_CONGRESS_NET_DEGENERACY_TEST_2026-07-20.md`): across the served universe congress `net(buys−sells)`
+is **7 net-BUY / 7 net-SELL, mean ≈ 0** (clean net-buyers 3/0, 5/0 present) — it **DISCRIMINATES**,
+unlike insider net (~15/15 structural sell = degenerate). So the insider-parity principle does NOT
+transfer; **`positioning_intel.py` L118 stays UNCHANGED** (S1-4 reject). The regime-confounded 0-for-5
+was never used as justification (unanimous red line). The PRINCIPLE arm of the S1 trigger is CLOSED;
+the **n-arm (n≥15 or 0-for-10 EPISODES) remains** — the outflow question is settled by DATA, not the
+parity shortcut. Spin-off flagged, not acted on: the 4 outflow mega-caps fire "outflow" at saturated
+intensity 1.0 while two-sided (6 buys/14 sells) — a conviction/intensity item, its own future
+investigation, NOT S1.
+
+**D8 (T1 presentation-truth): SHIPPED, flag-gated `D8_MM_EXCLUDE`.** Backtest-proven ledger-neutral
+(enrollment gates on flow+intensity, never mm — 0/12 resolved rows affected). Ruled spec = serve
+`money_movement: null` + `money_data_absent: true` + an ABSENT money tier ONLY when EVERY money
+component is absent/degenerate — **null-only, NO renormalized-survivor recipe** (no row-to-row recipe
+drift); market_confirmation (M) untouched.
+- **Engine:** `market_signal_engine.py` (equity) + `crypto_money_gradient.py` (crypto — all 12 coins).
+  Truth-table verified: flag-OFF byte-identical (the 30.0 pin we're fixing); flag-ON nulls only the
+  all-degenerate rows; a single live component leaves the composite exactly as-is.
+- **Web:** `MarketSignal.tsx` + `Crypto.tsx` render an "n/a" money ring + a "Market-Confirmation-only"
+  banner; the crypto page subtitle drops the "Money Gradient" headline when every coin is money-absent;
+  list cells show n/a. `api.ts` types extended.
+- **Mobile:** `gradientApi.ts` mappers thread `moneyDataAbsent` (money read → null); `risk/[key].tsx`,
+  `crypto/[coin].tsx`, `RiskCard.tsx`, `CryptoCard.tsx` render n/a + "Market-Confirmation only",
+  null-safe on the now-nullable `moneyMovement`/`lead`.
+- Commit `c0d0575`; engine deploy + `D8_MM_EXCLUDE=1` config var + web (gh-pages) + mobile preview
+  redeploy = the closeout steps.
+
+---
+
 ## Session 2026-07-20 — Board hardenings review fixes H1–H8 / P1 / R1 + R2 principle-OR-n (all OPERATIONAL/doc; SHIPPED + VERIFIED LIVE)
 
 Implemented the Chairman-ruled decision table from `audits/board/BOARD_hardenings-review_2026-07-20.md`
