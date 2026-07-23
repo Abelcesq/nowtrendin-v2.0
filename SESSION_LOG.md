@@ -7,6 +7,24 @@ _Last updated: 2026-07-23_
 
 ---
 
+## Session 2026-07-23 (cont.) — P2-A streaming explainers (SSE): fresh AI Context feels <1s
+
+Closes the phase-2 latency arc: the residual 2-5s "fresh" first-view now STREAMS.
+- **Engine** `GET /explainer/{key}/stream` (SSE): cached explainer → ONE instant `full_text`
+  event; fresh → Anthropic token deltas (Haiku, plain-text `short --- full`, same grounding +
+  STRICT RULES via a format override — JSON can't stream legibly). Persists the same record
+  (upsert-if-empty), records real cost from streamed usage, warms the in-mem cache.
+  `ai_grade.explain_topic_stream_deltas` + `split_short_full` (defensive: no `---` → first
+  paragraph = short, never empty).
+- **Web** `api.streamExplainer` (EventSource + cancel fn) wired into **MarketSignal** + **Screener**
+  AI Context: live token render with a `▍` cursor, snaps to short + "Read full definition" on done;
+  ANY stream failure → the sync `/explainer` endpoint (which carries the OpenRouter lane). Grade.tsx
+  kept sync (background context, no visible benefit). Mobile unchanged (RN has no native
+  EventSource; its panels are cache-hit-instant for warmed topics).
+- **Verified live** (engine `36a9530`, gh-pages `ef22f0c`): fresh `lagoon` — first token at
+  **1.15s**, complete at 4.04s (15 deltas); second view (cached) — **0.18s** single event. The
+  spinner-then-dump is gone; words appear ~1s in.
+
 ## Session 2026-07-23 (cont.) — P2-C market-panel prewarm + P2-B OpenRouter resilience lane
 
 Founder-approved both phase-2 items:
