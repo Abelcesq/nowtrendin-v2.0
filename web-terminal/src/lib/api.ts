@@ -264,6 +264,31 @@ export const api = {
   // Source-aware AI definition (short + full) — same /explainer the mobile app uses.
   explainer: (key: string) => get<{ available: boolean; short?: string; full?: string }>(
     `/explainer/${encodeURIComponent(key)}`),
+  // P2-A: streaming variant — cached explainers arrive instantly as one event; fresh ones
+  // stream token-by-token so the panel shows words in <1s. Returns a cancel function.
+  // On error the caller falls back to api.explainer (which carries the fallback lane).
+  streamExplainer: (
+    key: string,
+    onDelta: (accumulated: string) => void,
+    onDone: (r: { short?: string; full?: string } | null) => void,
+    onError: () => void,
+  ): (() => void) => {
+    const es = new EventSource(`${ENGINE}/explainer/${encodeURIComponent(key)}/stream`)
+    let acc = ''
+    let settled = false
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d.type === 'delta') { acc += d.text || ''; onDelta(acc) }
+        else if (d.type === 'full_text' || (d.type === 'done' && d.short)) {
+          settled = true; es.close(); onDone({ short: d.short, full: d.full })
+        } else if (d.type === 'done') { settled = true; es.close(); onDone(null) }
+        else if (d.type === 'error') { settled = true; es.close(); onError() }
+      } catch { /* ignore malformed event */ }
+    }
+    es.onerror = () => { if (!settled) { settled = true; es.close(); onError() } }
+    return () => { settled = true; es.close() }
+  },
   // Lazy trend-detail panels — same endpoints the mobile signal page uses.
   convergence: (key: string) => get<any>(`/convergence/${encodeURIComponent(key)}`),
   xsignal: (topic: string) => get<any>(`/signal-x/${encodeURIComponent(topic)}`),

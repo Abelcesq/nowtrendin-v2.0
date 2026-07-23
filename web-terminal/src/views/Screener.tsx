@@ -149,15 +149,25 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const [loading, setLoading] = useState(true)
   const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
   const [exLoading, setExLoading] = useState(true)
+  const [exStream, setExStream] = useState<string | null>(null)   // P2-A: live token stream
   const [showFull, setShowFull] = useState(false)
   useEffect(() => {
-    let alive = true; setLoading(true); setExLoading(true); setShowFull(false)
+    let alive = true; setLoading(true); setExLoading(true); setShowFull(false); setEx(null); setExStream(null)
     api.score(row.topic_key).then((x) => alive && setD(x)).catch(() => {}).finally(() => alive && setLoading(false))
-    // Source-aware AI definition (same /explainer the mobile app shows).
-    api.explainer(row.topic_key)
-      .then((x) => alive && setEx(x?.available ? x : null))
-      .catch(() => {}).finally(() => alive && setExLoading(false))
-    return () => { alive = false }
+    // P2-A: stream the source-aware AI definition (cached = instant; fresh = words <1s);
+    // fall back to the sync endpoint (OpenRouter lane included) on any stream failure.
+    const cancel = api.streamExplainer(
+      row.topic_key,
+      (acc) => { if (alive) { setExStream(acc); setExLoading(false) } },
+      (r) => { if (alive) { setEx(r?.short ? r : null); setExStream(null); setExLoading(false) } },
+      () => {
+        if (!alive) return
+        api.explainer(row.topic_key)
+          .then((x) => alive && setEx(x?.available ? x : null))
+          .catch(() => {}).finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
+      },
+    )
+    return () => { alive = false; cancel() }
   }, [row.topic_key])
 
   // Lazy panels (same endpoints the mobile signal page uses).
@@ -255,10 +265,14 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="gauge conf">{ring(conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: (MC as any).confidenceText || MC.confidence }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">precision · &lt;9% FP</div></div>
       </div>
 
-      {/* AI Context — renders ONLY while loading or when a definition exists (§17) */}
-      {(ex?.short || exLoading) && <div className="sect">
+      {/* AI Context — renders ONLY while loading/streaming or when a definition exists (§17) */}
+      {(ex?.short || exStream || exLoading) && <div className="sect">
         <h4>AI Context</h4>
-        {ex?.short ? (
+        {exStream ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{exStream.split(/\n\s*---+\s*\n/)[0]}<span style={{ opacity: 0.5 }}>▍</span></div>
+          </div>
+        ) : ex?.short ? (
           <div className="ai-ctx">
             <div className="ai-preview">{ex.short}</div>
             {ex.full && ex.full.trim() !== ex.short.trim() && (

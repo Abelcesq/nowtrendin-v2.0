@@ -73,6 +73,7 @@ import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from fastapi import FastAPI, Query, HTTPException, Body, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from dotenv import load_dotenv
@@ -7992,6 +7993,89 @@ def topic_explainer(topic_key: str, topic: str = ""):
         ex["short"], ex["full"] = _s, _f
         _cache.set(cache_key, ex, CACHE_TTL_XSIGNAL)
     return ex
+
+
+@app.get("/explainer/{topic_key}/stream")
+def topic_explainer_stream(topic_key: str, topic: str = ""):
+    """P2-A: SSE variant of /explainer — cached explainers arrive as ONE instant event;
+    fresh ones stream token-by-token so the panel shows words in <1s instead of a 2-5s
+    spinner. Persists the SAME record as the sync path (upsert-if-empty). On any failure
+    the client falls back to GET /explainer/{key} (which carries the OpenRouter lane)."""
+    def _sse(obj) -> str:
+        return f"data: {json.dumps(obj)}\n\n"
+
+    def gen():
+        cache_key = f"explainer:{topic_key}"
+        cached = _cache.get(cache_key)
+        if cached is not None:
+            yield _sse({"type": "full_text", "short": cached.get("short", ""),
+                        "full": cached.get("full", "")})
+            yield _sse({"type": "done"})
+            return
+        conn = None
+        try:
+            conn = get_db(DB_PATH)
+            row = conn.execute(
+                "SELECT short, full_text FROM topic_explainers WHERE topic_key = ?",
+                (topic_key,)).fetchone()
+            if row and row["short"]:
+                _s, _f = _clean_explainer(row["short"], row["full_text"] or "")
+                out = {"available": True, "short": _s, "full": _f, "cached": True}
+                _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
+                yield _sse({"type": "full_text", "short": _s, "full": _f})
+                yield _sse({"type": "done"})
+                return
+        except Exception as e:
+            print(f"[explainer/stream] read error: {e}")
+        finally:
+            if conn is not None:
+                try: conn.close()
+                except Exception: pass
+        if not _AI_GRADE_AVAILABLE or not _ai_budget_ok():
+            yield _sse({"type": "error", "reason": "unavailable or monthly AI budget reached"})
+            return
+        name = (topic or topic_key.replace("_", " ")).strip()
+        acc, usage = [], {}
+        try:
+            for delta in ai_grade.explain_topic_stream_deltas(
+                    name, context=_topic_source_context(topic_key), usage_out=usage):
+                acc.append(delta)
+                yield _sse({"type": "delta", "text": delta})
+        except Exception as e:
+            print(f"[explainer/stream] gen error for '{name}': {e}")
+            yield _sse({"type": "error", "reason": str(e)[:120]})
+            return
+        text = "".join(acc)
+        if not text.strip():
+            yield _sse({"type": "error", "reason": "empty generation"})
+            return
+        short, full = ai_grade.split_short_full(text)
+        cost = ai_grade._claude_cost(ai_grade.AI_FAST_MODEL, usage)
+        _record_ai_cost("definition", name, {"anthropic": round(cost, 6), "total": round(cost, 6)})
+        conn = None
+        try:
+            conn = get_db(DB_PATH)
+            conn.execute(
+                "INSERT INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
+                "VALUES (?,?,?,?,?) "
+                "ON CONFLICT (topic_key) DO UPDATE SET "
+                "topic_display=excluded.topic_display, short=excluded.short, "
+                "full_text=excluded.full_text, created_at=excluded.created_at "
+                "WHERE COALESCE(TRIM(topic_explainers.short),'') = ''",
+                (topic_key, name, short, full, datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[explainer/stream] persist error: {e}")
+        finally:
+            if conn is not None:
+                try: conn.close()
+                except Exception: pass
+        _cache.set(cache_key, {"available": True, "short": short, "full": full}, CACHE_TTL_XSIGNAL)
+        yield _sse({"type": "done", "short": short, "full": full})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:

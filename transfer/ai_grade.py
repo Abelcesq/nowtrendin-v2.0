@@ -321,6 +321,70 @@ _EXPLAINER_SYS = ("You write concise, plain-English explainers of what a trendin
                   "investment, or legal advice. Return ONLY the requested JSON.")
 
 
+def split_short_full(text: str):
+    """Split the streaming plain-text explainer (short --- full) into its two fields.
+    Defensive: with no separator, the first paragraph is the short and the whole text
+    is the full — never an empty short for a non-empty generation."""
+    parts = re.split(r"\n\s*---+\s*\n", (text or "").strip(), maxsplit=1)
+    if len(parts) == 2 and parts[0].strip():
+        return parts[0].strip()[:400], parts[1].strip()
+    t = (text or "").strip()
+    seg = t.split("\n\n", 1)
+    return seg[0].strip()[:400], t
+
+
+def explain_topic_stream_deltas(topic: str, context: str = "", usage_out: dict = None):
+    """P2-A (founder-approved 2026-07-23): yield text DELTAS for the panel explainer via
+    Anthropic streaming so the panel renders words as they generate (perceived <1s).
+    Plain-text `short --- full` format (JSON can't stream legibly); the SAME grounding
+    prompt + STRICT RULES as the sync path, with a format override appended. Raises on
+    failure — the caller falls back to the sync path (which has the OpenRouter lane)."""
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("no anthropic key")
+    ctx = (context or "").strip()
+    base = (_EXPLAINER_CONTEXT_PROMPT.format(topic=topic, context=ctx[:2500])
+            if ctx else _EXPLAINER_PROMPT.format(topic=topic))
+    prompt = base + (
+        "\n\nFORMAT OVERRIDE (streaming display — replaces the JSON instruction above): "
+        "Do NOT return JSON. Output plain text only: first the 'short' (1-2 plain "
+        "sentences), then a line containing only ---, then the 'full' (exactly 2 compact "
+        "information-dense markdown paragraphs). No braces, no code fences."
+    )
+    _api("claude")
+    r = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": AI_FAST_MODEL, "max_tokens": 320, "system": _EXPLAINER_SYS,
+              "messages": [{"role": "user", "content": prompt}], "stream": True},
+        stream=True, timeout=30,
+    )
+    r.raise_for_status()
+    usage = {}
+    for line in r.iter_lines(decode_unicode=True):
+        if not line or not line.startswith("data: "):
+            continue
+        try:
+            evt = json.loads(line[6:])
+        except Exception:
+            continue
+        et = evt.get("type")
+        if et == "message_start":
+            usage["input_tokens"] = ((evt.get("message") or {}).get("usage") or {}).get("input_tokens", 0)
+        elif et == "content_block_delta":
+            d = evt.get("delta") or {}
+            if d.get("type") == "text_delta" and d.get("text"):
+                yield d["text"]
+        elif et == "message_delta":
+            u = evt.get("usage") or {}
+            if u.get("output_tokens"):
+                usage["output_tokens"] = u["output_tokens"]
+        elif et == "message_stop":
+            break
+    if usage_out is not None:
+        usage_out.update(usage)
+
+
 def _explain_via_claude(topic: str, prompt: str) -> dict:
     """Claude fallback for the topic explainer — grounded ONLY on the context already in
     `prompt` (the real headlines/posts). No web access, so it must not invent specifics.

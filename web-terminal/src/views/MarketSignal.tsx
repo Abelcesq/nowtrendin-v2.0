@@ -147,13 +147,24 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   // never a fabricated definition).
   const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
   const [exLoading, setExLoading] = useState(true)
+  const [exStream, setExStream] = useState<string | null>(null)   // P2-A: live token stream
   const [showFull, setShowFull] = useState(false)
   useEffect(() => {
-    let alive = true; setExLoading(true); setShowFull(false); setEx(null)
-    api.explainer(row.key)
-      .then((x) => alive && setEx(x?.available ? x : null))
-      .catch(() => {}).finally(() => alive && setExLoading(false))
-    return () => { alive = false }
+    let alive = true; setExLoading(true); setShowFull(false); setEx(null); setExStream(null)
+    // P2-A: stream first (cached = one instant event; fresh = words appear <1s).
+    // On any stream failure, fall back to the sync endpoint (OpenRouter lane included).
+    const cancel = api.streamExplainer(
+      row.key,
+      (acc) => { if (alive) { setExStream(acc); setExLoading(false) } },
+      (r) => { if (alive) { setEx(r?.short ? r : null); setExStream(null); setExLoading(false) } },
+      () => {
+        if (!alive) return
+        api.explainer(row.key)
+          .then((x) => alive && setEx(x?.available ? x : null))
+          .catch(() => {}).finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
+      },
+    )
+    return () => { alive = false; cancel() }
   }, [row.key])
   const onWatch = async () => setAct(await addToWatchlist(row.key, row.name, 'market'))
   const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this instrument.')
@@ -217,7 +228,11 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
           placed under the score like the trend panel. */}
       <div className="sect">
         <h4>AI Context</h4>
-        {ex?.short ? (
+        {exStream ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{exStream.split(/\n\s*---+\s*\n/)[0]}<span style={{ opacity: 0.5 }}>▍</span></div>
+          </div>
+        ) : ex?.short ? (
           <div className="ai-ctx">
             <div className="ai-preview">{ex.short}</div>
             {ex.full && ex.full.trim() !== ex.short.trim() && (
