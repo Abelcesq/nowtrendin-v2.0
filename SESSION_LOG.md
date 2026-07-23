@@ -3,7 +3,66 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-23 (health check + F1-F5)_
+
+---
+
+## Session 2026-07-23 (cont.) — Full systems health check + Board + F1-F5 fixes
+
+Founder ordered a complete health check (all systems/skills/scoring, no-leak sweep) → Board analysis
+→ fix F1-F5. Audit: services UP, 16/17 collectors healthy, 0 quarantine leaks, cost $542/$700 OK,
+3 ledgers reporting. Board (6 memos, `audits/board/BOARD_healthcheck_2026-07-23.md`) ranked findings
+F1>F2>F5>F3>F4.
+
+**F1 — mainstream detection "collapse" — RESOLVED, but the Board's diagnosis was WRONG (major lesson).**
+The `pipeline_integrity` alert hard-coded "pathway gate regressed"; the Board inherited it; I deployed
+that fix BEFORE tracing to ground truth — and it was wrong-direction and made it worse (desynced the
+stage). Reverted. **Real cause (traced):** the served detection 40 for `artificial_intelligence` is
+CORRECT — `ai_topic_intelligence.py` intentionally caps a Tier-4 "MAINSTREAM — Already Arrived"
+umbrella term at its ceiling (det 40 / conf 48). Founder's **Heisenberg framing** (now in
+METHODOLOGY.md): Detection=earliness/momentum (Δp), Confidence=position (Δx), conjugate — a fully
+position-localized mainstream term has ~zero earliness, so its Detection correctly collapses no matter
+how large its raw magnitude; the leading edge lives in its Tier-1 sub-topics. Stored 79.1 is a distinct
+magnitude observable. **Two REAL bugs fixed (`7cff966`, no score value changed):** (1) stage desync —
+serve tail now recomputes `signal_stage` from FINAL served det/conf (AI → coherent WATCHING, verified);
+(2) auditor misattribution — B8 now taxonomy-aware + a STAGE↔DETECTION contradiction check + visible
+`serve_taxonomy_capped` count. `pipeline_integrity` back to **ok**. **Board RATIFIED** the correction
+6/6 (`BOARD_F1-ratification_2026-07-23.md`) with a standing scoring ruling + 4 residual risks logged
+(R-A ledger can't validate the cap; R-B keep exemption visible [shipped]; R-C hand-taxonomy needs a
+saturation-detector; R-D UI must explain the low number). **VERIFY-BEFORE-FIX** codified as a hard
+rule for Claude across all models/sessions (CLAUDE.md §10a, nowtrendin2.0 skill rule 0, memory
+`feedback-verify-root-cause-before-fix`, board doc).
+
+**F2 — Canonical Date Auditor runnable — DONE (`7cff966` + `e191547`).** `/monitor/datecanon` H12-timed
+out (503) 2-of-3; now a background thread computes the heavy scan and the endpoint is a fast status
+read (0.55s, catmaps pattern; hourly TTL, ?force=1). Immediately surfaced a real finding that was
+invisible while it timed out: `fastlane_recheck_log.detection_date` unregistered (0 non-canonical,
+copied from pending_detections) → registered in DATE_SEMANTIC. (Per-process cache caveat, like prewarm.)
+
+**F3 — D8 T2 reopen — REVIEWED, defer stands (`6895055`).** T2 fired (covered-lane unmeasured_fraction
+0.524→0.362, majority-measured). Reopen review (`D8_REOPEN_REVIEW_2026-07-23.md`): D8-T1 (null-when-
+all-absent) already SHIPPED live (D8_MM_EXCLUDE=1, 206/300 absent); the Δ=0 shield is intact (ledgers
+never read mm, T3 not fired, market ledger unchanged 12 resolved/regime 6-of-11) → the fuller
+renormalized-survivor exclusion still has zero ledger effect → DEFER STANDS. Reconciled the stale
+DEFERRED_ITEMS D8 header (said "DEFERRED", now "T1-shipped").
+
+**F4 — Reddit/Guardian — verified; Reddit needs founder credentials.** Guardian is NOT a gap (already
+flowing via RSS — `blogs` collector HEALTHY 1669 sig/50m; only the optional content-API key is unset).
+Reddit collector is wired + inert-safe ("ran 62m ago but 0 signals", clean skip) — the one real
+Dark-Matter breadth gap; needs the founder to create a Reddit app + set REDDIT_CLIENT_ID/SECRET/
+USER_AGENT (credential task, like OpenRouter — I cannot create the account).
+
+**F5 — ledger reporting integrity — verified GREEN (no fix needed).** Tracked-race cohort IS surfaced,
+NOT regressed to blended-only: API returns blended 10.8% + tracked-race 26.3% (n=38) + byEpoch (v1
+39.1%, v2 6.7%) + byMaturity + pre-broken split + smallSample flag; the web Ledger view renders the
+tracked-race rate WITH its denominator, never a bare number. Follow-ups logged: (1) Economist — survival
+analysis (Kaplan-Meier) for the 1102 right-censored pending to raise statistical power; (2) hold the
+Board's stricter external-publication n-threshold (never publish blended/catch-all/census as accuracy).
+
+**Process note:** two PowerShell commit failures this session from em-dash/arrow chars in heredoc
+messages + a new-file `git commit <path>` that needs `git add` first — switched to ASCII `-F` message
+files / `git add` then commit. **Next: F6 (market-panel AI Context refusal on Nasdaq/OFR microcaps +
+topic provenance).**
 
 ---
 
