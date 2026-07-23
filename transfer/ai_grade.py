@@ -40,6 +40,26 @@ ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY", "")
 FIRECRAWL_API_KEY   = os.getenv("FIRECRAWL_API_KEY", "")
 PPLX_MODEL   = os.getenv("AI_GRADE_PPLX_MODEL", "sonar")
 CLAUDE_MODEL = os.getenv("AI_GRADE_CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
+# LATENCY SPLIT (founder-ordered 2026-07-23: panel AI Context was 5-9s, target 1-2s).
+# The user-facing PANEL surfaces (topic explainer / market + crypto narrative) are short,
+# strictly-guardrailed JSON — Haiku 4.5 generates them ~3-5x faster at 1/3 the price with
+# the same guardrail prompts. The GRADE synthesis (propose_score — a score proposal) stays
+# on CLAUDE_MODEL (Sonnet) where quality outranks speed.
+AI_FAST_MODEL = os.getenv("AI_FAST_MODEL", "claude-haiku-4-5")
+
+# Model-aware Anthropic pricing ($ per 1M input/output tokens) — the old hardcoded 3.0/15.0
+# was Sonnet-only and would over-report Haiku spend 3x to the Cost Sentinel.
+_CLAUDE_PRICES = {"haiku": (1.0, 5.0), "sonnet": (3.0, 15.0), "opus": (5.0, 25.0)}
+
+
+def _claude_cost(model: str, usage: dict) -> float:
+    inp, out = 3.0, 15.0
+    for fam, (i, o) in _CLAUDE_PRICES.items():
+        if fam in (model or ""):
+            inp, out = i, o
+            break
+    return ((usage.get("input_tokens", 0) / 1e6) * inp
+            + (usage.get("output_tokens", 0) / 1e6) * out)
 # Resilience: when Perplexity (the cheap web-research primary) is unavailable/unauthorized,
 # fall back to Claude for the topic explainer so the AI Context never goes fully dark.
 # Default ON; the engine's monthly $20 AI budget cap still bounds spend. Set to "0" to
@@ -251,7 +271,8 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
                      "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
             json={
-                "model": CLAUDE_MODEL, "max_tokens": 700,
+                # Panel surface → fast model (latency target 1-2s; guardrails unchanged).
+                "model": AI_FAST_MODEL, "max_tokens": 500,
                 "system": ("You write concise, plain-English explainers of what a trending topic "
                            "is and why it is drawing attention. Ground every specific claim ONLY "
                            "in the coverage/context provided; if the context is thin, give a brief "
@@ -260,13 +281,13 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
                            "investment, or legal advice. Return ONLY the requested JSON."),
                 "messages": [{"role": "user", "content": prompt}],
             },
-            timeout=60,
+            timeout=30,
         )
         r.raise_for_status()
         data = r.json()
         text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
         usage = data.get("usage") or {}
-        cost = (usage.get("input_tokens", 0) / 1e6) * 3.0 + (usage.get("output_tokens", 0) / 1e6) * 15.0
+        cost = _claude_cost(AI_FAST_MODEL, usage)
         _c = {"perplexity": 0.0, "anthropic": round(cost, 6), "total": round(cost, 6)}
         parsed = _extract_json(text)
         if parsed and parsed.get("short"):
@@ -338,16 +359,16 @@ def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
-            json={"model": CLAUDE_MODEL, "max_tokens": 400,
+            json={"model": AI_FAST_MODEL, "max_tokens": 400,   # panel surface → fast model
                   "system": _MARKET_ANALYSIS_SYS,
                   "messages": [{"role": "user", "content": user}]},
-            timeout=45,
+            timeout=30,
         )
         r.raise_for_status()
         data = r.json()
         text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
         usage = data.get("usage") or {}
-        cost = (usage.get("input_tokens", 0) / 1e6) * 3.0 + (usage.get("output_tokens", 0) / 1e6) * 15.0
+        cost = _claude_cost(AI_FAST_MODEL, usage)
         parsed = _extract_json(text)
         out_text = ((parsed or {}).get("text") or text or "").strip()[:600]
         # Guardrail backstop: if the model leaked an advice word, drop to the safe rule-based
@@ -542,9 +563,9 @@ def propose_score(topic: str, research_summary: str) -> dict:
         r.raise_for_status()
         data = r.json()
         text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
-        # Cost from token usage (Claude Sonnet 4.5: $3/M input, $15/M output).
+        # Cost from token usage — model-aware (Grade synthesis stays on CLAUDE_MODEL).
         usage = data.get("usage") or {}
-        cost = (usage.get("input_tokens", 0) / 1e6) * 3.0 + (usage.get("output_tokens", 0) / 1e6) * 15.0
+        cost = _claude_cost(CLAUDE_MODEL, usage)
         parsed = _extract_json(text)
         if parsed is None:
             return {"available": False, "error": "Could not parse model output", "cost": cost}
