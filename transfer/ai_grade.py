@@ -101,9 +101,13 @@ def _openrouter_chat(system: str, user: str, max_tokens: int, timeout: int = 30)
         if not text:
             return None
         usage = data.get("usage") or {}
-        cost = ((usage.get("prompt_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_IN
-                + (usage.get("completion_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_OUT)
-        return {"text": text, "cost": round(cost, 6)}
+        # OpenRouter reports the REAL dollar cost in usage.cost (verified live 2026-07-23) —
+        # prefer it; the env-price estimate is only the fallback when the field is absent.
+        cost = usage.get("cost")
+        if cost is None:
+            cost = ((usage.get("prompt_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_IN
+                    + (usage.get("completion_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_OUT)
+        return {"text": text, "cost": round(float(cost), 6)}
     except Exception as e:
         print(f"[ai_grade] openrouter fallback error: {e}")
         return None
