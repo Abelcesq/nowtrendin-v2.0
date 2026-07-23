@@ -3,7 +3,35 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-07-20_
+_Last updated: 2026-07-23_
+
+---
+
+## Session 2026-07-23 — AI panel latency (5-9s → instant-cached / ~2-4s fresh) + fast-model split
+
+Founder: panel "AI Context" generation took 5-9s, target 1-2s; Perplexity subscription cancelled but
+**config/code path deliberately preserved** (founder: don't switch it off; Claude is the temporary
+fix; prefer free/<$20-mo). `AI_SKIP_PERPLEXITY=1` was already set since 2026-06-23 — panels were
+already Claude-only; the 5-9s was Sonnet × a 3-5-paragraph output budget.
+- **Fast-model split** (`transfer/ai_grade.py`): panel surfaces (topic explainer `_explain_via_claude`
+  + `market_analysis` narrative) → `AI_FAST_MODEL` (default **claude-haiku-4-5**, env-overridable,
+  ~3-5× faster at 1/3 price, guardrail prompts unchanged); **Grade synthesis (`propose_score`) stays
+  on `AI_GRADE_CLAUDE_MODEL`** (Sonnet — quality over speed for score proposals). Cost accounting now
+  model-aware (`_claude_cost`; the hardcoded 3/15 would over-report Haiku spend 3× to Cost Sentinel).
+- **Output budget**: both explainer prompts 3-5 paragraphs → exactly 2 compact paragraphs;
+  max_tokens 700→320 (explainer), 400→250 (market narrative); timeouts 60/45→30.
+- **Pre-generation ON**: `EXPLAINER_BACKFILL_PER_CYCLE=15` (existed, defaulted 0) — top topics
+  generate in the background each cycle → panel views hit cache.
+- **Persist leak fixed** (found in testing): `INSERT OR IGNORE` + a pre-existing EMPTY
+  `topic_explainers` row blocked the persist forever → those topics regenerated every restart
+  (cost + the 4.6s "cached" rfk). Now upsert-if-empty (never overwrites a real explainer).
+- **Measured**: cached ≈ **0.6-0.8s total incl. ~0.56s network RTT** (server-side ~instant); fresh
+  first-ever generation ~2.7-5.5s (round 1, 500 tok) → expected ~2-3s at the 320-token budget;
+  backfill makes fresh views rare. Engine deploys `f1887b1`→`e28951b`→(upsert) · config v269.
+- **Cost ruling context**: steady-state AI usage is ~9 calls/week (caching) → Haiku pay-per-use ≈
+  pennies/mo, satisfying the founder's <$20/mo preference with NO new vendor. Free-tier providers
+  (Gemini/Groq free) REJECTED for panel use: free tiers train on submitted data — proprietary
+  topic/market payloads must not become training data (enterprise confidentiality standard).
 
 ---
 
