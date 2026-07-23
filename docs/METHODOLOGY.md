@@ -29,6 +29,40 @@ Both are produced from the same components, with different emphasis:
 The **gap** (Detection − Confidence) is the earliness signal: a large gap = detected
 early, not yet broadly confirmed; it closes as Persistence rises.
 
+### The Heisenberg framing (why the two scores are conjugate — founder-ruled 2026-07-23)
+
+The Duality is a deliberate analogue of the Heisenberg uncertainty principle, and this
+framing is load-bearing for scoring decisions — not decoration:
+
+- **Detection ≈ momentum (Δp):** where attention is *moving* — earliness/velocity. A pure
+  "momentum" signal is a topic with a well-defined direction of travel but not yet localized
+  in the mainstream (experts moving; public hasn't caught on).
+- **Confidence ≈ position (Δx):** where attention *is* — broad, localized, confirmed presence.
+- **The gap D − C is the uncertainty product.** You cannot simultaneously maximize earliness
+  and confirmation: a topic sharply localized in the mainstream (Δx→0, fully "arrived") has
+  ~zero remaining earliness (Δp collapses), and a topic with high early momentum is by
+  definition not yet broadly localized. Persistence rising = the wave packet localizing =
+  the gap closing.
+
+**Direct scoring consequence (the `artificial intelligence` case):** a fully-mainstream
+umbrella term is *position-localized* — everyone already knows where it is — so its
+**Detection (earliness) correctly collapses to a low ceiling even when its raw mention
+MAGNITUDE is enormous.** High volume of a saturated term is NOT an early signal; it is
+confirmation. The AI Topic Intelligence layer (`ai_topic_intelligence.py`) encodes exactly
+this: a "MAINSTREAM — Already Arrived" (Tier-4) umbrella term is capped (detection ceiling
+~40) regardless of how loud it is, and the copy tells the user *"search for specific
+sub-topics to find the leading edge."* The leading edge lives in the Tier-1 children, which
+is where the earliness (Δp) actually is. **A high Detection on the bare umbrella term would
+be the bug** — it would claim earliness for something that has already arrived.
+
+- The engine also stores a **dual-pathway magnitude** (`detection_score` pre-taxonomy, e.g.
+  ~79 for AI) so mainstream topics stay *rankable by footprint*; this is a distinct
+  observable from the served earliness Detection and is not shown as the headline. Because
+  two conjugate observables can touch the same field at different pipeline stages, **every
+  derived label (stage band, gap) MUST be recomputed from the FINAL served Detection/
+  Confidence** — never from a pre-taxonomy intermediate. Enforced by the serve-tail stage +
+  gap recompute and the `pipeline_integrity` B8 STAGE↔DETECTION contradiction check.
+
 > **Displayed stage band** (BREAKOUT/STRONG/EMERGING/WATCHING/MONITORING) is derived
 > from **Detection** in the app (`stageFromScore` in `frontend/lib/signals.ts`), the
 > same basis the category tiles use, so a topic's badge can't contradict the category

@@ -249,8 +249,26 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     #     value (every mainstream topic ≈27, unrankable). If the scoring is not
     #     matching, there is a problem — this is the alarm.
     # Sub-sampled (live calibration is costly): the top rows only.
+    # TAXONOMY-AWARE (2026-07-23, F1): stored detection ≠ served detection is EXPECTED
+    # for AI-taxonomy-governed topics. The AI Topic Intelligence layer deliberately caps
+    # a "MAINSTREAM — Already Arrived" umbrella term (e.g. artificial_intelligence) at its
+    # Tier-4 ceiling (~40) even though its stored dual-pathway MAGNITUDE is high (~79) —
+    # by the platform's Heisenberg duality, a position-localized (fully mainstream) topic
+    # has ~zero earliness/momentum, so its Detection correctly collapses. That is not a
+    # pathway-gate regression. This check previously mis-flagged it CRITICAL and named the
+    # wrong file, which sent a whole health-check review down a false trail. It now
+    # (a) EXEMPTS topics the taxonomy intentionally capped, and (b) adds a STAGE-vs-
+    # DETECTION contradiction check — the class of bug that WAS real (served stage from a
+    # pre-override intermediate beside a post-override detection).
     import json as _json, os as _os
-    stale, collapsed, checked = [], [], 0
+    try:
+        from ai_topic_intelligence import lookup_topic as _lookup_ai
+    except Exception:
+        _lookup_ai = None
+    stale, collapsed, stage_desync, checked = [], [], [], 0
+    _band = lambda d, c: ("BREAKOUT" if (b := (d if _os.getenv("STAGE_FROM_DETECTION", "0") == "1" else (d + c) / 2)) >= 85
+                          else "STRONG" if b >= 70 else "EMERGING" if b >= 55
+                          else "WATCHING" if b >= 35 else "MONITORING")
     for r in rows[:int(_os.getenv("SERVE_CONSISTENCY_SAMPLE", "40"))]:
         rd = dict(r)
         payload = rd.pop("serve_payload", None)
@@ -263,28 +281,55 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
             continue
         checked += 1
         served_det = live_det
+        served_stage = live.get("signal_stage")
+        served_conf = live.get("confidence_score") or 0
         if payload:
             try:
-                served_det = (_json.loads(payload) or {}).get("detection_score") or live_det
+                _pl = _json.loads(payload) or {}
+                served_det = _pl.get("detection_score") or live_det
+                served_stage = _pl.get("signal_stage") or served_stage
+                served_conf = _pl.get("confidence_score") or served_conf
                 if abs(served_det - live_det) > 2.0:
                     stale.append((rd.get("topic_key"), round(served_det, 1), round(live_det, 1)))
             except Exception:
                 pass
-        if pathway in ("mainstream", "blended") and stored_det >= 50 and served_det < stored_det * 0.6:
+        # Is this topic intentionally capped by the AI taxonomy? (stored≠served expected)
+        _tax_capped = False
+        if _lookup_ai is not None:
+            try:
+                _tax_capped = bool(_lookup_ai(rd.get("topic_display") or rd.get("topic_key") or ""))
+            except Exception:
+                _tax_capped = False
+        if (not _tax_capped) and pathway in ("mainstream", "blended") \
+                and stored_det >= 50 and served_det < stored_det * 0.6:
             collapsed.append((rd.get("topic_key"), round(stored_det, 1), round(served_det, 1)))
+        # STAGE↔DETECTION contradiction: the served stage band must match the served
+        # detection/confidence (the real 2026-07-23 defect — stage from a pre-taxonomy value).
+        if served_stage:
+            _expect = _band(served_det, served_conf)
+            if served_stage != _expect:
+                stage_desync.append((rd.get("topic_key"), served_stage, _expect,
+                                     round(served_det, 1)))
     summary["serve_consistency_checked"] = checked
     summary["serve_stale_payload"] = len(stale)
     summary["serve_mainstream_collapse"] = len(collapsed)
+    summary["serve_stage_desync"] = len(stage_desync)
     if stale:
         alerts.append({"level": "warn", "block": "B8",
                        "msg": f"{len(stale)} topic(s) serve a STALE serve_payload (payload≠fresh "
                               f"calibration, e.g. {stale[:4]}) — regenerate _precompute_serve_payloads "
                               f"after ANY scoring/calibration change (GOTCHA)"})
+    if stage_desync:
+        alerts.append({"level": "critical", "block": "B8",
+                       "msg": f"{len(stage_desync)} topic(s) serve a STAGE that contradicts served "
+                              f"Detection/Confidence (stage, expected, det: {stage_desync[:4]}) — a "
+                              f"post-calibration layer (AI taxonomy / floor) moved det/conf AFTER "
+                              f"signal_stage was set; recompute stage from FINAL served scores"})
     if collapsed:
         alerts.append({"level": "critical", "block": "B8",
-                       "msg": f"{len(collapsed)} mainstream topic(s) served with COLLAPSED detection "
-                              f"(≪ stored dual-pathway, e.g. {collapsed[:4]}) — the pathway gate in "
-                              f"apply_calibration (signal_calibration_integration.py) regressed; served "
+                       "msg": f"{len(collapsed)} NON-taxonomy mainstream topic(s) served with COLLAPSED "
+                              f"detection (≪ stored dual-pathway, e.g. {collapsed[:4]}) — the pathway gate "
+                              f"in apply_calibration (signal_calibration_integration.py) regressed; served "
                               f"detection must match across /topics, /scores, /scores/{{key}}"})
 
     return {

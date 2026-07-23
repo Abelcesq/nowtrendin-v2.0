@@ -8657,25 +8657,65 @@ def monitor_all():
             except Exception: pass
 
 
-@app.get("/monitor/datecanon")
-def monitor_datecanon():
-    """Canonical Date Auditor — is every stored date-semantic value canonical
-    YYYY-MM-DD, across ALL sources? Audits the date COLUMNS (the funnel every source
-    writes into) + discovers new *_date columns from the live schema, so new sources
-    are covered automatically. Flags non-canonical values, ungated *_date columns,
-    and pending human format reviews. (block B3a)"""
-    if not _MONITOR_AVAILABLE:
-        return {"available": False, "reason": "monitoring_agents not loaded"}
+# F2 (2026-07-23): the canonical-date auditor is a heavy full-schema scan that H12-timed
+# out at the 30s router 2-of-3 runs — "a monitor that can't run isn't monitoring". Move the
+# scan OFF the request path: a background thread computes it and stores the result; the
+# endpoint is a FAST read of that last run (the proven /monitor/catmaps pattern). Never
+# widen the router timeout.
+_DATECANON_CACHE = {"result": None, "ran_at": None, "running": False, "error": None}
+_DATECANON_TTL_S = float(os.getenv("DATECANON_TTL_S", "3600"))   # refresh at most hourly
+
+
+def _run_datecanon_bg():
+    """Compute the canonical-date audit in the background; store the result."""
+    if _DATECANON_CACHE["running"]:
+        return
+    _DATECANON_CACHE["running"] = True
     conn = None
     try:
         conn = get_db(DB_PATH)
-        return {"available": True, **_monitor.canon_date_auditor(conn=conn, db_path=DB_PATH)}
+        res = _monitor.canon_date_auditor(conn=conn, db_path=DB_PATH)
+        _DATECANON_CACHE["result"] = res
+        _DATECANON_CACHE["ran_at"] = datetime.now(timezone.utc).isoformat()
+        _DATECANON_CACHE["error"] = None
     except Exception as e:
-        return {"available": False, "error": str(e)}
+        _DATECANON_CACHE["error"] = str(e)[:200]
+        print(f"[datecanon] background run error: {e}")
     finally:
+        _DATECANON_CACHE["running"] = False
         if conn is not None:
             try: conn.close()
             except Exception: pass
+
+
+@app.get("/monitor/datecanon")
+def monitor_datecanon(force: int = Query(0)):
+    """Canonical Date Auditor (block B3a) — is every stored date-semantic value canonical
+    YYYY-MM-DD, across ALL sources? FAST STATUS READ (F2): returns the last background run
+    instantly and kicks off a refresh when the cached result is stale/absent (or ?force=1).
+    The heavy full-schema scan never runs on the request path, so this endpoint no longer
+    H12-times-out. `stale=true` means a refresh is in flight; poll again shortly."""
+    if not _MONITOR_AVAILABLE:
+        return {"available": False, "reason": "monitoring_agents not loaded"}
+    import threading, time as _t
+    c = _DATECANON_CACHE
+    age = None
+    if c["ran_at"]:
+        try:
+            age = _t.time() - datetime.fromisoformat(c["ran_at"]).timestamp()
+        except Exception:
+            age = None
+    need_refresh = bool(force) or c["result"] is None or (age is not None and age > _DATECANON_TTL_S)
+    if need_refresh and not c["running"]:
+        threading.Thread(target=_run_datecanon_bg, daemon=True).start()
+    if c["result"] is not None:
+        return {"available": True, "cached": True, "ran_at": c["ran_at"],
+                "age_sec": round(age) if age is not None else None,
+                "refreshing": c["running"] or need_refresh, **c["result"]}
+    # First-ever call: no stored run yet — computing in the background.
+    return {"available": True, "cached": False, "computing": True,
+            "note": "canonical-date audit computing in background (~30-60s); poll again shortly",
+            "last_error": c["error"]}
 
 
 @app.get("/quarantine/dates", dependencies=[Depends(_require_internal)])
@@ -10743,6 +10783,29 @@ def _calibrate_score_fields(s: dict) -> dict:
         (s.get("detection_score") or 0) - (s.get("confidence_score") or 0), 1
     )
     s["gap_label"] = _gap_label(s["heisenberg_gap"])
+
+    # FINAL stage recompute (F1, 2026-07-23) — same invariant as the gap above: the
+    # served stage label must derive from the FINAL served Detection/Confidence, not a
+    # pre-override intermediate. The AI-taxonomy layer (and the floor) can move det/conf
+    # AFTER apply_calibration set signal_stage, leaving e.g. artificial_intelligence
+    # serving stage STRONG (from the pre-taxonomy dual-pathway 79.1) beside detection 40
+    # (the Tier-4 "Already Arrived" ceiling) — one response asserting two contradictory
+    # truths. Heisenberg framing (founder-ruled): Detection is the EARLINESS/momentum
+    # observable; a fully-mainstream umbrella term is position-localized so its earliness
+    # correctly collapses — every derived label must follow the FINAL earliness value.
+    # Same band thresholds + STAGE_FROM_DETECTION basis as apply_calibration.
+    try:
+        _det_f  = float(s.get("detection_score") or 0)
+        _conf_f = float(s.get("confidence_score") or 0)
+        _basis = _det_f if os.getenv("STAGE_FROM_DETECTION", "0") == "1" \
+            else (_det_f + _conf_f) / 2
+        s["signal_stage"] = ("BREAKOUT" if _basis >= 85 else
+                            "STRONG"   if _basis >= 70 else
+                            "EMERGING" if _basis >= 55 else
+                            "WATCHING" if _basis >= 35 else
+                            "MONITORING")
+    except Exception:
+        pass
     return s
 
 
