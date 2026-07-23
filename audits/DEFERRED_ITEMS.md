@@ -7,11 +7,23 @@
 
 ---
 
-## D8 — score-side exclusion of degenerate positioning components (DEFERRED 2026-07-19)
+## D8 — score-side exclusion of degenerate positioning components (T1 SHIPPED; fuller exclusion DEFERRED)
+
+> **STATE RECONCILIATION (2026-07-23):** D8's narrowed-spec **T1 SHIPPED** 2026-07-20 under the
+> founder truth-ruling — `D8_MM_EXCLUDE=1` is LIVE: serve `money_movement: null` when ALL money
+> components are absent/degenerate (206/300 equity + all 12 coins serve the honest absent state).
+> The ONLY remaining unbuilt scope is the renormalized-survivor composite exclusion, which stays
+> DEFERRED. **T2 fired 2026-07-23** (covered-lane `unmeasured_fraction` 0.524→0.362, majority-
+> measured) → reopen backtest REVIEWED (`audits/ledger-research/D8_REOPEN_REVIEW_2026-07-23.md`):
+> **DEFER STANDS** — the Δ=0 shield is intact (ledgers still never read mm; T3 not fired; market
+> ledger unchanged at 12 resolved / regime 6-of-11), so the fuller exclusion still has zero ledger
+> effect and the renormalized-survivor recipe stays rejected (recipe-drift). T2 will keep firing
+> while <0.5; that is expected, NOT a ship signal. The real reactivation is T3.
 
 **What it is:** exclude degenerate (zero-variance, constant-mean) positioning components
 from the Money Movement *composite* so the served number equals the honest-absence display
-(D7 shipped the display half; E1 shipped the composite disclosure).
+(D7 shipped the display half; E1 shipped the composite disclosure; T1 shipped the null-when-
+ALL-absent half).
 
 **Why deferred (board-unanimous):** the market/crypto accuracy ledgers NEVER read
 money_movement (enrollment gates on positioning flow + intensity; verdicts are realized
