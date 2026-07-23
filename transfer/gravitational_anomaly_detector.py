@@ -7967,9 +7967,17 @@ def topic_explainer(topic_key: str, topic: str = ""):
         conn = None
         try:
             conn = get_db(DB_PATH)
+            # UPSERT (was INSERT OR IGNORE): a pre-existing row with an EMPTY short blocked
+            # the persist forever, so those topics regenerated on every process restart —
+            # a silent cost + latency leak (the 4.6s "cached" rfk, 2026-07-23). Fill empty
+            # rows; never overwrite a real explainer.
             conn.execute(
-                "INSERT OR IGNORE INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
-                "VALUES (?,?,?,?,?)",
+                "INSERT INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
+                "VALUES (?,?,?,?,?) "
+                "ON CONFLICT (topic_key) DO UPDATE SET "
+                "topic_display=excluded.topic_display, short=excluded.short, "
+                "full_text=excluded.full_text, created_at=excluded.created_at "
+                "WHERE COALESCE(TRIM(topic_explainers.short),'') = ''",
                 (topic_key, name, ex["short"], ex.get("full", ""),
                  datetime.now(timezone.utc).isoformat()),
             )
