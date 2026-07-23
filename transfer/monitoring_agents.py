@@ -265,7 +265,7 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
         from ai_topic_intelligence import lookup_topic as _lookup_ai
     except Exception:
         _lookup_ai = None
-    stale, collapsed, stage_desync, checked = [], [], [], 0
+    stale, collapsed, stage_desync, tax_capped_seen, checked = [], [], [], [], 0
     _band = lambda d, c: ("BREAKOUT" if (b := (d if _os.getenv("STAGE_FROM_DETECTION", "0") == "1" else (d + c) / 2)) >= 85
                           else "STRONG" if b >= 70 else "EMERGING" if b >= 55
                           else "WATCHING" if b >= 35 else "MONITORING")
@@ -300,9 +300,16 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
                 _tax_capped = bool(_lookup_ai(rd.get("topic_display") or rd.get("topic_key") or ""))
             except Exception:
                 _tax_capped = False
-        if (not _tax_capped) and pathway in ("mainstream", "blended") \
-                and stored_det >= 50 and served_det < stored_det * 0.6:
-            collapsed.append((rd.get("topic_key"), round(stored_det, 1), round(served_det, 1)))
+        if pathway in ("mainstream", "blended") and stored_det >= 50 and served_det < stored_det * 0.6:
+            if _tax_capped:
+                # VISIBLE, not silent (Board ratification 2026-07-23, Engineer/Data-Collection
+                # residual risk): a taxonomy exemption that silently drops rows would blind B8 to
+                # a genuine future divergence. Record capped topics so an operator can watch the
+                # count — an unexpected spike or a capped topic whose stored magnitude craters is
+                # a signal, even though the served<stored gap itself is the intended Tier-4 cap.
+                tax_capped_seen.append((rd.get("topic_key"), round(stored_det, 1), round(served_det, 1)))
+            else:
+                collapsed.append((rd.get("topic_key"), round(stored_det, 1), round(served_det, 1)))
         # STAGE↔DETECTION contradiction: the served stage band must match the served
         # detection/confidence (the real 2026-07-23 defect — stage from a pre-taxonomy value).
         if served_stage:
@@ -314,6 +321,7 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     summary["serve_stale_payload"] = len(stale)
     summary["serve_mainstream_collapse"] = len(collapsed)
     summary["serve_stage_desync"] = len(stage_desync)
+    summary["serve_taxonomy_capped"] = len(tax_capped_seen)   # intended Tier-4 caps (not alarms)
     if stale:
         alerts.append({"level": "warn", "block": "B8",
                        "msg": f"{len(stale)} topic(s) serve a STALE serve_payload (payload≠fresh "
