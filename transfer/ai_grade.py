@@ -164,8 +164,9 @@ _EXPLAINER_PROMPT = (
     "Explain the topic \"{topic}\" for a smart but non-expert reader. "
     "Return ONLY valid JSON, no prose, with two keys: "
     "\"short\" — 1-2 plain sentences saying what it is and why it matters; "
-    "\"full\" — 3-5 short paragraphs in markdown covering what it is, the core "
-    "problem it solves, and why it matters. Be accurate and current.\n\n"
+    "\"full\" — exactly 2 compact paragraphs in markdown (information-dense, no "
+    "filler): first what it is and the core problem it solves, then why it "
+    "matters. Be accurate and current.\n\n"
     "STRICT RULES (this text is displayed next to a live, measured score, so it "
     "must never contradict the engine or invent data):\n"
     "- Do NOT state specific quantitative metrics you cannot verify (star counts, "
@@ -195,8 +196,9 @@ _EXPLAINER_CONTEXT_PROMPT = (
     "team's match, a company, a person, a launch), explain THAT specific thing.\n\n"
     "Return ONLY valid JSON, no prose, with two keys: "
     "\"short\" — 1-2 plain sentences on what is driving attention and why it "
-    "matters; \"full\" — 3-5 short markdown paragraphs on what it is (in this "
-    "context), what is happening, and why it matters.\n\n"
+    "matters; \"full\" — exactly 2 compact markdown paragraphs (information-dense, "
+    "no filler): first what it is in this context and what is happening, then why "
+    "it matters.\n\n"
     "STRICT RULES (shown next to a live measured score — never contradict the "
     "engine or invent data):\n"
     "- Ground the explanation in the sample above; if the evidence is thin, say so "
@@ -272,7 +274,8 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
                      "Content-Type": "application/json"},
             json={
                 # Panel surface → fast model (latency target 1-2s; guardrails unchanged).
-                "model": AI_FAST_MODEL, "max_tokens": 500,
+                # 320 tokens ≈ the 2-paragraph "full" + "short"; Haiku generates it in ~1.5-2s.
+                "model": AI_FAST_MODEL, "max_tokens": 320,
                 "system": ("You write concise, plain-English explainers of what a trending topic "
                            "is and why it is drawing attention. Ground every specific claim ONLY "
                            "in the coverage/context provided; if the context is thin, give a brief "
@@ -359,7 +362,7 @@ def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                      "Content-Type": "application/json"},
-            json={"model": AI_FAST_MODEL, "max_tokens": 400,   # panel surface → fast model
+            json={"model": AI_FAST_MODEL, "max_tokens": 250,   # panel surface → fast model; 2-4 sentence JSON
                   "system": _MARKET_ANALYSIS_SYS,
                   "messages": [{"role": "user", "content": user}]},
             timeout=30,
