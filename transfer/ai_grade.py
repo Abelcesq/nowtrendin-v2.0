@@ -60,6 +60,53 @@ def _claude_cost(model: str, usage: dict) -> float:
             break
     return ((usage.get("input_tokens", 0) / 1e6) * inp
             + (usage.get("output_tokens", 0) / 1e6) * out)
+
+
+# ── P2-B (founder-approved 2026-07-23): SECOND-PROVIDER FALLBACK LANE ────────────────
+# Kills the 2026-07-07 outage class (Anthropic prepaid balance exhausted → AI Context +
+# Grade dark until topped up): when the Anthropic call FAILS, the same prompt retries on
+# an OpenRouter-hosted open model. INERT until OPENROUTER_API_KEY is set (pay-per-use,
+# no subscription — satisfies the founder's <$20/mo preference). `data_collection:
+# "deny"` excludes providers that train on prompts — proprietary topic/market payloads
+# must never become training data (enterprise confidentiality standard). Fallback is a
+# RESILIENCE lane only — Anthropic stays primary; never silently re-route healthy calls.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+AI_FALLBACK_MODEL = os.getenv("AI_FALLBACK_MODEL", "deepseek/deepseek-v4-flash")
+# Cost ESTIMATE prices ($/1M tokens) for the Cost Sentinel — OpenRouter prices vary by
+# model/provider; these are conservative defaults, overridable to match the chosen model.
+AI_FALLBACK_PRICE_IN = float(os.getenv("AI_FALLBACK_PRICE_IN", "0.5"))
+AI_FALLBACK_PRICE_OUT = float(os.getenv("AI_FALLBACK_PRICE_OUT", "1.5"))
+
+
+def _openrouter_chat(system: str, user: str, max_tokens: int, timeout: int = 30):
+    """Fallback completion via OpenRouter. Returns {text, cost} or None (inert/failed).
+    Cost is an ESTIMATE from real usage tokens × env prices (never fabricated tokens)."""
+    if not OPENROUTER_API_KEY:
+        return None
+    try:
+        _api("openrouter")
+        msgs = ([{"role": "system", "content": system}] if system else []) + \
+               [{"role": "user", "content": user}]
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                     "Content-Type": "application/json"},
+            json={"model": AI_FALLBACK_MODEL, "messages": msgs, "max_tokens": max_tokens,
+                  "provider": {"data_collection": "deny"}},
+            timeout=timeout,
+        )
+        r.raise_for_status()
+        data = r.json()
+        text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+        if not text:
+            return None
+        usage = data.get("usage") or {}
+        cost = ((usage.get("prompt_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_IN
+                + (usage.get("completion_tokens", 0) / 1e6) * AI_FALLBACK_PRICE_OUT)
+        return {"text": text, "cost": round(cost, 6)}
+    except Exception as e:
+        print(f"[ai_grade] openrouter fallback error: {e}")
+        return None
 # Resilience: when Perplexity (the cheap web-research primary) is unavailable/unauthorized,
 # fall back to Claude for the topic explainer so the AI Context never goes fully dark.
 # Default ON; the engine's monthly $20 AI budget cap still bounds spend. Set to "0" to
@@ -262,9 +309,19 @@ def explain_topic(topic: str, context: str = "") -> dict:
     return {"available": False, "error": "no explainer provider available"}
 
 
+_EXPLAINER_SYS = ("You write concise, plain-English explainers of what a trending topic "
+                  "is and why it is drawing attention. Ground every specific claim ONLY "
+                  "in the coverage/context provided; if the context is thin, give a brief "
+                  "careful general definition and do NOT fabricate events, dates, or "
+                  "numbers. This is measurement of attention — never financial, "
+                  "investment, or legal advice. Return ONLY the requested JSON.")
+
+
 def _explain_via_claude(topic: str, prompt: str) -> dict:
     """Claude fallback for the topic explainer — grounded ONLY on the context already in
-    `prompt` (the real headlines/posts). No web access, so it must not invent specifics."""
+    `prompt` (the real headlines/posts). No web access, so it must not invent specifics.
+    If Anthropic itself fails (e.g. credits exhausted), the SAME prompt retries on the
+    OpenRouter resilience lane (inert without a key)."""
     try:
         _api("claude")
         r = requests.post(
@@ -276,12 +333,7 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
                 # Panel surface → fast model (latency target 1-2s; guardrails unchanged).
                 # 320 tokens ≈ the 2-paragraph "full" + "short"; Haiku generates it in ~1.5-2s.
                 "model": AI_FAST_MODEL, "max_tokens": 320,
-                "system": ("You write concise, plain-English explainers of what a trending topic "
-                           "is and why it is drawing attention. Ground every specific claim ONLY "
-                           "in the coverage/context provided; if the context is thin, give a brief "
-                           "careful general definition and do NOT fabricate events, dates, or "
-                           "numbers. This is measurement of attention — never financial, "
-                           "investment, or legal advice. Return ONLY the requested JSON."),
+                "system": _EXPLAINER_SYS,
                 "messages": [{"role": "user", "content": prompt}],
             },
             timeout=30,
@@ -300,7 +352,17 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
         return {"available": True, "short": text[:240], "full": text,
                 "citations": [], "cost": _c, "provider": "claude"}
     except Exception as e:
-        print(f"[ai_grade] explain (claude fallback) error for '{topic}': {e}")
+        print(f"[ai_grade] explain (claude fallback) error for '{topic}': {e} — trying openrouter lane")
+        fb = _openrouter_chat(_EXPLAINER_SYS, prompt, 320)
+        if fb:
+            _c = {"perplexity": 0.0, "anthropic": 0.0, "openrouter": fb["cost"], "total": fb["cost"]}
+            parsed = _extract_json(fb["text"])
+            if parsed and parsed.get("short"):
+                return {"available": True, "short": str(parsed.get("short", ""))[:400],
+                        "full": str(parsed.get("full", "")), "citations": [], "cost": _c,
+                        "provider": "openrouter"}
+            return {"available": True, "short": fb["text"][:240], "full": fb["text"],
+                    "citations": [], "cost": _c, "provider": "openrouter"}
         return {"available": False, "error": str(e)}
 
 
@@ -324,6 +386,18 @@ _MARKET_ANALYSIS_SYS = (
     "- Note that the Accuracy Ledger records, AFTER THE FACT, whether an early read actually led.\n"
     "Return ONLY JSON: {\"text\": \"<2-4 sentence measurement analysis>\"}."
 )
+
+
+_ADVICE_BANNED = (" buy ", " sell ", "undervalued", "overvalued", "bullish", "bearish",
+                  " should ", "opportunity", "price target")
+
+
+def _advice_guardrail_ok(text: str) -> bool:
+    """True when the narrative contains no advice language (measurement, never advice).
+    Shared by the Anthropic path and the OpenRouter resilience lane — the guardrail is
+    identical regardless of which provider generated the text."""
+    low = f" {(text or '').lower()} "
+    return not any(b in low for b in _ADVICE_BANNED)
 
 
 def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
@@ -376,17 +450,25 @@ def market_analysis(name: str, money, confirm, leverage=None, flow: str = "",
         out_text = ((parsed or {}).get("text") or text or "").strip()[:600]
         # Guardrail backstop: if the model leaked an advice word, drop to the safe rule-based
         # text rather than serve advice (defense in depth beyond the system prompt).
-        _banned = (" buy ", " sell ", "undervalued", "overvalued", "bullish", "bearish",
-                   " should ", "opportunity", "price target")
-        low = f" {out_text.lower()} "
-        if any(b in low for b in _banned):
+        if not _advice_guardrail_ok(out_text):
             return {"available": False, "reason": "advice-guardrail tripped"}
         if ck:
             _MARKET_AI_CACHE[ck] = {"text": out_text, "ts": _t.time()}
         return {"available": True, "text": out_text, "cached": False, "provider": "claude",
                 "cost": {"perplexity": 0.0, "anthropic": round(cost, 6), "total": round(cost, 6)}}
     except Exception as e:
-        print(f"[ai_grade] market_analysis error for '{name}': {e}")
+        print(f"[ai_grade] market_analysis error for '{name}': {e} — trying openrouter lane")
+        fb = _openrouter_chat(_MARKET_ANALYSIS_SYS, user, 250)
+        if fb:
+            parsed = _extract_json(fb["text"])
+            out_text = ((parsed or {}).get("text") or fb["text"] or "").strip()[:600]
+            if not _advice_guardrail_ok(out_text):
+                return {"available": False, "reason": "advice-guardrail tripped"}
+            if ck:
+                _MARKET_AI_CACHE[ck] = {"text": out_text, "ts": _t.time()}
+            return {"available": True, "text": out_text, "cached": False, "provider": "openrouter",
+                    "cost": {"perplexity": 0.0, "anthropic": 0.0,
+                             "openrouter": fb["cost"], "total": fb["cost"]}}
         return {"available": False, "error": str(e)}
 
 
@@ -576,7 +658,18 @@ def propose_score(topic: str, research_summary: str) -> dict:
         parsed["cost"] = round(cost, 6)
         return parsed
     except Exception as e:
-        print(f"[ai_grade] claude error: {e}")
+        print(f"[ai_grade] claude error: {e} — trying openrouter lane")
+        # Resilience lane: the Grade synthesis should degrade to an open model rather than
+        # go dark when Anthropic is unavailable (the proposed score is already clearly
+        # labelled PROPOSED — an AI estimate — on every surface).
+        fb = _openrouter_chat(_SCORE_SYSTEM, user, 1024, timeout=45)
+        if fb:
+            parsed = _extract_json(fb["text"])
+            if parsed is not None:
+                parsed["available"] = True
+                parsed["cost"] = fb["cost"]
+                parsed["provider"] = "openrouter"
+                return parsed
         return {"available": False, "error": str(e), "cost": 0.0}
 
 

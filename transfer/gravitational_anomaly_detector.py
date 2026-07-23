@@ -8011,10 +8011,30 @@ def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:
             INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
               ON v.topic_key = l.topic_key AND v.scored_at = l.m
             LEFT JOIN topic_explainers e ON v.topic_key = e.topic_key
-            WHERE e.topic_key IS NULL AND v.topic_display IS NOT NULL
+            WHERE (e.topic_key IS NULL OR COALESCE(TRIM(e.short),'') = '')
+              AND v.topic_display IS NOT NULL
             ORDER BY v.detection_score DESC
             LIMIT ?
         """, (limit,)).fetchall()
+        # P2-C (2026-07-23): the MARKET panel's AI Context uses the SAME /explainer pipeline
+        # keyed on risk_topic, but only trend topics were ever backfilled — first viewers of
+        # an instrument paid the full generation. Warm the top instruments too (the crypto
+        # rail is deterministic — no AI call — so coins need no warming).
+        try:
+            mrows = conn.execute("""
+                SELECT r.risk_topic AS topic_key, r.risk_display AS topic_display
+                FROM risk_scores r
+                INNER JOIN (SELECT risk_topic, MAX(scored_at) m FROM risk_scores GROUP BY risk_topic) lr
+                  ON r.risk_topic = lr.risk_topic AND r.scored_at = lr.m
+                LEFT JOIN topic_explainers e ON r.risk_topic = e.topic_key
+                WHERE (e.topic_key IS NULL OR COALESCE(TRIM(e.short),'') = '')
+                  AND r.risk_display IS NOT NULL
+                ORDER BY r.detection_score DESC
+                LIMIT ?
+            """, (max(4, limit // 3),)).fetchall()
+            rows = list(rows) + list(mrows)
+        except Exception as _me:
+            print(f"[explainer] market backfill query error: {_me}")
         conn.close()
     except Exception as e:
         print(f"[explainer] backfill query error: {e}")
@@ -8034,9 +8054,15 @@ def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:
             if ex.get("available") and ex.get("short"):
                 _record_ai_cost("definition", name, ex.get("cost") or {})
                 c = get_db(DB_PATH)
+                # Upsert-if-empty (matches the serve endpoint): the query above selects
+                # empty-short rows, so OR IGNORE would re-select them forever.
                 c.execute(
-                    "INSERT OR IGNORE INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
-                    "VALUES (?,?,?,?,?)",
+                    "INSERT INTO topic_explainers (topic_key, topic_display, short, full_text, created_at) "
+                    "VALUES (?,?,?,?,?) "
+                    "ON CONFLICT (topic_key) DO UPDATE SET "
+                    "topic_display=excluded.topic_display, short=excluded.short, "
+                    "full_text=excluded.full_text, created_at=excluded.created_at "
+                    "WHERE COALESCE(TRIM(topic_explainers.short),'') = ''",
                     (r["topic_key"], name, ex["short"], ex.get("full", ""),
                      datetime.now(timezone.utc).isoformat()),
                 )
