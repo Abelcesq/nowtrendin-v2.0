@@ -7,6 +7,27 @@ _Last updated: 2026-07-23_
 
 ---
 
+## Session 2026-07-23 (cont.) — P2-C market-panel prewarm + P2-B OpenRouter resilience lane
+
+Founder-approved both phase-2 items:
+- **P2-C:** the market panel's AI Context rides the SAME `/explainer/{key}` pipeline (keyed on
+  `risk_topic`) but `_backfill_explainers` only drew trend topics — first viewers of an instrument
+  paid full generation. The backfill now also warms the top market instruments (`risk_scores` by
+  detection, ~limit/3 per cycle). The crypto rail needs no warming — its narrative is deterministic
+  (`_crypto_analysis`), no AI call. Backfill query + write now handle empty-`short` rows with the
+  same upsert-if-empty as the serve endpoint (no infinite reselect).
+- **P2-B:** second-provider resilience lane via OpenRouter — **INERT until `OPENROUTER_API_KEY` is
+  set** (pay-per-use, no subscription; satisfies the founder's <$20/mo bar). On an Anthropic FAILURE
+  (the 2026-07-07 credits-exhausted outage class) the same prompt retries on `AI_FALLBACK_MODEL`
+  (default `deepseek/deepseek-v4-flash`, verified against the live OpenRouter catalog) with
+  `provider.data_collection="deny"` — our payloads are never training data. Wired into the topic
+  explainer, `market_analysis` (the advice-word guardrail backstop now shared by BOTH lanes via
+  `_advice_guardrail_ok`) and `propose_score` (Grade degrades to the open model rather than going
+  dark; output stays labelled PROPOSED). **Anthropic remains primary — healthy calls never
+  re-route.** Activation = founder creates an OpenRouter account + sets the key; nothing else.
+- Cost estimate for fallback usage: real usage tokens × `AI_FALLBACK_PRICE_IN/OUT` env estimates
+  (documented as estimates, never fabricated tokens); `_api("openrouter")` counter added.
+
 ## Session 2026-07-23 — AI panel latency (5-9s → instant-cached / ~2-4s fresh) + fast-model split
 
 Founder: panel "AI Context" generation took 5-9s, target 1-2s; Perplexity subscription cancelled but
