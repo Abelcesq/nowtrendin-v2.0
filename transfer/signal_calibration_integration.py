@@ -1213,8 +1213,29 @@ def apply_calibration(
     # incoming dual-pathway headline. (At scoring time the dual-pathway step runs
     # AFTER calibration and overwrites anyway; at SERVE time the stored row
     # carries detection_pathway='mainstream', so this keeps the two consistent.)
-    _pathway = (raw_result.get("detection_pathway") or "expert").lower()
-    if _pathway not in ("expert", "niche", ""):
+    #
+    # FAIL-SAFE (F1 fix, 2026-07-23 — the artificial_intelligence 79.1→40 serve
+    # collapse). Collapse to the expert recompute ONLY for a GENUINELY expert/niche
+    # topic: an affirmative expert/niche tag AND ~zero mainstream weight
+    # (`mainstream_ratio <= 0`). PRESERVE the stored dual-pathway headline in every
+    # other case — an absent/None/unknown/mainstream/blended tag, OR any topic that
+    # carries mainstream weight even if a stale row left its `detection_pathway` at the
+    # 'expert' column default. That default was the bug: AI has mainstream_ratio>0 and
+    # 89 mainstream mentions but its tag read 'expert' at serve time, and the previous
+    # `(... or "expert")` collapsed it to 40 while /topics + /scores served the stored
+    # 79.1 (the INV-1 "one number everywhere" break). Preserving the stored value is
+    # always correct at serve time — it is exactly what scoring persisted.
+    # SCORING-TIME SAFETY: at scoring time `mainstream_ratio` is not set on raw_result
+    # until AFTER the post-calibration dual-pathway block (which overwrites detection
+    # anyway), so `_mratio<=0` there → identical to the old behavior. This changes SERVE
+    # only, where mainstream_ratio is populated from the stored row.
+    _pathway = (raw_result.get("detection_pathway") or "").lower()
+    try:
+        _mratio = float(raw_result.get("mainstream_ratio") or 0)
+    except (TypeError, ValueError):
+        _mratio = 0.0
+    _is_expert_topic = _pathway in ("expert", "niche") and _mratio <= 0.0
+    if not _is_expert_topic:
         new_detection  = round(detection_score, 1)
         new_confidence = round(confidence_score, 1)
         new_overall    = round(overall_score, 1)
