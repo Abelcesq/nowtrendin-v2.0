@@ -52,6 +52,11 @@ DATE_SEMANTIC = {
     "market_pending_detections": ["detection_date"],
     "crypto_accuracy_ledger":    ["detection_date", "move_date"],
     "crypto_pending_detections": ["detection_date"],
+    # fastlane_recheck_log.detection_date is COPIED verbatim from
+    # pending_detections.detection_date (already-canonical YYYY-MM-DD); registered
+    # 2026-07-23 after the now-runnable Canonical Date Auditor (F2) flagged it
+    # undeclared — 0 non-canonical values, it just wasn't in the registry.
+    "fastlane_recheck_log":      ["detection_date"],
 }
 
 
