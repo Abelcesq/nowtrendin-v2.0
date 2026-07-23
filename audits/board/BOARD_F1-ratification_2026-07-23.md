@@ -60,3 +60,41 @@ corrected model and the Board never re-"fixes" this as a regression. **All six C
 Challenger ✅ · Engineer ✅ (owned the incomplete trace) · Economist ✅ · Fiduciary ✅ ·
 Data-Collection ✅ · Outsider ✅. Six of six confirm; the four residual risks above are logged as
 tracked follow-ups, not blockers.
+
+---
+
+## PROCESS GOTCHA — VERIFY-BEFORE-FIX (founder-ordered 2026-07-23; binds Claude across ALL models + sessions)
+
+**The failure this session, stated plainly:** a fix was IMPLEMENTED AND DEPLOYED before the issue
+was independently traced to its actual root cause. The `pipeline_integrity` alert *hard-coded* the
+words "the pathway gate in apply_calibration regressed"; the Board (all six archetypes) inherited
+that hypothesis; the Engineer "traced" it but stopped at the gate; and the first fix shipped —
+which was **wrong-direction and made it worse** (it desynced the stage label). The real cause was a
+downstream taxonomy cap that nobody had read yet. An authoritative-sounding hypothesis became a
+"fact" through repetition, not verification.
+
+**THE RULE (mandatory, every model, every session):**
+> Before implementing ANY fix or solution — especially anything score-affecting, or a diagnosis
+> handed to you by a monitoring alert, an agent, the Board, or an outside AI analysis — INDEPENDENTLY
+> verify, check, and CONFIRM the actual root cause in the code/data FIRST. Trace to the real
+> mechanism (the actual line/module that produces the behavior), reproduce it, and confirm your
+> hypothesis is the cause — THEN fix. A hypothesis, an alert message, or another AI's analysis is a
+> STARTING POINT, never a verified diagnosis. If you cannot point to the exact code/data that
+> produces the symptom, you have not diagnosed it — do not deploy.
+
+**Operational checklist the AI must satisfy before shipping a fix:**
+1. Read the actual code path end-to-end (every layer that touches the value), not just the first
+   plausible site. The bug is often DOWNSTREAM of the first suspect.
+2. Reproduce the symptom from real data and state the exact mechanism in one sentence naming the
+   file + line.
+3. Independently sanity-check the "expected correct" value against the product's own design docs
+   (e.g. METHODOLOGY.md / the taxonomy) — the anomaly may be intended behavior.
+4. For score-affecting changes: unit/behavioral test the fix locally, confirm no NEW inconsistency
+   (this session's fix introduced a stage/detection desync), THEN deploy + verify live + regen
+   serve_payload.
+5. Treat Board hypotheses and external analyses as leads to VERIFY, not conclusions to implement.
+   The Board's job is to widen the search; the AI's job is to prove the mechanism before acting.
+
+This is now also recorded as a standing hard rule in CLAUDE.md, the `nowtrendin2.0` session-startup
+skill, and the `feedback-verify-root-cause-before-fix` memory, so it loads for every future session
+and model.

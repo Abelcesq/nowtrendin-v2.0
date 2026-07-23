@@ -216,6 +216,20 @@ or results obtained through the platform."
 5. Restricted features use TierGate?
 If any answer is NO — stop and fix.
 
+### 10a. VERIFY-BEFORE-FIX (HARD RULE — Claude, every model, every session; founder-ordered 2026-07-23)
+Before implementing OR deploying ANY fix/solution — especially score-affecting, or a diagnosis handed
+to you by a monitoring alert, an agent, the Board, or an outside AI analysis — INDEPENDENTLY verify,
+check, and CONFIRM the actual root cause in the code/data FIRST. Trace to the real mechanism (the
+exact line/module that produces the behavior), reproduce it from real data, and confirm the
+hypothesis is the cause — THEN fix. A hypothesis, an alert's message, or another AI's analysis is a
+STARTING POINT, never a verified diagnosis; the bug is often DOWNSTREAM of the first suspect. If you
+cannot point to the exact code/data that produces the symptom, you have NOT diagnosed it — do not
+deploy. Also sanity-check the "expected correct" value against the design docs (METHODOLOGY.md / the
+taxonomy) — the anomaly may be INTENDED behavior. **Origin:** the 2026-07-23 F1 gotcha — a fix was
+deployed on a `pipeline_integrity` alert's hard-coded "pathway gate regressed" hypothesis (which the
+Board inherited); the real cause was a downstream taxonomy cap, and the premature fix made it worse.
+Full rule: memory `feedback-verify-root-cause-before-fix`; `audits/board/BOARD_F1-ratification_2026-07-23.md`.
+
 ---
 
 ## 11. THEME — ⚠ SUPERSEDED FOR MOBILE (see §3 reconciliation note, 2026-07-19). The paragraph
