@@ -3,7 +3,62 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-07-23 (health check + F1-F5)_
+_Last updated: 2026-07-24 (F1 R-D/R-C + F5 KM shipped 3 surfaces)_
+
+---
+
+## Session 2026-07-24 — F1 residual risks R-D + R-C + F5 KM denominator (all shipped + verified live)
+
+Founder: "fix f1 r-d, f1 r-c and f5 and also check reddit." All three are ADDITIVE read-layer changes
+with **ZERO stored-score impact** (R-D computes at detail-serve; R-C is a new read-only endpoint; F5 is
+report-time) → **no serve_payload regeneration required**. Verify-before-fix held throughout: taxonomy
+paths traced + the KM math self-tested before deploy. Engine **v281** (`ba5629f`), gh-pages `a3a84fd`,
+preview `0ec0ff9`. All verified LIVE.
+
+**F1 R-D — "already arrived" UI disclosure (the trust item) — SHIPPED 3 surfaces.** The Board's residual
+risk: a customer opening `artificial intelligence` sees Detection ~35 and reads it as a broken score. Fix
+tells them WHY it's low and where the momentum actually is. Engine `_mainstream_context(topic_key, display,
+s)` reads the AI taxonomy DIRECTLY (`lookup_topic` / `get_variation_map`) → returns a disclosure **only for
+Tier-4** already-arrived umbrella terms, with the leading-edge Tier-1/2 sub-topics; exposed on
+`/scores/{topic_key}` as `mainstream_context` (it was computed-then-DROPPED from the detail dict before).
+Verified live: AI serves det 35.4 / stage WATCHING + `mainstream_context` {tier_label "MAINSTREAM — Already
+Arrived", leading_edge [agentic coding, agent memory, 12-factor agents]}. Web (Screener.tsx) = disclosure
+banner under the dual gradient + leading-edge chips; mobile (signal/[id].tsx + gradientApi + signals type)
+= same, Aurora tokens (`#2A5B9E` sapphire, borderless). Heisenberg framing surfaced to the user: Detection
+measures MOVEMENT not size; an already-arrived term has ~zero earliness left.
+
+**F1 R-C — taxonomy saturation detector (FLAG-NEVER-FORCE) — SHIPPED (engine).** The hand-maintained Tier-4
+cap list is a MOVING target; a term can cross into already-arrived (≥5 independent outlets =
+`mainstream_confirmed`) while still NOT in the taxonomy and scoring high Detection — the F1 defect in
+miniature. New read-only `GET /monitor/taxonomy-saturation`: surfaces confirmed-mainstream / broad-outlet
+topics NOT in the taxonomy as CANDIDATES a human may add as a Tier-4 cap; prioritizes still-high-Detection
+ones (a cap would most change the read). Changes NOTHING (Charter §5) — reviewed by the operator / weekly
+improve-system audit. Verified live: 1495 candidates, **95 priority** (iran det 94.6/65 outlets, Donald
+Trump 68.8/59, france 94.2/22, openai 82.1/21, agent 93.5/19 — exactly the saturated non-capped umbrellas).
+
+**F5 — Kaplan-Meier confirmation over the right-censored pending pool — SHIPPED (engine + web).** The
+Economist's F5 follow-up. `accuracy_ledger_enhanced.survival_confirmation()`: KM estimate treating the ~1,102
+still-pending rows as RIGHT-CENSORED (365-day patience) instead of discarding them; event = confirmed by a
+Google breakout (LED/SAME_DAY/near-LAGGED), excludes pre-broken (not a forward race). Reported ALONGSIDE —
+never instead of — blended/tracked-race, under `report['survival']` + `/accuracy/ledger.survival`; web
+Ledger.tsx KM stat card. Held-out, measurement-only, **not an external KPI** (catch-all-% rule). KM math
+self-tested (monotonic, correct on a known example). Verified live: 1140 obs / 38 events / 1102 censored →
+KM eventual **3.4%**. NOTE the direction: KM reads LOWER than blended 10.8% and tracked-race 26.3% because
+the large long-pending pool that has sat WITHOUT confirming legitimately pulls survival down — the honest
+conservative counterweight (resolved-only rates ignore the silent non-confirmers). Worth a Board read on how
+to present a KM number that sits below the resolved-only rates without confusing a hedge-fund reader.
+
+**Reddit — founder set the credentials (v280, ~34m before this work).** `REDDIT_CLIENT_ID/SECRET/USER_AGENT`
+now all SET on the engine. The collector's DEGRADED "0 signals" reading (last run 47m ago) PREDATES the
+credential set, so Reddit hasn't been re-exercised yet — it validates on the next collection cycle. Did NOT
+trigger a manual production `/collect` just to test (the cadence covers it). Re-check the collector health on
+the next session; if still 0 signals AFTER a post-v280 run, the creds need debugging.
+
+**Deploy hygiene note (self-caught + fixed):** the first gh-pages attempt mis-fired — the `git worktree add
+../ghp` collided with the existing `.ghpages-deploy` worktree, so the `cd` failed and a dist commit landed on
+**main** by mistake. Caught immediately (was NEVER pushed to origin main), `git reset --hard` back to the
+clean source commit `080e3f0`, removed the stray empty `assets/`, then redeployed correctly through the
+existing `.ghpages-deploy` worktree. main is clean; origin/main unaffected.
 
 ---
 
