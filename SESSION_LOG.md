@@ -59,10 +59,30 @@ tracked-race rate WITH its denominator, never a bare number. Follow-ups logged: 
 analysis (Kaplan-Meier) for the 1102 right-censored pending to raise statistical power; (2) hold the
 Board's stricter external-publication n-threshold (never publish blended/catch-all/census as accuracy).
 
+**F6 — market-panel AI Context refusal — FIXED (`148d492`).** Founder-reported: halted micro-caps
+showed raw model meta-text as the "definition" (e.g. *"I appreciate your detailed request, but I
+need to flag... the string 'paranovus entrmt tech cl a ord pavs' does not correspond to any
+topic..."*). Reproduced live + traced. **Provenance:** these are NOT trending topics — they enter
+from the official **Nasdaq trade-halt RSS** (`collect_nasdaq_halts`, Stage-2 microstructure) because
+they were HALTED for volatility; the lane rule puts every non-watchlist/non-macro instrument (incl.
+halt micro-caps) in `halted_microcap` (283 of 300). **Root cause (2 parts):** (1) the /explainer key
+is broker boilerplate (`paranovus_entrmt_tech_cl_a_ord_pavs` → "paranovus entrmt tech cl a ord pavs")
+the model can't identify → returns a refusal; (2) when `_extract_json` failed, the fallback stored
+`short = text[:240]` — persisting the REFUSAL and serving it forever (§17 violation). **Fix:**
+`_looks_like_refusal()` guard on ALL lanes (Claude / OpenRouter / Perplexity / SSE streaming) →
+available:false, never stored/served (unit-tested vs both real refusals + genuine explainers);
+`_humanize_instrument_name()` → "Paranovus Entertainment Technology (PAVS)" etc. (trend topics
+unchanged, no regression; caught + fixed a self-introduced GIBO-name bug pre-ship); wired into all 3
+explainer call sites; `POST /maintenance/purge-refusal-explainers` cleared the 6 already-poisoned
+rows. **Verified live:** PAVS now serves nothing (correct §17 omit), NVVE regenerated clean
+("Nuvve Holding Corporation (NVVE)... vehicle-to-grid technology"). Interesting: the 6 poisoned rows
+included thin-context trend topics too (soccer players, a match pairing), not just micro-caps.
+
 **Process note:** two PowerShell commit failures this session from em-dash/arrow chars in heredoc
 messages + a new-file `git commit <path>` that needs `git add` first — switched to ASCII `-F` message
-files / `git add` then commit. **Next: F6 (market-panel AI Context refusal on Nasdaq/OFR microcaps +
-topic provenance).**
+files / `git add` then commit. **F1-F6 all complete.** Founder credential asks outstanding: Reddit
+(REDDIT_CLIENT_ID/SECRET/USER_AGENT). Follow-ups logged: F1 residual risks R-A..R-D (esp. R-D UI
+"already arrived" disclosure + R-C saturation-detector), F5 survival-analysis denominator.
 
 ---
 
