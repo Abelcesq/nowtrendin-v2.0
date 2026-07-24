@@ -7892,6 +7892,59 @@ def _topic_source_context(topic_key: str, limit: int = 10, keys: list = None) ->
     return "\n".join(lines)
 
 
+_INSTRUMENT_ABBREV = {
+    "entrmt": "entertainment", "tech": "technology", "cmn": "common",
+    "stk": "stock", "shs": "shares", "ord": "ordinary", "cl": "class",
+    "corp": "corporation", "inc": "incorporated", "hldgs": "holdings",
+    "hldg": "holding", "intl": "international", "pfd": "preferred",
+    "adr": "American Depositary Receipt", "ads": "American Depositary Shares",
+}
+
+
+def _humanize_instrument_name(topic_key: str, display: str = "") -> str:
+    """F6 (2026-07-23) — turn a broker-format security name into something an AI can
+    actually identify. Halted micro-caps arrive from the Nasdaq trade-halt feed with
+    abbreviated share-class boilerplate, e.g. topic_key
+    `paranovus_entrmt_tech_cl_a_ord_pavs` -> "paranovus entrmt tech cl a ord pavs".
+    The model cannot resolve that string and returns a REFUSAL, which used to be stored
+    and displayed as the AI Context (the 2026-07-23 Market Signal panel bug).
+
+    Produces: "Paranovus Entertainment Technology (PAVS)" — company name expanded,
+    share-class boilerplate dropped, ticker kept as the strongest identifier.
+    Falls back to the raw display/key when nothing is recognizable."""
+    src = (display or topic_key.replace("_", " ") or "").strip()
+    if not src:
+        return src
+    # Ticker: prefer an explicit "(XXXX)" in the display, else a trailing all-caps token.
+    ticker = ""
+    m = re.search(r"\(([A-Z][A-Z0-9.\-]{0,6})\)", display or "")
+    if m:
+        ticker = m.group(1)
+    base = re.sub(r"\([^)]*\)", " ", src)                 # drop parenthetical ticker
+    toks = [t for t in re.split(r"[\s_]+", base) if t]
+    if not ticker and toks and toks[-1].isupper() and 1 < len(toks[-1]) <= 6:
+        ticker = toks[-1]
+    # Drop share-class/'-type' boilerplate; expand known abbreviations.
+    _DROP = {"cl", "ord", "cmn", "stk", "shs", "sh", "os", "pfd", "unit", "units",
+             "a", "b", "c", "new", "wt", "wts"}
+    out, seen_drop = [], False
+    for i, t in enumerate(toks):
+        low = t.lower().strip(".,")
+        # Drop the ticker only as a TRAILING suffix (from the topic_key) — a company name
+        # may legitimately START with it ("GIBO Holdings Limited (GIBO)").
+        if ticker and t.upper() == ticker.upper() and i == len(toks) - 1:
+            continue
+        if low in _DROP:
+            seen_drop = True          # everything from here is class boilerplate
+            continue
+        if seen_drop and low in _INSTRUMENT_ABBREV:
+            continue
+        out.append(_INSTRUMENT_ABBREV.get(low, t).title()
+                   if low in _INSTRUMENT_ABBREV else t)
+    name = " ".join(out).strip(" ,-") or src
+    return f"{name} ({ticker})" if ticker else name
+
+
 def _clean_explainer(short, full):
     """Repair an explainer whose `short` is a raw/fenced JSON blob (the
     '```json {"short": ...}' leak). Strips the fence and recovers the real short
@@ -7958,7 +8011,9 @@ def topic_explainer(topic_key: str, topic: str = ""):
     if not _ai_budget_ok():
         return {"available": False, "reason": "monthly AI budget reached",
                 "budget": AI_MONTHLY_BUDGET_USD}
-    name = (topic or topic_key.replace("_", " ")).strip()
+    # F6: humanize broker-format instrument names so the model can identify them
+    # (garbled names caused refusals that were stored + shown as the AI Context).
+    name = _humanize_instrument_name(topic_key, topic or "")
     # Source-aware: feed the real headlines/posts + their platforms so the
     # explainer describes the SPECIFIC trend, not a dictionary definition.
     _ctx = _topic_source_context(topic_key)
@@ -8034,7 +8089,9 @@ def topic_explainer_stream(topic_key: str, topic: str = ""):
         if not _AI_GRADE_AVAILABLE or not _ai_budget_ok():
             yield _sse({"type": "error", "reason": "unavailable or monthly AI budget reached"})
             return
-        name = (topic or topic_key.replace("_", " ")).strip()
+        # F6: humanize broker-format instrument names so the model can identify them
+        # (garbled names caused refusals that were stored + shown as the AI Context).
+        name = _humanize_instrument_name(topic_key, topic or "")
         acc, usage = [], {}
         try:
             for delta in ai_grade.explain_topic_stream_deltas(
@@ -8048,6 +8105,11 @@ def topic_explainer_stream(topic_key: str, topic: str = ""):
         text = "".join(acc)
         if not text.strip():
             yield _sse({"type": "error", "reason": "empty generation"})
+            return
+        # F6: never persist/serve a refusal or meta-response as a definition (§17) — the
+        # streaming lane needs the same guard as the sync lane.
+        if ai_grade._looks_like_refusal(text):
+            yield _sse({"type": "error", "reason": "model could not identify topic"})
             return
         short, full = ai_grade.split_short_full(text)
         cost = ai_grade._claude_cost(ai_grade.AI_FAST_MODEL, usage)
@@ -8076,6 +8138,48 @@ def topic_explainer_stream(topic_key: str, topic: str = ""):
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/maintenance/purge-refusal-explainers", dependencies=[Depends(_require_internal)])
+def purge_refusal_explainers(payload: dict = Body(default={})):
+    """F6 (2026-07-23) — delete PERSISTED model refusals from `topic_explainers`.
+
+    When the model could not identify a garbled broker-format instrument name (halted
+    micro-caps from the Nasdaq trade-halt feed, e.g. "paranovus entrmt tech cl a ord
+    pavs") it returned meta-commentary ("I appreciate your detailed request, but I need
+    to flag...") which the old fallback stored as the definition and the Market Signal
+    AI Context panel displayed to users. The refusal GUARD now blocks new ones; this
+    clears the ones already stored so they regenerate with the humanized name (or stay
+    absent, which is the correct §17 behavior).
+
+    Deletes ONLY rows whose text matches a refusal marker — never a real explainer.
+    `?dry_run=1` reports what would be deleted without deleting."""
+    dry = bool(payload.get("dry_run"))
+    conn = None
+    try:
+        conn = get_db(DB_PATH)
+        rows = conn.execute(
+            "SELECT topic_key, short FROM topic_explainers WHERE short IS NOT NULL").fetchall()
+        bad = [r["topic_key"] for r in rows
+               if ai_grade._looks_like_refusal(r["short"] or "")]
+        if bad and not dry:
+            for i in range(0, len(bad), 200):
+                chunk = bad[i:i + 200]
+                ph = ",".join("?" for _ in chunk)
+                conn.execute(f"DELETE FROM topic_explainers WHERE topic_key IN ({ph})", tuple(chunk))
+            conn.commit()
+            _cache.invalidate()
+        return {"available": True, "dry_run": dry, "scanned": len(rows),
+                "refusals_found": len(bad), "deleted": 0 if dry else len(bad),
+                "examples": bad[:10],
+                "note": "refusals are never valid explainers (§17); they regenerate with a "
+                        "humanized instrument name or stay absent"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 
 def _backfill_explainers(limit: int = 12, pace: float = 3.5) -> int:
@@ -10109,7 +10213,9 @@ def history_analysis(topic_key: str, topic: str = ""):
     direction = "rising" if (d1 - d0) >= 3 else "falling" if (d1 - d0) <= -3 else "flat"
     movement = (f"Detection {d0} to {d1}, Confidence {c0} to {c1} over the last "
                 f"{len(series)} scoring cycles")
-    name = (topic or topic_key.replace("_", " ")).strip()
+    # F6: humanize broker-format instrument names so the model can identify them
+    # (garbled names caused refusals that were stored + shown as the AI Context).
+    name = _humanize_instrument_name(topic_key, topic or "")
     ctx = _topic_source_context(topic_key)
     res = ai_grade.analyze_movement(name, movement, direction, context=ctx)
     if res.get("available") and res.get("short"):

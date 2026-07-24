@@ -298,9 +298,12 @@ def explain_topic(topic: str, context: str = "") -> dict:
             cost = float(((data.get("usage") or {}).get("cost") or {}).get("total_cost", 0) or 0)
             _c = {"perplexity": cost, "anthropic": 0.0, "total": cost}
             parsed = _extract_json(content)
-            if parsed and parsed.get("short"):
+            if parsed and parsed.get("short") and not _looks_like_refusal(parsed.get("short")):
                 return {"available": True, "short": str(parsed.get("short", ""))[:400],
                         "full": str(parsed.get("full", "")), "citations": citations, "cost": _c}
+            # F6: a refusal/meta-response is never stored or served (§17).
+            if _looks_like_refusal(content):
+                return {"available": False, "reason": "model could not identify topic", "cost": _c}
             # Model didn't return clean JSON — use the prose directly.
             return {"available": True, "short": content[:240], "full": content,
                     "citations": citations, "cost": _c}
@@ -311,6 +314,33 @@ def explain_topic(topic: str, context: str = "") -> dict:
     if EXPLAINER_CLAUDE_FALLBACK and ANTHROPIC_API_KEY:
         return _explain_via_claude(topic, prompt)
     return {"available": False, "error": "no explainer provider available"}
+
+
+# F6 (2026-07-23) — REFUSAL GUARD. When the model cannot identify a topic (e.g. the garbled
+# broker-format instrument names on halted micro-caps: "paranovus entrmt tech cl a ord pavs")
+# it returns META-COMMENTARY instead of the requested JSON — "I appreciate your detailed
+# request, but I need to flag...", "I don't have sufficient context...", "Please provide...".
+# The old code fell back to `short = text[:240]`, so that REFUSAL was stored in
+# topic_explainers and served to users as if it were a definition (visible in the Market
+# Signal AI Context panel). Per §17 the correct behavior is to serve NOTHING — omit the
+# section rather than render model meta-text. Never persist a refusal.
+_REFUSAL_MARKERS = (
+    "i appreciate your", "i need to flag", "does not correspond to any topic",
+    "i don't have sufficient", "i do not have sufficient", "i cannot responsibly",
+    "i can't responsibly", "cannot generate an explanation", "please provide",
+    "could you clarify", "i'm unable to", "i am unable to", "without this context",
+    "no supporting articles", "appears to be either", "i'd need", "i would need",
+    "not enough information", "insufficient context",
+)
+
+
+def _looks_like_refusal(text: str) -> bool:
+    """True when the model returned meta-commentary / a request for clarification instead
+    of an explainer. Such text must NEVER be stored or displayed (§17)."""
+    t = (text or "").strip().lower()
+    if not t:
+        return True
+    return any(m in t for m in _REFUSAL_MARKERS)
 
 
 _EXPLAINER_SYS = ("You write concise, plain-English explainers of what a trending topic "
@@ -413,10 +443,15 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
         cost = _claude_cost(AI_FAST_MODEL, usage)
         _c = {"perplexity": 0.0, "anthropic": round(cost, 6), "total": round(cost, 6)}
         parsed = _extract_json(text)
-        if parsed and parsed.get("short"):
+        if parsed and parsed.get("short") and not _looks_like_refusal(parsed.get("short")):
             return {"available": True, "short": str(parsed.get("short", ""))[:400],
                     "full": str(parsed.get("full", "")), "citations": [], "cost": _c,
                     "provider": "claude"}
+        # F6: no clean JSON — if it's a refusal/meta-response, serve NOTHING (never store or
+        # display model meta-text as a definition, §17). Only free prose that is clearly an
+        # explanation may be used as a fallback.
+        if _looks_like_refusal(text):
+            return {"available": False, "reason": "model could not identify topic", "cost": _c}
         return {"available": True, "short": text[:240], "full": text,
                 "citations": [], "cost": _c, "provider": "claude"}
     except Exception as e:
@@ -425,10 +460,12 @@ def _explain_via_claude(topic: str, prompt: str) -> dict:
         if fb:
             _c = {"perplexity": 0.0, "anthropic": 0.0, "openrouter": fb["cost"], "total": fb["cost"]}
             parsed = _extract_json(fb["text"])
-            if parsed and parsed.get("short"):
+            if parsed and parsed.get("short") and not _looks_like_refusal(parsed.get("short")):
                 return {"available": True, "short": str(parsed.get("short", ""))[:400],
                         "full": str(parsed.get("full", "")), "citations": [], "cost": _c,
                         "provider": "openrouter"}
+            if _looks_like_refusal(fb["text"]):   # F6: never store/serve a refusal (§17)
+                return {"available": False, "reason": "model could not identify topic", "cost": _c}
             return {"available": True, "short": fb["text"][:240], "full": fb["text"],
                     "citations": [], "cost": _c, "provider": "openrouter"}
         return {"available": False, "error": str(e)}
