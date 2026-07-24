@@ -204,6 +204,9 @@ export function Ledger() {
             <div className="statcard"><div className="sl">Led / Same / Near / Pre-broken / FP</div><div className="sv">{summary?.led ?? 0}/{summary?.sameDay ?? 0}/{summary?.laggedNear ?? summary?.lagged ?? 0}/{summary?.preBroken ?? 0}/{summary?.falsePositives ?? 0}</div><div className="sf">outcome breakdown (near + pre-broken = lagged)</div></div>
             <div className="statcard"><div className="sl">LED referee check</div><div className="sv">✓{summary?.ledCorroborated ?? 0} · ✗{summary?.ledUncorroborated ?? 0} · —{summary?.ledUnchecked ?? 0}</div><div className="sf">Wikipedia-corroborated · not corroborated · unchecked</div></div>
             <div className="statcard"><div className="sl">Resolved · pending</div><div className="sv">{resolved}·{summary?.pending ?? 0}</div><div className="sf">{summary?.smallSample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
+            {summary?.survival?.available && summary.survival.estimated_confirmation_pct?.eventual != null && (
+              <div className="statcard"><div className="sl">KM eventual confirmation</div><div className="sv early">{summary.survival.estimated_confirmation_pct.eventual.toFixed(1)}%</div><div className="sf">survival estimate over {summary.survival.censored ?? 0} censored pending (denominator-honest companion)</div></div>
+            )}
           </div>
         </>
       )}

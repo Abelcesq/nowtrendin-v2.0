@@ -132,6 +132,20 @@ export function mapSignal(r: any): Signal {
           whyDifferent: v.why_different || undefined,
         }))
       : undefined,
+    // F1 R-D: "already arrived" mainstream disclosure — non-null ONLY for Tier-4 umbrella
+    // terms whose Detection is intentionally capped low. Explains the low number + the
+    // leading edge. (Heisenberg: an already-arrived term has ~zero earliness.)
+    mainstreamContext: r.mainstream_context && r.mainstream_context.already_arrived
+      ? {
+          tierLabel: r.mainstream_context.tier_label || 'Mainstream — Already Arrived',
+          note: String(r.mainstream_context.note || ''),
+          leadingEdge: Array.isArray(r.mainstream_context.leading_edge)
+            ? r.mainstream_context.leading_edge
+                .map((le: any) => ({ topic: String(le.topic ?? ''), topicKey: String(le.topic_key ?? '') }))
+                .filter((le: any) => le.topic)
+            : [],
+        }
+      : undefined,
     totalMentions: r.total_mentions != null ? Number(r.total_mentions) : undefined,
     timesScored: r.times_scored != null ? Number(r.times_scored) : undefined,
     isAnomaly: Boolean(r.is_anomaly ?? r.is_gravitational_anomaly),

@@ -152,6 +152,34 @@ export default function SignalDetail() {
             {action.title}{action.body ? ` ${action.body}` : ''}
           </Text>
         </View>
+
+        {/* F1 R-D — "already arrived" mainstream disclosure. A low Detection on a Tier-4
+            umbrella term is BY DESIGN (Detection = movement, not size); the momentum lives
+            in the specific sub-topics. Shown only when the engine flags mainstreamContext. */}
+        {signal.mainstreamContext && (
+          <View className="rounded-2xl px-4 py-4 mt-4" style={{ backgroundColor: '#2A5B9E0D' }}>
+            <Text style={{ color: '#2A5B9E', fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>
+              {signal.mainstreamContext.tierLabel.toUpperCase()}
+            </Text>
+            <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, marginTop: 6, fontWeight: '500' }}>
+              {signal.mainstreamContext.note}
+            </Text>
+            {signal.mainstreamContext.leadingEdge.length > 0 && (
+              <View className="mt-3">
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>
+                  LEADING EDGE — WHERE THE MOVEMENT IS
+                </Text>
+                <View className="flex-row flex-wrap mt-2" style={{ gap: 6 }}>
+                  {signal.mainstreamContext.leadingEdge.map((le, i) => (
+                    <View key={i} className="rounded-full px-3 py-1" style={{ backgroundColor: '#2A5B9E14' }}>
+                      <Text style={{ color: '#2A5B9E', fontSize: 12, fontWeight: '600' }}>{titleCaseTopic(le.topic)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* ── Everything deeper: collapsed by default ── */}

@@ -6578,6 +6578,101 @@ def monitor_deferred_triggers():
     return out
 
 
+@app.get("/monitor/taxonomy-saturation")
+def monitor_taxonomy_saturation():
+    """F1 R-C (2026-07-23, Board residual risk) — FLAG-NEVER-FORCE saturation detector.
+
+    The AI taxonomy hand-caps a fixed list of 'MAINSTREAM — Already Arrived' umbrella
+    terms (Tier-4, detection ceiling ~40). But mainstream saturation is a MOVING target:
+    a term can cross into already-arrived status (≥5 independent outlets corroborating =
+    mainstream_confirmed) while its Detection still reads high, because it is NOT in the
+    hand-maintained taxonomy yet. That is the F1 defect class in miniature — a saturated
+    umbrella term scoring like an early signal.
+
+    This is a READ-ONLY monitor: it surfaces confirmed-mainstream topics that are NOT in
+    the taxonomy as CANDIDATES for a human to review and (maybe) add as a Tier-4 cap. It
+    changes NOTHING — no score, no cap, no taxonomy write. Flagging a candidate is not an
+    action (Charter §5); a wrong auto-cap would be a credibility event. The operator (or
+    the weekly improve-system audit) reads this and decides. Sorted worst-first
+    (still-high Detection = a cap would most change the read)."""
+    import os as _os
+    try:
+        from ai_topic_intelligence import lookup_topic as _lookup_ai
+    except Exception:
+        _lookup_ai = None
+    min_outlets = int(_os.getenv("SATURATION_MIN_OUTLETS", "5"))   # Mainstream-v2 ≥5 independent outlets
+    still_high_det = float(_os.getenv("SATURATION_STILL_HIGH_DET", "55"))  # EMERGING+ band
+    limit = int(_os.getenv("SATURATION_SCAN_LIMIT", "1500"))
+    conn = get_db(DB_PATH)
+    try:
+        rows = conn.execute("""
+            SELECT v.topic_key, v.topic_display, v.detection_score, v.confidence_score,
+                   v.overall_score, v.mainstream_ratio, v.mainstream_breadth,
+                   v.news_outlets, v.mainstream_confirmed, v.total_mentions
+            FROM velocity_scores v
+            INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores GROUP BY topic_key) l
+              ON v.topic_key = l.topic_key AND v.scored_at = l.m
+            WHERE (COALESCE(v.mainstream_confirmed,0) = 1
+                   OR COALESCE(v.news_outlets,0) >= ?)
+            ORDER BY COALESCE(v.news_outlets,0) DESC, v.overall_score DESC
+            LIMIT ?
+        """, (min_outlets, limit)).fetchall()
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return {"available": False, "reason": f"scan failed: {str(e)[:100]}"}
+    candidates, already_capped = [], 0
+    for r in rows:
+        rd = dict(r)
+        disp = rd.get("topic_display") or (rd.get("topic_key") or "").replace("_", " ")
+        in_taxonomy = False
+        if _lookup_ai is not None:
+            try:
+                in_taxonomy = bool(_lookup_ai(disp))
+            except Exception:
+                in_taxonomy = False
+        if in_taxonomy:
+            already_capped += 1
+            continue
+        det = round(rd.get("detection_score") or 0, 1)
+        candidates.append({
+            "topic_key": rd.get("topic_key"),
+            "topic_display": disp,
+            "detection": det,
+            "confidence": round(rd.get("confidence_score") or 0, 1),
+            "overall": round(rd.get("overall_score") or 0, 1),
+            "news_outlets": rd.get("news_outlets") or 0,
+            "mainstream_confirmed": bool(rd.get("mainstream_confirmed")),
+            "mainstream_ratio": round(rd.get("mainstream_ratio") or 0, 3),
+            "total_mentions": rd.get("total_mentions") or 0,
+            # a cap would MOST change the read where Detection still reads early despite
+            # confirmed saturation — the operator's priority signal.
+            "still_high_detection": det >= still_high_det,
+        })
+    try:
+        conn.close()
+    except Exception:
+        pass
+    # worst-first: still-high-detection candidates on top, then by breadth.
+    candidates.sort(key=lambda c: (c["still_high_detection"], c["news_outlets"], c["overall"]),
+                    reverse=True)
+    priority = [c for c in candidates if c["still_high_detection"]]
+    return {
+        "note": "FLAG-NEVER-FORCE (Charter §5). Confirmed-mainstream topics NOT in the AI "
+                "taxonomy — candidates a human may add as a Tier-4 'already arrived' cap. "
+                "Changes nothing; reviewed by the operator / weekly improve-system audit.",
+        "thresholds": {"min_outlets": min_outlets, "still_high_detection_at": still_high_det},
+        "scanned_confirmed_or_broad": len(rows),
+        "already_in_taxonomy": already_capped,
+        "candidate_count": len(candidates),
+        "priority_count": len(priority),     # still-high Detection => a cap would bind
+        "priority_candidates": priority[:25],
+        "all_candidates": candidates[:100],
+    }
+
+
 @app.get("/macro/leverage")
 def macro_leverage():
     """OFR Short-Term Funding Monitor — systemic leverage + funding-stress read
@@ -6921,6 +7016,9 @@ def accuracy_ledger_report():
                     "preBroken": h.get("misses_pre_broken"),
                     "trackedRaceHitRate": h.get("tracked_race_hit_rate_pct"),
                     "trackedRaceSample": h.get("tracked_race_sample"),
+                    # F5: KM confirmation estimate over the censored pending pool —
+                    # a denominator-honesty companion to the resolved-only rates above.
+                    "survival": h.get("survival"),
                     "falsePositives": h["misses_false_positive"],
                     "pending": h["still_pending"],
                     "smallSample": h["small_sample_warning"],
@@ -7899,6 +7997,50 @@ _INSTRUMENT_ABBREV = {
     "hldg": "holding", "intl": "international", "pfd": "preferred",
     "adr": "American Depositary Receipt", "ads": "American Depositary Shares",
 }
+
+
+def _mainstream_context(topic_key: str, display: str, s: dict):
+    """F1 R-D (2026-07-23, Board residual risk) — when the AI taxonomy caps a saturated
+    'MAINSTREAM — Already Arrived' (Tier-4) umbrella term, surface WHY its Detection is low
+    plus the leading-edge sub-topics, so a customer reads the low number as RIGOR, not a
+    broken score. Heisenberg: a fully position-localized (already-arrived) term has ~zero
+    earliness, so Detection (movement, not size) is correctly low; the momentum lives in the
+    specific sub-topics. Returns the disclosure dict for Tier-4 topics only, else None.
+    Reads the taxonomy DIRECTLY (lookup_topic / get_variation_map) so it works whether or
+    not the serve_payload carried the ai_* fields."""
+    if not _AI_INTEL_AVAILABLE:
+        return None
+    try:
+        import ai_topic_intelligence as _ai
+        disp = display or s.get("topic_display") or topic_key.replace("_", " ")
+        tier = (s.get("ai_tier") or "")
+        if not tier:
+            lk = _ai.lookup_topic(disp)
+            tier = (lk[0] if lk else "") or ""     # lookup_topic → (tier_key, ...)
+        if tier != "tier_4":
+            return None
+        variations = s.get("variations")
+        if not variations:
+            try:
+                variations = _ai.get_variation_map(disp)
+            except Exception:
+                variations = []
+        leading = [{"topic": v.get("display"), "topic_key": v.get("topic_key")}
+                   for v in (variations or [])
+                   if v.get("tier") in ("tier_1", "tier_2") and not v.get("is_queried")
+                   and v.get("display")][:3]
+        return {
+            "already_arrived": True,
+            "tier_label": s.get("ai_tier_label") or "MAINSTREAM — Already Arrived",
+            "note": ("This term has already gone mainstream, so its Detection is intentionally "
+                     "low. Detection measures where attention is MOVING (earliness), not how large "
+                     "a topic is — an already-arrived term has little movement left. The leading "
+                     "edge is in the specific sub-topics."),
+            "leading_edge": leading,
+        }
+    except Exception as e:
+        print(f"[mainstream-context] {topic_key}: {e}")
+        return None
 
 
 def _humanize_instrument_name(topic_key: str, display: str = "") -> str:
@@ -9778,6 +9920,12 @@ def get_topic_detail(topic_key: str):
         "topic_key":    topic_key,
         "category":     _category_for(topic_key, s["topic_display"]),
         "scored_at":    s["scored_at"],
+
+        # F1 R-D: mainstream "already arrived" disclosure — non-null ONLY for Tier-4
+        # taxonomy topics (an already-arrived umbrella term whose Detection is
+        # intentionally capped low). Frontends render a plain-language note + the
+        # leading-edge sub-topics so a low Detection reads as rigor, not a bug.
+        "mainstream_context": _mainstream_context(topic_key, s["topic_display"], s),
 
         # ── THE DUAL SCORE ──────────────────────────────────────
         "velocity_scores": {

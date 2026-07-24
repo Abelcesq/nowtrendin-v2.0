@@ -454,6 +454,146 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
     return out
 
 
+def survival_confirmation(db_path=DB_PATH) -> dict:
+    """F5 (2026-07-23, Board residual risk) — KAPLAN–MEIER confirmation estimate over the
+    RIGHT-CENSORED pending pool. HELD-OUT, measurement-only, ZERO score impact.
+
+    WHY: the blended/tracked-race rates divide wins by RESOLVED rows only, discarding the
+    large `pending` pool (≈1,100 rows) as if it did not exist. But under the 365-day patience
+    window (§14) a pending detection has simply not had its full year for Google to catch up —
+    it is CENSORED, not a miss. Reporting only resolved rows biases the rate by whichever
+    detections happened to resolve first (fast breakouts resolve early; slow-burn winners sit
+    pending). Kaplan–Meier is the standard estimator for exactly this: it uses each censored
+    row's information up to its observation time instead of dropping it.
+
+    MODEL (stated so no reader over-reads it):
+      • EVENT   = confirmed by a Google breakout (verdict LED / SAME_DAY / near-miss LAGGED).
+                  time = days(detection → breakout), clamped >= 0.
+      • CENSORED= FALSE_POSITIVE (reached the patience window with NO breakout → censored at the
+                  timeout) and still-PENDING rows (censored at days-since-detection, capped at
+                  the timeout).
+      • EXCLUDED= PRE-BROKEN lag (breakout > grace BEFORE first sighting — the topic entered
+                  already-confirmed; a forward confirmation model must not count it as a race)
+                  and LATE_REDETECTION (already outside the honest denominator, C1 gate).
+
+    Output is the estimated probability a detection is EVENTUALLY confirmed, at 30/90/180/365-day
+    horizons and at the largest observed event time (the KM 'eventual' estimate). It is reported
+    ALONGSIDE — never instead of — the blended and tracked-race rates. Not published externally
+    as a KPI (same rule as the catch-all %): it is an internal denominator-honesty check."""
+    conn = db_compat.connect(db_path)
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM accuracy_ledger").fetchall()]
+        pend = [dict(r) for r in conn.execute(
+            "SELECT detection_date FROM pending_detections WHERE status='pending'").fetchall()]
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return {"available": False, "reason": "ledger not initialised"}
+    conn.close()
+    now = datetime.now(timezone.utc)
+    T = DEFAULT_TIMEOUT_DAYS
+    obs = []          # (time_days, event: 1=confirmed, 0=censored)
+    excluded_pre = excluded_late = 0
+
+    def _lag_days(r):
+        ld = r.get("lead_time_days")
+        if ld is not None:
+            return ld
+        try:
+            return (_parse(r["breakout_date"]) - _parse(r["detection_date"])).days
+        except Exception:
+            return None
+
+    def _is_pre(r):
+        if r.get("pre_broken") is not None:
+            return bool(r["pre_broken"])
+        ld = _lag_days(r)
+        return ld is not None and ld < -LEDGER_PRE_BROKEN_DAYS_V
+
+    for r in rows:
+        v = r.get("verdict")
+        if v == "LATE_REDETECTION":
+            excluded_late += 1
+            continue
+        if v in ("LED", "SAME_DAY", "LAGGED"):
+            if v == "LAGGED" and _is_pre(r):
+                excluded_pre += 1           # entered already-confirmed — not a forward race
+                continue
+            # EVENT: confirmed by breakout. Time = days detection→breakout (clamp >= 0).
+            dd = r.get("detection_date"); bd = r.get("breakout_date")
+            t = None
+            try:
+                t = max(0, (_parse(bd) - _parse(dd)).days)
+            except Exception:
+                ld = _lag_days(r)
+                t = max(0, ld) if ld is not None else 0
+            obs.append((min(t, T), 1))
+        elif v == "FALSE_POSITIVE":
+            obs.append((T, 0))              # reached the window with no breakout — censored at timeout
+        # other verdicts ignored
+    for p in pend:                          # still-pending = right-censored at age
+        dd = p.get("detection_date")
+        try:
+            age = (now - _parse(dd)).days
+        except Exception:
+            age = 0
+        obs.append((min(max(0, age), T), 0))
+
+    n_total = len(obs)
+    events_total = sum(e for _, e in obs)
+    if n_total == 0 or events_total == 0:
+        return {"available": False, "reason": "no forward-race observations yet",
+                "observations": n_total, "events": events_total,
+                "excluded_pre_broken": excluded_pre, "excluded_late_redetection": excluded_late}
+
+    # Kaplan–Meier: S(t) = Π over event times t_i of (1 - d_i / n_i), n_i = # at risk (time >= t_i).
+    event_times = sorted({t for t, e in obs if e == 1})
+    S = 1.0
+    curve = []
+    for t in event_times:
+        d = sum(1 for tt, e in obs if e == 1 and tt == t)
+        n = sum(1 for tt, _ in obs if tt >= t)
+        if n <= 0:
+            continue
+        S *= (1.0 - d / n)
+        curve.append((t, round(1.0 - S, 4)))   # confirmation prob = 1 - survival
+
+    def _conf_at(h):
+        c = 0.0
+        for t, cp in curve:
+            if t <= h:
+                c = cp
+            else:
+                break
+        return round(c * 100, 1)
+
+    eventual = round((curve[-1][1] if curve else 0.0) * 100, 1)
+    return {
+        "available": True,
+        "method": "Kaplan-Meier (right-censored pending pool); HELD-OUT, measurement-only, "
+                  "not an external KPI",
+        "event_definition": "confirmed by Google breakout (LED / SAME_DAY / near-miss LAGGED)",
+        "censoring": "FALSE_POSITIVE at timeout + still-pending at age (capped at patience window)",
+        "excluded": {"pre_broken": excluded_pre, "late_redetection": excluded_late},
+        "observations": n_total,
+        "events_confirmed": events_total,
+        "censored": n_total - events_total,
+        "patience_window_days": T,
+        "estimated_confirmation_pct": {
+            "at_30d": _conf_at(30), "at_90d": _conf_at(90),
+            "at_180d": _conf_at(180), "at_365d": _conf_at(365),
+            "eventual": eventual,
+        },
+        "interpretation": ("KM estimated share of detections EVENTUALLY confirmed by a Google "
+                           "breakout, using censored pending rows instead of discarding them — "
+                           "read ALONGSIDE the blended/tracked-race resolved-only rates, never "
+                           "instead of them."),
+        "param_version": LEDGER_PARAM_VERSION,
+    }
+
+
 def generate_honest_report(db_path=DB_PATH) -> dict:
     """Accuracy report with the misses counted in the denominator.
 
@@ -597,12 +737,22 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                 "median_lead_days": round(statistics.median(s_leads), 1) if s_leads else None}
     by_mat = {k: _seg(k) for k in ("emerging", "established", "unknown")}
 
+    # F5 (2026-07-23): KM confirmation estimate over the right-censored pending pool —
+    # reported ALONGSIDE the resolved-only rates below, never instead of them. Held-out,
+    # measurement-only. Fail-open (a KM error must never break the honest report).
+    try:
+        _survival = survival_confirmation(db_path)
+    except Exception as _se:
+        _survival = {"available": False, "reason": f"km error: {str(_se)[:80]}"}
+
     return {
         "status": "ok",
         "param_version": LEDGER_PARAM_VERSION,
         # Measurement-policy stamps (board convergence: no published rate silently
         # spans two regimes — a reader can always see which policies were in force).
         "sweep_newest_slots": int(os.getenv("LEDGER_SWEEP_NEWEST_SLOTS", "0")),
+        # KM survival estimate over censored pending (F5) — denominator-honesty companion.
+        "survival": _survival,
         "sample_size": resolved,
         "still_pending": pending,
         "late_redetection_excluded": len(late),

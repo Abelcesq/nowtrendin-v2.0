@@ -41,6 +41,13 @@ export interface LedgerSummary {
   // out >grace before our first sighting (never a race). Blended hitRate counts BOTH.
   laggedNear?: number | null; preBroken?: number | null
   trackedRaceHitRate?: number | null; trackedRaceSample?: number | null
+  // F5: KM confirmation estimate over the right-censored pending pool (held-out,
+  // measurement-only) — read alongside the resolved-only rates, never instead of them.
+  survival?: {
+    available?: boolean
+    observations?: number; events_confirmed?: number; censored?: number
+    estimated_confirmation_pct?: { at_30d?: number; at_90d?: number; at_180d?: number; at_365d?: number; eventual?: number }
+  } | null
   // Match validity of the LED wins (independent Wikipedia referee).
   ledCorroborated?: number | null; ledUncorroborated?: number | null
   ledUnchecked?: number | null; ledAmbiguousQuery?: number | null

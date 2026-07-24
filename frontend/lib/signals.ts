@@ -112,6 +112,12 @@ export interface Signal {
   aiVelocity?: string;       // ACCELERATING | STEADY | ...
   scoreExplanation?: string;
   variations?: TopicVariation[];
+  // F1 R-D: "already arrived" mainstream disclosure (Tier-4 umbrella terms only).
+  mainstreamContext?: {
+    tierLabel: string;
+    note: string;
+    leadingEdge: { topic: string; topicKey: string }[];
+  };
   // Dark Matter signatures (inferred private-conversation indicators)
   darkMatter?: number;          // D component 0–100
   firstTimerRatio?: number;     // 0–1 — share of first-time participants

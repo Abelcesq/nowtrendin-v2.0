@@ -217,6 +217,10 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const ftPct = r.first_timer_ratio != null ? Math.round(r.first_timer_ratio * 100) : null
   const asym = r.engagement_asymmetry != null ? Boolean(Number(r.engagement_asymmetry)) : null
   const variations: any[] = Array.isArray(r.variations) ? r.variations : []
+  // F1 R-D: "already arrived" mainstream disclosure — present ONLY for Tier-4 umbrella
+  // terms whose Detection is intentionally capped low (Heisenberg: an already-arrived
+  // term has ~zero earliness). Explains the low number + points to the leading edge.
+  const mctx = d?.mainstream_context && d.mainstream_context.already_arrived ? d.mainstream_context : null
   const scoreExpl = r.score_explanation
   const tcol = (n?: string) => (({ green: MC.confidence, blue: MC.detection, gold: MC.gold, gray: MC.slate, grey: MC.slate } as any)[(n || '').toLowerCase()] || MC.textSec)
   const gbi = gapBandIndex(gap)
@@ -264,6 +268,26 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="gauge det">{ring(det, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{det}</div><div className="gl" style={{ marginTop: 28 }}>Detection</div><div className="gf">speed · early / leading read</div></div>
         <div className="gauge conf">{ring(conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: (MC as any).confidenceText || MC.confidence }}>{conf}</div><div className="gl" style={{ marginTop: 28 }}>Confidence</div><div className="gf">precision · &lt;9% FP</div></div>
       </div>
+
+      {/* F1 R-D — "already arrived" mainstream disclosure. A low Detection on a Tier-4
+          umbrella term is BY DESIGN (Detection = movement, not size); the momentum lives
+          in the specific sub-topics. Shown only when the engine flags mainstream_context. */}
+      {mctx && <div className="ms-arrived" style={{ margin: '2px 0 12px', padding: '12px 14px', borderRadius: 12, background: MC.detection + '0D', border: `1px solid ${MC.detection}33` }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: MC.detection, marginBottom: 5 }}>
+          {(mctx.tier_label || 'MAINSTREAM — ALREADY ARRIVED').toUpperCase()}
+        </div>
+        <div className="narr" style={{ fontSize: 12.5, lineHeight: 1.5 }}>{mctx.note}</div>
+        {Array.isArray(mctx.leading_edge) && mctx.leading_edge.length > 0 && (
+          <div style={{ marginTop: 9 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.08em', color: MC.textSec, marginBottom: 5 }}>LEADING EDGE — WHERE THE MOVEMENT IS</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {mctx.leading_edge.map((le: any, i: number) => (
+                <span key={i} style={{ fontSize: 11.5, fontWeight: 600, color: MC.detection, background: MC.detection + '14', border: `1px solid ${MC.detection}2E`, borderRadius: 999, padding: '3px 10px' }}>{le.topic}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>}
 
       {/* AI Context — renders ONLY while loading/streaming or when a definition exists (§17) */}
       {(ex?.short || exStream || exLoading) && <div className="sect">
