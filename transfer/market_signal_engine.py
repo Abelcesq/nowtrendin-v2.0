@@ -57,11 +57,36 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 _MKT_QUARANTINE = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "true"
 
 # ── Dark-Positioning V2 feature flag (SEC 13F + Congress → positioning_concentration) ──
-# When True: a ticker's held-out dark-positioning signal (positioning_intel: curated-fund
-# 13F breadth + congressional net-trading), passed in via payload["dark_positioning_intel"],
-# BLENDS into positioning_concentration (40% weight). DEFAULT False — the code ships inert;
-# flip ONLY after the predictive backtest validates it improves (not just changes) the score.
-# Non-circular: inputs are external SEC/Congress filings, independent of any Now TrendIn score.
+# Blends a ticker's dark-positioning signal (positioning_intel: curated-fund 13F breadth +
+# congressional net-trading), passed in via payload["dark_positioning_intel"], into
+# positioning_concentration at DARK_POS_WEIGHT.
+#
+# ⚠ LIVE-BEHAVIOR NOTE (corrected 2026-07-25, Board-reviewed — the previous comment here was
+# FALSE in production and said the code "ships inert"). The blend below is gated on
+# `DARK_POSITIONING_V2 or MARKET_SIGNAL_V2`. MARKET_SIGNAL_V2=1 is LIVE on the engine, so the
+# blend IS ACTIVE today even though DARK_POSITIONING_V2 is unset. That was DELIBERATE
+# (commit 72b7271: "MARKET_SIGNAL_V2 implies the congress/13F dark-positioning blend — they
+# are D inputs"), on the reasoning that v2 reframed the score as money MOVEMENT measurement,
+# for which MARKET_SIGNAL_V2.md §4 holds measurement fidelity — not return prediction — to be
+# the integration criterion. The `dark_positioning_backtest.py` null result (IC≈0) tested
+# forward-return alpha, which we do not claim.
+#
+# OPEN — awaiting Chairman's ruling (audits/board/BOARD_market-crypto-signal_2026-07-25.md).
+# The Board voted 6/6 against the blend AS WIRED, on grounds neither flag captures:
+#   (a) `positioning_signal` is DIRECTIONLESS breadth — `flow`/`net` are computed in
+#       positioning_intel but never reach the score, so congressional SELLING raises this
+#       component exactly as much as buying;
+#   (b) 0.6 of it is `funds_holding`, sourced from the top-10 holdings of ~9 curated funds
+#       (≤90 mega-cap issuers) — i.e. largely an index-membership/market-cap proxy that is
+#       positively correlated with mainstream attention, and quarterly-stale;
+#   (c) the backtest correlated DIRECTION with returns, while the blend uses INTENSITY — so
+#       the wired quantity has never actually been tested against anything.
+# KILL SWITCH: `DARK_POS_WEIGHT=0` makes the blend a no-op (line reduces to _norm(pos_conc),
+# byte-identical to unblended) with NO code change and NO deploy. Do NOT instead gate the
+# attach sites (financial_risk_gradient.py:2371/2567) on DARK_POSITIONING_V2 — that empties
+# payload["dark_positioning_intel"], which drives `flow`, and would silently stop the market
+# accuracy ledger from recording (every row rejected as non-directional).
+# Non-circular either way: inputs are external SEC/Congress filings, independent of any score.
 DARK_POSITIONING_V2 = os.getenv("DARK_POSITIONING_V2", "0") == "1"
 DARK_POS_WEIGHT = float(os.getenv("DARK_POS_WEIGHT", "0.4"))
 
@@ -480,10 +505,15 @@ def assemble_market_components(payload: dict, sig_summary: dict) -> dict:
     else:
         pos_conc = _norm(min(si_chg, 30) / 30 * 0.4 + min(inst_chg, 40) / 40 * 0.4
                          + math.log1p(insider) / math.log1p(20) * 0.2)
-        # Dark-Positioning V2 (flag-gated, default OFF): blend the held-out smart-money
-        # (curated-fund 13F breadth) + political (Congress net-trading) signal for this
-        # ticker into positioning_concentration. Only fires when the flag is on AND the
-        # ticker actually has 13F/Congress activity, so the default path is unchanged.
+        # Dark-Positioning blend: smart-money (curated-fund 13F breadth) + political
+        # (Congress net-trading) into positioning_concentration.
+        # ⚠ The old comment here claimed "only fires when the flag is on… the default path is
+        # unchanged" — FALSE in production and corrected 2026-07-25. The `or MARKET_SIGNAL_V2`
+        # below means this IS the live default path (MARKET_SIGNAL_V2=1 on the engine).
+        # `_sig` is DIRECTIONLESS intensity: direction lives in _dpi["flow"], which is NOT
+        # consulted here, so an outflow raises this component as much as an inflow.
+        # See the DARK_POS_WEIGHT block at the top of this file for the full Board note and
+        # the no-deploy kill switch (DARK_POS_WEIGHT=0).
         if DARK_POSITIONING_V2 or MARKET_SIGNAL_V2:
             _dpi = payload.get("dark_positioning_intel") or {}
             _sig = _dpi.get("positioning_signal")

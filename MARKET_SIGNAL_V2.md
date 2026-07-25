@@ -118,6 +118,29 @@ to `available:false` when `FMP_API_KEY` is absent, flag-gated so only the Money 
 alpha*, which we do not claim; this ledger tests *directional accuracy of our movement signal*,
 which we do.
 
+> ⚠ **BOARD REVIEW 2026-07-25 — this §4 position is under challenge; Chairman's ruling pending.**
+> Full record: `audits/board/BOARD_market-crypto-signal_2026-07-25.md`. The Board voted **6/6
+> against the congress/13F blend as currently wired**, on three grounds that the
+> "fidelity-not-alpha" argument above does not answer:
+> 1. **The wired quantity is directionless.** `positioning_intel.positioning_signal` is unsigned
+>    breadth; `flow` (in/out) never reaches the score. A fidelity defense fails on its own terms:
+>    the score does not faithfully report *direction*, so filings showing money leaving raise the
+>    component as much as money arriving.
+> 2. **0.6 of it is an index-membership proxy** (top-10 holdings of ~9 curated funds, ≤90 mega-cap
+>    issuers, quarterly, a level not a change) — positively correlated with mainstream attention,
+>    which is the opposite of a dark-matter input.
+> 3. **The backtest tested a different variable** than the one wired (direction vs intensity), so
+>    the blended term has never been tested against any baseline at all.
+>
+> Separately, the Board found the **market accuracy ledger does not currently validate the Market
+> Signal**: enrollment passes `_dpi2["flow"]` (congressional net direction), and `detection_score`
+> is a stored witness never used in the verdict — so the ledger is a track record of the Quiver
+> congress feed. And `lead_time_days` measures time-to-our-own-±5%-move, **not** lead over
+> mainstream arrival. Until an independent mainstream-arrival clock exists (abnormal volume,
+> coverage breadth, analyst initiation — and per the non-circularity rule, *not* derived from
+> price), the phrase "we detected it early" describes earliness to a price move, not earliness to
+> the crowd.
+
 ---
 
 ## 5. Language purge (hard requirement)

@@ -7,10 +7,35 @@ Inverts the two held-out positioning sources into ONE per-ticker signal:
   • Congress trades (QuiverQuant, quiver_research) — how many members traded the TICKER
     recently + net buy/sell DIRECTION (keyed by ticker directly).
 
-OUTPUT (a 0-1 `positioning_signal` + a net `direction`) is what OPTIONALLY augments Market
-Signal `positioning_concentration` — but ONLY behind the DARK_POSITIONING_V2 flag (default off),
-after the backtest validates it. Non-circular: both inputs are EXTERNAL (fund/Congress filings),
-independent of any Now TrendIn score. Cached + refreshed (filings are quarterly/periodic).
+OUTPUT (a 0-1 `positioning_signal` + a net `direction`) augments Market Signal
+`positioning_concentration`.
+
+⚠ LIVE-BEHAVIOR CORRECTION (2026-07-25, Board-reviewed). This docstring previously said the
+augment happens "ONLY behind the DARK_POSITIONING_V2 flag (default off), after the backtest
+validates it." That was FALSE in production: the blend is gated on
+`DARK_POSITIONING_V2 or MARKET_SIGNAL_V2` (market_signal_engine.py), and MARKET_SIGNAL_V2=1 is
+LIVE — so this signal HAS been blended at 0.4 weight. The widening was deliberate (commit
+72b7271), on MARKET_SIGNAL_V2.md §4's position that measurement fidelity, not return
+prediction, is the integration criterion; the backtest's IC≈0 tested forward-return alpha,
+which the product does not claim.
+
+⚠ KNOWN LIMITS of `positioning_signal` (Board, 6/6 — awaiting Chairman's ruling; see
+audits/board/BOARD_market-crypto-signal_2026-07-25.md):
+  • It is DIRECTIONLESS. `net`/`flow` below carry the in-vs-out direction, but only the
+    unsigned intensity is blended into the score — so filings showing money moving OUT raise
+    the component exactly as much as money moving IN. Contrast the AV branch further down,
+    which correctly treats insider BUYING as the signal because net is sell-dominated.
+  • `sm_norm` (0.6 of the signal) counts funds from `sec_13f_research.latest_13f`, which
+    returns only each fund's TOP-10 holdings — so the "smart money" universe is ≤90 mostly
+    mega-cap issuers. It behaves largely as an index-membership/market-cap proxy, is
+    quarterly-stale, and is a LEVEL (holdings held) rather than a CHANGE (holdings initiated).
+  • The 13F issuer match at `_norm_name` is an UNBOUNDED SUBSTRING test, and signal_for() is
+    called with the display name as ticker when no watchlist entry exists — short or generic
+    names can match unrelated issuers and inflate funds_holding. Fix before relying on this
+    as a faithful measurement.
+
+Non-circular regardless: both inputs are EXTERNAL (fund/Congress filings), independent of any
+Now TrendIn score. Cached + refreshed (filings are quarterly/periodic).
 """
 from __future__ import annotations
 import os
