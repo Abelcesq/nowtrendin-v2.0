@@ -47,12 +47,28 @@ def _get(endpoint: str, params: dict) -> Optional[object]:
         return None
 
 
+# Bound on distinct cache keys. Board round 3 (Executioner): `_CACHE` was unbounded and
+# never evicted. Each OHLCV entry holds ~750 daily bars, and the money-movement ledger
+# introduces a per-(ticker, date-range) key space that grows monotonically in a long-lived
+# dyno — a slow leak that surfaces as an R14 memory event, not an obvious failure.
+_CACHE_MAX = int(os.getenv("FMP_CACHE_MAX", "2000"))
+
+
 def _cached(key: str, fn):
     entry = _CACHE.get(key)
     if entry and time.time() - entry["ts"] < _TTL:
         return entry["data"]
     data = fn()
     _CACHE[key] = {"data": data, "ts": time.time()}
+    if len(_CACHE) > _CACHE_MAX:
+        # Drop expired entries first; if still over, evict oldest-first (approximate LRU —
+        # insertion/refresh order, which is what `ts` records).
+        now = time.time()
+        for k in [k for k, v in _CACHE.items() if now - v["ts"] >= _TTL]:
+            _CACHE.pop(k, None)
+        if len(_CACHE) > _CACHE_MAX:
+            for k in sorted(_CACHE, key=lambda k: _CACHE[k]["ts"])[:len(_CACHE) - _CACHE_MAX]:
+                _CACHE.pop(k, None)
     return data
 
 

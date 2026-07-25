@@ -66,6 +66,43 @@ BASELINE_MIN_SESSIONS = int(os.getenv("ARRIVAL_BASELINE_MIN", "30"))
 # version and a new cohort — stored rows are never re-scored under a different definition.
 PARAM_VERSION = os.getenv("ARRIVAL_PARAM_VERSION", "arrival-v2-sharevolume")
 
+# One wide, stable fetch window per ticker (see arrival_for) instead of a per-detection
+# range — the latter made every ledger row mint its own HTTP call.
+FETCH_WINDOW_DAYS = int(os.getenv("ARRIVAL_FETCH_WINDOW_DAYS", "1100"))   # ~3 years
+
+
+def scheduled_event_on(date_str: str) -> Optional[str]:
+    """Name the DETERMINISTIC calendar artifact on `date_str`, else None.
+
+    Board round 3 (Challenger): earnings, index rebalances and lockup expiries produce
+    volume shocks on a PREDICTABLE schedule — "leading" them is trivial and worthless. The
+    round-2 control was an alarm when scheduled events exceed ~25% of wins, but the field
+    was hard-coded None, so the alarm COULD NEVER FIRE. It was a promise, not a control.
+
+    This stamps the artifacts that are computable with zero data: quarterly
+    triple-witching (3rd Friday of Mar/Jun/Sep/Dec, when index futures/options expire and
+    S&P rebalances take effect — reliably the highest-volume sessions of the year),
+    month-end and quarter-end (index fund rebalancing).
+
+    ⚠ HONEST LIMIT: earnings dates are NOT covered — we have no calendar feed wired. An
+    unstamped date therefore means "no KNOWN scheduled artifact", never "verified clean".
+    Callers must treat None as unknown. Fabricating a clean flag would be worse than
+    admitting the gap.
+    """
+    d = _parse(date_str)
+    if d is None:
+        return None
+    # 3rd Friday of a quarter-end month = triple witching
+    if d.month in (3, 6, 9, 12) and d.weekday() == 4 and 15 <= d.day <= 21:
+        return "triple_witching"
+    nxt = d + timedelta(days=1)
+    if nxt.month != d.month:
+        return "quarter_end" if d.month in (3, 6, 9, 12) else "month_end"
+    # last WEEKDAY of the month (month-end rebalancing lands on the last session)
+    if d.weekday() == 4 and (d + timedelta(days=3)).month != d.month:
+        return "quarter_end" if d.month in (3, 6, 9, 12) else "month_end"
+    return None
+
 
 def _iso(d) -> str:
     return d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10]
@@ -206,7 +243,8 @@ def find_arrival(dv: dict, since: str, baseline_median: float,
                     "threshold": round(threshold, 2),
                     "ratio_to_baseline": round(dv[d] / baseline_median, 2),
                     "hits_in_window": hits, "window_sessions": len(forward),
-                    "scheduled": None,   # unknown until an earnings/rebalance calendar is wired
+                    # None = no KNOWN artifact, NOT "verified clean" (no earnings feed).
+                    "scheduled": scheduled_event_on(d),
                     "param_version": PARAM_VERSION}
     return {"arrived": False, "sessions_checked": len(dates),
             "threshold": round(threshold, 2), "param_version": PARAM_VERSION}
@@ -257,8 +295,16 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
     d = _parse(detection_date)
     if d is None:
         return {"available": False, "reason": "bad detection_date"}
-    frm = _iso(d - timedelta(days=int((BASELINE_SESSIONS + BASELINE_GAP_SESSIONS) * 1.6) + 20))
-    to = _iso(d + timedelta(days=horizon_days + 10))
+
+    # FETCH AMPLIFICATION FIX (Board round 3, Executioner). A per-detection date range
+    # makes the cache key unique per row, so EVERY ledger row minted its own HTTP call —
+    # invisible at 16 tickers, hundreds of calls per sweep once enrollment goes
+    # market-wide. Instead request ONE WIDE, STABLE window per ticker: the range depends
+    # only on the ticker and today's date, so every detection for that ticker on a given
+    # day shares a single cached fetch. ~3y of daily bars covers any baseline + horizon.
+    today = datetime.now(timezone.utc)
+    frm = _iso(min(d - timedelta(days=400), today - timedelta(days=FETCH_WINDOW_DAYS)))
+    to = _iso(today)
     try:
         ohlcv = fetch_ohlcv(ticker, frm, to)
     except Exception as e:
@@ -374,5 +420,16 @@ if __name__ == "__main__":
     b4 = compute_baseline(sv_zero, _iso(base_day + timedelta(days=79)))
     assert not b4["available"], b4
     print(f"zero-volume history -> refuses ({b4['reason']})  OK")
+
+    # Scheduled-artifact stamps (Board R3): the field must actually populate, or the
+    # "too many scheduled wins" alarm can never fire.
+    assert scheduled_event_on("2026-06-19") == "triple_witching", \
+        scheduled_event_on("2026-06-19")           # 3rd Friday of June
+    assert scheduled_event_on("2026-03-20") == "triple_witching"
+    assert scheduled_event_on("2026-06-30") == "quarter_end"
+    assert scheduled_event_on("2026-07-31") == "month_end"
+    assert scheduled_event_on("2026-07-15") is None
+    print("scheduled stamps: triple_witching / quarter_end / month_end populate  OK")
+    print("  (None = no KNOWN artifact, NOT verified-clean — no earnings feed wired)")
 
     print("\nAll self-tests passed.")
