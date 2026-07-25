@@ -598,8 +598,23 @@ def report(db_path=DB_PATH) -> dict:
         "median_lead_days": round(statistics.median(leads), 1) if leads else None,
         "by_flow": by_flow,
         "episodes": episodes,
-        # P1: regime-adjusted (vs benchmark) — the diligence-defensible read.
-        "regime_adjusted": regime,
+        # ⚠ R1 PAYOFF-FIREWALL GATE (Board round 4, O2 — First-Principles Guardian).
+        # `_regime_adjusted` computes EXCESS RETURN VS THE BENCHMARK and reports a
+        # confirm-rate over it — i.e. a hit rate on BEATING THE MARKET. That is a return
+        # claim: "a track record with the P&L relabelled." It was previously served in this
+        # payload and described in-code as "the diligence-defensible read", with only a
+        # comment instructing readers not to publish it. A comment is not a control.
+        #
+        # The computation still runs and NO row is deleted (ledger retention is absolute) —
+        # only its PUBLICATION is gated, default OFF. Set MARKET_REGIME_ADJ_INTERNAL=1 to
+        # surface it for internal confound analysis. It must never be a headline, a
+        # marketing figure, or a weight-fitting target.
+        "regime_adjusted": (regime if os.getenv("MARKET_REGIME_ADJ_INTERNAL", "0") == "1"
+                            else {"available": False,
+                                  "reason": "withheld — excess-return diagnostic is gated "
+                                            "off by the R1 payoff firewall (Board 2026-07-25)",
+                                  "internal_only": True,
+                                  "enable_with": "MARKET_REGIME_ADJ_INTERNAL=1"}),
         # R1 SYMMETRY RULING (hardenings review 2026-07-20): the absolute-threshold rates
         # (confirm_rate_pct, by_flow) are regime-BLENDED in BOTH directions. Neither lane is
         # validated at this n — a high inflow rate is as regime-flattered as a low outflow

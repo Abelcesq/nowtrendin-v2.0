@@ -1471,7 +1471,11 @@ def canon_date_auditor(conn=None, db_path=None) -> dict:
                    # market/crypto ledgers store the same computed deadline INSTANT
                    # (detection + TIMEOUT_DAYS).isoformat(), consumed via now > _parse()
                    ("market_pending_detections", "timeout_date"),
-                   ("crypto_pending_detections", "timeout_date")}
+                   ("crypto_pending_detections", "timeout_date"),
+                   # flow ledger (Board round 4, O6) — same deadline-instant semantics as
+                   # its three siblings above. Its detection_date/arrival_date ARE canonical
+                   # and are registered in ingestion_gate.DATE_SEMANTIC.
+                   ("flow_pending_detections", "timeout_date")}
     discovered = _discover_date_columns(conn) - operational
     # (b) drift — a date-named column nobody registered/gated (likely a new source).
     #     WARN (classify it: gate + register it, OR add to the operational allowlist) —

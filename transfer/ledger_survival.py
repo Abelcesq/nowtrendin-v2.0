@@ -204,7 +204,8 @@ def kaplan_meier(observations: Sequence[tuple], horizons: Iterable[int] = (30, 9
 
 
 def compare_arms(treated: Sequence[tuple], control: Sequence[tuple],
-                 horizons: Iterable[int] = (30, 90, 180, 365), alpha: float = 0.05) -> dict:
+                 horizons: Iterable[int] = (30, 90, 180, 365), alpha: float = 0.05,
+                 primary_horizon: Optional[int] = None) -> dict:
     """KM for a treated arm and its matched control arm, plus the separation between them.
 
     The Board's unanimous position: a single-arm rate is not evidence. What we publish is
@@ -230,8 +231,15 @@ def compare_arms(treated: Sequence[tuple], control: Sequence[tuple],
 
     t_by_h = {h["horizon_days"]: h for h in t_km["at_horizon"]}
     c_by_h = {h["horizon_days"]: h for h in c_km["at_horizon"]}
+    # ⚠ O3 (Board round 4, Challenger): `separated` previously meant "disjoint at ANY
+    # horizon", i.e. three or four independent chances to beat the null — a multiple-
+    # comparisons problem hidden inside a boolean. The verdict is now decided by ONE
+    # pre-registered primary horizon; every other horizon is descriptive only.
+    hz = list(horizons)
+    primary = primary_horizon if primary_horizon is not None else (hz[0] if hz else None)
     any_sep = False
-    for h in horizons:
+    primary_sep = None
+    for h in hz:
         a, b = t_by_h.get(h), c_by_h.get(h)
         if not a or not b:
             continue
@@ -244,16 +252,26 @@ def compare_arms(treated: Sequence[tuple], control: Sequence[tuple],
         if None not in (a.get("lo_pct"), b.get("hi_pct"), a.get("hi_pct"), b.get("lo_pct")):
             sep = a["lo_pct"] > b["hi_pct"] or b["lo_pct"] > a["hi_pct"]
             any_sep = any_sep or bool(sep)
+        if h == primary:
+            primary_sep = sep
         out["horizons"].append({
             "horizon_days": h, "treated_pct": a["confirmed_pct"], "control_pct": b["confirmed_pct"],
             "delta_pp": delta, "intervals_disjoint": sep,
+            "is_primary": h == primary,
             "treated_at_risk": a["at_risk"], "control_at_risk": b["at_risk"]})
 
-    out["separated"] = any_sep
-    out["verdict"] = ("treated and control separate at >=1 horizon (intervals disjoint)"
-                      if any_sep else
-                      "NO separation from the matched control at any horizon — the signal "
-                      "has not been shown to beat its null")
+    # The VERDICT is the primary horizon alone. `separated_any_horizon` is retained purely
+    # as a descriptive diagnostic and must never be published as the result.
+    out["primary_horizon_days"] = primary
+    out["separated"] = bool(primary_sep)
+    out["separated_any_horizon"] = any_sep
+    out["verdict"] = (
+        f"treated separates from matched control at the pre-registered primary horizon "
+        f"({primary}d)" if primary_sep else
+        f"NO separation from the matched control at the pre-registered primary horizon "
+        f"({primary}d) — the signal has not been shown to beat its null"
+        + (" (note: a NON-primary horizon appears disjoint; that is descriptive only and "
+           "is not a result)" if any_sep else ""))
     return out
 
 
@@ -339,6 +357,23 @@ if __name__ == "__main__":
     cmp_nc = compare_arms(fast, [(300, 0)] * 30)
     assert cmp_nc["separated"] is None, "all-censored control must not yield a verdict"
     print(f"all-censored control -> separated=None (refuses to claim a win)  OK")
+
+    # 5c. REGRESSION (Board R4, O3 — Challenger): separation at a NON-primary horizon must
+    #     NOT count as a result. `separated` previously meant "disjoint at ANY horizon",
+    #     which is three or four chances at the null hidden inside a boolean.
+    late_t = [(150, 1)] * 28 + [(400, 0)] * 2     # nothing happens before 180d
+    late_c = [(350, 1)] * 2 + [(400, 0)] * 28
+    cmp_late = compare_arms(late_t, late_c, horizons=(30, 180), primary_horizon=30)
+    assert cmp_late["separated"] is False, \
+        "must not claim a win when the primary horizon does not separate"
+    assert cmp_late["separated_any_horizon"] is True, cmp_late
+    assert cmp_late["primary_horizon_days"] == 30
+    print("separates only at a NON-primary horizon -> separated=False  OK")
+    print(f"  verdict: {cmp_late['verdict'][:88]}...")
+    # ...and declaring 180 primary flips the verdict, as it should
+    cmp_p180 = compare_arms(late_t, late_c, horizons=(30, 180), primary_horizon=180)
+    assert cmp_p180["separated"] is True, cmp_p180
+    print("same data, primary=180 -> separated=True (the horizon must be pre-registered)  OK")
 
     # 6. Missing control arm is reported, never silently treated as a pass
     cmp_nocontrol = compare_arms(same, [])

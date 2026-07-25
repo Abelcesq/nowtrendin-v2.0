@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import os
 import json
+import time
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Sequence
@@ -366,14 +367,25 @@ def _flush_rejects(conn):
 
 # ── Resolution ──────────────────────────────────────────────────────────────────────────
 
-def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str = "") -> dict:
+def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str = "",
+          pause_s: float = None) -> dict:
     """Resolve pending rows. TREATED AND CONTROL ROWS TAKE THE IDENTICAL PATH — that is the
     point of the design; any asymmetry here would invalidate the comparison.
 
     Verdicts: ARRIVED (participation expanded after detection) · PRE_ARRIVED (the crowd was
     already there at detection — discovery latency, reported separately, never a race) ·
     NO_ARRIVAL (horizon reached without expansion — CENSORED, not a miss).
+
+    ⚠ PLACEMENT (Board round 4, O5 — Executioner). This issues one price/volume fetch per
+    pending row. It MUST run in the scheduler thread inside `_collect_phase`, never behind
+    an API endpoint: a synchronous few-hundred-row loop reachable from a request is an H12
+    generator, and §13's batch-pacing rule exists precisely because heavy phases must not
+    clog the serve path (the 2026-07-06 wedged-prewarm outage is the precedent). Each fetch
+    is separated by FLOW_SWEEP_PAUSE_S, defaulting to the pipeline's COLLECT_SOURCE_PAUSE_S.
     """
+    if pause_s is None:
+        pause_s = float(os.getenv("FLOW_SWEEP_PAUSE_S",
+                                  os.getenv("COLLECT_SOURCE_PAUSE_S", "10")))
     if arrival_fn is None:
         import arrival_clock
         arrival_fn = arrival_clock.arrival_for
@@ -382,6 +394,7 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
     conn = _connect(db_path)
     out = {"checked": 0, "arrived": 0, "pre_arrived": 0, "no_arrival": 0, "errors": 0}
     _pre_cache: dict = {}
+    fetched = 0          # remote fetches issued this sweep (drives §13 pacing)
 
     def _pre_for(pid):
         """D2 FIX (Board round 4): resolve thresholds from the ROW'S OWN pre-registration,
@@ -424,6 +437,9 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                     kw = {"horizon_days": row_horizon}
                     if row_mult:
                         kw["mult"] = float(row_mult)
+                    if pause_s and fetched:
+                        time.sleep(pause_s)      # §13 batch pacing between remote fetches
+                    fetched += 1
                     a = arrival_fn(p["ticker"], det, **kw)
                     arr = (a or {}).get("arrival") or {}
                     if arr.get("arrived"):
@@ -553,15 +569,38 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         if c in arms and d:
             arms[c].append((min((now - d).days, FLOW_TIMEOUT_DAYS), 0))
 
-    cmp_out = ledger_survival.compare_arms(arms[COHORT_TREATED], arms[COHORT_CONTROL],
-                                           horizons=(30, 90, 180))
+    # O4 (Board round 4, Executioner): a control ticker reused across match groups yields
+    # repeated, NON-INDEPENDENT observations. Kaplan-Meier assumes independence, so the
+    # control arm's interval comes out too narrow — and it errs IN OUR FAVOUR, which is
+    # exactly the direction that must never be left silent. We cannot widen the interval
+    # honestly without a cluster bootstrap, so we measure and DISCLOSE the clustering, and
+    # refuse to publish when it is material.
+    ctrl_tickers = [r.get("ticker") for r in rows if r.get("cohort") == COHORT_CONTROL]
+    uniq = len(set(ctrl_tickers))
+    reuse_factor = round(len(ctrl_tickers) / uniq, 2) if uniq else None
+    control_independence = {
+        "control_rows": len(ctrl_tickers), "distinct_control_tickers": uniq,
+        "reuse_factor": reuse_factor,
+        "independent": bool(reuse_factor is not None and reuse_factor <= 1.25),
+        "note": ("Controls reused across match groups are not independent observations; the "
+                 "KM interval on the control arm is narrower than the data support. A "
+                 "cluster bootstrap (by ticker) is required before any published claim."),
+    }
+
+    cmp_out = ledger_survival.compare_arms(
+        arms[COHORT_TREATED], arms[COHORT_CONTROL],
+        horizons=(30, 90, 180),
+        # O3: the verdict rests on ONE pre-registered horizon, not on whichever separates.
+        primary_horizon=int((pre or {}).get("primary_horizon_days") or 90))
     n_t = len([1 for t, e in arms[COHORT_TREATED] if e == 1])
     min_ep = int((pre or {}).get("min_episodes") or 0)
     publishable = (bool(cmp_out.get("separated")) and n_t >= min_ep and min_ep > 0
                    # A superseded cohort holding rows must be disclosed before anything is
                    # publishable — otherwise the reader cannot see that an earlier
                    # definition was tried and set aside.
-                   and not superseded)
+                   and not superseded
+                   # O4: material control reuse makes the control interval falsely narrow.
+                   and control_independence["independent"])
 
     return {
         "available": True,
@@ -575,6 +614,7 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
                  "treated_events": n_t,
                  "control_events": len([1 for t, e in arms[COHORT_CONTROL] if e == 1])},
         "excluded": excluded,
+        "control_independence": control_independence,
         "gate_rejects": rejects,
         "pending": len(pend),
         "comparison": cmp_out,
@@ -684,7 +724,7 @@ if __name__ == "__main__":
                 "ratio_to_baseline": 4.2, "scheduled": None}}
         return {"available": True, "arrival": {"arrived": False}}
 
-    s = sweep(db_path=tmp, arrival_fn=fake_arrival, today="2026-12-31")
+    s = sweep(db_path=tmp, arrival_fn=fake_arrival, today="2026-12-31", pause_s=0)
     print(f"sweep: checked={s['checked']} arrived={s['arrived']} "
           f"no_arrival={s['no_arrival']} errors={s['errors']}  OK")
     # 2 treated (AAA arrives, BBB does not) + 6 controls = 8 rows
@@ -721,6 +761,16 @@ if __name__ == "__main__":
     print(f"report: treated_events={rep['arms']['treated_events']} "
           f"control_rows={rep['arms']['control_rows']} "
           f"publishable={rep['publishable']}  OK")
+    # O4 REGRESSION (Board R4): C1/C2/C3 serve BOTH match groups, so the control arm has 6
+    # rows over 3 distinct tickers. Those are not independent observations — KM would give a
+    # falsely narrow control interval, erring in our favour. It must be measured, disclosed,
+    # and must block publication until a cluster bootstrap exists.
+    ci = rep["control_independence"]
+    assert ci["control_rows"] == 6 and ci["distinct_control_tickers"] == 3, ci
+    assert ci["reuse_factor"] == 2.0 and ci["independent"] is False, ci
+    print(f"  control_independence: {ci['control_rows']} rows / "
+          f"{ci['distinct_control_tickers']} distinct = {ci['reuse_factor']}x reuse -> "
+          f"independent={ci['independent']} (blocks publication)  OK")
     print(f"  headline: {rep['headline']}")
     print(f"  gate_rejects: {rep['gate_rejects']}")
     assert rep["gate_rejects"].get("no_prereg", 0) >= 1, "refusals must be counted"

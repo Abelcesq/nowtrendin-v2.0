@@ -52,6 +52,14 @@ DATE_SEMANTIC = {
     "market_pending_detections": ["detection_date"],
     "crypto_accuracy_ledger":    ["detection_date", "move_date"],
     "crypto_pending_detections": ["detection_date"],
+    # Flow ledger — the disclosure-to-participation latency register (flow_ledger.py).
+    # Registered 2026-07-25 at build time rather than waiting for B3a auto-discovery to
+    # flag them (Board round 4, O6). Writers canonicalize via date_utils.to_iso_date.
+    # NOTE flow_pending_detections.timeout_date is an OPERATIONAL INSTANT consumed via
+    # `now >= _parse(...)`, exactly like its three siblings above — it belongs on the
+    # canon_date_auditor operational allowlist, NOT here.
+    "flow_ledger":               ["detection_date", "arrival_date"],
+    "flow_pending_detections":   ["detection_date"],
     # fastlane_recheck_log.detection_date is COPIED verbatim from
     # pending_detections.detection_date (already-canonical YYYY-MM-DD); registered
     # 2026-07-23 after the now-runnable Canonical Date Auditor (F2) flagged it
