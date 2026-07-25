@@ -18,6 +18,13 @@ import os, json, math, time
 from typing import Optional
 from urllib.request import Request, urlopen
 
+try:                                    # §14 canonical dates; never a raw [:10] slice
+    from date_utils import to_iso_date
+except Exception:                       # keep price fetching alive if date_utils is absent
+    def to_iso_date(value, default_today: bool = False):
+        s = str(value or "").strip()
+        return s[:10] if len(s) >= 10 and s[4] == "-" and s[7] == "-" else None
+
 FMP_API_KEY: str = os.getenv("FMP_API_KEY", "")
 _BASE = "https://financialmodelingprep.com/stable"
 _TTL  = int(os.getenv("FMP_TTL_SEC", "21600"))   # 6 h default
@@ -96,6 +103,55 @@ def historical_close(ticker: str, frm: str = "", to: str = "") -> Optional[dict]
                 out[d] = float(px)
             except (TypeError, ValueError):
                 continue
+    return out or None
+
+
+def historical_ohlcv(ticker: str, frm: str = "", to: str = "") -> Optional[dict]:
+    """Daily EOD close AND VOLUME as {YYYY-MM-DD: {"close": float, "volume": float}}.
+
+    Board round 2 (2026-07-25, unanimous): the arrival clock for the money-movement ledger
+    is ABNORMAL VOLUME — deliberately NOT price, so that "lead" is a timing measurement
+    rather than a return test wearing a different name. Five of six archetypes independently
+    noticed that `historical-price-eod/light` already returns volume (see the sibling
+    `historical_close` docstring: "date + close + volume") and that we were parsing the close
+    and DISCARDING the volume. So the arrival clock needs no new source and costs $0 — it
+    needs a field we already pay for.
+
+    Deliberately a SEPARATE function rather than a change to `historical_close`: that function
+    feeds the existing market accuracy ledger's verdict path, which must stay byte-identical
+    (Executioner's ship condition). Same upstream call and the same 6h cache key space, so
+    turning this on adds no API calls when both are used for one ticker.
+
+    A MEASUREMENT input only — never investment advice.
+    """
+    tkr = ticker.upper()
+    params = {"symbol": tkr}
+    if frm:
+        params["from"] = frm
+    if to:
+        params["to"] = to
+    key = f"hc:{tkr}:{frm}:{to}"          # SAME key as historical_close — one fetch, two views
+    raw = _cached(key, lambda: _get("historical-price-eod/light", params))
+    if not isinstance(raw, list):
+        return None
+    out = {}
+    for row in raw:
+        d = to_iso_date(row.get("date"))   # §14 canonical, not a raw [:10] slice
+        if not d:
+            continue
+        px = row.get("price", row.get("close"))
+        vol = row.get("volume")
+        if px is None:
+            continue
+        try:
+            rec = {"close": float(px)}
+        except (TypeError, ValueError):
+            continue
+        try:
+            rec["volume"] = float(vol) if vol is not None else None
+        except (TypeError, ValueError):
+            rec["volume"] = None
+        out[d] = rec
     return out or None
 
 
