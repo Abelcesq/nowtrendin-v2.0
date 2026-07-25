@@ -239,7 +239,9 @@ def find_arrival(dv: dict, since: str, baseline_median: float,
             first = _parse(d)
             return {"arrived": True, "arrival_date": d,
                     "lead_days": (first - s).days if first else None,
-                    "dollar_volume": round(dv[d], 2),
+                    # D6 (Board R4): this key previously read `dollar_volume` while holding
+                    # SHARE volume — in the very module rewritten to end that confusion.
+                    "volume_at_arrival": round(dv[d], 2),
                     "threshold": round(threshold, 2),
                     "ratio_to_baseline": round(dv[d] / baseline_median, 2),
                     "hits_in_window": hits, "window_sessions": len(forward),
@@ -253,7 +255,8 @@ def find_arrival(dv: dict, since: str, baseline_median: float,
 def already_arrived_before(dv: dict, detection_date: str, baseline_median: float,
                            lookback_sessions: int = 10,
                            mult: float = ARRIVAL_VOL_MULT,
-                           hits_required: int = ARRIVAL_HITS_REQUIRED) -> bool:
+                           hits_required: int = ARRIVAL_HITS_REQUIRED,
+                           window: int = ARRIVAL_WINDOW_SESSIONS) -> bool:
     """True if volume had ALREADY arrived shortly before detection.
 
     The market analogue of the attention ledger's `pre_broken` split, and the reason that
@@ -273,12 +276,21 @@ def already_arrived_before(dv: dict, detection_date: str, baseline_median: float
     if d is None or not baseline_median or baseline_median <= 0:
         return False
     prior = sorted(x for x in dv if (_parse(x) or d) < d)[-lookback_sessions:]
-    hits = sum(1 for x in prior if dv.get(x, 0) >= mult * baseline_median)
-    return hits >= hits_required
+    # D5 (Board R4): require the hits to fall inside a window of the SAME width
+    # find_arrival uses. Counting 2 hits anywhere in a 10-session lookback still stamped
+    # pre_arrived on evidence (e.g. two spikes 9 sessions apart) that would never have
+    # counted as an arrival — the same flattering direction as the original defect, just
+    # smaller. Slide find_arrival's own window across the lookback instead.
+    w = max(1, int(window))
+    for i in range(len(prior)):
+        seg = prior[i:i + w]
+        if sum(1 for x in seg if dv.get(x, 0) >= mult * baseline_median) >= hits_required:
+            return True
+    return False
 
 
 def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
-                fetch_ohlcv=None) -> dict:
+                fetch_ohlcv=None, mult: float = None) -> dict:
     """Convenience end-to-end read for ONE instrument at ONE detection date.
 
     Returns the frozen baseline, whether the crowd had already arrived, and the first
@@ -322,7 +334,11 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
 
     med = base["median_volume"]
     horizon_end = _iso(d + timedelta(days=horizon_days))
-    arr = find_arrival(sv, detection_date, med, until=horizon_end)
+    # `mult` is supplied by the caller from the ROW'S pre-registration when resolving a
+    # ledger row, so an env change can never re-resolve an enrolled row under a different
+    # threshold. Falls back to the module default for ad-hoc/research reads.
+    arr = find_arrival(sv, detection_date, med, until=horizon_end,
+                       mult=float(mult) if mult else ARRIVAL_VOL_MULT)
 
     # Dollar volume travels alongside as human-readable CONTEXT only. It is never
     # consulted for the verdict — it is price-contaminated by construction.

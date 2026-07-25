@@ -223,6 +223,7 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
     pre = active_prereg(db_path)
     if not pre:
         _GATE_REJECTS["no_prereg"] += 1
+        _persist_rejects(db_path)
         return {"enrolled": False, "reason": "no active pre-registration — "
                 "register_prereg() must be called before any enrollment"}
 
@@ -230,12 +231,14 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
     controls = list(controls or [])
     if len(controls) < need:
         _GATE_REJECTS["no_controls"] += 1
+        _persist_rejects(db_path)
         return {"enrolled": False, "reason": f"needs {need} matched controls, got "
                 f"{len(controls)} — a treated row is never written alone"}
 
     base = treated.get("baseline") or {}
     if not base.get("available"):
         _GATE_REJECTS["calibrating"] += 1
+        _persist_rejects(db_path)
         return {"enrolled": False, "reason": f"baseline unusable "
                 f"({base.get('reason', 'calibrating')}) — §16a honest absence"}
 
@@ -248,6 +251,8 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
             (tkr,)).fetchone()
         if open_row:
             _GATE_REJECTS["already_open"] += 1
+            _flush_rejects(conn)          # conn is open here; do not nest a connection
+            conn.commit()
             return {"enrolled": False, "reason": f"{tkr} already has an open episode"}
 
         det = _canon_date(treated.get("detection_date"))
@@ -266,8 +271,15 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
             rb = r.get("baseline") or {}
             if not rb.get("available"):
                 continue          # a control without a usable baseline is simply not enrolled
-            rid = _mk_id(cohort, r.get("ticker"), det, pre["id"])
-            conn.execute(
+            # ⚠ D1 FIX (Board round 4, Executioner — reproduced before fixing). The id
+            # previously omitted `group`, so two treated tickers enrolled on the SAME date
+            # sharing a control ticker collided; `ON CONFLICT DO NOTHING` swallowed the
+            # insert while the counter still incremented, so the all-or-nothing check
+            # passed and a LONE TREATED ROW was written while enroll() reported success.
+            # Matched controls are drawn on sector + size decile + liquidity, so control
+            # overlap is the NORMAL case on a heavy filing day, not an edge case.
+            rid = _mk_id(cohort, r.get("ticker"), det, pre["id"], group)
+            cur = conn.execute(
                 f"INSERT INTO flow_pending_detections ({cols}) "
                 f"VALUES ({','.join([ph] * 21)}) ON CONFLICT (id) DO NOTHING",
                 (rid, cohort, group, (r.get("ticker") or "").upper(), r.get("name") or "",
@@ -278,13 +290,20 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
                  1 if r.get("pre_arrived") else 0,
                  r.get("size_decile"), r.get("sector") or "",
                  pre["id"], pre.get("param_version") or "", timeout, "", "pending"))
-            written += 1
+            # Count ACTUAL inserts, never loop iterations — that conflation is what let the
+            # parity check pass on a swallowed insert.
+            try:
+                written += 1 if (cur is not None and cur.rowcount != 0) else 0
+            except Exception:
+                written += 1
 
         if written < 1 + need:
             conn.rollback()
             _GATE_REJECTS["no_controls"] += 1
-            return {"enrolled": False, "reason": f"only {written} of {1 + need} rows had a "
-                    f"usable baseline — enrollment is all-or-nothing so the arms stay at parity"}
+            _flush_rejects(conn)
+            conn.commit()
+            return {"enrolled": False, "reason": f"only {written} of {1 + need} rows were "
+                    f"actually written — enrollment is all-or-nothing so the arms stay at parity"}
 
         _flush_rejects(conn)
         conn.commit()
@@ -299,6 +318,26 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
         return {"enrolled": False, "reason": f"error: {e}"}
     finally:
         conn.close()
+
+
+def _persist_rejects(db_path: str = DB_PATH):
+    """D4 FIX (Board round 4, Executioner): `_flush_rejects` was only reached on the SUCCESS
+    path, so in the regime where refusals carry the most information — no pre-registration,
+    no controls, everything calibrating — nothing succeeded, nothing flushed, and the
+    counters died with the dyno. The `no_prereg` branch returned before a connection even
+    existed. Opens its own connection so a refusal is always durably recorded.
+    """
+    if not any(_GATE_REJECTS.values()):
+        return
+    try:
+        c = _connect(db_path)
+        try:
+            _flush_rejects(c)
+            c.commit()
+        finally:
+            c.close()
+    except Exception as e:
+        print(f"[flow-ledger] reject persist skipped: {e}")
 
 
 def _flush_rejects(conn):
@@ -342,6 +381,25 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
     now = _parse(today) if today else datetime.now(timezone.utc)
     conn = _connect(db_path)
     out = {"checked": 0, "arrived": 0, "pre_arrived": 0, "no_arrival": 0, "errors": 0}
+    _pre_cache: dict = {}
+
+    def _pre_for(pid):
+        """D2 FIX (Board round 4): resolve thresholds from the ROW'S OWN pre-registration,
+        never from module/env values. Previously `sweep()` used FLOW_TIMEOUT_DAYS and
+        `find_arrival` used ARRIVAL_VOL_MULT, so a config change on the dyno silently
+        re-resolved ALREADY-ENROLLED rows under a different definition — exactly the
+        'tested a different variable than the one wired' failure this module exists to
+        prevent."""
+        if pid not in _pre_cache:
+            try:
+                r = conn.execute(
+                    ("SELECT * FROM flow_prereg WHERE id=%s" if db_compat.USE_PG
+                     else "SELECT * FROM flow_prereg WHERE id=?"), (pid,)).fetchone()
+                _pre_cache[pid] = dict(r) if r else {}
+            except Exception:
+                _pre_cache[pid] = {}
+        return _pre_cache[pid]
+
     try:
         rows = [dict(r) for r in conn.execute(
             "SELECT * FROM flow_pending_detections WHERE status='pending' "
@@ -357,11 +415,16 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                 verdict = arrival_date = None
                 lead = ratio = None
                 sched = ""
+                rp = _pre_for(p.get("prereg_id"))
+                row_horizon = int(rp.get("horizon_days") or FLOW_TIMEOUT_DAYS)
+                row_mult = rp.get("arrival_mult")
                 if p.get("pre_arrived"):
                     verdict = "PRE_ARRIVED"
                 else:
-                    a = arrival_fn(p["ticker"], det,
-                                   horizon_days=int(FLOW_TIMEOUT_DAYS))
+                    kw = {"horizon_days": row_horizon}
+                    if row_mult:
+                        kw["mult"] = float(row_mult)
+                    a = arrival_fn(p["ticker"], det, **kw)
                     arr = (a or {}).get("arrival") or {}
                     if arr.get("arrived"):
                         verdict = "ARRIVED"
@@ -421,20 +484,41 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
     """
     import ledger_survival
 
+    pre = active_prereg(db_path)
+    active_id = (pre or {}).get("id")
+
     conn = _connect(db_path)
     try:
-        rows = [dict(r) for r in conn.execute("SELECT * FROM flow_ledger").fetchall()]
+        # ⚠ D3 FIX (Board round 4, Challenger). This previously read the WHOLE table with no
+        # prereg filter, while the banner and min_episodes came from the ACTIVE
+        # registration — so enrolling under prereg A, disliking the trend, and
+        # re-registering as B would present B's terms over A+B's rows, with no reader able
+        # to see that A existed. That is specification shopping, shipped, inside the module
+        # written to prevent it. Rows are now scoped to one cohort, and every superseded
+        # cohort is surfaced (the "null archive", enforced in code rather than in prose).
+        ph = "%s" if db_compat.USE_PG else "?"
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT * FROM flow_ledger WHERE prereg_id={ph}", (active_id,)).fetchall()]
         pend = [dict(r) for r in conn.execute(
-            "SELECT cohort, detection_date FROM flow_pending_detections "
-            "WHERE status='pending'").fetchall()]
+            f"SELECT cohort, detection_date FROM flow_pending_detections "
+            f"WHERE status='pending' AND prereg_id={ph}", (active_id,)).fetchall()]
         rejects = {r["reason"]: r["count"] for r in
                    [dict(x) for x in conn.execute("SELECT * FROM flow_gate_rejects").fetchall()]}
-    except Exception:
-        return {"available": False, "reason": "flow ledger not initialised"}
+        history = [dict(r) for r in conn.execute(
+            "SELECT id, param_version, registered_at, active FROM flow_prereg "
+            "ORDER BY registered_at").fetchall()]
+        counts = {}
+        for h in history:
+            c = conn.execute(f"SELECT COUNT(*) n FROM flow_ledger WHERE prereg_id={ph}",
+                             (h["id"],)).fetchone()
+            h["ledger_rows"] = dict(c)["n"] if c else 0
+            counts[h["id"]] = h["ledger_rows"]
+    except Exception as e:
+        return {"available": False, "reason": f"flow ledger not initialised ({e})"}
     finally:
         conn.close()
 
-    pre = active_prereg(db_path)
+    superseded = [h for h in history if not h.get("active") and h.get("ledger_rows")]
     now = datetime.now(timezone.utc)
     excluded = {"pre_arrived": 0, "disclosure_echo": 0, "scheduled": 0}
     arms = {COHORT_TREATED: [], COHORT_CONTROL: []}
@@ -473,13 +557,19 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
                                            horizons=(30, 90, 180))
     n_t = len([1 for t, e in arms[COHORT_TREATED] if e == 1])
     min_ep = int((pre or {}).get("min_episodes") or 0)
-    publishable = bool(cmp_out.get("separated")) and n_t >= min_ep and min_ep > 0
+    publishable = (bool(cmp_out.get("separated")) and n_t >= min_ep and min_ep > 0
+                   # A superseded cohort holding rows must be disclosed before anything is
+                   # publishable — otherwise the reader cannot see that an earlier
+                   # definition was tried and set aside.
+                   and not superseded)
 
     return {
         "available": True,
         "held_out": True,
-        "prereg": {"id": (pre or {}).get("id"), "param_version": (pre or {}).get("param_version"),
+        "prereg": {"id": active_id, "param_version": (pre or {}).get("param_version"),
                    "min_episodes": min_ep, "stop_rule": (pre or {}).get("stop_rule")},
+        "prereg_history": history,
+        "superseded_cohorts_with_rows": [h["id"] for h in superseded],
         "arms": {"treated_rows": len(arms[COHORT_TREATED]),
                  "control_rows": len(arms[COHORT_CONTROL]),
                  "treated_events": n_t,
@@ -556,8 +646,38 @@ if __name__ == "__main__":
     assert not r2["enrolled"] and "already has an open episode" in r2["reason"]
     print("duplicate ticker -> refused (one open episode)  OK")
 
+    # 5b. REGRESSION (Board R4, D1 — reproduced before fixing). TWO treated tickers on the
+    #     SAME detection date SHARING control tickers. Controls are matched on sector +
+    #     size decile + liquidity, so overlap is the NORMAL case on a heavy filing day.
+    #     Previously the control ids omitted match_group -> collision -> ON CONFLICT DO
+    #     NOTHING swallowed the insert -> `written` counted ITERATIONS not inserts -> the
+    #     parity check passed and a LONE TREATED ROW was written while enroll() reported
+    #     success. The original suite never enrolled two treated rows on one date, so it
+    #     never caught the module's headline guarantee being false.
+    r3 = enroll(mk("BBB"), [mk("C1"), mk("C2"), mk("C3")], db_path=tmp)
+    assert r3["enrolled"], r3
+    conn = _connect(tmp)
+    grp = {}
+    for row in [dict(x) for x in conn.execute(
+            "SELECT match_group, cohort FROM flow_pending_detections").fetchall()]:
+        grp.setdefault(row["match_group"], []).append(row["cohort"])
+    conn.close()
+    lone = [g for g, c in grp.items()
+            if COHORT_TREATED in c and COHORT_CONTROL not in c]
+    assert not lone, f"LONE TREATED ROW written for group(s) {lone} — the control arm " \
+                     f"cannot be retrofitted, so this must never happen"
+    for g, c in grp.items():
+        assert c.count(COHORT_TREATED) == 1 and c.count(COHORT_CONTROL) == 3, (g, c)
+    print(f"2nd treated, shared controls -> {len(grp)} groups, each 1 treated + 3 "
+          f"controls, no lone treated  OK")
+
     # 6. Sweep with an injected clock: treated arrives fast, controls do not.
-    def fake_arrival(ticker, det, horizon_days=180):
+    seen_mult = []
+
+    def fake_arrival(ticker, det, horizon_days=180, mult=None):
+        # `mult` and `horizon_days` must arrive from the ROW'S pre-registration (D2), not
+        # from module env — record them so the test can assert it.
+        seen_mult.append((horizon_days, mult))
         if ticker == "AAA":
             return {"available": True, "arrival": {
                 "arrived": True, "arrival_date": "2026-03-25", "lead_days": 15,
@@ -566,13 +686,38 @@ if __name__ == "__main__":
 
     s = sweep(db_path=tmp, arrival_fn=fake_arrival, today="2026-12-31")
     print(f"sweep: checked={s['checked']} arrived={s['arrived']} "
-          f"no_arrival={s['no_arrival']}  OK")
-    assert s["arrived"] == 1 and s["no_arrival"] == 3, s
+          f"no_arrival={s['no_arrival']} errors={s['errors']}  OK")
+    # 2 treated (AAA arrives, BBB does not) + 6 controls = 8 rows
+    assert s["errors"] == 0, s
+    assert s["arrived"] == 1 and s["no_arrival"] == 7, s
+    # D2 REGRESSION: the horizon and multiple must come from the pre-registration
+    # (180 / 3.0), never from module env — a dyno config change must not be able to
+    # re-resolve already-enrolled rows under a different definition.
+    assert seen_mult and all(h == 180 and m == 3.0 for h, m in seen_mult), seen_mult
+    print(f"sweep used prereg thresholds (horizon=180, mult=3.0) not env  OK")
 
     # 7. Report: both arms present, and NOT publishable at n=1 vs min_episodes=60.
     rep = report(db_path=tmp)
-    assert rep["arms"]["treated_events"] == 1 and rep["arms"]["control_rows"] == 3, rep["arms"]
+    assert rep["arms"]["treated_events"] == 1 and rep["arms"]["control_rows"] == 6, rep["arms"]
     assert rep["publishable"] is False, "must refuse to publish below min_episodes"
+
+    # 7b. REGRESSION (Board R4, D3 — Challenger). Re-registering with different terms must
+    #     NOT let the new banner present the OLD cohort's rows. Previously report() read the
+    #     whole table with no prereg filter while min_episodes came from the ACTIVE prereg —
+    #     enroll under A, dislike the trend, re-register as B, and B's terms were shown over
+    #     A+B's rows with no reader able to see A existed.
+    pr2 = register_prereg(
+        hypothesis="same but a friendlier threshold", observable="o2", universe="u",
+        enroll_threshold=0.5, arrival_mult=2.0, horizon_days=180, min_episodes=1,
+        stop_rule="s", param_version="v2", db_path=tmp)
+    rep2 = report(db_path=tmp)
+    assert rep2["prereg"]["id"] == pr2["prereg_id"], rep2["prereg"]
+    assert rep2["arms"]["treated_events"] == 0, \
+        f"new cohort must NOT inherit the old cohort's rows: {rep2['arms']}"
+    assert pr["prereg_id"] in rep2["superseded_cohorts_with_rows"], rep2
+    assert rep2["publishable"] is False, "must not publish while a superseded cohort holds rows"
+    print(f"re-register -> new cohort sees 0 rows, superseded cohort disclosed "
+          f"({len(rep2['prereg_history'])} in history)  OK")
     print(f"report: treated_events={rep['arms']['treated_events']} "
           f"control_rows={rep['arms']['control_rows']} "
           f"publishable={rep['publishable']}  OK")
