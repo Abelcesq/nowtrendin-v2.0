@@ -309,7 +309,15 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
             stats["written"] += 1
             stats["tickers"].add(tkr)
 
-        truncated = 1 if len(rows) >= 200 else 0     # observed source cap (defect D)
+        # Defect D: judge truncation on the SOURCE's raw row count, not on what survived
+        # parsing — dropping malformed rows would otherwise make a capped day look uncapped.
+        raw_rows = len(rows)
+        try:
+            import finviz_data as _fv
+            raw_rows = max(raw_rows, _fv.last_feed_raw_rows())
+        except Exception:
+            pass
+        truncated = 1 if raw_rows >= 200 else 0      # observed source cap
         conn.execute(
             f"INSERT INTO insider_coverage (ingest_at,rows_returned,rows_requested,"
             f"distinct_tickers,truncated,rejected_misaligned,rejected_form144,"
@@ -324,7 +332,8 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
 
     stats["tickers"] = len(stats["tickers"])
     stats["ingested"] = True
-    stats["truncated"] = bool(len(rows) >= 200)
+    stats["source_raw_rows"] = raw_rows
+    stats["truncated"] = bool(truncated)
     stats["actor_identities_stored"] = bool(ACTOR_SALT)
     return stats
 
