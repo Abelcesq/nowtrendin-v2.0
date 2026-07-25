@@ -121,6 +121,17 @@ _ALT_TICKER = re.compile(r'alt="([A-Z][A-Z0-9.\-]{0,9})\s+logo"', re.I)
 _TS_LIKE = re.compile(r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{1,2}:\d{2}\s*(AM|PM)$")
 
 
+#: Serialization flag for the parser correctness fix (2026-07-25).
+#: The fix is CORRECT and therefore defaults ON — we do not ship known-broken parsing as a
+#: default. But it is a LIVE-PATH behaviour change: it takes the primary insider source from
+#: "returns nothing" to "returns real data", which moves `positioning_concentration` — the
+#: very component currently inside the R7 baseline transient. Two score-affecting changes
+#: landing together would make neither attributable, so production runs with
+#: INSIDER_PARSER_FIX=0 until the R7 baseline re-forms, then flips with before/after capture.
+#: Flipping is a config change with instant rollback — the R7 pattern.
+INSIDER_PARSER_FIX = os.getenv("INSIDER_PARSER_FIX", "1") == "1"
+
+
 def _ticker_from_cell(raw_cell: str, stripped: str) -> str:
     """Recover the true ticker from a Finviz ticker cell.
 
@@ -167,6 +178,20 @@ def _parse_insider(html: str, only_ticker: str = "") -> list:
         if len(keep) < 9:
             continue                                  # skip nav / non-data rows
         texts = [c for _, c in keep]
+
+        if not INSIDER_PARSER_FIX:
+            # LEGACY path, retained ONLY so the fix can ship inert while the R7 transient
+            # resolves. It parses the ticker with its first letter doubled (LEVI->LLEVI),
+            # so `only_ticker` never matches and per-ticker reads return zero rows. Do not
+            # "clean this up" — deleting it removes the ability to serialize the rollout.
+            if not re.match(r"^[A-Z]{1,5}$", texts[0]):
+                continue
+            row = dict(zip(_INSIDER_COLS, texts[:10]))
+            if only and row["ticker"].upper() != only:
+                continue
+            out.append(row)
+            continue
+
         tkr = _ticker_from_cell(keep[0][0], texts[0])
         if not re.match(r"^[A-Z][A-Z0-9.\-]{0,9}$", tkr):
             continue
