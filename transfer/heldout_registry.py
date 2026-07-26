@@ -50,6 +50,8 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "market_accuracy_ledger":   "market accuracy ledger",
     "crypto_accuracy_ledger":   "crypto accuracy ledger",
     "signal_analysis":     "per-item narrative; measurement-only, never an input",
+    "flow_enrollment":     "the enrollment driver — the detector's ONLY doorway into the flow program",
+    "insider_flow":        "the append-only Form-4 panel + universe promotion",
 }
 
 #: Modules that PRODUCE OR CALIBRATE A SCORE. These must never import the held-out set.
@@ -100,6 +102,15 @@ ACKNOWLEDGED_EXCEPTIONS = {
     # must be revoked rather than widened.
     ("financial_risk_gradient", "market_accuracy_ledger"):
         "WRITE-ONLY enrollment: calls record_market_detection only; never reads a verdict",
+    # The money-movement wiring (master remediation Step 6, the one construction the freeze
+    # permits). The detector's scheduler drives ingestion/enrollment/sweep and its endpoints
+    # serve the reports — all through flow_enrollment's wrappers, ONE module wide, so the
+    # exception surface stays reviewable. Direction: detector -> flow program, WRITE + serve.
+    # ⚠ THE REVIEW MUST RE-CHECK: no flow-ledger VERDICT, arrival, or rate may ever be read
+    # back into a score. The day one is, this exception is revoked, not widened.
+    ("gravitational_anomaly_detector", "flow_enrollment"):
+        "scheduler driver + serve endpoints (/flow/*): write + read-only reports; "
+        "never a verdict into a score",
 }
 
 #: Identifiers that signal a REALIZED-RETURN computation. Their presence inside a module

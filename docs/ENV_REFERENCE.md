@@ -162,3 +162,14 @@ Status legend:
 
 _Last updated: 2026-06-21_
 _See `transfer/.env.example` and `backend/.env.example` for local dev setup._
+
+## Money-movement program (flow ledger) — 2026-07-26
+
+| Var | Default | Meaning |
+|---|---|---|
+| `ACTOR_ID_SALT` | (unset) | Salt for insider-identity pseudonymisation (`insider_flow.actor_id`). **WRITE-ONCE — NEVER ROTATE**: rotating it fractures every actor identity across an append-only, never-deleted ledger (Board master remediation, Expansionist). Set 2026-07-26 (v288). No identity is stored at all while unset. |
+| `INSIDER_PARSER_FIX` | `0` | Finviz insider parser correctness fix (doubled-ticker + F144). Flips ONLY after the R7 transient decays, with before/after capture. |
+| `INSIDER_FLOW` | `0` | Market-wide Form-4 ingestion into `insider_events`. **MUST NOT be enabled before `INSIDER_PARSER_FIX=1`** — the append-only panel must never receive doubled tickers. |
+| `FLOW_ENROLL` | `0` | Flow-ledger enrollment + sweep in `_collect_phase`. Requires an active pre-registration (the code refuses otherwise). |
+| `CRYPTO_COVERAGE_GATE` | `1` | Coverage-keyed crypto absence (absent when <2 voting proxies). Emergency kill switch only. |
+| `CRYPTO_LEDGER_CLEAN_COHORT_START` | `2026-07-27` | Boundary of the dead-parser-era cohort annotation in the crypto ledger. Set to the actual parser-flip date at flip time. |

@@ -5394,6 +5394,35 @@ def start_scheduler():
                             crypto_ledger.sweep_crypto_pending(DB_PATH, limit=60)
                     except Exception as _cce:
                         print(f"[scheduler] crypto error: {_cce}")
+                # ── Money-movement program (Board master remediation, Step 6 — the one
+                # construction the enrollment freeze permits). ONE doorway: everything
+                # routes through flow_enrollment (heldout_registry acknowledged exception);
+                # this block never reads a flow verdict, arrival, or rate — write + drive
+                # only. Both flags default OFF, so this is inert until flipped in order:
+                # INSIDER_PARSER_FIX → INSIDER_FLOW (panel accrues) → prereg lock →
+                # FLOW_ENROLL (rows enroll + sweep). ingest_panel() itself refuses to run
+                # while the parser fix is off (append-only panel, doubled-ticker poison).
+                if os.getenv("INSIDER_FLOW", "0") == "1" or os.getenv("FLOW_ENROLL", "0") == "1":
+                    try:
+                        import flow_enrollment as _fe
+                        if _src_pause > 0:
+                            _ct.sleep(_src_pause)           # §13 breather before the block
+                        _ing = _fe.ingest_panel(db_path=DB_PATH)
+                        if _ing.get("ran") is False:
+                            print(f"[scheduler] insider panel: {_ing.get('reason')}")
+                        else:
+                            _iw = (_ing.get("ingest") or {})
+                            print(f"[scheduler] insider panel: wrote {_iw.get('written', 0)} "
+                                  f"of {_iw.get('returned', 0)} rows "
+                                  f"(truncated={_iw.get('truncated')})")
+                        if os.getenv("FLOW_ENROLL", "0") == "1":
+                            _fc = _fe.run_cycle(db_path=DB_PATH)
+                            print(f"[scheduler] flow cycle: qualified={_fc.get('qualified')} "
+                                  f"enrolled={_fc.get('enrolled')} "
+                                  f"refused={len(_fc.get('refused') or [])} "
+                                  f"sweep={_fc.get('sweep')}")
+                    except Exception as _fee:
+                        print(f"[scheduler] flow program error: {_fee}")
                 print("[scheduler] collect phase complete.")
             except Exception as _ce:
                 print(f"[scheduler] collect phase error: {_ce}")
@@ -7388,6 +7417,47 @@ def market_accuracy_detail(limit: int = Query(300, ge=1, le=1000), verdict: str 
         except Exception as _mde2:
             print(f"[market-accuracy] detail error: {_mde2}")
             return {"rows": [], "count": 0, "status": "error"}
+
+
+# ── Money-movement flow program (held-out; Board master remediation Step 6) ─────────────
+# All three endpoints route through flow_enrollment — the detector's ONE doorway into the
+# flow program (heldout_registry acknowledged exception). Reads are open; the prereg lock
+# is a WRITE and is internal-key gated. Nothing here feeds any score.
+
+@app.get("/flow/status")
+def flow_status():
+    """Flow-program state: flags, active pre-registration, insider-panel counts, qualify
+    rule. Read-only; held-out; MEASUREMENT infrastructure, not a signal."""
+    try:
+        import flow_enrollment as _fe
+        return {"available": True, **_fe.status(db_path=DB_PATH)}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.get("/flow/accuracy")
+def flow_accuracy():
+    """The flow ledger's treated-vs-control report (KM + Greenwood, cohort-scoped,
+    refusals counted). Publishes SEPARATION, never a single-arm rate; `publishable` stays
+    false below the pre-registered minimum. Read-only; held-out."""
+    try:
+        import flow_enrollment as _fe
+        return _fe.accuracy(db_path=DB_PATH)
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+@app.post("/flow/prereg", dependencies=[Depends(_require_internal)])
+def flow_prereg_lock(terms: dict):
+    """ONE-TIME pre-registration lock (master remediation Step 7). Terms are SHA-hashed —
+    changing any term later mints a NEW registration and a NEW cohort; report() refuses to
+    publish while a superseded cohort holds rows. Gated: requires the Chairman's arrival-
+    target ruling (R-a) before it is ever called. Internal-key write."""
+    try:
+        import flow_enrollment as _fe
+        return _fe.lock_prereg(terms or {}, db_path=DB_PATH)
+    except Exception as e:
+        return {"locked": False, "error": str(e)}
 
 
 @app.get("/crypto")
