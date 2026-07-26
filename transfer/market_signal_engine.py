@@ -88,7 +88,13 @@ _MKT_QUARANTINE = os.getenv("SCORE_QUARANTINE_ENABLED", "false").lower() == "tru
 # accuracy ledger from recording (every row rejected as non-directional).
 # Non-circular either way: inputs are external SEC/Congress filings, independent of any score.
 DARK_POSITIONING_V2 = os.getenv("DARK_POSITIONING_V2", "0") == "1"
-DARK_POS_WEIGHT = float(os.getenv("DARK_POS_WEIGHT", "0.4"))
+# ⚠ DEFAULT IS "0" (A7, Board master remediation 2026-07-25). The default was 0.4 while the
+# Board-ruled 0 (R7, 6/6 against the blend as wired) existed only as an unversioned Heroku
+# config var — the same flag-defect class the accountability review fixed on
+# INSIDER_PARSER_FIX: a config reset, review app, or fresh environment would silently restore
+# the rejected directionless mega-cap blend. Code must equal intent. Re-enabling the blend is
+# an explicit act (env DARK_POS_WEIGHT>0) that requires a new Board ruling on post-flip data.
+DARK_POS_WEIGHT = float(os.getenv("DARK_POS_WEIGHT", "0"))
 
 MIN_BASELINE_CYCLES = 3        # below this: no usable baseline at all
 # Cold-start guard (Fix #1, market diagnostic): a baseline of 3–9 cycles passes the

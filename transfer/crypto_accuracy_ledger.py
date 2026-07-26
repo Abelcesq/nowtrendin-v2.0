@@ -189,7 +189,19 @@ def record_from_serve(payload: dict, db_path=DB_PATH) -> dict:
     conn = db_compat.connect(db_path)
     try:
         for c in (payload or {}).get("coins", []):
+            # ⚠ C2b (Board master remediation, 2026-07-25 — a LIVE breach found by the
+            # Guardian): this function enrolled falsifiable "informed-money" claims off a
+            # single AV-fallback proxy vote WHILE the serve payload said the money read was
+            # absent — it gated on dark_matter.flow + intensity and never consulted
+            # money_data_absent. The serve payload now omits dark_matter when absent, but
+            # the ledger must not depend on payload shape for its own integrity: an absent
+            # or coverage-thin coin is never enrolled, explicitly, here.
+            if c.get("money_data_absent"):
+                continue
             dm = c.get("dark_matter") or {}
+            if (dm.get("proxy_coverage") == "thin"
+                    or (dm.get("proxies_covered") or 0) < 2):
+                continue
             flow = (dm.get("flow") or "").lower()             # informed-money (D) direction
             intensity = dm.get("intensity")                   # proxy DM strength (0-100), baseline-independent
             if flow not in ("inflow", "outflow"):
@@ -328,6 +340,16 @@ def report(db_path=DB_PATH) -> dict:
     except Exception:
         pending = 0
     conn.close()
+    # ⚠ DEAD-PARSER-ERA ANNOTATION (Board master remediation, C2b; the v233
+    # restore-and-annotate precedent — rows are NEVER deleted, they are labelled). Every
+    # detection made before the clean-cohort start was enrolled off proxy dark matter fed by
+    # the dead insider parser (single AV-fallback votes); those rows stay visible but are
+    # reported as their own cohort and never blend into a cited post-fix rate. The boundary
+    # is env-set at the parser flip (CRYPTO_LEDGER_CLEAN_COHORT_START).
+    clean_start = os.getenv("CRYPTO_LEDGER_CLEAN_COHORT_START", "2026-07-27")
+    for r in rows:
+        r["dead_parser_era"] = bool((r.get("detection_date") or "") < clean_start)
+    era_rows = [r for r in rows if r["dead_parser_era"]]
     confirmed = [r for r in rows if r.get("verdict") == "CONFIRMED"]
     not_conf = [r for r in rows if r.get("verdict") == "NOT_CONFIRMED"]
     no_move = [r for r in rows if r.get("verdict") == "NO_MOVE"]
@@ -338,15 +360,29 @@ def report(db_path=DB_PATH) -> dict:
         c = sum(1 for r in confirmed if r.get("flow") == f)
         nn = sum(1 for r in rows if r.get("flow") == f and r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
         by_flow[f] = {"confirmed": c, "resolved": nn, "confirm_rate_pct": round(100.0 * c / nn, 1) if nn else None}
+    small_sample = resolved < 20
     return {
         "ground_truth": "realized coin close direction (FMP crypto + AV)",
         "distinct_from": "trends ledger (Google Trends) AND market ledger (equity EOD price)",
         "move_threshold_pct": CRYPTO_MOVE_THRESHOLD_PCT, "timeout_days": CRYPTO_TIMEOUT_DAYS,
         "resolved": resolved, "pending": pending,
         "confirmed": len(confirmed), "not_confirmed": len(not_conf), "no_move": len(no_move),
-        "confirm_rate_pct": round(100.0 * len(confirmed) / resolved, 1) if resolved else None,
+        # HEADLINE DISCIPLINE (Outsider, master remediation): crypto publishes NO rate until
+        # the post-fix cohort reaches a pre-declared n — a rate on proxy-degenerate-era data
+        # is a liability, not a metric. Denominators stay served; the rate is withheld.
+        "confirm_rate_pct": (round(100.0 * len(confirmed) / resolved, 1)
+                             if resolved and not small_sample else None),
+        "rate_withheld_reason": ("small_sample: no crypto rate is published below 20 "
+                                 "resolved episodes — denominators above are the record"
+                                 if small_sample and resolved else None),
+        "dead_parser_era_rows": len(era_rows),
+        "clean_cohort_start": clean_start,
+        "cohort_note": ("detections before clean_cohort_start were enrolled off proxy dark "
+                        "matter fed by a dead insider parser (single-source AV fallback); "
+                        "they remain in the record, annotated, and never blend into a cited "
+                        "post-fix rate" if era_rows else None),
         "median_lead_days": round(statistics.median(leads), 1) if leads else None,
-        "by_flow": by_flow, "small_sample": resolved < 20,
+        "by_flow": by_flow, "small_sample": small_sample,
         "note": "MEASUREMENT of the Crypto Money Gradient's own accuracy — did the coin's realized price "
                 "move the way the detected informed-money flow indicated, and how many days after. NOT a "
                 "forecast, NOT advice, NOT a buy/sell signal.",

@@ -119,13 +119,35 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
     # D8 (founder-ruled 2026-07-20, flag-gated MONEY_MOVEMENT_EXCLUDE): every crypto MM component
     # is proxy-degenerate on all 12 coins today → serve money_movement=null + "market-confirmation
     # only", never a "Money Gradient" headline over zero money data. M is untouched.
+    #
+    # ⚠ COVERAGE-KEYED ABSENCE (Board master remediation, 2026-07-25 — the Guardian's
+    # "right-for-the-wrong-reason trap", Chairman-approved). Today's honest absence rides
+    # ENTIRELY on baseline degeneracy, which is downstream of the dead insider parser: the
+    # moment INSIDER_PARSER_FIX=1 revives the COIN proxy, baselines de-degenerate and the ten
+    # COIN-only coins would silently serve a numeric "Money Movement" backed by ONE shared
+    # Coinbase-equity proxy — zero coverage improvement, absence evaporated by accident.
+    # So absence is ALSO keyed on coverage, unconditionally: fewer than 2 distinct voting
+    # proxies (or a structurally "thin" map) is not a money read, whatever the baselines do.
+    # NOTE `proxy_coverage` alone is insufficient — BTC serves "partial" with covered==1 —
+    # hence the explicit covered >= 2 requirement. `absence_reason` is served because the
+    # two absences are different truths a diligence reader must be able to tell apart.
+    # Env kill switch CRYPTO_COVERAGE_GATE=0 for emergency rollback (flag-never-force; the
+    # gate changes NOTHING live today — all 12 coins are already absent — it only prevents
+    # the silent post-flip revival).
     money_data_absent = False
-    if getattr(mse, "MONEY_MOVEMENT_EXCLUDE", False):
+    absence_reason = None
+    _cov_gate = os.getenv("CRYPTO_COVERAGE_GATE", "1") == "1"
+    if _cov_gate and ((dm or {}).get("proxy_coverage") == "thin" or covered < 2):
+        money_data_absent = True
+        money_movement = None
+        absence_reason = "proxy_coverage_thin"
+    elif getattr(mse, "MONEY_MOVEMENT_EXCLUDE", False):
         mm_live = [c for c in CRYPTO_MM_WEIGHTS
                    if c in scored and not scored[c].get("degenerate_baseline")]
         if not mm_live:
             money_data_absent = True
             money_movement = None
+            absence_reason = "degenerate_baseline"
     gap = None if money_data_absent else round(money_movement - market_confirmation, 1)
     # Reuse the equity Money-Gradient interpretation (movement + facts language, no advice), then append
     # the rich crypto analysis walk (parity with the Market Signal's _market_analysis) — EXCEPT while
@@ -150,13 +172,22 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "money_movement": money_movement, "market_confirmation": market_confirmation,
         # D8: null money read → render "Market-Confirmation-only", never a Money Gradient headline.
         "money_data_absent": money_data_absent,
+        # Which absence this is — "proxy_coverage_thin" (structural: <2 voting proxies) vs
+        # "degenerate_baseline" (cold-start: no variance yet). Two different truths.
+        "absence_reason": absence_reason,
         "tier": ("ABSENT" if money_data_absent
                  else mse._level((money_movement + market_confirmation) / 2)),
         "detection_level": ("ABSENT" if money_data_absent else mse._level(money_movement)),
         "confidence_level": mse._level(market_confirmation),
         "detection_fp": mse.MONEY_MOVEMENT_FP, "confidence_fp": mse.MARKET_CONFIRM_FP,
         "gap_state": interp["state"], "interpretation": _interp_text, "calibrating": any_calibrating,
-        "flow": flow,
+        # ⚠ CONTRADICTION GUARD (Board master remediation, C1 — verified live before the fix:
+        # BTC served flow "inflow" + dark_matter intensity 60.0 beside money_movement:null and
+        # every MM component absent; traced to a SINGLE AV-fallback proxy vote of five, hence
+        # intensity = 100*(0.5+0.5*0.2) = 60.0 exactly). A payload may never emit a direction
+        # while the money read it belongs to is absent. This is the single choke point all
+        # three platforms inherit — the guard lives here, in the engine, not in three UIs.
+        "flow": ("no_data" if money_data_absent else flow),
         # §17 source-display: only render components that contributed; show real value or n/a (never NaN).
         # D7 (2026-07-19): a DEGENERATE zero-on-zero pin (all 12 coins served proxy D=30.0
         # as if measured) serves score:null + a truthful flag; the weighted score is
@@ -202,9 +233,13 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
                            else None),
         "price": ({k: price.get(k) for k in ("last_close", "change_7d_pct", "change_30d_pct", "trend", "as_of")}
                   if price and price.get("available") else None),
+        # §17: when the money read is ABSENT, the dark_matter block is OMITTED ENTIRELY — a
+        # sub-source that did not contribute to the served read is never rendered beside it.
+        # This is also what stops the crypto ledger enrolling on the suppressed direction
+        # (record_from_serve reads dark_matter.flow; see its own guard for defense in depth).
         "dark_matter": ({"coverage": (dm or {}).get("proxy_coverage"), "flow": (dm or {}).get("flow"),
                          "intensity": (dm or {}).get("intensity"), "proxies_covered": covered}
-                        if dm and dm.get("available") else None),
+                        if (dm and dm.get("available") and not money_data_absent) else None),
         "disclaimer": _DISCLAIMER,
     }
 

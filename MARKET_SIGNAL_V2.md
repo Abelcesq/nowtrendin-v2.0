@@ -118,6 +118,13 @@ to `available:false` when `FMP_API_KEY` is absent, flag-gated so only the Money 
 alpha*, which we do not claim; this ledger tests *directional accuracy of our movement signal*,
 which we do.
 
+> ⚠ **CONTAMINATION RECORD (2026-07-25):** the PRIMARY insider source (Finviz) was
+> silently dead — every ticker parsed with a doubled first letter, so per-ticker reads
+> returned zero rows for every symbol; Form 144 intents were classified as executed
+> sales. Worst-case window 2026-06-25 → 2026-07-25 (onset unknowable — no raw snapshots
+> retained). Full statement + ledger annotations:
+> `audits/board/CONTAMINATION_insider-dead-parser_2026-07-25.md`.
+>
 > ⚠ **BOARD REVIEW 2026-07-25 — this §4 position is under challenge; Chairman's ruling pending.**
 > Full record: `audits/board/BOARD_market-crypto-signal_2026-07-25.md`. The Board voted **6/6
 > against the congress/13F blend as currently wired**, on three grounds that the
