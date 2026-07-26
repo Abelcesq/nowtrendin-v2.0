@@ -3,7 +3,75 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-07-24 (F1 R-D/R-C + F5 KM shipped 3 surfaces)_
+_Last updated: 2026-07-26 (money-movement program: R7 + dead insider source + runbook Steps 0-2 live)_
+
+---
+
+## Session 2026-07-25/26 — Money-movement program: 6 board rounds, R7 executed, primary insider source found DEAD, runbook Steps 0-2 live
+
+Founder ordered the market/crypto reassessment -> money-movement build -> accountability
+review -> master remediation. Engine v283->v287. Board record: 7 new docs in audits/board/
+(market-crypto-signal, money-movement-build, mechanisms-and-tools, crash-physics-and-corpus,
+accountability-review, MASTER_REMEDIATION, R7 evidence + CONTAMINATION statement).
+
+**R7 EXECUTED + VERIFIED (config-only, v282):** `DARK_POS_WEIGHT=0` — the congress/13F blend
+(6/6 against: directionless intensity; 0.6 = top-10-holdings index proxy) removed from
+positioning_concentration. Blast radius confirmed the charge empirically: blend fired on
+exactly 16 mega-caps of 300, zero elsewhere. Predictions recorded BEFORE the flip held
+(flow unchanged 16/16, market ledger delta=0, ~12-cycle negative-z transient decaying:
+NVDA positioning z -3.95 -> -1.93). Code default now also "0" (A7).
+
+**PRIMARY INSIDER SOURCE WAS SILENTLY DEAD (found via §16 gate-5 live sample):** Finviz
+ticker cells render a logo-fallback initial, so tag-stripping doubled every first letter
+(LEVI->LLEVI, 111/111) — `insider_signal()` returned 0 rows for EVERY ticker, failing as
+"no data" not an error. Also: Form 144 "Proposed Sale" (26.5% of feed) substring-counted as
+executed sales; those rows column-misaligned. Fixed (logo-URL ticker recovery — preserves
+MMM correctly; exact-match _TXN_CLASS; misalignment rejection); parser fix flag-gated
+`INSIDER_PARSER_FIX` default "0", flips with R7-pattern capture after the transient decays.
+Contamination statement: audits/board/CONTAMINATION_insider-dead-parser_2026-07-25.md
+(window honestly unboundable: worst case 06-25 -> 07-25; no raw snapshots retained).
+
+**MONEY-MOVEMENT INSTRUMENT (held-out, built, ZERO rows enrolled by design):**
+disclosure-to-participation latency — trigger=filing instant; observable=insider buying
+breadth vs own base rate; clock=abnormal SHARE volume vs baseline FROZEN at enrollment
+(was decorative — sweep never passed it; now passed verbatim + regression: same data,
+recomputed baseline=NO arrival vs frozen=5.0x arrival); proof=KM+Greenwood (was missing
+variance entirely) vs matched controls, ONE pre-registered primary horizon. New modules:
+ledger_survival, arrival_clock, flow_ledger (atomic treated+3-controls or nothing; refuses
+without active prereg), insider_flow (ingest live-verified: 200 raw -> 69 written/47
+tickers, F144/immaterial/misaligned refused+counted), macro_series (vintaged OFR/FINRA),
+heldout_registry (R1/R2 firewall as AST audit + negative controls; 11 scoring modules,
+5 acknowledged WRITE-ONLY exceptions — widening it immediately caught
+financial_risk_gradient->market_accuracy_ledger, verified write-only). /monitor now 9
+agents + flow_integrity reads `not_started` (never "ok" on an empty room).
+
+**CALIBRATION (fixed seed 20260725):** unconditional 60d arrival null = 24.1% at the 3.0x
+placeholder; Executioner's 5-8% target unreachable AND wrong direction (required n
+DECREASES in p0); power ~110/200/430 treated/arm for 20/15/10pp -> UNIVERSE BREADTH is the
+binding constraint (16 names = a decade; market-wide = 2-3 quarters; CI closes ~Dec 2026,
+Oct-Nov with stratified log-rank primary). O8 backtest: only G2 floor-binding real
+(market_momentum floor-bound 15/16 — 12-MONTH aggregates re-read 6-hourly = data defect;
+median/MAD RETRACTED by its proposer; my own R7 transient confounded G1 3.57%->0.89%).
+
+**RUNBOOK STEPS 0-2 LIVE (v287, verified):** pre-flip captures in audits/board/preflip/;
+crypto COVERAGE-KEYED absence (absent when proxy_coverage=="thin" OR covered<2 — closes
+the "partial with covered==1" BTC trap; served `absence_reason`; kill switch
+CRYPTO_COVERAGE_GATE) so honest absence SURVIVES the parser flip instead of evaporating;
+CONTRADICTION GUARD at the engine choke point (absent => flow="no_data", dark_matter block
+OMITTED — kills BTC's live inflow/60.0-beside-all-absent breach, traced to ONE AV-fallback
+proxy vote: 100*(0.5+0.5*0.2)=60.0); C2b crypto-ledger guard (record_from_serve was
+enrolling on the suppressed direction — 1 CONFIRMED + 1 pending off a single proxy vote;
+now skips absent/thin/covered<2; era rows ANNOTATED dead_parser_era, never deleted; NO
+crypto rate published below 20 resolved). Live acceptance: 12/12 coins
+absence_reason=proxy_coverage_thin, contradictions=0, ledger counts unchanged, fleet green.
+
+**PENDING CHAIRMAN RULINGS:** R-a arrival target (Board: 3.0-3.5x; gates prereg lock — the
+only calendar dependency) · R-b parser-flip GO (transient must decay <|1.5|; -1.93 today)
+· R-c ACTOR_ID_SALT (write-once, BEFORE INSIDER_FLOW) · R-e momentum signed-vs-magnitude
+(NEW: abs(price_return_12m) — a crash scores like a rally) · R-f panel name ("N" collides
+with the excluded component; letter-free candidates stand). NEXT: flip -> salt -> ingest ->
+~150-line enrollment wiring (verified nonexistent; the one construction the freeze permits)
+-> prereg lock -> `pending_treated>=1, pending_control>=3` — the number the freeze thaws on.
 
 ---
 
