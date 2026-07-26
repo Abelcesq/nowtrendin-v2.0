@@ -107,7 +107,13 @@ def init_flow_db(db_path: str = DB_PATH):
             id TEXT PRIMARY KEY, hypothesis TEXT, observable TEXT, universe TEXT,
             enroll_threshold REAL, arrival_mult REAL, horizon_days INTEGER,
             controls_per INTEGER, min_episodes INTEGER, stop_rule TEXT,
-            param_version TEXT, doc_path TEXT, registered_at TEXT, active INTEGER DEFAULT 1)
+            param_version TEXT, doc_path TEXT, registered_at TEXT, active INTEGER DEFAULT 1,
+            -- Board accountability review: report() read `primary_horizon_days` from the
+            -- prereg, but the column and the parameter did not exist — so it was ALWAYS
+            -- None and fell through to a hardcoded 90. The O3 multiple-comparisons fix was
+            -- a constant the pre-registration could not express. It is now a real,
+            -- SHA-covered term (see register_prereg).
+            primary_horizon_days INTEGER)
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS flow_pending_detections (
@@ -158,16 +164,21 @@ def register_prereg(hypothesis: str, observable: str, universe: str,
                     enroll_threshold: float, arrival_mult: float, horizon_days: int,
                     min_episodes: int, stop_rule: str, param_version: str,
                     doc_path: str = "", controls_per: int = FLOW_CONTROLS_PER,
+                    primary_horizon_days: int = 90,
                     db_path: str = DB_PATH) -> dict:
     """Commit a pre-registration BEFORE any enrollment. Its id is the sha256 of the terms,
     so an altered hypothesis is a different registration and cannot masquerade as the
     original. Registering a new one deactivates the previous — a threshold change mints a
     new cohort rather than silently redefining the running one.
     """
+    # `primary_horizon_days` is INSIDE the hashed payload: it is a pre-registered term, so
+    # changing it must mint a different registration rather than silently redefining the
+    # running one.
     payload = json.dumps({"hypothesis": hypothesis, "observable": observable,
                           "universe": universe, "enroll_threshold": enroll_threshold,
                           "arrival_mult": arrival_mult, "horizon_days": horizon_days,
                           "controls_per": controls_per, "min_episodes": min_episodes,
+                          "primary_horizon_days": primary_horizon_days,
                           "stop_rule": stop_rule, "param_version": param_version},
                          sort_keys=True)
     pid = hashlib.sha256(payload.encode()).hexdigest()[:16]
@@ -177,13 +188,13 @@ def register_prereg(hypothesis: str, observable: str, universe: str,
         ph = "%s" if db_compat.USE_PG else "?"
         cols = ("id,hypothesis,observable,universe,enroll_threshold,arrival_mult,"
                 "horizon_days,controls_per,min_episodes,stop_rule,param_version,"
-                "doc_path,registered_at,active")
+                "doc_path,registered_at,active,primary_horizon_days")
         conn.execute(
-            f"INSERT INTO flow_prereg ({cols}) VALUES ({','.join([ph] * 14)}) "
+            f"INSERT INTO flow_prereg ({cols}) VALUES ({','.join([ph] * 15)}) "
             f"ON CONFLICT (id) DO UPDATE SET active=1",
             (pid, hypothesis, observable, universe, enroll_threshold, arrival_mult,
              horizon_days, controls_per, min_episodes, stop_rule, param_version,
-             doc_path, _now(), 1))
+             doc_path, _now(), 1, primary_horizon_days))
         conn.commit()
     finally:
         conn.close()
@@ -293,10 +304,13 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
                  pre["id"], pre.get("param_version") or "", timeout, "", "pending"))
             # Count ACTUAL inserts, never loop iterations — that conflation is what let the
             # parity check pass on a swallowed insert.
+            # If rowcount is unavailable we must NOT assume success — that silently
+            # restores the iteration-counting bug this replaced.
             try:
-                written += 1 if (cur is not None and cur.rowcount != 0) else 0
+                inserted = cur is not None and cur.rowcount != 0
             except Exception:
-                written += 1
+                inserted = False
+            written += 1 if inserted else 0
 
         if written < 1 + need:
             conn.rollback()
@@ -437,6 +451,13 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                     kw = {"horizon_days": row_horizon}
                     if row_mult:
                         kw["mult"] = float(row_mult)
+                    # ⚠ THE ANTI-LOOKAHEAD LOCK (Board accountability review). This call
+                    # previously omitted the baseline, so the resolver recomputed it from a
+                    # fresh series under today's env — making the "frozen at enrollment"
+                    # guarantee decorative: the column was written and never read. Pass the
+                    # stored value so a resolution is reproducible from the row alone.
+                    if p.get("baseline_median"):
+                        kw["baseline_median"] = float(p["baseline_median"])
                     if pause_s and fetched:
                         time.sleep(pause_s)      # §13 batch pacing between remote fetches
                     fetched += 1
@@ -516,8 +537,13 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         rows = [dict(r) for r in conn.execute(
             f"SELECT * FROM flow_ledger WHERE prereg_id={ph}", (active_id,)).fetchall()]
         pend = [dict(r) for r in conn.execute(
-            f"SELECT cohort, detection_date FROM flow_pending_detections "
+            f"SELECT cohort, detection_date, prereg_id FROM flow_pending_detections "
             f"WHERE status='pending' AND prereg_id={ph}", (active_id,)).fetchall()]
+        # Horizons per registration, so censoring uses the term the ROW was registered
+        # under rather than whatever the dyno env says today.
+        _horizons = {h["id"]: h.get("horizon_days")
+                     for h in [dict(x) for x in conn.execute(
+                         "SELECT id, horizon_days FROM flow_prereg").fetchall()]}
         rejects = {r["reason"]: r["count"] for r in
                    [dict(x) for x in conn.execute("SELECT * FROM flow_gate_rejects").fetchall()]}
         history = [dict(r) for r in conn.execute(
@@ -535,6 +561,10 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         conn.close()
 
     superseded = [h for h in history if not h.get("active") and h.get("ledger_rows")]
+
+    def horizon_for(pid):
+        """Censoring horizon for a row, from ITS registration — never module env."""
+        return int(_horizons.get(pid) or FLOW_TIMEOUT_DAYS)
     now = datetime.now(timezone.utc)
     excluded = {"pre_arrived": 0, "disclosure_echo": 0, "scheduled": 0}
     arms = {COHORT_TREATED: [], COHORT_CONTROL: []}
@@ -559,7 +589,11 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
                 continue
             arms[cohort].append((max(0, int(lead)), 1))
         elif v == "NO_ARRIVAL":
-            arms[cohort].append((FLOW_TIMEOUT_DAYS, 0))       # censored at the horizon
+            # D2(a), Board accountability review: censoring used the module/env horizon, so
+            # changing FLOW_TIMEOUT_DAYS on the dyno would move every censored observation's
+            # time and shift the survival tail for rows already resolved. Censor at the
+            # horizon the ROW was registered under.
+            arms[cohort].append((horizon_for(r.get("prereg_id")), 0))
 
     # Still-pending rows are censored at their current age — they have not failed, they
     # have not finished being observed.
@@ -567,7 +601,7 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         c = p.get("cohort")
         d = _parse(p.get("detection_date") or "")
         if c in arms and d:
-            arms[c].append((min((now - d).days, FLOW_TIMEOUT_DAYS), 0))
+            arms[c].append((min((now - d).days, horizon_for(p.get("prereg_id"))), 0))
 
     # O4 (Board round 4, Executioner): a control ticker reused across match groups yields
     # repeated, NON-INDEPENDENT observations. Kaplan-Meier assumes independence, so the
@@ -713,11 +747,13 @@ if __name__ == "__main__":
 
     # 6. Sweep with an injected clock: treated arrives fast, controls do not.
     seen_mult = []
+    seen_baseline = []
 
-    def fake_arrival(ticker, det, horizon_days=180, mult=None):
+    def fake_arrival(ticker, det, horizon_days=180, mult=None, baseline_median=None):
         # `mult` and `horizon_days` must arrive from the ROW'S pre-registration (D2), not
         # from module env — record them so the test can assert it.
         seen_mult.append((horizon_days, mult))
+        seen_baseline.append(baseline_median)
         if ticker == "AAA":
             return {"available": True, "arrival": {
                 "arrived": True, "arrival_date": "2026-03-25", "lead_days": 15,
@@ -735,6 +771,14 @@ if __name__ == "__main__":
     # re-resolve already-enrolled rows under a different definition.
     assert seen_mult and all(h == 180 and m == 3.0 for h, m in seen_mult), seen_mult
     print(f"sweep used prereg thresholds (horizon=180, mult=3.0) not env  OK")
+
+    # REGRESSION (Board accountability review): THE ANTI-LOOKAHEAD LOCK. sweep() must pass
+    # the baseline FROZEN at enrollment to the resolver. Previously it did not, and
+    # arrival_for could not accept it — so every resolution recomputed the baseline under
+    # today's env, making the "frozen at enrollment" guarantee decorative.
+    assert seen_baseline and all(b == 1000.0 for b in seen_baseline), \
+        f"frozen baseline must reach the resolver verbatim, got {set(seen_baseline)}"
+    print(f"sweep passed the FROZEN baseline (1000.0) to resolution  OK")
 
     # 7. Report: both arms present, and NOT publishable at n=1 vs min_episodes=60.
     rep = report(db_path=tmp)

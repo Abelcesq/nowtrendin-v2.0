@@ -290,12 +290,23 @@ def already_arrived_before(dv: dict, detection_date: str, baseline_median: float
 
 
 def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
-                fetch_ohlcv=None, mult: float = None) -> dict:
-    """Convenience end-to-end read for ONE instrument at ONE detection date.
+                fetch_ohlcv=None, mult: float = None,
+                baseline_median: float = None) -> dict:
+    """End-to-end read for ONE instrument at ONE detection date.
 
-    Returns the frozen baseline, whether the crowd had already arrived, and the first
-    arrival within the horizon. The ledger stores the baseline from this call so the
-    resolution never depends on re-fetching or re-deriving it.
+    ⚠ `baseline_median` — THE ANTI-LOOKAHEAD LOCK, AND IT WAS DECORATIVE UNTIL NOW
+    (Board accountability review, Executioner). Three docstrings in this project asserted
+    that the baseline is "frozen into the ledger row at enrollment and never recomputed at
+    resolution time". It was written to the row and then **never read**: `flow_ledger.sweep`
+    called this function without it, and this function had no parameter to accept it, so
+    every resolution recomputed the baseline from a freshly-fetched series under whatever
+    `ARRIVAL_BASELINE_SESSIONS`/`_GAP`/`_MIN` the dyno happened to hold at that moment.
+
+    A resolution must be reproducible from the stored row alone, years later, by someone
+    who does not have our environment. So: when `baseline_median` is supplied it is USED
+    VERBATIM and no baseline is computed. Only an ad-hoc/research read (no stored row yet)
+    computes one — and that path stamps `baseline_source: "recomputed"` so a caller can
+    never mistake the two.
     """
     if fetch_ohlcv is None:
         try:
@@ -327,12 +338,24 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
     sv = share_volume_series(ohlcv)          # PRIMARY — price-free (see share_volume_series)
     if not sv:
         return {"available": False, "reason": "no volume in payload"}
-    base = compute_baseline(sv, detection_date)
-    if not base.get("available"):
-        return {"available": False, "reason": base.get("reason"),
-                "calibrating": base.get("calibrating", False), "baseline": base}
 
-    med = base["median_volume"]
+    if baseline_median:
+        # RESOLUTION PATH: use the value frozen at enrollment, verbatim. No recomputation,
+        # so no environment variable read today can change how a row enrolled months ago
+        # resolves.
+        med = float(baseline_median)
+        base = {"available": True, "median_volume": med,
+                "baseline_source": "frozen_at_enrollment"}
+    else:
+        # RESEARCH PATH ONLY: no stored row exists yet, so a baseline is derived here and
+        # stamped as such.
+        base = compute_baseline(sv, detection_date)
+        if not base.get("available"):
+            return {"available": False, "reason": base.get("reason"),
+                    "calibrating": base.get("calibrating", False), "baseline": base}
+        med = base["median_volume"]
+        base["baseline_source"] = "recomputed"
+
     horizon_end = _iso(d + timedelta(days=horizon_days))
     # `mult` is supplied by the caller from the ROW'S pre-registration when resolving a
     # ledger row, so an env change can never re-resolve an enrolled row under a different
@@ -350,7 +373,14 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
             "detection_date": str(detection_date)[:10],
             "observable": "share_volume_ratio_to_frozen_baseline",
             "baseline": base,
-            "pre_arrived": already_arrived_before(sv, detection_date, med),
+            # D2(b), Board accountability review: this was called WITHOUT `mult`, so it used
+            # the env default while find_arrival used the row's pre-registered value. Any
+            # time env < prereg, `pre_arrived` fired on weaker evidence than an arrival —
+            # shrinking the lead denominator in the direction that flatters us. Both sides
+            # must read the same threshold.
+            "pre_arrived": already_arrived_before(
+                sv, detection_date, med,
+                mult=float(mult) if mult else ARRIVAL_VOL_MULT),
             "arrival": arr, "horizon_days": horizon_days,
             "param_version": PARAM_VERSION}
 
@@ -446,6 +476,33 @@ if __name__ == "__main__":
     assert scheduled_event_on("2026-07-31") == "month_end"
     assert scheduled_event_on("2026-07-15") is None
     print("scheduled stamps: triple_witching / quarter_end / month_end populate  OK")
+
+    # REGRESSION (Board accountability review): a SUPPLIED baseline must be used VERBATIM,
+    # never recomputed. Feed a series whose recomputed median would be 5000 but pass a
+    # stored baseline of 1000 — the ratio must be computed against 1000.
+    # The series sits at 5000 with a 10000 bump. A RECOMPUTED baseline is 5000, so nothing
+    # reaches 3x and there is NO arrival. The baseline frozen at enrollment was 1000, under
+    # which the very first session already clears 3x. Same data, opposite verdicts — which
+    # is precisely why resolution must never recompute.
+    loud = mk([5000] * 100 + [10000] * 6 + [5000] * 20)
+    det_v = _iso(base_day + timedelta(days=99))
+    recomputed = compute_baseline(share_volume_series(loud), det_v)["median_volume"]
+    assert recomputed == 5000.0, recomputed
+
+    frozen = arrival_for("TEST", det_v, horizon_days=60,
+                         fetch_ohlcv=lambda t, f, u: loud, baseline_median=1000.0)
+    assert frozen["baseline"]["median_volume"] == 1000.0, frozen["baseline"]
+    assert frozen["baseline"]["baseline_source"] == "frozen_at_enrollment", frozen["baseline"]
+    assert frozen["arrival"]["arrived"] is True, frozen["arrival"]
+    assert frozen["arrival"]["ratio_to_baseline"] == 5.0, frozen["arrival"]
+
+    ad_hoc = arrival_for("TEST", det_v, horizon_days=60, fetch_ohlcv=lambda t, f, u: loud)
+    assert ad_hoc["baseline"]["baseline_source"] == "recomputed", ad_hoc["baseline"]
+    assert ad_hoc["arrival"]["arrived"] is False, \
+        "recomputed baseline must NOT arrive here — that contrast is the whole point"
+    print(f"frozen baseline (1000) -> ARRIVED at {frozen['arrival']['ratio_to_baseline']}x; "
+          f"recomputed ({recomputed:.0f}) -> NO arrival. Same data, opposite verdicts  OK")
+    print("research path stamps baseline_source='recomputed' (never confusable)  OK")
     print("  (None = no KNOWN artifact, NOT verified-clean — no earnings feed wired)")
 
     print("\nAll self-tests passed.")

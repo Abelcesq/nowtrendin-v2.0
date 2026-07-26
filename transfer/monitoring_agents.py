@@ -1658,8 +1658,15 @@ def flow_integrity(conn) -> dict:
                    "ledger_rows": ledger, "active_prereg": prereg}
 
         if treated is None:
-            return {"agent": "flow_integrity", "status": "ok",
-                    "alerts": [], "summary": {"note": "flow ledger tables not created yet"},
+            # ⚠ NOT "ok" (Board accountability review, Guardian). Reporting green on a
+            # system that does not exist is the same class of failure as the insider source
+            # returning `available: False` instead of an error — the exact defect this
+            # session was spent finding. Non-existence is `not_started`, and the fleet must
+            # not be able to read all-green while the ledger has no tables.
+            return {"agent": "flow_integrity", "status": "not_started",
+                    "alerts": [], "summary": {
+                        "note": "flow ledger tables do not exist — nothing is enrolling",
+                        "enrolled": 0},
                     "checked_at": _now().isoformat()}
 
         # THE check that matters: a treated row with no control arm cannot be repaired

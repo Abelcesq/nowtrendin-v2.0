@@ -299,10 +299,12 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
                 f"VALUES ({','.join([ph]*13)}) ON CONFLICT (id) DO NOTHING",
                 (rid, tkr, filed_iso, txn_iso, ah, role_raw, _role_class(role_raw), code,
                  val, _num(r.get("shares")), _num(r.get("cost")), "finviz", now))
+            # rowcount unavailable -> treat as NOT inserted rather than assuming
+            # success (assuming success is the original defect).
             try:
                 inserted = cur is not None and cur.rowcount != 0
             except Exception:
-                inserted = True
+                inserted = False
             if not inserted:
                 stats["duplicates"] = stats.get("duplicates", 0) + 1
                 continue

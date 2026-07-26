@@ -122,14 +122,21 @@ _TS_LIKE = re.compile(r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{1,2}:\d{2}\s*(AM|PM)$")
 
 
 #: Serialization flag for the parser correctness fix (2026-07-25).
-#: The fix is CORRECT and therefore defaults ON — we do not ship known-broken parsing as a
-#: default. But it is a LIVE-PATH behaviour change: it takes the primary insider source from
-#: "returns nothing" to "returns real data", which moves `positioning_concentration` — the
-#: very component currently inside the R7 baseline transient. Two score-affecting changes
-#: landing together would make neither attributable, so production runs with
-#: INSIDER_PARSER_FIX=0 until the R7 baseline re-forms, then flips with before/after capture.
-#: Flipping is a config change with instant rollback — the R7 pattern.
-INSIDER_PARSER_FIX = os.getenv("INSIDER_PARSER_FIX", "1") == "1"
+#: The fix takes the primary insider source from "returns nothing" to "returns real data",
+#: which moves `positioning_concentration` — the component inside the R7 baseline transient.
+#: Two score-affecting changes landing together would make neither attributable, so it flips
+#: explicitly, with before/after capture (the R7 pattern) and instant rollback.
+#:
+#: ⚠ DEFAULT IS "0" (corrected by the Board accountability review). It previously defaulted
+#: to "1" while production held it OFF via an unversioned Heroku config var — so the OFF
+#: state existed on exactly one server, and every other context (fresh dyno, review app,
+#: local run, anything under tools/) silently got the changed behaviour. Four archetypes
+#: flagged it independently; the Outsider's phrasing was "a flag that is ON everywhere
+#: except one server." Code must equal intent, so the safe state is the default and the
+#: change is opt-in.
+#: NOTE: the Form-144 classification fix (`classify_transaction`) is deliberately NOT gated —
+#: counting a notice of intent as an executed sale is wrong on both branches.
+INSIDER_PARSER_FIX = os.getenv("INSIDER_PARSER_FIX", "0") == "1"
 
 
 def _ticker_from_cell(raw_cell: str, stripped: str) -> str:

@@ -88,9 +88,10 @@ def _upsert(conn, rows) -> int:
         # the Board found in flow_ledger.enroll() and that I then repeated in
         # insider_flow.ingest() — it is evidently a habit, so it is checked here up front.
         try:
-            written += 1 if (cur is not None and cur.rowcount != 0) else 0
+            inserted = cur is not None and cur.rowcount != 0
         except Exception:
-            written += 1
+            inserted = False
+        written += 1 if inserted else 0
     return written
 
 

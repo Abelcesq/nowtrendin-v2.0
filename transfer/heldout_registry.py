@@ -65,6 +65,41 @@ SCORING_MODULES = {
     "crypto_money_gradient",
     "positioning_intel",
     "enterprise_intel",
+    # ⚠ ADDED after the Board accountability review (Guardian). Omitting these two made the
+    # audit green by scoping it away from the only files where scoring and measurement share
+    # a namespace — "the firewall is blind at the one point where the breach will actually
+    # occur." `gravitational_anomaly_detector` contains score_topic /
+    # compute_nowtrendin_score / apply_calibration AND the API surface, so it necessarily
+    # imports ledgers to serve endpoints. Those imports are declared below as ACKNOWLEDGED
+    # exceptions rather than hidden by omission — the exception list is now the thing under
+    # review, which is the point.
+    "gravitational_anomaly_detector",
+    "financial_risk_gradient",
+}
+
+#: (scoring_module, held_out_module) pairs that are KNOWN and JUSTIFIED. Each needs a reason.
+#: An acknowledged exception is auditable; an omitted module is invisible. Adding a pair here
+#: is a deliberate act that shows up in review — which is exactly the property the Guardian
+#: asked for when he said not to delete the entry once it goes red.
+ACKNOWLEDGED_EXCEPTIONS = {
+    ("gravitational_anomaly_detector", "accuracy_ledger_enhanced"):
+        "serves GET /accuracy/ledger; ledger is DB-driven and read-only from the API path",
+    ("gravitational_anomaly_detector", "market_accuracy_ledger"):
+        "serves GET /market/accuracy + the deferred-trigger read; read-only",
+    ("gravitational_anomaly_detector", "crypto_accuracy_ledger"):
+        "serves the crypto ledger endpoint; read-only",
+    ("gravitational_anomaly_detector", "signal_analysis"):
+        "serves POST /analysis/{kind}; held-out narrative, never an input to a score",
+    # Found by widening the audit — a REAL violation the narrow list could not see, then
+    # verified safe on DIRECTION. financial_risk_gradient imports the ledger at :2597 for
+    # exactly one call, `record_market_detection` (:2600): the scorer WRITES a detection
+    # INTO the held-out ledger and never reads an outcome back. That direction is correct —
+    # the ledger observes the score; the score must never observe the ledger.
+    # ⚠ WHAT THE EXCEPTION REVIEW MUST RE-CHECK: that this stays WRITE-ONLY. The day a read
+    # appears here (a hit-rate consulted while scoring), it is circular and the exception
+    # must be revoked rather than widened.
+    ("financial_risk_gradient", "market_accuracy_ledger"):
+        "WRITE-ONLY enrollment: calls record_market_detection only; never reads a verdict",
 }
 
 #: Identifiers that signal a REALIZED-RETURN computation. Their presence inside a module
@@ -111,20 +146,28 @@ def audit_firewall(root: str = _HERE,
         if not os.path.exists(os.path.join(root, f"{mod}.py")):
             missing.append(mod)
 
+    acknowledged = []
     for mod in sorted(scoring):
         path = os.path.join(root, f"{mod}.py")
         if not os.path.exists(path):
             continue
         checked += 1
-        for imported in _module_imports(path) & held:
-            violations.append({
+        for imported in sorted(_module_imports(path) & held):
+            entry = {
                 "scoring_module": mod,
                 "imports_held_out": imported,
                 "why_held_out": HELD_OUT_ARRIVAL_INPUTS.get(imported, "held out"),
                 "rule": "R2 arrival firewall — a scorer may not see its own referee",
-            })
+            }
+            reason = ACKNOWLEDGED_EXCEPTIONS.get((mod, imported))
+            if reason:
+                entry["acknowledged_because"] = reason
+                acknowledged.append(entry)
+            else:
+                violations.append(entry)
 
     return {"ok": not violations, "violations": violations,
+            "acknowledged_exceptions": acknowledged,
             "scoring_modules_checked": checked, "held_out_declared": len(held),
             "missing_files": missing}
 
@@ -208,6 +251,24 @@ if __name__ == "__main__":
     doc = audit_firewall(root=tmp, scoring={"doc_scorer"}, held_out={"arrival_clock"})
     assert doc["ok"], "a docstring mention must not be flagged as an import"
     print("docstring mention is not an import (AST, not grep)  OK")
+
+    # ⚠ NEGATIVE CONTROL FOR THE PAYOFF AUDIT (Board accountability review, Guardian).
+    # Previously only audit_firewall had one, so there was no evidence in the repo that the
+    # R1 half could EVER return red — "an audit with no proof it can fail is decoration",
+    # and my claim that the firewall can go red was true of one of the two audits.
+    with open(os.path.join(tmp, "bad_resolver.py"), "w", encoding="utf-8") as fh:
+        fh.write("def resolve(r):\n    excess_return = r['a'] - r['b']\n"
+                 "    return excess_return\n")
+    badp = audit_payoff_firewall(root=tmp, resolvers=("bad_resolver",))
+    assert not badp["ok"] and badp["violations"][0]["token"] == "excess_return", badp
+    print("negative control: payoff audit DETECTS a realized-return token  OK")
+
+    with open(os.path.join(tmp, "good_resolver.py"), "w", encoding="utf-8") as fh:
+        fh.write('"""Mentions excess_return only in prose."""\n'
+                 "def resolve(r):\n    return r['volume'] > r['baseline']\n")
+    goodp = audit_payoff_firewall(root=tmp, resolvers=("good_resolver",))
+    assert goodp["ok"], goodp
+    print("payoff audit: prose mention is not a violation  OK")
 
     print(f"\nLIVE TREE: {'CLEAN' if s['status'] == 'ok' else 'VIOLATIONS PRESENT'}")
     if not s["arrival_firewall"]["ok"]:
