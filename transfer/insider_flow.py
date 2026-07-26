@@ -159,6 +159,19 @@ def actor_id(name: str) -> Optional[str]:
 
 # ── Schema ──────────────────────────────────────────────────────────────────────────────
 
+def _connect(db_path: str = DB_PATH):
+    """db_compat connection with dict-style rows in BOTH modes: Postgres uses a
+    RealDictCursor; local sqlite needs an explicit Row factory so dict(row) works."""
+    conn = db_compat.connect(db_path)
+    if not db_compat.USE_PG:
+        try:
+            import sqlite3
+            conn.row_factory = sqlite3.Row
+        except Exception:
+            pass
+    return conn
+
+
 def init_insider_db(db_path: str = DB_PATH):
     conn = db_compat.connect(db_path)
     conn.execute("""
@@ -338,6 +351,78 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
     return stats
 
 
+# ── Phase 2c: universe promotion (§16a cold-start progression) ──────────────────────────
+
+#: Qualifying events before a candidate may be promoted out of cold start. Not a quality
+#: judgement — just "enough of its own history to have a baseline at all".
+UNIVERSE_PROMOTE_EVENTS = int(os.getenv("UNIVERSE_PROMOTE_EVENTS", "3"))
+#: No qualifying event in this many days -> dormant. Rows are NEVER deleted (§13); the
+#: instrument simply stops being scored until it files again.
+UNIVERSE_DORMANT_DAYS = int(os.getenv("UNIVERSE_DORMANT_DAYS", "180"))
+
+
+def promote_universe(db_path: str = DB_PATH, today: str = "") -> dict:
+    """Advance instruments through the §16a stages. NEVER skips a stage.
+
+        candidate   -> first qualifying filing seen; NOT scored, no baseline yet
+        calibrating -> >= UNIVERSE_PROMOTE_EVENTS events; still NOT scored — the flow
+                       ledger independently refuses enrollment on an unusable baseline,
+                       so "calibrating" here and "refused" there agree by construction
+        active      -> baseline depth is sufficient; eligible for enrollment
+        dormant     -> no qualifying event in UNIVERSE_DORMANT_DAYS; scoring stops,
+                       rows retained
+
+    §16a is explicit that stages are never skipped to reach scoring, and that the honest
+    interim state is a disclosed absence rather than a fabricated read. This function only
+    ever moves an instrument ONE stage, and only on evidence from its own filings.
+    """
+    now = datetime.now(timezone.utc)
+    today_iso = (today or now.strftime("%Y-%m-%d"))[:10]
+    conn = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    moved = {"to_calibrating": 0, "to_active": 0, "to_dormant": 0}
+    try:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT ticker, events_seen, state, last_event_date FROM market_universe"
+        ).fetchall()]
+        for r in rows:
+            tkr, n, state = r["ticker"], (r.get("events_seen") or 0), r.get("state")
+            last = (r.get("last_event_date") or "")[:10]
+            stale = False
+            if last:
+                try:
+                    stale = (now - datetime.strptime(last, "%Y-%m-%d")
+                             .replace(tzinfo=timezone.utc)).days > UNIVERSE_DORMANT_DAYS
+                except ValueError:
+                    stale = False
+
+            if stale and state in ("candidate", "calibrating", "active"):
+                conn.execute(f"UPDATE market_universe SET state='dormant' WHERE ticker={ph}",
+                             (tkr,))
+                moved["to_dormant"] += 1
+                continue
+            if state == "candidate" and n >= UNIVERSE_PROMOTE_EVENTS:
+                conn.execute(
+                    f"UPDATE market_universe SET state='calibrating', promoted_at={ph} "
+                    f"WHERE ticker={ph}", (today_iso, tkr))
+                moved["to_calibrating"] += 1
+            # calibrating -> active is NOT decided here. Baseline sufficiency is the
+            # arrival clock's judgement (it refuses on thin/degenerate history), and having
+            # two places decide "is this scoreable" is how the two answers drift apart.
+        conn.commit()
+        counts = {}
+        for st in ("candidate", "calibrating", "active", "dormant"):
+            c = conn.execute(
+                f"SELECT COUNT(*) AS n FROM market_universe WHERE state={ph}", (st,)
+            ).fetchone()
+            counts[st] = (dict(c)["n"] if hasattr(c, "keys") else c[0]) if c else 0
+    finally:
+        conn.close()
+    return {"moved": moved, "states": counts,
+            "note": "calibrating->active is decided by baseline sufficiency at enrollment, "
+                    "not here — one authority per question"}
+
+
 def _role_class(role_raw: str) -> str:
     """Coarse role bucket for the Seyhun-grounded weighting (officers > directors > 10%)."""
     r = (role_raw or "").lower()
@@ -356,7 +441,7 @@ def _role_class(role_raw: str) -> str:
 
 def status(db_path: str = DB_PATH) -> dict:
     """Read-only health for the monitoring fleet."""
-    conn = db_compat.connect(db_path)
+    conn = _connect(db_path)
     try:
         def one(q):
             try:
@@ -433,6 +518,30 @@ if __name__ == "__main__":
     # No salt configured -> no identity stored
     assert actor_id("Jane Doe") is None or ACTOR_SALT
     print(f"  identities stored: {bool(ACTOR_SALT)} (no salt -> no identity, by design)  OK")
+
+    # Phase 2c: §16a promotion must never skip a stage.
+    feed2 = [dict(feed[0], transaction="Buy", date=f"Jul 2{i} '26",
+                  value_usd="500,000", filed=f"Jul 2{i} 09:00 PM") for i in (1, 2, 3)]
+    ingest(db_path=tmp, feed_fn=lambda limit=500: feed2)
+    p = promote_universe(db_path=tmp)
+    print(f"\npromotion: moved={p['moved']} states={p['states']}")
+    assert p["states"]["active"] == 0, \
+        "nothing may reach 'active' here — baseline sufficiency is the clock's call"
+    assert p["states"]["calibrating"] >= 1, p["states"]
+    print("  candidate -> calibrating on its own filings; NOTHING auto-promoted to active  OK")
+
+    # Dormancy retains the row rather than deleting it (§13).
+    conn2 = db_compat.connect(tmp)
+    conn2.execute("UPDATE market_universe SET last_event_date='2020-01-01'")
+    conn2.commit()
+    conn2.close()
+    p2 = promote_universe(db_path=tmp)
+    assert p2["states"]["dormant"] >= 1 and p2["moved"]["to_dormant"] >= 1, p2
+    conn3 = db_compat.connect(tmp)
+    n = conn3.execute("SELECT COUNT(*) AS n FROM market_universe").fetchone()
+    conn3.close()
+    assert (dict(n)["n"] if hasattr(n, "keys") else n[0]) >= 1, "dormant must RETAIN rows"
+    print(f"  stale -> dormant, rows retained not deleted  OK")
 
     print(f"\nstatus: {json.dumps(status(tmp))}")
     print("\nAll self-tests passed.")

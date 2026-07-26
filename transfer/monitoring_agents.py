@@ -1588,6 +1588,102 @@ def scoring_contract_auditor(conn=None, db_path=None) -> dict:
             "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
 
 
+def heldout_firewall() -> dict:
+    """R1/R2 FIREWALL AUDIT — the check that makes the held-out boundary a mechanism.
+
+    Board round 4 (First-Principles Guardian) found the `HELD_OUT_ARRIVAL_INPUTS` registry
+    existed ONLY as prose inside a board document, with no code and no contract test:
+    "my R2 firewall is currently a memo, not a mechanism." `heldout_registry.py` supplies
+    the registry and an AST-based audit; this wires it into the fleet so it runs on cadence
+    rather than only when someone remembers to look.
+
+    CRITICAL on violation: a scoring module importing a held-out module lets the measured
+    see its own referee, and a verdict scored on realized return is a trading record wearing
+    a measurement label. Neither is a warning-level event.
+    """
+    alerts = []
+    try:
+        import heldout_registry
+        s = heldout_registry.status()
+    except Exception as e:
+        return {"agent": "heldout_firewall", "status": "warn",
+                "alerts": [{"level": "warn", "block": "R1/R2",
+                            "msg": f"firewall audit unavailable: {e}"}],
+                "checked_at": _now().isoformat()}
+
+    for v in (s.get("arrival_firewall") or {}).get("violations", []):
+        alerts.append({"level": "critical", "block": "R2",
+                       "msg": f"scoring module {v['scoring_module']} imports held-out "
+                              f"{v['imports_held_out']} ({v['why_held_out']})"})
+    for v in (s.get("payoff_firewall") or {}).get("violations", []):
+        alerts.append({"level": "critical", "block": "R1",
+                       "msg": f"{v['module']} references {v['token']} on a verdict path"})
+    missing = (s.get("arrival_firewall") or {}).get("missing_files") or []
+    if missing:
+        alerts.append({"level": "warn", "block": "R2",
+                       "msg": f"registry names modules with no file on disk: {missing} — "
+                              f"a registry that drifts from reality is one nobody trusts"})
+    return {"agent": "heldout_firewall", "status": _roll_up(alerts), "alerts": alerts,
+            "summary": {"scoring_modules_checked":
+                        (s.get("arrival_firewall") or {}).get("scoring_modules_checked"),
+                        "held_out_declared":
+                        (s.get("arrival_firewall") or {}).get("held_out_declared")},
+            "checked_at": _now().isoformat()}
+
+
+def flow_integrity(conn) -> dict:
+    """FLOW LEDGER INTEGRITY — ONE agent, deliberately.
+
+    The Executioner held this position across two rounds: four agents alarming on the same
+    root failure (the feed stopped) through four pagers means alert fatigue, then a muted
+    channel, then an undetected outage. So every flow-ledger concern is checked here.
+
+    Silent while the ledger is empty — it is pre-enrollment by design, and an agent that
+    cries about a system not yet turned on trains people to ignore it.
+    """
+    alerts, summary = [], {}
+    try:
+        def _n(sql):
+            try:
+                r = conn.execute(sql).fetchone()
+                return (r[0] if not hasattr(r, "keys") else list(dict(r).values())[0]) or 0
+            except Exception:
+                return None
+
+        treated = _n("SELECT COUNT(*) FROM flow_pending_detections WHERE cohort='treated'")
+        control = _n("SELECT COUNT(*) FROM flow_pending_detections WHERE cohort='control'")
+        ledger = _n("SELECT COUNT(*) FROM flow_ledger")
+        prereg = _n("SELECT COUNT(*) FROM flow_prereg WHERE active=1")
+        summary = {"pending_treated": treated, "pending_control": control,
+                   "ledger_rows": ledger, "active_prereg": prereg}
+
+        if treated is None:
+            return {"agent": "flow_integrity", "status": "ok",
+                    "alerts": [], "summary": {"note": "flow ledger tables not created yet"},
+                    "checked_at": _now().isoformat()}
+
+        # THE check that matters: a treated row with no control arm cannot be repaired
+        # later — you cannot enroll a placebo in the past without fabricating data.
+        if treated and not control:
+            alerts.append({"level": "critical", "block": "FLOW",
+                           "msg": f"{treated} treated rows with ZERO controls — the control "
+                                  f"arm cannot be retrofitted; enrollment must be halted"})
+        elif treated and control and control < treated:
+            alerts.append({"level": "critical", "block": "FLOW",
+                           "msg": f"control arm ({control}) is smaller than treated "
+                                  f"({treated}) — arms must stay at parity"})
+        # Enrolling without an active pre-registration means thresholds were never fixed.
+        if (treated or ledger) and not prereg:
+            alerts.append({"level": "critical", "block": "FLOW",
+                           "msg": "rows exist with NO active pre-registration — thresholds "
+                                  "were not committed before enrollment"})
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "FLOW", "msg": f"check failed: {e}"})
+
+    return {"agent": "flow_integrity", "status": _roll_up(alerts), "alerts": alerts,
+            "summary": summary, "checked_at": _now().isoformat()}
+
+
 def run_all(conn, db_path=None) -> dict:
     # HEAVY DATA-SCANNING auditors excluded from this synchronous roll-up — they
     # do full-table scans that push /monitor past Heroku's 30s router limit (503):
@@ -1599,7 +1695,11 @@ def run_all(conn, db_path=None) -> dict:
     agents = [source_watchdog(conn=conn, db_path=db_path), scorer_watchdog(conn=conn, db_path=db_path),
               pipeline_integrity(conn),
               fragment_category_auditor(conn), cost_sentinel(), calibration_auditor(),
-              data_subscriptions()]
+              data_subscriptions(),
+              # Both are cheap: the firewall is an AST pass over ~17 files (no DB, no
+              # network); flow_integrity is four COUNT(*)s. Neither threatens the ~3-5s
+              # budget that keeps /monitor inside Heroku's 30s router limit.
+              heldout_firewall(), flow_integrity(conn)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses
