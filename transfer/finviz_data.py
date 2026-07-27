@@ -160,7 +160,18 @@ def _ticker_from_cell(raw_cell: str, stripped: str) -> str:
     m = _LOGO_TICKER.search(raw_cell or "") or _ALT_TICKER.search(raw_cell or "")
     if m:
         return m.group(1).upper()
-    s = (stripped or "").strip().upper()
+    s = (stripped or "").strip()
+    # ⚠ NAV-BAR GUARD (found 2026-07-27 during post-flip verification). The page's navigation
+    # row ("Home | News | Screener | Charts | Maps | Groups | Portfolio | Insider") carries
+    # enough cells to survive the >=9-cell test, and this fallback UPPERCASED "Home" into a
+    # ticker-shaped "HOME" that passed the ticker regex — one junk row per fetch, wearing a
+    # real ticker's shape. A genuine ticker cell renders ALREADY UPPERCASE; title-case text is
+    # chrome, never an instrument. (The row was refused downstream by the ingest gates on an
+    # unclassifiable transaction, so nothing entered the append-only panel — but it inflated
+    # the parsed-row and distinct-ticker counts that the liveness tripwire reads.)
+    if s and s != s.upper():
+        return ""
+    s = s.upper()
     if len(s) >= 2 and s[0] == s[1]:
         return s[1:]
     return s

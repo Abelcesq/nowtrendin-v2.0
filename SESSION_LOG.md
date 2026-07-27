@@ -2886,3 +2886,48 @@ POSITIVE control (deprecated `FrameIterator` → emits its advisory) and a NEGAT
 repo's code → silent). Session-scoped `hooks.json` also switched `python3`→`python`, but that
 copy is regenerated per session; the `python3.exe` fix is the durable one. Memory:
 `env-windows-python3-store-alias`.
+
+### 2026-07-27 (evening) — PARSER FLIP EXECUTED (founder) + post-flip verification
+
+**Flip landed:** engine **v291**, `INSIDER_PARSER_FIX=1`, `CRYPTO_LEDGER_CLEAN_COHORT_START=2026-07-27`
+(stamped in the same `config:set`, per B11). `INSIDER_FLOW=0`, `FLOW_ENROLL` unset — the chain
+is correctly still gated. Prereg `2d65eac796c28476` active, `term_drift: []`.
+
+**THE PARSER IS ALIVE — verified against the LIVE source, not inferred:**
+`201 raw rows -> 116 parsed -> 69 distinct tickers`. The 30-day corpse is breathing.
+
+**The visible Market-Signal effect, and why it is CORRECT rather than a regression.**
+On a fair like-for-like 226-topic comparison, **14 of 16** watchlist names LOST their insider
+read (score+z -> `None`); only JPMorgan and Alphabet kept one. Root cause traced, not assumed:
+the live market-wide Form-4 feed contains **only GOOGL** of the 16 watchlist mega-caps — the
+feed is small/mid-cap dominated (ACU, ANDE, ANIX, BMNR, CRAI...). Those mega-caps have **no
+recent qualifying insider activity**, so the honest read is ABSENCE. Corroborating: pre-flip,
+**8 of 17** topics sat pinned at **20.9-21.0 with z ~ -1.13** (Apple, Microsoft, IBM, Meta,
+Alphabet, Amazon, Wells Fargo, Nvidia — eight different companies, one number) — a floor value
+wearing a measured badge, the §16a stage-2 "30 ✓" defect. Post-flip those read absent, and
+**Alphabet — the one mega-cap actually in the live feed — moved 21.0 -> 24.9 (z -1.13 -> -0.64)**,
+a real differentiated value. The flip replaced fabricated-constant insider reads with honest
+absence plus one genuine measurement. `/research/dark-positioning` (rebuilt 23s before the read,
+so post-flip) shows `dark_matter_inputs: "congress + curated_13F"` — insider legitimately absent
+for those names.
+
+**NEW DEFECT found during verification and FIXED (not deferred):** Finviz's navigation row
+("Home | News | Screener | Charts | Maps | Groups | Portfolio | Insider") carries enough cells
+to survive the >=9-cell test, and `_ticker_from_cell`'s fallback **UPPERCASED "Home" into a
+ticker-shaped "HOME"** — one junk row per fetch wearing a real ticker's shape. It was refused
+downstream by the ingest gates (unclassifiable transaction "Maps"), so **nothing could have
+entered the append-only panel** — defense in depth worked — but it inflated the parsed-row and
+distinct-ticker counts the **B9 liveness tripwire reads**, which is exactly the metric that must
+not lie. Guard added: a genuine ticker cell renders ALREADY UPPERCASE, so title-case text is
+chrome, never an instrument. Verified live: `115 parsed / 68 tickers / 0 nav rows`, with
+`LEVI`, `AAAPL->AAPL` and `BRK.B` all preserved.
+
+**Crypto post-flip: unchanged and correct.** 12/12 `money_data_absent` with
+`absence_reason: proxy_coverage_thin`, `flow: no_data`, `dark_matter` omitted, no direction
+anywhere. BTC/ETH stay absent because fewer than 2 of their own proxies vote — the coverage gate
+holding conservatively, as designed. Ledger: `resolved 1`, `confirm_rate_pct: null` (withheld
+under the corrected n=30 floor), `dead_parser_era_rows: 1`, `clean_cohort_start: 2026-07-27`.
+
+**Captures archived** in `audits/board/postflip/` (6 endpoints, same set as `preflip/`).
+**Next gate:** watch one full collect cycle, then `INSIDER_FLOW=1` (panel begins accruing;
+hourly ingest tick + liveness tripwire go live with it), then `FLOW_ENROLL=1`.
