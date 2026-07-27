@@ -85,12 +85,16 @@ def kaplan_meier(observations: Sequence[tuple], horizons: Iterable[int] = (30, 9
     Returns the curve, the estimate at each horizon with an interval and the number still
     at risk there, and the 'eventual' estimate at the largest observed event time.
     """
+    # Observations are `(time, event)` or `(time, event, stratum)` — the stratum is carried
+    # for the stratified log-rank and IGNORED here (KM is a pooled, single-arm estimate).
+    # Accepting both shapes keeps one arm-building path in the caller: building the arms
+    # twice is how the two analyses drift apart on subtly different data.
     obs = []
-    for t, e in observations:
+    for row in observations:
         try:
-            tt = max(0, int(t))
-            ee = 1 if int(e) == 1 else 0
-        except (TypeError, ValueError):
+            tt = max(0, int(row[0]))
+            ee = 1 if int(row[1]) == 1 else 0
+        except (TypeError, ValueError, IndexError):
             continue
         obs.append((tt, ee))
 
@@ -200,6 +204,125 @@ def kaplan_meier(observations: Sequence[tuple], horizons: Iterable[int] = (30, 9
                    "at_risk": p["at_risk"]} for p in curve],
         "caveat": ("Right-censored rows are retained at their observation time, not dropped. "
                    "Read the interval and at_risk, never the point estimate alone."),
+    }
+
+
+def _chi2_sf_1df(x: float) -> float:
+    """Upper tail of chi-square with 1 df = erfc(sqrt(x/2)). Exact, no tables, no SciPy."""
+    if x <= 0:
+        return 1.0
+    return math.erfc(math.sqrt(x / 2.0))
+
+
+def stratified_logrank(treated: Sequence[tuple], control: Sequence[tuple],
+                       alpha: float = 0.05, follow_up_days: Optional[int] = None) -> dict:
+    """Stratified log-rank test on time-to-arrival. THE PRE-REGISTERED PRIMARY ANALYSIS.
+
+    ⚠ B8 (Board review 2, Economist). The pre-registration named a stratified log-rank as the
+    PRIMARY analysis and nothing in this codebase computed one — the only implemented test
+    was the disjoint-bands PUBLICATION GATE, which the registration lists as the conservative
+    secondary. Writing the test statistic after the data accumulate is precisely the analytic
+    flexibility a pre-registration exists to foreclose, so it is implemented here, BEFORE the
+    first row enrolls, with its conventions fixed in code rather than chosen later.
+
+    CONVENTIONS (fixed; changing any of them is a new registration):
+      • Observations are `(time, event, stratum)`; `event` 1 = arrival, 0 = right-censored.
+      • STRATA are the match groups — one treated row and its matched controls. Comparing
+        within the stratum is the whole point of matching: sector, size, ADV and pretrend are
+        held fixed, so the test asks whether the DISCLOSURE moved the clock, not whether
+        big liquid names move differently from small ones.
+      • Mantel-Haenszel form: at each distinct event time in a stratum, O = observed treated
+        events, E = d*n1/n, V = d*n1*n0*(n-d) / (n^2*(n-1)). Sum O-E and V ACROSS strata,
+        then Z = sum(O-E)/sqrt(sum V), chi-square 1 df, TWO-SIDED at `alpha`.
+      • Ties: hypergeometric variance with the (n-d)/(n-1) correction (exact for tied times).
+      • A stratum with no events, or with only one arm at risk, contributes ZERO information
+        and is skipped — reported as `strata_uninformative`, never silently dropped.
+      • `follow_up_days` right-censors every observation at the registered horizon before
+        testing, so the test uses the whole curve up to the horizon and no further.
+
+    Returns the statistic, the two-sided p-value, and the DIRECTION. Direction matters: a
+    significant result with sum(O-E) < 0 means controls arrived SOONER than treated — the
+    opposite of the hypothesis, and it must be reported as a refutation, never as "a result".
+    """
+    def _prep(rows, arm):
+        out = []
+        for r in rows or []:
+            t, e = float(r[0]), int(r[1])
+            s = r[2] if len(r) > 2 else "_pooled"
+            if follow_up_days is not None and t > follow_up_days:
+                t, e = float(follow_up_days), 0        # censor at the registered horizon
+            out.append((t, e, s, arm))
+        return out
+
+    obs = _prep(treated, 1) + _prep(control, 0)
+    if not obs:
+        return {"available": False, "reason": "no observations"}
+
+    strata = {}
+    for t, e, s, arm in obs:
+        strata.setdefault(s, []).append((t, e, arm))
+
+    sum_o_minus_e = 0.0
+    sum_var = 0.0
+    used = uninformative = 0
+    total_events = 0
+    for s, rows in strata.items():
+        n1 = sum(1 for _, _, a in rows if a == 1)
+        n0 = len(rows) - n1
+        ev = sum(e for _, e, _ in rows)
+        if n1 == 0 or n0 == 0 or ev == 0:
+            uninformative += 1
+            continue
+        used += 1
+        total_events += ev
+        contributed = False
+        for t in sorted({tt for tt, e, _ in rows if e == 1}):
+            # Recompute risk sets at this time (small strata — clarity over cleverness).
+            r1 = sum(1 for tt, _, a in rows if a == 1 and tt >= t)
+            r0 = sum(1 for tt, _, a in rows if a == 0 and tt >= t)
+            n = r1 + r0
+            if n < 2 or r1 == 0 or r0 == 0:
+                continue
+            d = sum(1 for tt, e, _ in rows if e == 1 and tt == t)
+            d1 = sum(1 for tt, e, a in rows if e == 1 and tt == t and a == 1)
+            sum_o_minus_e += d1 - (d * r1 / n)
+            sum_var += (d * r1 * r0 * (n - d)) / (n * n * (n - 1))
+            contributed = True
+        if not contributed:
+            used -= 1
+            uninformative += 1
+
+    if sum_var <= 0:
+        return {"available": False, "reason": "no informative strata — the test carries no "
+                                              "information yet",
+                "strata_total": len(strata), "strata_used": used,
+                "strata_uninformative": uninformative, "events": total_events}
+
+    z = sum_o_minus_e / math.sqrt(sum_var)
+    chi2 = z * z
+    p = _chi2_sf_1df(chi2)
+    direction = ("treated_arrives_sooner" if sum_o_minus_e > 0
+                 else "control_arrives_sooner" if sum_o_minus_e < 0 else "no_difference")
+    significant = p < alpha
+    return {
+        "available": True, "test": "stratified log-rank (Mantel-Haenszel), two-sided",
+        "strata_total": len(strata), "strata_used": used,
+        "strata_uninformative": uninformative,
+        "events": total_events,
+        "observed_minus_expected": round(sum_o_minus_e, 4),
+        "variance": round(sum_var, 4),
+        "z": round(z, 4), "chi_square": round(chi2, 4), "df": 1,
+        "p_value": round(p, 6), "alpha": alpha,
+        "significant": bool(significant),
+        "direction": direction,
+        "follow_up_days": follow_up_days,
+        "verdict": (
+            "treated arrives SOONER than matched controls "
+            f"(p={p:.4g})" if significant and direction == "treated_arrives_sooner" else
+            "REFUTED IN THE OPPOSITE DIRECTION: matched controls arrived sooner than "
+            f"treated (p={p:.4g}) — this refutes the hypothesis, it is not support for it"
+            if significant and direction == "control_arrives_sooner" else
+            f"no significant difference from matched controls (p={p:.4g}) — the null stands"),
     }
 
 
@@ -379,5 +502,73 @@ if __name__ == "__main__":
     cmp_nocontrol = compare_arms(same, [])
     assert cmp_nocontrol["separated"] is None and not cmp_nocontrol["control_arm_present"]
     print(f"no control arm -> separated=None, control_arm_present=False  OK")
+
+    # ── 7. STRATIFIED LOG-RANK (B8) — the pre-registered PRIMARY analysis ────────────────
+    # Validated against a PUBLISHED result, because an estimator nobody checked against a
+    # known answer is not evidence. Freireich et al. 6-MP vs placebo (Kalbfleisch & Prentice):
+    # log-rank chi-square = 16.79, p = 4.2e-05, placebo relapses sooner.
+    fre_t = [(6, 0), (6, 1), (6, 1), (6, 1), (7, 1), (9, 0), (10, 0), (10, 1), (11, 0),
+             (13, 1), (16, 1), (17, 0), (19, 0), (20, 0), (22, 1), (23, 1), (25, 0),
+             (32, 0), (32, 0), (34, 0), (35, 0)]
+    fre_c = [(1, 1), (1, 1), (2, 1), (2, 1), (3, 1), (4, 1), (4, 1), (5, 1), (5, 1),
+             (8, 1), (8, 1), (8, 1), (8, 1), (11, 1), (11, 1), (12, 1), (12, 1),
+             (15, 1), (17, 1), (22, 1), (23, 1)]
+    lr = stratified_logrank(fre_t, fre_c)
+    assert abs(lr["chi_square"] - 16.79) < 0.02, lr["chi_square"]
+    assert abs(lr["p_value"] - 4.2e-05) < 1e-06, lr["p_value"]
+    assert lr["direction"] == "control_arrives_sooner", lr
+    print(f"log-rank vs PUBLISHED Freireich trial: chi2={lr['chi_square']} "
+          f"p={lr['p_value']:.2g} (published 16.79 / 4.2e-05)  OK")
+
+    # Type-I calibration: under the null the rejection rate must sit near alpha. A test that
+    # never rejects is useless; one that rejects often manufactures findings.
+    import random as _rnd
+
+    def _t1(strata, reps=400, per_arm=80, seed=11):
+        rng = _rnd.Random(seed)
+        rej = usable = 0
+        for _ in range(reps):
+            t, c = [], []
+            for g in range(strata):
+                for _ in range(per_arm // strata):
+                    t.append((rng.expovariate(1 / 30.0), 1, f"g{g}"))
+                    c.append((rng.expovariate(1 / 30.0), 1, f"g{g}"))
+            r = stratified_logrank(t, c)
+            if r.get("available"):
+                usable += 1
+                rej += 1 if r["significant"] else 0
+        return rej / usable
+    for _s in (1, 20):
+        _rate = _t1(_s)
+        assert 0.02 <= _rate <= 0.09, f"type-I rate {_rate} at {_s} strata is not ~0.05"
+        print(f"log-rank type-I rate at {_s:>2} strata = {_rate:.3f} (target 0.05)  OK")
+
+    # Power: a real 2x hazard difference must actually be detected, in the RIGHT direction.
+    _rng = _rnd.Random(3)
+    _det = 0
+    for _ in range(200):
+        _t = [(_rng.expovariate(1 / 60.0), 1, f"g{i % 20}") for i in range(80)]
+        _c = [(_rng.expovariate(1 / 30.0), 1, f"g{i % 20}") for i in range(80)]
+        _r = stratified_logrank(_t, _c)
+        _det += 1 if _r["significant"] and _r["direction"] == "control_arrives_sooner" else 0
+    assert _det / 200 > 0.85, _det
+    print(f"log-rank detects a true 2x hazard gap in {_det / 200:.0%} of replications  OK")
+
+    # An OPPOSITE-direction significant result must read as a REFUTATION, never as support.
+    _opp = stratified_logrank([(2, 1, "g"), (3, 1, "g"), (2, 1, "h"), (3, 1, "h")],
+                              [(40, 1, "g"), (41, 1, "g"), (40, 1, "h"), (41, 1, "h")])
+    assert _opp["direction"] == "treated_arrives_sooner"
+    _opp2 = stratified_logrank([(40, 1, "g"), (41, 1, "g")], [(2, 1, "g"), (3, 1, "g")])
+    assert "REFUTES" in _opp2["verdict"] or not _opp2["significant"], _opp2["verdict"]
+    # Uninformative strata are counted, never silently dropped.
+    _u = stratified_logrank([(5, 0, "a")], [(5, 0, "a")])
+    assert not _u["available"] and _u["strata_uninformative"] == 1, _u
+    print("direction reported honestly; uninformative strata counted, not dropped  OK")
+
+    # KM must accept the 3-tuple shape the log-rank needs, so ONE arm feeds both analyses.
+    # Building the arms twice is how two analyses quietly end up on different data.
+    _mixed = kaplan_meier([(10, 1, "g1"), (20, 0, "g1"), (30, 1, "g2")], horizons=(30,))
+    assert _mixed["available"] and _mixed["observations"] == 3, _mixed
+    print("KM accepts (t,e) and (t,e,stratum) alike -> one arm feeds both analyses  OK")
 
     print("\nAll self-tests passed.")

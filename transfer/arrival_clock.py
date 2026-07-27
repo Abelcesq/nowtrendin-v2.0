@@ -291,7 +291,8 @@ def already_arrived_before(dv: dict, detection_date: str, baseline_median: float
 
 def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
                 fetch_ohlcv=None, mult: float = None,
-                baseline_median: float = None) -> dict:
+                baseline_median: float = None,
+                hits_required: int = None, window_sessions: int = None) -> dict:
     """End-to-end read for ONE instrument at ONE detection date.
 
     ⚠ `baseline_median` — THE ANTI-LOOKAHEAD LOCK, AND IT WAS DECORATIVE UNTIL NOW
@@ -360,8 +361,18 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
     # `mult` is supplied by the caller from the ROW'S pre-registration when resolving a
     # ledger row, so an env change can never re-resolve an enrolled row under a different
     # threshold. Falls back to the module default for ad-hoc/research reads.
-    arr = find_arrival(sv, detection_date, med, until=horizon_end,
-                       mult=float(mult) if mult else ARRIVAL_VOL_MULT)
+    #
+    # ⚠ B7 (Board review 2): the PERSISTENCE rule now travels the same way. The D2 fix bound
+    # `mult` and `horizon` to the row's registration but left `hits_required`/`window` reading
+    # live env — so changing ARRIVAL_HITS_REQUIRED would still have re-resolved already-
+    # enrolled rows under a different definition of "arrival". The persistence rule is a
+    # pre-registered term (it is what "arrival" MEANS); it must not be a dyno setting.
+    persist = {"mult": float(mult) if mult else ARRIVAL_VOL_MULT}
+    if hits_required:
+        persist["hits_required"] = int(hits_required)
+    if window_sessions:
+        persist["window"] = int(window_sessions)
+    arr = find_arrival(sv, detection_date, med, until=horizon_end, **persist)
 
     # Dollar volume travels alongside as human-readable CONTEXT only. It is never
     # consulted for the verdict — it is price-contaminated by construction.
@@ -379,8 +390,7 @@ def arrival_for(ticker: str, detection_date: str, horizon_days: int = 180,
             # shrinking the lead denominator in the direction that flatters us. Both sides
             # must read the same threshold.
             "pre_arrived": already_arrived_before(
-                sv, detection_date, med,
-                mult=float(mult) if mult else ARRIVAL_VOL_MULT),
+                sv, detection_date, med, **persist),
             "arrival": arr, "horizon_days": horizon_days,
             "param_version": PARAM_VERSION}
 

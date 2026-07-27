@@ -1,0 +1,105 @@
+==============================================================================
+  N MARKET SCORE -- VERIFICATION
+==============================================================================
+
+  STORE INTEGRITY
+  PASS  T1a UPDATE refused   hist_observations is append-only: UPDATE refused
+  PASS  T1b DELETE refused   hist_observations is append-only: DELETE refused
+  PASS  T1c prereg immutable   prereg is immutable: DELETE refused
+  PASS  T2  knowable-before-event refused
+  PASS  T3  revisions create vintages, never overwrite   as-of Jun=100.0  as-of Dec=97.5
+  PASS  T3b both vintages retained   2 rows
+  PASS  T4a read-only handle can read   [('2020-01-01', 1.0)]
+  PASS  T4b read-only handle refuses INSERT   attempt to write a readonly database
+  PASS  T5  manifest seal verifies   root=fbfe0dfaecbb27e3...
+
+  LOOKAHEAD
+  PASS  T6  NO LOOKAHEAD (full == truncated)   as_of=2017-06-30  4 primitives compared
+
+  CRASH-ERA BEHAVIOUR (reported, not asserted)
+
+    era                            peak TURBULENCE   peak SUPEREXP
+    --------------------------------------------------------------
+    1929 crash                      77.45 ( 100th)   11.51 (  97th)
+    1937 slump                       3.24 (  93th)    1.87 (  60th)
+    1973-74 bear                    15.41 (  99th)    8.19 (  91th)
+    1987 Black Monday               16.44 (  99th)    9.32 (  93th)
+    2000-02 dot-com                 18.80 ( 100th)   -2.95 (  30th)
+    2007-09 GFC                     39.81 ( 100th)   -1.48 (  38th)
+    2020 COVID                      64.18 ( 100th)    1.52 (  57th)
+    --- calm control 1993-96         2.13 (  87th)    9.68 (  94th)
+    --- calm control 2013-16         3.29 (  93th)    5.89 (  82th)
+
+    Percentiles are against the full 1871-2026 sample. Read this as
+    'the instrument is alive and moves in the right eras', NOT as
+    'the instrument predicts crashes'. It was not tested out of
+    sample and no threshold was pre-registered.
+==============================================================================
+  10/10 checks passed
+==============================================================================
+==============================================================================
+  N MARKET SCORE  --  state of the market as of 2026-07-25
+==============================================================================
+
+  PRIMITIVES (no composite -- see D2 ruling)
+  --------------------------------------------------------------------------
+  TURBULENCE   value=   2.2172  pctile= 87.9th of own history  n=1743
+               shiller.sp500, monthly log returns
+  SUPEREXP     value=   8.0803  pctile= 90.4th of own history  n=1804
+               shiller.sp500, t-stat of quadratic log-price term
+  COUPLING     value=   0.7267  pctile= 13.9th of own history  n=1007
+               200 names; 7 eigenvalues clear Marchenko-Pastur
+               *** STALE: last observation 2018-02-07 (panel as-of 2026-07-25)
+  FUNDING      value=   0.1696  pctile= 65.8th of own history  n=8984
+               cboe.vix (stand-in; prefer credit-gap or BAA10Y in production)
+
+  STALE INPUTS: COUPLING -- the source series ends
+  before the panel date. Treat those readings as historical.
+
+  READING THE PERCENTILES
+  --------------------------------------------------------------------------
+  Each percentile is that primitive's rank against ITS OWN prior
+  history, computed only from data knowable on the as-of date.
+  A high reading means 'this condition is unusual by its own
+  standard'. It does not mean anything is about to happen.
+
+  WHAT THIS PANEL DOES NOT SAY
+  --------------------------------------------------------------------------
+  * It does not forecast a crash, or a date, or a probability.
+  * It does not estimate a return, and no weight here was fitted
+    to returns.
+  * It is not investment advice and implies no position.
+  * The crash-time parameter t_c is deliberately not estimated;
+    the replication literature finds it poorly determined.
+
+  param_version: nscore-v1-primitives
+==============================================================================
+
+==============================================================================
+  N MARKET SCORE  --  METHODOLOGICAL FOUNDATIONS
+==============================================================================
+
+  OBJECTIVE   Conceptual & mathematical foundations
+  SOURCE      Mandelbrot & Hudson, The (Mis)Behavior of Markets (2004)
+  CONTRIBUTES Fat tails, volatility clustering, multifractal scaling. Why Gaussian risk measures understate danger.
+  PRIMITIVE   TURBULENCE
+  LIMIT       Descriptive, not predictive. Mandelbrot argued markets are wilder than models assume; he did not claim crashes are forecastable, and neither do we.
+
+  OBJECTIVE   Direct quantitative crash modelling
+  SOURCE      Sornette, Why Stock Markets Crash (2003); Johansen, Ledoit & Sornette, 'Crashes as Critical Points', Int. J. Theor. Appl. Finance 3(2), 219-255 (2000)
+  CONTRIBUTES Bubbles as positive-feedback regimes with super-exponential price growth approaching a critical point.
+  PRIMITIVE   SUPEREXP
+  LIMIT       We implement the growth-acceleration diagnostic ONLY. We do not fit the log-periodic term or solve for the critical time t_c: Bree, Challet & Peirano (Quantitative Finance 13(2), 2013) show t_c is a 'sloppy' parameter, poorly constrained by the data, and that published confidence windows for it are 'likely to be over-optimistic'.
+
+  OBJECTIVE   Implementation / rigorous econophysics
+  SOURCE      Bouchaud & Potters, Theory of Financial Risk and Derivative Pricing (2nd ed., 2003)
+  CONTRIBUTES Random-matrix cleaning of correlation matrices, tail estimation, and honest treatment of estimation error.
+  PRIMITIVE   COUPLING
+  LIMIT       Correlation structure is estimable only up to the Marchenko-Pastur bound at a given N and T. We report how many eigenvalues clear that bound rather than pretending the whole matrix is signal.
+
+  OBJECTIVE   Empirical crisis antecedents  [ADDED - see note]
+  SOURCE      Schularick & Taylor, 'Credit Booms Gone Bust', American Economic Review 102(2), 1029-61 (2012); Jorda-Schularick-Taylor Macrohistory Database (free)
+  CONTRIBUTES Across 14 advanced economies, 1870-2008, credit expansion is the most informative measurable antecedent of financial crises.
+  PRIMITIVE   FUNDING
+  LIMIT       Operates at a macro/annual horizon. It tells you the system is loaded, never when it releases.
+==============================================================================

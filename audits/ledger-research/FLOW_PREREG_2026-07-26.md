@@ -4,6 +4,17 @@ the git timestamp of this file is the pre-registration.**
 **Authority:** Chairman's "proceed" on the Board's master-remediation recommendation
 (R-a: 3.0–3.5×, read mechanically off the CORRECTED calibration curve).
 
+> ## ⚠ SUPERSEDED BY THE 2026-07-27 RE-LOCK — read `FLOW_PREREG_2026-07-27.md`
+> Board review 2 found that four material terms were enforceable by environment variable but
+> absent from the SHA (qualify window, arrival persistence rule, echo threshold, match-key
+> spec), that the registered `enroll_threshold` was **never compared to anything in code**,
+> that the window said "trading days" while the code subtracted calendar days, and that the
+> registration's own prose described an observable ("vs the name's own base rate") that the
+> code does not compute. **Zero rows had enrolled**, so by this document's own rule
+> ("before the first row enrolls, a re-lock is costless") the registration was corrected and
+> re-locked rather than run as written. This file is retained unaltered as the record of
+> what was first registered — never edited to match the code.
+
 ## The hypothesis
 
 **Cluster open-market insider buying precedes expanded market participation.**

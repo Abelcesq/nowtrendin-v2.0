@@ -225,6 +225,21 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
     if not INSIDER_FLOW:
         return {"ingested": False, "reason": "INSIDER_FLOW is not enabled"}
 
+    # ⚠ B4 (Board review 2 — Challenger + Guardian). Without a salt, `actor_id()` returns
+    # None and rows were still written with `actor_hash` NULL. The qualifier counts
+    # COUNT(DISTINCT COALESCE(actor_hash, role_raw)), so a panel holding both salted and
+    # unsalted eras counts ONE person twice — once as a hash, once as "Officer" — and TWO
+    # real buyers plus one identity fracture fabricate the 3-buyer cluster that is the
+    # enrollment trigger itself. `insider_events` is append-only under the never-delete
+    # rule, so such rows could never be cleaned up. Refuse, exactly as the parser-fix gate
+    # beside this one refuses: an append-only panel must never accept ambiguous identities.
+    if not ACTOR_SALT:
+        return {"ingested": False,
+                "reason": "REFUSED: ACTOR_ID_SALT is not set — unsalted rows would make "
+                          "DISTINCT-buyer counting ambiguous in an append-only panel "
+                          "(see docs/ENV_REFERENCE.md: the salt is WRITE-ONCE; rotating it "
+                          "re-keys every hash and is a declared cohort break)"}
+
     if feed_fn is None:
         try:
             import finviz_data
@@ -441,6 +456,72 @@ def _role_class(role_raw: str) -> str:
     return "other"
 
 
+#: Liveness floors. A market-wide Form-4 feed that returns fewer distinct tickers than this,
+#: or nothing at all for this many hours, is not "quiet" — it is a corpse (see below).
+LIVENESS_MIN_TICKERS = int(os.getenv("INSIDER_LIVENESS_MIN_TICKERS", "8"))
+LIVENESS_MAX_AGE_H = float(os.getenv("INSIDER_LIVENESS_MAX_AGE_H", "24"))
+
+
+def liveness(db_path: str = DB_PATH) -> dict:
+    """SOURCE-LIVENESS TRIPWIRE — is the insider feed actually alive?
+
+    ⚠ B9 (Board review 2, the Outsider). The primary insider source was DEAD for up to 30
+    days and nothing alarmed, because every existing watchdog asks whether our PROCESS ran,
+    not whether the SOURCE returned usable data. A collector that runs perfectly and parses
+    zero rows looks identical to a quiet market. Turning the parser back on makes Finviz
+    load-bearing again, so the identical failure mode must not be able to recur unobserved:
+    *"reviving a source that died silently for 30 days with no alarm on the identical
+    failure mode is not a risk I'd sign."*
+
+    RED when the feed is stale beyond `LIVENESS_MAX_AGE_H`, or returns raw rows that parse
+    to fewer than `LIVENESS_MIN_TICKERS` distinct tickers. The second is the one that would
+    have caught the dead parser: rows arrived, rows were refused, coverage collapsed to a
+    handful of names. Read-only; alarms, never repairs.
+    """
+    if os.getenv("INSIDER_FLOW", "0") != "1":
+        return {"status": "OFF", "detail": "INSIDER_FLOW is not enabled — nothing to watch"}
+    conn = _connect(db_path)
+    try:
+        row = conn.execute("SELECT * FROM insider_coverage "
+                           "ORDER BY ingest_at DESC LIMIT 1").fetchone()
+    except Exception as e:
+        return {"status": "UNKNOWN", "detail": f"coverage table unreadable ({e})"}
+    finally:
+        conn.close()
+    if not row:
+        return {"status": "RED", "alarm": "no_ingest_ever",
+                "detail": "INSIDER_FLOW is on but the feed has never recorded a pull"}
+    cov = dict(row) if hasattr(row, "keys") else {}
+    age_h = None
+    try:
+        last = datetime.fromisoformat(str(cov.get("ingest_at")))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        age_h = round((datetime.now(timezone.utc) - last).total_seconds() / 3600.0, 2)
+    except Exception:
+        pass
+    tickers = int(cov.get("distinct_tickers") or 0)
+    raw = int(cov.get("rows_returned") or 0)
+    alarms = []
+    if age_h is not None and age_h > LIVENESS_MAX_AGE_H:
+        alarms.append(f"stale: last ingest {age_h}h ago (> {LIVENESS_MAX_AGE_H}h)")
+    if raw <= 0:
+        alarms.append("source returned ZERO raw rows — feed down or shape changed")
+    elif tickers < LIVENESS_MIN_TICKERS:
+        # Raw rows arrived but almost nothing survived parsing: the dead-parser signature.
+        alarms.append(f"coverage collapse: {raw} raw rows parsed to only {tickers} distinct "
+                      f"tickers (< {LIVENESS_MIN_TICKERS}) — the dead-parser signature")
+    return {"status": "RED" if alarms else "OK",
+            "alarms": alarms,
+            "last_ingest_at": cov.get("ingest_at"), "age_hours": age_h,
+            "raw_rows": raw, "distinct_tickers": tickers,
+            "truncated": cov.get("truncated"),
+            "floors": {"min_tickers": LIVENESS_MIN_TICKERS,
+                       "max_age_hours": LIVENESS_MAX_AGE_H},
+            "note": "Watches the SOURCE, not the process. A collector that runs cleanly and "
+                    "parses nothing is the failure this exists to catch."}
+
+
 def status(db_path: str = DB_PATH) -> dict:
     """Read-only health for the monitoring fleet."""
     conn = _connect(db_path)
@@ -504,6 +585,17 @@ if __name__ == "__main__":
     _m = _s.modules[__name__]
     _m.INSIDER_FLOW = True
 
+    # ⚠ B4 REGRESSION (Board review 2): an unsalted ingest must REFUSE, not silently write
+    # NULL-hash rows into an append-only panel where DISTINCT-buyer counting then double-
+    # counts one person across salt eras — enough to fabricate the 3-buyer trigger.
+    _saved_salt = _m.ACTOR_SALT
+    _m.ACTOR_SALT = ""
+    refused = ingest(db_path=tmp, feed_fn=lambda limit=500: feed)
+    assert refused.get("ingested") is False and "ACTOR_ID_SALT" in refused.get("reason", ""), \
+        refused
+    print("  unsalted ingest REFUSES (identity-ambiguous rows never enter the panel)  OK")
+    _m.ACTOR_SALT = _saved_salt or "selftest-salt-not-a-production-value"
+
     out = ingest(db_path=tmp, feed_fn=lambda limit=500: feed)
     print(f"\ningest: {json.dumps({k: v for k, v in out.items() if k != 'tickers'})}")
     assert out["written"] == 1, out
@@ -517,9 +609,12 @@ if __name__ == "__main__":
     assert out2["written"] == 0, out2
     print("  re-ingest writes 0 (idempotent)  OK")
 
-    # No salt configured -> no identity stored
-    assert actor_id("Jane Doe") is None or ACTOR_SALT
-    print(f"  identities stored: {bool(ACTOR_SALT)} (no salt -> no identity, by design)  OK")
+    # Salt present -> a pseudonym, never a reversible identity; absent -> no identity at all.
+    assert actor_id("Jane Doe") is None or _m.ACTOR_SALT
+    _m.ACTOR_SALT = ""
+    assert actor_id("Jane Doe") is None, "no salt must mean NO identity, never a raw name"
+    _m.ACTOR_SALT = _saved_salt or "selftest-salt-not-a-production-value"
+    print("  actor ids are salted pseudonyms; no salt -> None (never a raw name)  OK")
 
     # Phase 2c: §16a promotion must never skip a stage.
     feed2 = [dict(feed[0], transaction="Buy", date=f"Jul 2{i} '26",
@@ -531,6 +626,34 @@ if __name__ == "__main__":
         "nothing may reach 'active' here — baseline sufficiency is the clock's call"
     assert p["states"]["calibrating"] >= 1, p["states"]
     print("  candidate -> calibrating on its own filings; NOTHING auto-promoted to active  OK")
+
+    # ── B9: the SOURCE-LIVENESS tripwire must fire on the dead-parser signature ──────────
+    # Rows arrive, almost nothing survives parsing, coverage collapses to a handful of
+    # names — the exact shape of the 30-day silent death that no watchdog caught.
+    def _set_coverage(at, raw, tickers):
+        c = db_compat.connect(tmp)
+        c.execute("DELETE FROM insider_coverage")
+        c.execute("INSERT INTO insider_coverage (ingest_at,rows_returned,rows_requested,"
+                  "distinct_tickers,truncated,rejected_misaligned,rejected_form144,"
+                  "rejected_unknown) VALUES (?,?,?,?,?,?,?,?)",
+                  (at, raw, 500, tickers, 0, 0, 0, 0))
+        c.commit(); c.close()
+
+    _fresh = datetime.now(timezone.utc).isoformat()
+    _set_coverage(_fresh, 180, 2)
+    lv = liveness(db_path=tmp)
+    assert lv["status"] == "RED" and any("coverage collapse" in a for a in lv["alarms"]), lv
+    print(f"\nliveness: 180 raw rows -> 2 tickers = RED ({lv['alarms'][0][:56]}...)  OK  (B9)")
+
+    _set_coverage(_fresh, 0, 0)
+    assert any("ZERO raw rows" in a for a in liveness(db_path=tmp)["alarms"])
+    _set_coverage("2020-01-01T00:00:00+00:00", 180, 111)
+    assert any("stale" in a for a in liveness(db_path=tmp)["alarms"])
+    print("  zero-rows and stale-feed both alarm RED  OK  (B9)")
+
+    _set_coverage(_fresh, 180, 111)
+    assert liveness(db_path=tmp)["status"] == "OK", liveness(db_path=tmp)
+    print("  a healthy feed (180 rows / 111 tickers) reads OK — no false alarm  OK  (B9)")
 
     # Dormancy retains the row rather than deleting it (§13).
     conn2 = db_compat.connect(tmp)

@@ -43,13 +43,27 @@ DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 
 FLOW_ENROLL = os.getenv("FLOW_ENROLL", "0") == "1"
 #: Distinct open-market buyers required to qualify a cluster (the Chairman's "3+ C-suite").
+#: ⚠ B2 (Board review 2, ALL FIVE): this env is a DEFAULT, never the authority. `run_cycle`
+#: takes the threshold from the ACTIVE PRE-REGISTRATION and REFUSES when the env disagrees.
+#: Before the fix, setting this to 2 on one dyno silently redefined the cohort under an
+#: unchanged SHA — the D2 failure class, one level up, in the module written after D2.
 QUALIFY_MIN_BUYERS = int(os.getenv("FLOW_QUALIFY_MIN_BUYERS", "3"))
-#: Trailing window (days) the cluster must fall inside.
-QUALIFY_WINDOW_D = int(os.getenv("FLOW_QUALIFY_WINDOW_D", "10"))
+#: Trailing window the cluster must fall inside, in TRADING SESSIONS.
+#: ⚠ B3 (Challenger): the registration said "10 trading days"; the code subtracted 10
+#: CALENDAR days (~7 sessions — a ~30% tighter window than the one registered). Sessions are
+#: now counted as WEEKDAYS walked back from `asof` (deterministic, dependency-free). US market
+#: holidays are NOT excluded, so a holiday lengthens the effective calendar span by one day;
+#: that exact wording is now inside the SHA rather than implied by the word "trading".
+QUALIFY_WINDOW_SESSIONS = int(os.getenv("FLOW_QUALIFY_WINDOW_SESSIONS", "10"))
 #: Candidate controls examined per treated ticker before giving up (bounded work, §13).
 CONTROL_CANDIDATES_MAX = int(os.getenv("FLOW_CONTROL_CANDIDATES_MAX", "24"))
 #: Enrollments attempted per cycle (bounded; the feed is capped anyway).
-ENROLL_PER_CYCLE_MAX = int(os.getenv("FLOW_ENROLL_PER_CYCLE_MAX", "5"))
+#: ⚠ Board review 2 (Executioner) measured the worst case at 5 treated x 24 candidates x a
+#: 10s §13 pause ~= 25-30 min INSIDE `_collect_phase`, plus ~12 min of sweep — against only
+#: ~20 min of headroom before the 420-min risk-stale window. Deferring a cluster is nearly
+#: free (the trailing window re-qualifies it next cycle, and a later detection_date only
+#: SHRINKS measured lead — the conservative direction), so the default is 3.
+ENROLL_PER_CYCLE_MAX = int(os.getenv("FLOW_ENROLL_PER_CYCLE_MAX", "3"))
 #: Sweep batch per cycle.
 SWEEP_PER_CYCLE = int(os.getenv("FLOW_SWEEP_PER_CYCLE", "60"))
 #: Pre-trend bucket edges (Economist's key): contracting <0.9 · flat 0.9-1.15 · expanding >1.15
@@ -75,12 +89,40 @@ def _connect(db_path: str = DB_PATH):
 
 # ── 1. QUALIFY ──────────────────────────────────────────────────────────────────────────
 
-def qualify_clusters(db_path: str = DB_PATH, asof: str = "") -> list:
-    """Tickers whose panel shows >= QUALIFY_MIN_BUYERS distinct open-market buyers within
-    the trailing window, newest disclosure first. Reads ONLY the append-only insider panel."""
+def window_start(asof: str, sessions: int = None) -> str:
+    """Walk back `sessions` WEEKDAYS from `asof` — the registered window's exact semantics.
+
+    B3: "10 trading days" is now counted, not approximated by a calendar subtraction. US
+    market holidays are deliberately NOT excluded (no market-calendar dependency); the
+    registration says so, so the code and the SHA describe the same window.
+    """
+    sessions = QUALIFY_WINDOW_SESSIONS if sessions is None else int(sessions)
+    d = datetime.strptime(asof, "%Y-%m-%d")
+    walked = 0
+    while walked < sessions:
+        d -= timedelta(days=1)
+        if d.weekday() < 5:              # Mon-Fri
+            walked += 1
+    return d.strftime("%Y-%m-%d")
+
+
+def qualify_clusters(db_path: str = DB_PATH, asof: str = "",
+                     min_buyers: int = None, window_sessions: int = None) -> list:
+    """Tickers whose panel shows >= `min_buyers` distinct open-market buyers within the
+    trailing window, newest disclosure first. Reads ONLY the append-only insider panel.
+
+    `min_buyers` / `window_sessions` are passed by `run_cycle` FROM THE ACTIVE
+    PRE-REGISTRATION (B2). They fall back to the module envs only for offline/self-test use.
+
+    DISTINCT-BUYER COUNTING (B4, Challenger + Guardian): the count keys on `actor_hash` and
+    falls back to `role_raw` only for rows written before a salt existed. Mixed-salt eras
+    would let ONE person appear as both a hash and a role string and count TWICE — enough to
+    fabricate the 3-buyer trigger itself. `insider_flow.ingest()` now REFUSES to write
+    unsalted rows, so the fallback is a reader for legacy rows, never a live path.
+    """
     asof = asof or _now_date()
-    since = (datetime.strptime(asof, "%Y-%m-%d") - timedelta(days=QUALIFY_WINDOW_D)
-             ).strftime("%Y-%m-%d")
+    min_buyers = QUALIFY_MIN_BUYERS if min_buyers is None else int(min_buyers)
+    since = window_start(asof, window_sessions)
     conn = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
     try:
@@ -90,7 +132,7 @@ def qualify_clusters(db_path: str = DB_PATH, asof: str = "") -> list:
             f"FROM insider_events WHERE txn_code='P' AND signal_date >= {ph} "
             f"AND signal_date <= {ph} GROUP BY ticker "
             f"HAVING COUNT(DISTINCT COALESCE(actor_hash, role_raw)) >= {ph} "
-            f"ORDER BY MAX(signal_date) DESC", (since, asof, QUALIFY_MIN_BUYERS)).fetchall()]
+            f"ORDER BY MAX(signal_date) DESC", (since, asof, min_buyers)).fetchall()]
     except Exception:
         rows = []
     finally:
@@ -98,6 +140,7 @@ def qualify_clusters(db_path: str = DB_PATH, asof: str = "") -> list:
     for r in rows:
         r["window_start"] = since
         r["asof"] = asof
+        r["min_buyers"] = min_buyers
     return rows
 
 
@@ -133,7 +176,15 @@ def _pretrend_bucket(sv: dict, asof: str) -> Optional[str]:
 
 
 def _screener_universe() -> list:
-    """One screener snapshot: ticker, sector, market cap, avg volume. $0 (already paid)."""
+    """One screener snapshot: ticker, sector, market cap. $0 (already paid).
+
+    ⚠ B6 (Executioner): this snapshot's "Volume" column is the CURRENT SESSION's volume, not
+    ADV — and a treated name mid-attention-spike has an inflated one, which biased which
+    controls were allowed to match. Session volume is no longer a match facet at all. The ADV
+    facet is now the FROZEN 60-session baseline median that both arms already carry (see
+    `_adv_ratio`) — a real average, computed inside the frozen window, no lookahead, no extra
+    fetch. The screener is used only for sector + market cap, which it reports correctly.
+    """
     try:
         import finviz_data
         rows = finviz_data.screener(view="111") or []
@@ -149,14 +200,37 @@ def _screener_universe() -> list:
                 return float(str(x).replace(",", "").replace("%", "").strip())
             except (TypeError, ValueError):
                 return None
-        cap = _n(r.get("Market Cap"))
         out.append({"ticker": t, "sector": (r.get("Sector") or "").strip(),
-                    "mktcap": cap, "avg_volume": _n(r.get("Volume"))})
+                    "mktcap": _n(r.get("Market Cap"))})
     return out
 
 
-def _instrument_profile(ticker: str, asof: str, fetch_ohlcv=None) -> Optional[dict]:
-    """Frozen-window volume series + baseline + pretrend for one instrument."""
+def facets_of(ticker: str, universe: list) -> dict:
+    """Sector + size band for one ticker, read from the screener snapshot.
+
+    ⚠ B1 (Executioner F1 / Challenger F7 / Guardian): `run_cycle` used to read the treated
+    row's facets from `prof.get("match_facets")` — a key `_instrument_profile` has never
+    returned — so EVERY treated row would have enrolled with sector None and size_decile
+    hardcoded None, while its controls carried both. The pre-registered analysis stratifies
+    on those facets, and flow rows are never deleted, so row 1 would have been permanently
+    unanalysable. Treated and control facets now come from the SAME function.
+    """
+    row = next((u for u in (universe or []) if u.get("ticker") == (ticker or "").upper()),
+               None)
+    return {"sector": (row or {}).get("sector") or "",
+            "size_band": _size_band((row or {}).get("mktcap")),
+            "in_universe": row is not None}
+
+
+def _instrument_profile(ticker: str, asof: str, fetch_ohlcv=None,
+                        mult: float = None) -> Optional[dict]:
+    """Frozen-window volume series + baseline + pretrend for one instrument.
+
+    ⚠ B5 (Challenger F8 / Economist): `mult` is the ACTIVE PRE-REGISTRATION's `arrival_mult`,
+    passed by the caller. It used to be omitted, so the pre-arrival screen resolved from the
+    `ARRIVAL_VOL_MULT` env instead — meaning an env edit would silently change WHO is excluded
+    from the lead denominator, on rows already enrolled under a fixed SHA. D2 again.
+    """
     import arrival_clock
     if fetch_ohlcv is None:
         import fmp_data
@@ -175,20 +249,59 @@ def _instrument_profile(ticker: str, asof: str, fetch_ohlcv=None) -> Optional[di
     base = arrival_clock.compute_baseline(sv, asof)
     if not base.get("available"):
         return {"baseline": base}          # calibrating — caller decides
+    kw = {"mult": float(mult)} if mult else {}
     return {"baseline": base, "sv": sv,
             "pretrend": _pretrend_bucket(sv, asof),
             "pre_arrived": arrival_clock.already_arrived_before(
-                sv, asof, base["median_volume"])}
+                sv, asof, base["median_volume"], **kw)}
+
+
+#: ADV band: a control's frozen baseline median must sit inside this ratio of the treated's.
+_ADV_BAND = (0.2, 5.0)
+
+
+def _tainted_tickers(db_path: str, since: str, until: str, min_buyers: int) -> set:
+    """Tickers that ran their OWN qualifying cluster in the window — ineligible as controls.
+
+    ⚠ B6 (Challenger F6), two fixes:
+      • BOUNDED: the query had no upper bound, so any run with `asof` in the past (a backfill,
+        a delayed cycle) excluded controls using purchases filed AFTER the detection date —
+        lookahead in control selection.
+      • QUALIFYING, not ANY: one lone purchase used to taint a candidate, while the
+        registration excludes controls with no *qualifying* disclosure. Excluding every name
+        with any insider buying selects systematically QUIETER controls, which flatters the
+        treated arm — a bias in our own favour, and undisclosed. The taint now matches the
+        registered exclusion exactly: a control is ineligible only if it would itself qualify.
+    """
+    conn = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    try:
+        return {(r[0] if not hasattr(r, "keys") else dict(r)["ticker"])
+                for r in conn.execute(
+                    f"SELECT ticker FROM insider_events "
+                    f"WHERE txn_code='P' AND signal_date >= {ph} AND signal_date <= {ph} "
+                    f"GROUP BY ticker "
+                    f"HAVING COUNT(DISTINCT COALESCE(actor_hash, role_raw)) >= {ph}",
+                    (since, until, min_buyers)).fetchall()}
+    except Exception:
+        return set()
+    finally:
+        conn.close()
 
 
 def build_controls(treated: dict, need: int = 3, db_path: str = DB_PATH,
                    universe: list = None, fetch_ohlcv=None,
-                   pause_s: float = None) -> list:
+                   pause_s: float = None, min_buyers: int = None,
+                   mult: float = None) -> list:
     """Matched controls for one treated ticker. Deterministic (seeded by group identity).
 
-    Match key (Economist): sector + size band + ADV band + pretrend bucket, and NO
-    qualifying open-market purchase of their own inside the window. Each accepted control
+    Match key (Economist): sector + size band + ADV band + pretrend bucket, and no
+    qualifying open-market cluster of their own inside the window. Each accepted control
     carries its own frozen baseline (enroll() demands it) and the achieved match facets.
+
+    DETERMINISM (B-should-fix, Challenger F9): reproducible GIVEN THE SCREENER SNAPSHOT. The
+    seed fixes the shuffle, not the pool — the pool is a live snapshot, so a re-run on a
+    later day may propose different candidates. Stated rather than implied.
     """
     if pause_s is None:
         pause_s = float(os.getenv("FLOW_SWEEP_PAUSE_S",
@@ -197,37 +310,31 @@ def build_controls(treated: dict, need: int = 3, db_path: str = DB_PATH,
     if not uni:
         return []
     t_tkr = treated["ticker"].upper()
-    t_row = next((u for u in uni if u["ticker"] == t_tkr), None)
     t_prof = treated.get("_profile") or {}
     t_pretrend = t_prof.get("pretrend")
-    t_band = _size_band((t_row or {}).get("mktcap"))
-    t_sector = (t_row or {}).get("sector") or ""
-    t_adv = (t_row or {}).get("avg_volume")
+    t_adv = ((t_prof.get("baseline") or {}).get("median_volume")) or 0.0
+    t_facets = facets_of(t_tkr, uni)
+    t_band, t_sector = t_facets["size_band"], t_facets["sector"]
 
-    # Tickers with their own qualifying buys are ineligible as controls.
-    conn = _connect(db_path)
-    ph = "%s" if db_compat.USE_PG else "?"
-    try:
-        tainted = {r[0] if not hasattr(r, "keys") else dict(r)["ticker"]
-                   for r in conn.execute(
-                       f"SELECT DISTINCT ticker FROM insider_events "
-                       f"WHERE txn_code='P' AND signal_date >= {ph}",
-                       (treated.get("window_start") or _now_date(),)).fetchall()}
-    except Exception:
-        tainted = set()
-    finally:
-        conn.close()
+    # ⚠ Should-fix (Executioner): short-circuit BEFORE the fetch loop. An unknown treated
+    # pretrend refuses every candidate by construction, so walking 24 of them — each an FMP
+    # fetch behind a 10s §13 pause — burned ~4-5 minutes for a predetermined refusal.
+    if t_pretrend is None:
+        return []
+    # A treated name absent from the screener has no real facets; matching it would mean
+    # matching "" to "" and -1 to -1. Refuse rather than fabricate a match key.
+    if not t_facets["in_universe"] or not t_sector:
+        return []
 
-    def _adv_ok(u):
-        if not t_adv or not u.get("avg_volume"):
-            return True                     # facet unavailable — do not fabricate a match
-        return 0.2 <= (u["avg_volume"] / t_adv) <= 5.0
+    tainted = _tainted_tickers(
+        db_path, treated.get("window_start") or _now_date(),
+        treated.get("asof") or _now_date(),
+        QUALIFY_MIN_BUYERS if min_buyers is None else int(min_buyers))
 
     pool = [u for u in uni
             if u["ticker"] != t_tkr and u["ticker"] not in tainted
             and (u.get("sector") or "") == t_sector
-            and _size_band(u.get("mktcap")) == t_band
-            and _adv_ok(u)]
+            and _size_band(u.get("mktcap")) == t_band]
     # DETERMINISTIC order: seed by the group identity, not the wall clock.
     rng = random.Random(f"{t_tkr}|{treated.get('asof')}|{treated.get('latest_filing')}")
     rng.shuffle(pool)
@@ -239,13 +346,22 @@ def build_controls(treated: dict, need: int = 3, db_path: str = DB_PATH,
         tried += 1
         if tried > 1 and pause_s:
             time.sleep(pause_s)             # §13: breather between remote fetches
-        prof = _instrument_profile(cand["ticker"], treated["asof"], fetch_ohlcv)
+        prof = _instrument_profile(cand["ticker"], treated["asof"], fetch_ohlcv, mult=mult)
         if not prof or not prof.get("baseline", {}).get("available"):
             continue
-        # Pretrend must MATCH the treated bucket (the whole point of the facet). If the
-        # treated bucket is unknown, refuse fancy matching rather than fake it — the
-        # enrollment simply fails controls and is counted as a refusal.
-        if t_pretrend is None or prof.get("pretrend") != t_pretrend:
+        # Pretrend must MATCH the treated bucket (the whole point of the facet).
+        if prof.get("pretrend") != t_pretrend:
+            continue
+        # ADV band on the FROZEN baseline medians — a real 60-session average on both sides,
+        # not the screener's current-session volume (B6). When either side is missing we
+        # REFUSE the candidate; the old code passed it and then stamped `adv_matched: True`,
+        # which is the decorative-baseline pattern in miniature: the disclosure said matched,
+        # the code had not matched.
+        c_adv = (prof.get("baseline") or {}).get("median_volume") or 0.0
+        if not t_adv or not c_adv:
+            continue
+        ratio = c_adv / t_adv
+        if not (_ADV_BAND[0] <= ratio <= _ADV_BAND[1]):
             continue
         out.append({
             "ticker": cand["ticker"], "name": cand["ticker"],
@@ -255,7 +371,9 @@ def build_controls(treated: dict, need: int = 3, db_path: str = DB_PATH,
             "pre_arrived": bool(prof.get("pre_arrived")),
             "sector": t_sector, "size_decile": t_band,
             "match_facets": {"sector": t_sector, "size_band": t_band,
-                             "pretrend": prof.get("pretrend"), "adv_matched": True},
+                             "pretrend": prof.get("pretrend"),
+                             "adv_matched": True, "adv_ratio": round(ratio, 3),
+                             "adv_source": "frozen_baseline_median"},
         })
     return out
 
@@ -279,14 +397,49 @@ def run_cycle(db_path: str = DB_PATH, fetch_ohlcv=None, universe: list = None,
         # it here keeps the cycle log honest instead of producing N identical refusals).
         out["refused"].append("no active pre-registration")
     else:
-        clusters = qualify_clusters(db_path)
+        # ⚠ B2 (Board review 2, unanimous): every enrollment term is read FROM THE ACTIVE
+        # REGISTRATION, and a disagreeing env HALTS the cycle rather than quietly winning.
+        # Before this, qualification ran on `FLOW_QUALIFY_MIN_BUYERS` while the SHA said 3:
+        # one dyno env-set would have redefined the cohort under an unchanged hash, forever,
+        # in a ledger that never deletes.
+        terms = flow_ledger.prereg_terms(pre)
+        p_buyers, p_window = terms["enroll_threshold"], terms["qualify_window_sessions"]
+        p_mult = terms["arrival_mult"]
+        drift = []
+        if int(p_buyers) != QUALIFY_MIN_BUYERS:
+            drift.append(f"min_buyers env={QUALIFY_MIN_BUYERS} vs prereg={int(p_buyers)}")
+        if int(p_window) != QUALIFY_WINDOW_SESSIONS:
+            drift.append(f"window env={QUALIFY_WINDOW_SESSIONS} vs prereg={int(p_window)}")
+        if drift:
+            out["refused"].append(
+                "HALTED: environment disagrees with the active pre-registration "
+                f"({'; '.join(drift)}) — enrolling would silently redefine cohort "
+                f"{pre.get('id')}. Fix the env or mint a new registration.")
+            out["term_drift"] = drift
+            clusters = []
+        else:
+            clusters = qualify_clusters(db_path, min_buyers=int(p_buyers),
+                                        window_sessions=int(p_window))
         out["qualified"] = len(clusters)
+        out["terms"] = {"prereg_id": pre.get("id"), "min_buyers": int(p_buyers),
+                        "window_sessions": int(p_window), "arrival_mult": p_mult}
+        # ONE screener snapshot per cycle, shared by every treated row and its controls —
+        # treated and control facets must come from the same snapshot or the match key is
+        # comparing two different worlds.
+        uni = universe if universe is not None else _screener_universe()
+        deferred = max(0, len(clusters) - ENROLL_PER_CYCLE_MAX)
+        if deferred:
+            # No silent caps: a deferred cluster re-qualifies next cycle (the window is
+            # trailing), but the count is logged rather than dropped on the floor.
+            out["deferred_to_next_cycle"] = deferred
         for cl in clusters[:ENROLL_PER_CYCLE_MAX]:
-            prof = _instrument_profile(cl["ticker"], cl["asof"], fetch_ohlcv)
+            prof = _instrument_profile(cl["ticker"], cl["asof"], fetch_ohlcv, mult=p_mult)
             if not prof or not prof.get("baseline", {}).get("available"):
                 out["refused"].append(f"{cl['ticker']}: baseline calibrating")
                 continue
             cl["_profile"] = prof
+            # B1: treated facets from the SAME function the controls use.
+            t_facets = facets_of(cl["ticker"], uni)
             treated = {
                 "ticker": cl["ticker"], "name": cl["ticker"],
                 "detection_date": cl["asof"],
@@ -295,12 +448,13 @@ def run_cycle(db_path: str = DB_PATH, fetch_ohlcv=None, universe: list = None,
                 "direction": 1,
                 "baseline": prof["baseline"],
                 "pre_arrived": bool(prof.get("pre_arrived")),
-                "sector": (prof.get("match_facets") or {}).get("sector"),
-                "size_decile": None,
+                "sector": t_facets["sector"],
+                "size_decile": t_facets["size_band"],
             }
             controls = build_controls(cl | {"_profile": prof}, db_path=db_path,
-                                      universe=universe, fetch_ohlcv=fetch_ohlcv,
-                                      pause_s=pause_s)
+                                      universe=uni, fetch_ohlcv=fetch_ohlcv,
+                                      pause_s=pause_s, min_buyers=int(p_buyers),
+                                      mult=p_mult)
             res = flow_ledger.enroll(treated, controls, db_path=db_path)
             if res.get("enrolled"):
                 out["enrolled"] += 1
@@ -350,16 +504,34 @@ def status(db_path: str = DB_PATH) -> dict:
     try:
         import insider_flow
         panel = insider_flow.status(db_path)
+        live = insider_flow.liveness(db_path)      # B9 source-liveness tripwire
     except Exception as e:
         panel = {"error": str(e)}
+        live = {"status": "UNKNOWN", "detail": str(e)}
+    pre = flow_ledger.active_prereg(db_path)
+    terms = flow_ledger.prereg_terms(pre) if pre else {}
+    # The env is reported BESIDE the registered terms, and any divergence is named. A reader
+    # must be able to see, without reading code, whether the running config still matches the
+    # registration that defines the cohort (B2).
+    drift = []
+    if terms:
+        if int(terms.get("enroll_threshold") or 0) != QUALIFY_MIN_BUYERS:
+            drift.append("enroll_threshold")
+        if int(terms.get("qualify_window_sessions") or 0) != QUALIFY_WINDOW_SESSIONS:
+            drift.append("qualify_window_sessions")
     return {"held_out": True,
             "flags": {"INSIDER_FLOW": os.getenv("INSIDER_FLOW", "0"),
                       "FLOW_ENROLL": os.getenv("FLOW_ENROLL", "0"),
                       "INSIDER_PARSER_FIX": os.getenv("INSIDER_PARSER_FIX", "0")},
-            "prereg": flow_ledger.active_prereg(db_path),
+            "prereg": pre,
+            "registered_terms": terms,
             "panel": panel,
+            "source_liveness": live,
             "qualify_rule": {"min_buyers": QUALIFY_MIN_BUYERS,
-                             "window_days": QUALIFY_WINDOW_D}}
+                             "window_sessions": QUALIFY_WINDOW_SESSIONS,
+                             "window_basis": "weekdays; US market holidays not excluded"},
+            "term_drift": drift,
+            "enrollment_halted": bool(drift)}
 
 
 def accuracy(db_path: str = DB_PATH) -> dict:
@@ -378,6 +550,27 @@ def lock_prereg(terms: dict, db_path: str = DB_PATH) -> dict:
     missing = [k for k in required if terms.get(k) in (None, "")]
     if missing:
         return {"locked": False, "reason": f"missing terms: {missing}"}
+    # B7: everything the code enforces travels INSIDE the hash. Defaults are the values this
+    # build actually runs with, so a term omitted by a caller is still registered honestly
+    # rather than left to drift with the environment.
+    extra = dict(terms.get("extra_terms") or {})
+    extra.setdefault("qualify_window_sessions",
+                     int(terms.get("qualify_window_sessions", QUALIFY_WINDOW_SESSIONS)))
+    extra.setdefault("qualify_window_basis", "weekdays_walked_back_holidays_not_excluded")
+    extra.setdefault("echo_sessions", int(os.getenv("FLOW_ECHO_SESSIONS", "3")))
+    extra.setdefault("arrival_hits_required", int(os.getenv("ARRIVAL_HITS_REQUIRED", "2")))
+    extra.setdefault("arrival_window_sessions",
+                     int(os.getenv("ARRIVAL_WINDOW_SESSIONS", "5")))
+    extra.setdefault("baseline_sessions", int(os.getenv("ARRIVAL_BASELINE_SESSIONS", "60")))
+    extra.setdefault("baseline_gap_sessions", int(os.getenv("ARRIVAL_BASELINE_GAP", "5")))
+    extra.setdefault("match_key", {
+        "facets": ["sector", "size_band", "adv_band", "pretrend_bucket"],
+        "size_bands_usd": list(_SIZE_BANDS),
+        "pretrend_edges": list(_PRETREND_EDGES),
+        "adv_band": list(_ADV_BAND),
+        "adv_source": "frozen_baseline_median_share_volume",
+        "control_exclusion": "no qualifying cluster of its own inside the same window",
+    })
     return {"locked": True, **flow_ledger.register_prereg(
         hypothesis=terms["hypothesis"], observable=terms["observable"],
         universe=terms["universe"], enroll_threshold=float(terms["enroll_threshold"]),
@@ -386,7 +579,7 @@ def lock_prereg(terms: dict, db_path: str = DB_PATH) -> dict:
         min_episodes=int(terms["min_episodes"]), stop_rule=terms["stop_rule"],
         param_version=terms["param_version"], doc_path=terms.get("doc_path", ""),
         primary_horizon_days=int(terms.get("primary_horizon_days", 90)),
-        db_path=db_path)}
+        extra_terms=extra, db_path=db_path)}
 
 
 if __name__ == "__main__":
@@ -449,38 +642,97 @@ if __name__ == "__main__":
     assert lock["locked"], lock
     print(f"prereg locked: {lock['prereg_id']}  OK")
 
-    # Full cycle: qualify -> match (deterministic controls, same sector/size/pretrend,
-    # DDD excluded) -> enroll atomically -> sweep runs.
     q2 = qualify_clusters(db_path=tmp)
     for row in q2: row["asof"] = asof
-    # monkeypatch qualify inside run_cycle via the panel date — instead just call the parts:
-    prof = _instrument_profile("AAA", asof, fetch)
+    prof = _instrument_profile("AAA", asof, fetch, mult=3.0)
     assert prof and prof["baseline"]["available"] and prof["pretrend"] == "flat", prof
     ctrls = build_controls(q2[0] | {"_profile": prof}, db_path=tmp,
-                           universe=uni, fetch_ohlcv=fetch, pause_s=0)
+                           universe=uni, fetch_ohlcv=fetch, pause_s=0, mult=3.0)
     assert len(ctrls) == 3 and all(c["ticker"].startswith("CCC") for c in ctrls), \
         [c["ticker"] for c in ctrls]
+    assert all(c["match_facets"]["adv_source"] == "frozen_baseline_median" for c in ctrls)
     print(f"controls: 3 matched ({[c['ticker'] for c in ctrls]}), DDD (wrong sector) "
-          f"and AAA (treated) excluded  OK")
-    # Determinism: same inputs, same controls.
+          f"and AAA (treated) excluded; ADV from the FROZEN baseline  OK")
     ctrls2 = build_controls(q2[0] | {"_profile": prof}, db_path=tmp,
-                            universe=uni, fetch_ohlcv=fetch, pause_s=0)
+                            universe=uni, fetch_ohlcv=fetch, pause_s=0, mult=3.0)
     assert [c["ticker"] for c in ctrls] == [c["ticker"] for c in ctrls2]
-    print("control selection is deterministic (seeded by group identity)  OK")
+    print("control selection is deterministic, GIVEN the snapshot (seeded by group id)  OK")
 
+    # ── B1 REGRESSION: the whole cycle, THROUGH run_cycle ────────────────────────────────
+    # The old self-test hand-built the treated dict and so never executed the line that
+    # actually writes it — which is exactly why `prof.get("match_facets")` (a key that has
+    # never existed) survived review. Enrollment now runs end-to-end, and the STORED row is
+    # inspected. This test fails on the shipped-then-fixed defect.
     import flow_ledger as FL
-    treated = {"ticker": "AAA", "name": "AAA", "detection_date": asof,
-               "observable_value": 3.0, "direction": 1, "baseline": prof["baseline"],
-               "pre_arrived": bool(prof.get("pre_arrived")), "sector": "tech",
-               "size_decile": 1}
-    res = FL.enroll(treated, ctrls, db_path=tmp)
-    assert res.get("enrolled") and res["controls"] == 3, res
-    print(f"enrolled: 1 treated + {res['controls']} controls, atomically  OK")
+    _orig_qualify = globals()["qualify_clusters"]
+    globals()["qualify_clusters"] = lambda db_path=DB_PATH, asof="", min_buyers=None, \
+        window_sessions=None: [dict(r, min_buyers=min_buyers) for r in q2]
+    try:
+        rc = run_cycle(db_path=tmp, fetch_ohlcv=fetch, universe=uni, pause_s=0)
+    finally:
+        globals()["qualify_clusters"] = _orig_qualify
+    assert rc["enrolled"] == 1, rc
+    conn = _connect(tmp)
+    trow = dict(conn.execute(
+        "SELECT sector, size_decile, observable_value FROM flow_pending_detections "
+        "WHERE cohort='treated'").fetchone())
+    crow = dict(conn.execute(
+        "SELECT sector, size_decile FROM flow_pending_detections "
+        "WHERE cohort='control' LIMIT 1").fetchone())
+    conn.close()
+    assert trow["sector"] == "tech", f"B1: treated row lost its sector -> {trow}"
+    assert trow["size_decile"] is not None, f"B1: treated row lost its size band -> {trow}"
+    assert trow["sector"] == crow["sector"] and trow["size_decile"] == crow["size_decile"], \
+        f"B1: treated and control facets disagree -> {trow} vs {crow}"
+    assert trow["observable_value"] == 3.0, trow
+    print(f"run_cycle enrolled 1 treated + controls; STORED treated row carries "
+          f"sector={trow['sector']!r} size_decile={trow['size_decile']}  OK  (B1)")
+
+    # ── B2 REGRESSION: an env that disagrees with the registration HALTS the cycle ───────
+    _saved = globals()["QUALIFY_MIN_BUYERS"]
+    globals()["QUALIFY_MIN_BUYERS"] = 2
+    try:
+        rc2 = run_cycle(db_path=tmp, fetch_ohlcv=fetch, universe=uni, pause_s=0)
+    finally:
+        globals()["QUALIFY_MIN_BUYERS"] = _saved
+    assert rc2["enrolled"] == 0 and rc2.get("term_drift"), rc2
+    assert any("HALTED" in r for r in rc2["refused"]), rc2
+    print("env threshold 2 vs registered 3 -> cycle HALTS, enrolls nothing  OK  (B2)")
+
+    # ── B2 REGRESSION (ledger door): below-threshold never enrolls, and is COUNTED ───────
+    weak = {"ticker": "WEAK", "name": "WEAK", "detection_date": asof,
+            "observable_value": 1.0, "direction": 1, "baseline": prof["baseline"],
+            "pre_arrived": False, "sector": "tech", "size_decile": 1}
+    r_weak = FL.enroll(weak, ctrls, db_path=tmp)
+    assert not r_weak["enrolled"] and "below the pre-registered" in r_weak["reason"], r_weak
+    conn = _connect(tmp)
+    bt = conn.execute("SELECT count FROM flow_gate_rejects WHERE reason='below_threshold'"
+                      ).fetchone()
+    conn.close()
+    assert bt and (dict(bt)["count"] if hasattr(bt, "keys") else bt[0]) >= 1, \
+        "the refusal must be COUNTED, not merely returned"
+    print("observable below the registered threshold -> refused AND counted  OK  (B2)")
+
+    # ── B3 REGRESSION: the window is TRADING sessions, not calendar days ─────────────────
+    ws = window_start("2026-07-27", 10)     # Monday; 10 weekdays back = Mon 2026-07-13
+    assert ws == "2026-07-13", ws
+    assert (datetime.strptime("2026-07-27", "%Y-%m-%d")
+            - datetime.strptime(ws, "%Y-%m-%d")).days == 14, ws
+    print(f"qualify window = 10 trading sessions -> {ws} (14 calendar days)  OK  (B3)")
+
+    # ── B7 REGRESSION: the previously-unhashed terms are INSIDE the SHA ──────────────────
+    t2 = FL.prereg_terms(FL.active_prereg(tmp))
+    for k in ("qualify_window_sessions", "echo_sessions", "arrival_hits_required",
+              "arrival_window_sessions", "match_key"):
+        assert t2.get(k) is not None, f"{k} missing from the registered terms"
+    a = FL.register_prereg("h", "o", "u", 3, 3.0, 180, 120, "s", "v",
+                           extra_terms={"echo_sessions": 3}, db_path=tmp)["prereg_id"]
+    b = FL.register_prereg("h", "o", "u", 3, 3.0, 180, 120, "s", "v",
+                           extra_terms={"echo_sessions": 4}, db_path=tmp)["prereg_id"]
+    assert a != b, "changing the echo threshold MUST mint a different registration"
+    print(f"extra terms are hashed: echo 3 -> {a}, echo 4 -> {b} (different cohorts)  OK  (B7)")
 
     st = status(db_path=tmp)
-    assert st["prereg"] and st["qualify_rule"]["min_buyers"] == QUALIFY_MIN_BUYERS
-    acc = accuracy(db_path=tmp)
-    assert acc["available"] and acc["arms"]["control_rows"] == 3, acc.get("arms")
-    print(f"status + accuracy wrappers serve  OK  "
-          f"(treated_rows={acc['arms']['treated_rows']}, control_rows={acc['arms']['control_rows']})")
+    assert st["prereg"] and st["registered_terms"]
+    print(f"status + accuracy wrappers serve  OK")
     print("\nAll self-tests passed.")

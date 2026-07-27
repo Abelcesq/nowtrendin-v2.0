@@ -40,6 +40,10 @@ CRYPTO_TIMEOUT_DAYS = int(os.getenv("CRYPTO_LEDGER_TIMEOUT_DAYS", "45"))      # 
 # % move from the detection-day close that counts as a real DIRECTIONAL move above crypto noise.
 # Higher than the equity ledger (5%) because crypto is ~3-5x more volatile — keeps noise out of the record.
 CRYPTO_MOVE_THRESHOLD_PCT = float(os.getenv("CRYPTO_MOVE_THRESHOLD_PCT", "8.0"))
+#: Resolved episodes required before ANY crypto rate is published — headline, sub-rate, or
+#: median lead. The Outsider's condition was 30; the first implementation shipped 20 without
+#: anyone arguing the number down, so it is corrected here and stated ONCE (Board review 2).
+CRYPTO_MIN_PUBLISH_N = int(os.getenv("CRYPTO_MIN_PUBLISH_N", "30"))
 # Minimum Money Movement (D) score for a read to be worth logging — only meaningful informed-money
 # detections get a falsifiable record (a weak/quiet D read claims nothing).
 CRYPTO_MIN_MM = float(os.getenv("CRYPTO_LEDGER_MIN_MM", "40"))
@@ -355,12 +359,26 @@ def report(db_path=DB_PATH) -> dict:
     no_move = [r for r in rows if r.get("verdict") == "NO_MOVE"]
     resolved = len(confirmed) + len(not_conf) + len(no_move)
     leads = [r["lead_time_days"] for r in confirmed if r.get("lead_time_days") is not None]
+    # ⚠ Board review 2 (Outsider), TWO defects in one line:
+    #  (a) The withholding floor shipped at 20 when the Outsider's condition was 30. Nobody
+    #      argued it down — it simply landed lower than the control that was demanded. It is
+    #      now 30, and the number lives in one named constant instead of three literals.
+    #  (b) The headline rate was withheld while `by_flow` served `100.0%` on n=1 — computed
+    #      from the single dead-parser-era row. "That 100% will end up in a screenshot." A
+    #      withholding rule that only covers the headline is not a withholding rule; the same
+    #      floor now governs EVERY rate in this payload, sub-rates and median lead included.
+    small_sample = resolved < CRYPTO_MIN_PUBLISH_N
     by_flow = {}
     for f in ("inflow", "outflow"):
         c = sum(1 for r in confirmed if r.get("flow") == f)
-        nn = sum(1 for r in rows if r.get("flow") == f and r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
-        by_flow[f] = {"confirmed": c, "resolved": nn, "confirm_rate_pct": round(100.0 * c / nn, 1) if nn else None}
-    small_sample = resolved < 20
+        nn = sum(1 for r in rows if r.get("flow") == f
+                 and r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
+        by_flow[f] = {"confirmed": c, "resolved": nn,
+                      "confirm_rate_pct": (round(100.0 * c / nn, 1)
+                                           if nn and not small_sample else None),
+                      "rate_withheld_reason": ("small_sample: sub-rates follow the same "
+                                               f"{CRYPTO_MIN_PUBLISH_N}-resolved floor as the "
+                                               "headline" if nn and small_sample else None)}
     return {
         "ground_truth": "realized coin close direction (FMP crypto + AV)",
         "distinct_from": "trends ledger (Google Trends) AND market ledger (equity EOD price)",
@@ -372,8 +390,9 @@ def report(db_path=DB_PATH) -> dict:
         # is a liability, not a metric. Denominators stay served; the rate is withheld.
         "confirm_rate_pct": (round(100.0 * len(confirmed) / resolved, 1)
                              if resolved and not small_sample else None),
-        "rate_withheld_reason": ("small_sample: no crypto rate is published below 20 "
-                                 "resolved episodes — denominators above are the record"
+        "rate_withheld_reason": (f"small_sample: no crypto rate is published below "
+                                 f"{CRYPTO_MIN_PUBLISH_N} resolved episodes — the "
+                                 "denominators above are the record"
                                  if small_sample and resolved else None),
         "dead_parser_era_rows": len(era_rows),
         "clean_cohort_start": clean_start,
@@ -381,7 +400,11 @@ def report(db_path=DB_PATH) -> dict:
                         "matter fed by a dead insider parser (single-source AV fallback); "
                         "they remain in the record, annotated, and never blend into a cited "
                         "post-fix rate" if era_rows else None),
-        "median_lead_days": round(statistics.median(leads), 1) if leads else None,
+        # A median lead computed from one dead-parser-era row is the same liability as a
+        # 100% rate from it. Withheld under the same floor; the COUNT stays visible.
+        "median_lead_days": (round(statistics.median(leads), 1)
+                             if leads and not small_sample else None),
+        "median_lead_n": len(leads),
         "by_flow": by_flow, "small_sample": small_sample,
         "note": "MEASUREMENT of the Crypto Money Gradient's own accuracy — did the coin's realized price "
                 "move the way the detected informed-money flow indicated, and how many days after. NOT a "

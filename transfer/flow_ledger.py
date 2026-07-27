@@ -113,7 +113,14 @@ def init_flow_db(db_path: str = DB_PATH):
             -- None and fell through to a hardcoded 90. The O3 multiple-comparisons fix was
             -- a constant the pre-registration could not express. It is now a real,
             -- SHA-covered term (see register_prereg).
-            primary_horizon_days INTEGER)
+            primary_horizon_days INTEGER,
+            -- ⚠ B7 (Board review 2, unanimous): the doc claimed "all terms inside the SHA",
+            -- but the qualify window, the arrival PERSISTENCE rule, the ECHO threshold (an
+            -- input to a pre-registered FALSIFIER) and the match-key spec lived only in env
+            -- and prose. Anything enforceable by env but absent from the hash can drift
+            -- without minting a cohort — the defect the hash exists to prevent. This column
+            -- carries them as JSON and they are INSIDE the hashed payload.
+            extra_terms TEXT)
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS flow_pending_detections (
@@ -149,6 +156,8 @@ def init_flow_db(db_path: str = DB_PATH):
         "CREATE INDEX IF NOT EXISTS idx_flow_pend_group ON flow_pending_detections(match_group)",
         "CREATE INDEX IF NOT EXISTS idx_flow_ledger_verdict ON flow_ledger(verdict)",
         "CREATE INDEX IF NOT EXISTS idx_flow_ledger_cohort ON flow_ledger(cohort)",
+        # Forward-only: an already-created flow_prereg predates `extra_terms`.
+        "ALTER TABLE flow_prereg ADD COLUMN extra_terms TEXT",
     ):
         try:
             conn.execute(ddl)
@@ -164,7 +173,7 @@ def register_prereg(hypothesis: str, observable: str, universe: str,
                     enroll_threshold: float, arrival_mult: float, horizon_days: int,
                     min_episodes: int, stop_rule: str, param_version: str,
                     doc_path: str = "", controls_per: int = FLOW_CONTROLS_PER,
-                    primary_horizon_days: int = 90,
+                    primary_horizon_days: int = 90, extra_terms: dict = None,
                     db_path: str = DB_PATH) -> dict:
     """Commit a pre-registration BEFORE any enrollment. Its id is the sha256 of the terms,
     so an altered hypothesis is a different registration and cannot masquerade as the
@@ -174,11 +183,13 @@ def register_prereg(hypothesis: str, observable: str, universe: str,
     # `primary_horizon_days` is INSIDE the hashed payload: it is a pre-registered term, so
     # changing it must mint a different registration rather than silently redefining the
     # running one.
+    extra = dict(extra_terms or {})
     payload = json.dumps({"hypothesis": hypothesis, "observable": observable,
                           "universe": universe, "enroll_threshold": enroll_threshold,
                           "arrival_mult": arrival_mult, "horizon_days": horizon_days,
                           "controls_per": controls_per, "min_episodes": min_episodes,
                           "primary_horizon_days": primary_horizon_days,
+                          "extra_terms": extra,
                           "stop_rule": stop_rule, "param_version": param_version},
                          sort_keys=True)
     pid = hashlib.sha256(payload.encode()).hexdigest()[:16]
@@ -188,17 +199,48 @@ def register_prereg(hypothesis: str, observable: str, universe: str,
         ph = "%s" if db_compat.USE_PG else "?"
         cols = ("id,hypothesis,observable,universe,enroll_threshold,arrival_mult,"
                 "horizon_days,controls_per,min_episodes,stop_rule,param_version,"
-                "doc_path,registered_at,active,primary_horizon_days")
+                "doc_path,registered_at,active,primary_horizon_days,extra_terms")
         conn.execute(
-            f"INSERT INTO flow_prereg ({cols}) VALUES ({','.join([ph] * 15)}) "
+            f"INSERT INTO flow_prereg ({cols}) VALUES ({','.join([ph] * 16)}) "
             f"ON CONFLICT (id) DO UPDATE SET active=1",
             (pid, hypothesis, observable, universe, enroll_threshold, arrival_mult,
              horizon_days, controls_per, min_episodes, stop_rule, param_version,
-             doc_path, _now(), 1, primary_horizon_days))
+             doc_path, _now(), 1, primary_horizon_days,
+             json.dumps(extra, sort_keys=True)))
         conn.commit()
     finally:
         conn.close()
-    return {"prereg_id": pid, "registered_at": _now(), "param_version": param_version}
+    return {"prereg_id": pid, "registered_at": _now(), "param_version": param_version,
+            "extra_terms": extra}
+
+
+#: Defaults for terms registered before `extra_terms` existed. These are the values the code
+#: ACTUALLY ran with at that time — a legacy registration is read honestly, never upgraded.
+_LEGACY_TERMS = {"qualify_window_sessions": 10, "echo_sessions": 3,
+                 "arrival_hits_required": 2, "arrival_window_sessions": 5,
+                 "baseline_sessions": 60, "baseline_gap_sessions": 5}
+
+
+def prereg_terms(pre: dict) -> dict:
+    """Every enrollment/resolution term of a registration, hashed ones included.
+
+    B7: callers must never read a term from their own env when the registration carries it.
+    `extra_terms` is JSON inside the SHA; a pre-`extra_terms` row falls back to the values
+    that registration actually ran under.
+    """
+    out = dict(_LEGACY_TERMS)
+    raw = (pre or {}).get("extra_terms")
+    if raw:
+        try:
+            out.update(json.loads(raw) if isinstance(raw, str) else dict(raw))
+        except Exception:
+            pass
+    out["enroll_threshold"] = float((pre or {}).get("enroll_threshold") or 0)
+    out["arrival_mult"] = float((pre or {}).get("arrival_mult") or 0) or None
+    out["horizon_days"] = int((pre or {}).get("horizon_days") or FLOW_TIMEOUT_DAYS)
+    out["primary_horizon_days"] = int((pre or {}).get("primary_horizon_days") or 90)
+    out["controls_per"] = int((pre or {}).get("controls_per") or FLOW_CONTROLS_PER)
+    return out
 
 
 def active_prereg(db_path: str = DB_PATH) -> Optional[dict]:
@@ -246,6 +288,20 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
         _persist_rejects(db_path)
         return {"enrolled": False, "reason": f"needs {need} matched controls, got "
                 f"{len(controls)} — a treated row is never written alone"}
+
+    # ⚠ B2 (Board review 2, found by ALL FIVE archetypes): the registered `enroll_threshold`
+    # was DECORATIVE — hashed into the prereg id, then never compared to anything, while the
+    # `below_threshold` counter below was initialised and incremented by no code path at all.
+    # Qualification rode entirely on a module env var, so the running cohort could diverge
+    # from the registration that defines it with a valid SHA and no cohort break. The
+    # threshold is now enforced at the ledger door, where it cannot be bypassed by a caller.
+    thresh = float(pre.get("enroll_threshold") or 0)
+    observed = float(treated.get("observable_value") or 0)
+    if thresh and observed < thresh:
+        _GATE_REJECTS["below_threshold"] += 1
+        _persist_rejects(db_path)
+        return {"enrolled": False, "reason": f"observable {observed:g} is below the "
+                f"pre-registered enroll_threshold {thresh:g} (prereg {pre.get('id')})"}
 
     base = treated.get("baseline") or {}
     if not base.get("available"):
@@ -443,14 +499,22 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                 lead = ratio = None
                 sched = ""
                 rp = _pre_for(p.get("prereg_id"))
+                rt = prereg_terms(rp) if rp else dict(_LEGACY_TERMS)
                 row_horizon = int(rp.get("horizon_days") or FLOW_TIMEOUT_DAYS)
                 row_mult = rp.get("arrival_mult")
+                # B7: the PERSISTENCE rule and the ECHO threshold are pre-registered terms,
+                # resolved per row like mult/horizon — never from today's env.
+                row_echo = int(rt.get("echo_sessions") or FLOW_ECHO_SESSIONS)
                 if p.get("pre_arrived"):
                     verdict = "PRE_ARRIVED"
                 else:
                     kw = {"horizon_days": row_horizon}
                     if row_mult:
                         kw["mult"] = float(row_mult)
+                    if int(rt.get("arrival_hits_required") or 0):
+                        kw["hits_required"] = int(rt["arrival_hits_required"])
+                    if int(rt.get("arrival_window_sessions") or 0):
+                        kw["window_sessions"] = int(rt["arrival_window_sessions"])
                     # ⚠ THE ANTI-LOOKAHEAD LOCK (Board accountability review). This call
                     # previously omitted the baseline, so the resolver recomputed it from a
                     # fresh series under today's env — making the "frozen at enrollment"
@@ -479,7 +543,7 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                     continue
 
                 echo = 0
-                if verdict == "ARRIVED" and lead is not None and lead <= FLOW_ECHO_SESSIONS:
+                if verdict == "ARRIVED" and lead is not None and lead <= row_echo:
                     echo = 1        # the market consuming the same filing we read
 
                 lcols = ("id,cohort,match_group,ticker,name,detection_date,disclosure_ts,"
@@ -587,13 +651,14 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
             lead = r.get("lead_days")
             if lead is None:
                 continue
-            arms[cohort].append((max(0, int(lead)), 1))
+            arms[cohort].append((max(0, int(lead)), 1, r.get("match_group") or ""))
         elif v == "NO_ARRIVAL":
             # D2(a), Board accountability review: censoring used the module/env horizon, so
             # changing FLOW_TIMEOUT_DAYS on the dyno would move every censored observation's
             # time and shift the survival tail for rows already resolved. Censor at the
             # horizon the ROW was registered under.
-            arms[cohort].append((horizon_for(r.get("prereg_id")), 0))
+            arms[cohort].append((horizon_for(r.get("prereg_id")), 0,
+                                 r.get("match_group") or ""))
 
     # Still-pending rows are censored at their current age — they have not failed, they
     # have not finished being observed.
@@ -601,7 +666,8 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         c = p.get("cohort")
         d = _parse(p.get("detection_date") or "")
         if c in arms and d:
-            arms[c].append((min((now - d).days, horizon_for(p.get("prereg_id"))), 0))
+            arms[c].append((min((now - d).days, horizon_for(p.get("prereg_id"))), 0,
+                            p.get("match_group") or ""))
 
     # O4 (Board round 4, Executioner): a control ticker reused across match groups yields
     # repeated, NON-INDEPENDENT observations. Kaplan-Meier assumes independence, so the
@@ -621,12 +687,24 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
                  "cluster bootstrap (by ticker) is required before any published claim."),
     }
 
+    primary_h = int((pre or {}).get("primary_horizon_days") or 90)
     cmp_out = ledger_survival.compare_arms(
         arms[COHORT_TREATED], arms[COHORT_CONTROL],
         horizons=(30, 90, 180),
         # O3: the verdict rests on ONE pre-registered horizon, not on whichever separates.
-        primary_horizon=int((pre or {}).get("primary_horizon_days") or 90))
-    n_t = len([1 for t, e in arms[COHORT_TREATED] if e == 1])
+        primary_horizon=primary_h)
+
+    # ⚠ B8 (Board review 2, Economist): THE PRE-REGISTERED PRIMARY ANALYSIS, now actually
+    # computed. The registration names a stratified log-rank as primary and the disjoint
+    # Greenwood bands as the conservative publication gate; until this wiring existed, only
+    # the gate was implemented and the "primary" analysis was a sentence in a document.
+    # Strata are the match groups — the comparison is within matched sets, which is the
+    # entire purpose of matching. It is reported ALONGSIDE the gate, and the gate still
+    # governs publication (it is the stricter of the two).
+    logrank = ledger_survival.stratified_logrank(
+        arms[COHORT_TREATED], arms[COHORT_CONTROL],
+        follow_up_days=int((pre or {}).get("horizon_days") or FLOW_TIMEOUT_DAYS))
+    n_t = len([1 for _t, e, *_g in arms[COHORT_TREATED] if e == 1])
     min_ep = int((pre or {}).get("min_episodes") or 0)
     publishable = (bool(cmp_out.get("separated")) and n_t >= min_ep and min_ep > 0
                    # A superseded cohort holding rows must be disclosed before anything is
@@ -646,12 +724,22 @@ def report(db_path: str = DB_PATH, exclude_echo: bool = True,
         "arms": {"treated_rows": len(arms[COHORT_TREATED]),
                  "control_rows": len(arms[COHORT_CONTROL]),
                  "treated_events": n_t,
-                 "control_events": len([1 for t, e in arms[COHORT_CONTROL] if e == 1])},
+                 "control_events": len([1 for _t, e, *_g in arms[COHORT_CONTROL]
+                                        if e == 1])},
         "excluded": excluded,
         "control_independence": control_independence,
         "gate_rejects": rejects,
         "pending": len(pend),
         "comparison": cmp_out,
+        "primary_analysis": logrank,
+        "analysis_plan": {
+            "primary": "stratified log-rank on time-to-arrival, strata = match_group, "
+                       "two-sided alpha 0.05, censored at the registered horizon",
+            "publication_gate": f"disjoint Greenwood log-log bands at {primary_h}d "
+                                "(stricter than the primary test — it governs publication)",
+            "note": "Both are pre-registered. The gate is deliberately the more conservative "
+                    "of the two, so a published claim never rests on the log-rank alone.",
+        },
         "publishable": publishable,
         "headline": (
             "insufficient evidence — not publishable" if not publishable else
@@ -749,11 +837,17 @@ if __name__ == "__main__":
     seen_mult = []
     seen_baseline = []
 
-    def fake_arrival(ticker, det, horizon_days=180, mult=None, baseline_median=None):
+    seen_persist = []
+
+    def fake_arrival(ticker, det, horizon_days=180, mult=None, baseline_median=None,
+                     hits_required=None, window_sessions=None):
         # `mult` and `horizon_days` must arrive from the ROW'S pre-registration (D2), not
-        # from module env — record them so the test can assert it.
+        # from module env — record them so the test can assert it. B7 extends that to the
+        # PERSISTENCE rule: what "arrival" MEANS is a registered term, so every resolver
+        # (including an injected one) is handed it rather than reading today's env.
         seen_mult.append((horizon_days, mult))
         seen_baseline.append(baseline_median)
+        seen_persist.append((hits_required, window_sessions))
         if ticker == "AAA":
             return {"available": True, "arrival": {
                 "arrived": True, "arrival_date": "2026-03-25", "lead_days": 15,
@@ -771,6 +865,11 @@ if __name__ == "__main__":
     # re-resolve already-enrolled rows under a different definition.
     assert seen_mult and all(h == 180 and m == 3.0 for h, m in seen_mult), seen_mult
     print(f"sweep used prereg thresholds (horizon=180, mult=3.0) not env  OK")
+    # B7 REGRESSION: the PERSISTENCE rule travels with the row too. The D2 fix bound mult
+    # and horizon but left hits/window reading live env, so ARRIVAL_HITS_REQUIRED could
+    # still re-resolve enrolled rows under a different definition of "arrival".
+    assert seen_persist and all(h == 2 and w == 5 for h, w in seen_persist), seen_persist
+    print(f"sweep also passed the registered PERSISTENCE rule (hits=2, window=5)  OK  (B7)")
 
     # REGRESSION (Board accountability review): THE ANTI-LOOKAHEAD LOCK. sweep() must pass
     # the baseline FROZEN at enrollment to the resolver. Previously it did not, and

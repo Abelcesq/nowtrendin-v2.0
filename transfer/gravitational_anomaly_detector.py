@@ -5407,6 +5407,12 @@ def start_scheduler():
                         import flow_enrollment as _fe
                         if _src_pause > 0:
                             _ct.sleep(_src_pause)           # §13 breather before the block
+                        # NOTE: ingestion also runs on its OWN hourly tick (B10,
+                        # `_insider_ingest_loop`) because the source caps at ~200 rows and
+                        # the US filing burst is 4-10pm ET — 4 pulls a day cannot cover a
+                        # heavy day, and heavy days are precisely the cluster days. This
+                        # call is kept so a cycle never enrolls against a stale panel;
+                        # ingest is idempotent, so the extra pull costs one HTTP request.
                         _ing = _fe.ingest_panel(db_path=DB_PATH)
                         if _ing.get("ran") is False:
                             print(f"[scheduler] insider panel: {_ing.get('reason')}")
@@ -5415,6 +5421,14 @@ def start_scheduler():
                             print(f"[scheduler] insider panel: wrote {_iw.get('written', 0)} "
                                   f"of {_iw.get('returned', 0)} rows "
                                   f"(truncated={_iw.get('truncated')})")
+                        try:
+                            _lv = _fe.status(db_path=DB_PATH).get("source_liveness") or {}
+                            if _lv.get("status") == "RED":
+                                # B9: the source died silently for 30 days once. It does not
+                                # get to do that again without something saying so.
+                                print(f"[ALERT][insider-liveness] RED: {_lv.get('alarms')}")
+                        except Exception as _lve:
+                            print(f"[scheduler] liveness check skipped: {_lve}")
                         if os.getenv("FLOW_ENROLL", "0") == "1":
                             _fc = _fe.run_cycle(db_path=DB_PATH)
                             print(f"[scheduler] flow cycle: qualified={_fc.get('qualified')} "
@@ -5931,6 +5945,34 @@ def _prewarm_loop():
         _t.sleep(max(60, PREWARM_INTERVAL_MIN * 60))
 
 
+#: B10 (Board review 2, Executioner): the insider feed caps at ~200 rows per pull and the US
+#: Form-4 filing burst runs 4-10pm ET. Four pulls a day (the 6h collect cycle) CANNOT cover a
+#: heavy filing day — and heavy days are exactly the cluster-buying days the whole program is
+#: built to catch, so the truncation bias lands squarely on the signal. Ingestion therefore
+#: gets its own hourly tick. It is one $0 HTTP call, idempotent by row-id hash, and it does
+#: NOT run enrollment — `run_cycle` stays on the 6h cadence where its fetch budget belongs.
+INSIDER_INGEST_INTERVAL_MIN = int(os.getenv("INSIDER_INGEST_INTERVAL_MIN", "60"))
+
+
+def _insider_ingest_loop():
+    import time as _t
+    while True:
+        _t.sleep(max(300, INSIDER_INGEST_INTERVAL_MIN * 60))
+        if os.getenv("INSIDER_FLOW", "0") != "1":
+            continue
+        try:
+            import flow_enrollment as _fe
+            _r = (_fe.ingest_panel(db_path=DB_PATH) or {}).get("ingest") or {}
+            if _r:
+                print(f"[insider-ingest] wrote {_r.get('written', 0)} of "
+                      f"{_r.get('returned', 0)} rows (truncated={_r.get('truncated')})")
+            _lv = _fe.status(db_path=DB_PATH).get("source_liveness") or {}
+            if _lv.get("status") == "RED":
+                print(f"[ALERT][insider-liveness] RED: {_lv.get('alarms')}")
+        except Exception as _e:
+            print(f"[insider-ingest] loop error: {_e}")
+
+
 @app.get("/prewarm")
 def prewarm_now():
     """Kick a fresh warm in the BACKGROUND (non-blocking) + return the most recent
@@ -5956,6 +5998,17 @@ async def startup_auto_collect():
             print(f"[startup] prewarm-agent started (every {PREWARM_INTERVAL_MIN}m).")
         except Exception as _pwe:
             print(f"[startup] prewarm-agent failed to start: {_pwe}")
+
+    # B10: hourly insider-panel ingestion, independent of the 6h collect cycle (the source
+    # caps at ~200 rows and the filing burst is 4-10pm ET). Inert while INSIDER_FLOW is off —
+    # the loop wakes, sees the flag, and goes back to sleep without touching the network.
+    try:
+        threading.Thread(target=_insider_ingest_loop, daemon=True,
+                         name="insider-ingest").start()
+        print(f"[startup] insider-ingest started "
+              f"(every {INSIDER_INGEST_INTERVAL_MIN}m; gated on INSIDER_FLOW).")
+    except Exception as _iie:
+        print(f"[startup] insider-ingest failed to start: {_iie}")
 
     # Category enrichment: build the topic_key→category override maps (situation
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
