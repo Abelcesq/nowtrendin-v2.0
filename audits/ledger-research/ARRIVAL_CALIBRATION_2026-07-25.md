@@ -104,3 +104,29 @@ persistence rule and horizon are in scope for calibration or frozen as-is. The m
 follows mechanically, the pre-registration locks, and enrollment starts.
 
 *Reproduce: `CALIB_SEED=20260725 python tools/arrival_calibration.py`*
+
+
+---
+
+## CORRECTED RUN — 2026-07-26 (all four accountability-review corrections applied)
+
+`already_arrived_before` applied to the null per multiple · events/name-yr = -ln(1-p) x 365/60 ·
+universe FROZEN in `tools/calibration_universe_2026-07-26.txt` (55 tickers, committed) ·
+ticker-clustered bootstrap 95% CI (B=1000). Same seed (20260725), 295 ticker-dates.
+
+| mult | 60d null [95% CI] | 90d | 180d | pre-arrived | events/name-yr | med lead |
+|---|---|---|---|---|---|---|
+| 2.0 | 51.5% [43.5-60.3] | 59.9% | 77.2% | 58 | 4.40 | 18 |
+| 2.5 | 27.3% [20.7-34.4] | 36.5% | 56.9% | 35 | 1.94 | 14 |
+| **3.0** | **19.6% [13.8-26.0]** | 25.2% | 42.6% | 25 | 1.33 | 13 |
+| 3.5 | 17.5% [11.9-23.8] | 22.2% | 32.0% | 20 | 1.17 | 11 |
+| 4.0 | 13.6% [7.7-20.4] | 18.6% | 27.1% | 15 | 0.89 | 16 |
+| 5.0 | 12.0% [6.9-18.1] | 15.5% | 19.1% | 12 | 0.78 | 25 |
+
+The raw run's 24.1% at 3.0x was biased UPWARD by mid-surge draws (25 of them at 3.0x are
+pre-arrived and now excluded, as the ledger itself would exclude them). The corrected
+Challenger events target (2-4/name-yr) maps to ~2.2-2.5x, below the power-chosen band, so
+the Board's power rule governs. MECHANICAL READ at the ~20-25% regime: **3.0x** (19.6%,
+CI spanning the regime; 2.5x sits above at 27.3%, 3.5x below at 17.5%).
+
+Pre-registration locked from this curve: `audits/ledger-research/FLOW_PREREG_2026-07-26.md`.

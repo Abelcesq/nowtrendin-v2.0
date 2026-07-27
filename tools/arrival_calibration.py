@@ -31,6 +31,7 @@ and reconciling them is the Chairman's ruling, not this tool's.
 """
 from __future__ import annotations
 import json
+import math
 import os
 import random
 import sys
@@ -46,27 +47,25 @@ SEED = int(os.getenv("CALIB_SEED", "20260725"))
 SAMPLES_PER_TICKER = int(os.getenv("CALIB_SAMPLES_PER_TICKER", "6"))
 MULTIPLES = [2.0, 2.5, 3.0, 3.5, 4.0, 5.0]
 HORIZONS = [60, 90, 180]
-TRADING_DAYS_PER_YEAR = 252
+BOOTSTRAP_B = int(os.getenv("CALIB_BOOTSTRAP_B", "1000"))
 
-# Curated mega-caps PLUS whatever the live insider feed surfaces — the latter skews small/mid,
-# which is the universe the Board says the real signal lives in.
-BASE_TICKERS = ["AAPL", "MSFT", "TSLA", "NVDA", "META", "GOOGL", "AMZN", "JPM",
-                "WFC", "C", "MS", "IBM", "F", "CVX", "LMT"]
+# ⚠ CORRECTION 3 of 4 (accountability review, Challenger): the universe is FROZEN in a
+# committed file. The prior run drew 40 tickers from the live insider feed — a set that
+# changes daily and is selected on the variable correlated with the treatment — so "fixed
+# seed" fixed the date draw but not the sample. Same seed next week, different universe.
+# Now: same seed, same file, same result, and the file's git SHA is the provenance.
+UNIVERSE_FILE = os.getenv(
+    "CALIB_UNIVERSE_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "calibration_universe_2026-07-26.txt"))
 
 
-def universe(max_extra: int = 40) -> list:
-    tickers = list(BASE_TICKERS)
-    try:
-        os.environ.setdefault("INSIDER_PARSER_FIX", "1")   # research read; correct tickers
-        import finviz_data
-        rows = finviz_data.insider_feed(limit=500) or []
-        extra = sorted({(r.get("ticker") or "").upper() for r in rows})
-        extra = [t for t in extra if t and t not in tickers][:max_extra]
-        tickers += extra
-        print(f"  universe: {len(BASE_TICKERS)} curated + {len(extra)} from the live "
-              f"insider feed = {len(tickers)}")
-    except Exception as e:
-        print(f"  universe: insider feed unavailable ({e}); curated only")
+def universe() -> list:
+    with open(UNIVERSE_FILE, encoding="utf-8") as fh:
+        tickers = [ln.strip().upper() for ln in fh
+                   if ln.strip() and not ln.startswith("#")]
+    print(f"  universe: {len(tickers)} tickers, FROZEN in "
+          f"{os.path.basename(UNIVERSE_FILE)} (committed; SHA = provenance)")
     return tickers
 
 
@@ -86,8 +85,14 @@ def main():
     newest = today - timedelta(days=max(HORIZONS) + 20)
     span = (newest - oldest).days
 
-    # results[mult][horizon] = [n_fired, n_evaluated]
-    results = {m: {h: [0, 0] for h in HORIZONS} for m in MULTIPLES}
+    # ⚠ CORRECTION 1 of 4 (Challenger): the prior run never applied `already_arrived_before`,
+    # so dates drawn mid-surge fired at lead ~0 against a still-low frozen baseline — rows
+    # the ledger would stamp PRE_ARRIVED and exclude from the lead denominator. The null was
+    # therefore biased UPWARD. Pre-arrived samples are now excluded per multiple, and counted.
+    # Tallies are kept PER TICKER for correction 4 (a ticker-clustered bootstrap): the 295
+    # "observations" were ~55 clusters, and a naive n=295 interval overstates precision.
+    tally = {m: {h: {} for h in HORIZONS} for m in MULTIPLES}   # [m][h][ticker] = [fired, n]
+    pre_arrived = {m: 0 for m in MULTIPLES}
     lead_days = {m: [] for m in MULTIPLES}
     checked = skipped_thin = 0
 
@@ -113,13 +118,19 @@ def main():
             med = base["median_volume"]
             checked += 1
             for m in MULTIPLES:
+                # The ledger's own rule, applied to the null: a date where the crowd had
+                # ALREADY arrived at this multiple is discovery latency, not a race.
+                if arrival_clock.already_arrived_before(sv, det, med, mult=m):
+                    pre_arrived[m] += 1
+                    continue
                 for h in HORIZONS:
                     end = (datetime.strptime(det, "%Y-%m-%d")
                            + timedelta(days=h)).strftime("%Y-%m-%d")
                     a = arrival_clock.find_arrival(sv, det, med, mult=m, until=end)
-                    results[m][h][1] += 1
+                    cell = tally[m][h].setdefault(t, [0, 0])
+                    cell[1] += 1
                     if a.get("arrived"):
-                        results[m][h][0] += 1
+                        cell[0] += 1
                         if h == 60 and a.get("lead_days") is not None:
                             lead_days[m].append(a["lead_days"])
         if i < len(tickers) - 1:
@@ -131,33 +142,70 @@ def main():
         print("\nNo evaluable samples — inconclusive, not a result.")
         return 2
 
-    print()
-    print("=" * 78)
-    print("UNCONDITIONAL ARRIVAL BASE-RATE CURVE  (random dates; NO signal involved)")
-    print("=" * 78)
-    print(f"  {'mult':>5} | " + " | ".join(f"{h:>3}d window" for h in HORIZONS)
-          + " | events/name-yr | median lead(60d)")
-    print("  " + "-" * 74)
-    for m in MULTIPLES:
-        cells = []
-        for h in HORIZONS:
-            fired, n = results[m][h]
-            cells.append(f"{(100.0*fired/n if n else 0):>9.1f}%")
-        f60, n60 = results[m][60]
-        rate60 = (f60 / n60) if n60 else 0.0
-        per_year = rate60 * (TRADING_DAYS_PER_YEAR / 60.0)
-        lds = sorted(lead_days[m])
-        med_lead = lds[len(lds) // 2] if lds else None
-        print(f"  {m:>5} | " + " | ".join(cells)
-              + f" | {per_year:>13.2f} | {med_lead if med_lead is not None else '-':>16}")
+    def _pool(m, h):
+        fired = sum(v[0] for v in tally[m][h].values())
+        n = sum(v[1] for v in tally[m][h].values())
+        return fired, n
+
+    def _boot_ci(m, h):
+        """⚠ CORRECTION 4: ticker-clustered bootstrap (resample TICKERS with replacement).
+        Six overlapping draws per ticker from one 900-day window are not independent."""
+        keys = list(tally[m][h].keys())
+        if not keys:
+            return (None, None)
+        brng = random.Random(SEED + int(m * 10) + h)      # deterministic per cell
+        rates = []
+        for _ in range(BOOTSTRAP_B):
+            f = n = 0
+            for k in (brng.choice(keys) for _ in keys):
+                f += tally[m][h][k][0]
+                n += tally[m][h][k][1]
+            if n:
+                rates.append(f / n)
+        if not rates:
+            return (None, None)
+        rates.sort()
+        lo = rates[max(0, int(0.025 * len(rates)) - 1)]
+        hi = rates[min(len(rates) - 1, int(0.975 * len(rates)))]
+        return (round(lo * 100, 1), round(hi * 100, 1))
 
     print()
-    print("  Reference targets the Board offered (they do NOT reconcile — see below):")
-    print("    Executioner : placebo arrival ~5-8% per 60d window")
-    print("    Challenger  : 2-4 arrival events per name-year")
-    print("    2-4 events/yr implies roughly 40-70% chance of >=1 arrival in any 60d window,")
-    print("    which is an order of magnitude looser than 5-8%. The Chairman must rule on")
-    print("    which target governs BEFORE the threshold is written into the pre-registration.")
+    print("=" * 78)
+    print("CORRECTED ARRIVAL BASE-RATE CURVE  (random dates; NO signal; pre-arrived excluded;")
+    print("ticker-clustered bootstrap 95% CI on the 60d cell; hazard-correct events/yr)")
+    print("=" * 78)
+    print(f"  {'mult':>5} | {'60d null [95% CI]':>22} | {'90d':>6} | {'180d':>6} | "
+          f"{'pre-arr':>7} | {'ev/name-yr':>10} | med lead")
+    print("  " + "-" * 76)
+    for m in MULTIPLES:
+        f60, n60 = _pool(m, 60)
+        p60 = (f60 / n60) if n60 else 0.0
+        lo, hi = _boot_ci(m, 60)
+        cells = []
+        for h in (90, 180):
+            fh, nh = _pool(m, h)
+            cells.append(f"{(100.0*fh/nh if nh else 0):>5.1f}%")
+        # ⚠ CORRECTION 2: events/name-year = -ln(1-p) x 365/60 — hazard-correct, CALENDAR
+        # days (the window is timedelta(days=h)). The prior run used 252 trading days over
+        # a calendar window and skipped the -ln(1-p), overstating the gap between the two
+        # Board targets by enough to misstate the Challenger's own position.
+        per_year = (-math.log(max(1e-9, 1.0 - min(p60, 0.999999))) * (365.0 / 60.0)
+                    if p60 < 1 else float("inf"))
+        lds = sorted(lead_days[m])
+        med_lead = lds[len(lds) // 2] if lds else None
+        ci = f"[{lo}-{hi}%]" if lo is not None else "[n/a]"
+        print(f"  {m:>5} | {100.0*p60:>6.1f}% {ci:>14} | " + " | ".join(cells)
+              + f" | {pre_arrived[m]:>7} | {per_year:>10.2f} | "
+                f"{med_lead if med_lead is not None else '-'}")
+
+    print()
+    print("  READING THE CORRECTED CURVE (the Board's mechanical rule):")
+    print("    - The Board recommends 3.0-3.5x on power grounds, reading the multiple off the")
+    print("      corrected 60d null (target regime ~20-25%). Required n DECREASES in the null,")
+    print("      so the old 5-8% target was the wrong direction, not merely unreachable.")
+    print("    - Challenger's 2-4 events/name-year is now computed hazard-correct")
+    print("      (-ln(1-p) x 365/60); the prior run's 252/60 arithmetic overstated the gap")
+    print("      between the two targets and misstated his position.")
     print()
     print("  This tool deliberately does not choose. Picking the multiple after seeing the")
     print("  curve is exactly the specification-shopping the Board guarded against; the")
