@@ -2860,3 +2860,29 @@ because A7 set `DARK_POS_WEIGHT=0`. Chairman's call: accept "no served insider c
 the ACTUAL flip date in the same `config:set` as the flip), screener-random calibration
 robustness re-run before publication, gate-5 recurring, `market_momentum` raw-series dump,
 R-e (momentum signed vs magnitude), R-f (panel name).
+
+### 2026-07-27 (later) — CHAIRMAN RULING on the R7 gate + tooling fix
+
+**RULING (founder, 2026-07-27): the R7 flip gate is ACCEPTED on the served-universe reading** —
+*"no served insider component carries |z| >= 1.5 anywhere"* (measured: 3 insider components
+across all 300 risk items, max |z| = **0.64** — Alphabet -0.64, JPMorgan -0.10, drawdown 0.0).
+Recorded explicitly because this is NOT the original per-name check: AAPL/MSFT/NVDA no longer
+carry an insider z at all (plausibly A7's `DARK_POS_WEIGHT=0`), so no claim is made that those
+three specific transients decayed. **The parser flip is now UNBLOCKED and awaits execution.**
+
+**Tooling: every Claude hook on this box had been failing silently.** `python3` resolved to the
+**Windows Store App Execution Alias**, which launches the real Python312 but inside the Store
+app container where **`AppData\Roaming` is virtualized away** — so the hook scripts (which live
+under `AppData\Roaming\Claude\local-agent-mode-sessions\...`) reported "can't open file" on
+paths that `ls`, PowerShell and `python.exe` could all read. Verified: ordinary project file →
+visible; `AppData\Roaming\Claude` → NOT visible to the alias. Both the Pixeltable plugin's
+PostToolUse (`validate_antipatterns.py`) and SessionStart (`session_orientation.py`) hooks were
+dead for the whole session. **Root cause of the bad resolution:** `Python312\` is at PATH
+position 19, AHEAD of `WindowsApps\` at 21 — the alias only won because the Python folder ships
+`python.exe` but no `python3.exe`. **Fix (durable, one file, reversible):** copied `python.exe`
+→ `python3.exe` in `C:\Users\acinv\AppData\Local\Programs\Python\Python312\`. `python3` now
+resolves to real 3.12.10; the originally-failing command runs clean; hook verified with a
+POSITIVE control (deprecated `FrameIterator` → emits its advisory) and a NEGATIVE control (this
+repo's code → silent). Session-scoped `hooks.json` also switched `python3`→`python`, but that
+copy is regenerated per session; the `python3.exe` fix is the durable one. Memory:
+`env-windows-python3-store-alias`.
