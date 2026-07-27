@@ -65,6 +65,23 @@ now skips absent/thin/covered<2; era rows ANNOTATED dead_parser_era, never delet
 crypto rate published below 20 resolved). Live acceptance: 12/12 coins
 absence_reason=proxy_coverage_thin, contradictions=0, ledger counts unchanged, fleet green.
 
+**2026-07-26/27 continuation — PREREG LOCKED; the machine is one gate from enrolling.**
+Salt set (v288, never displayed, WRITE-ONCE documented in ENV_REFERENCE). Step-6 WIRING
+built + deployed inert (v289): `flow_enrollment.py` = the detector's ONE doorway (qualify =
+the Chairman's >=3-buyers-in-10d cluster; controls = sector+size+ADV+PRETREND bucket inside
+the frozen window, deterministic by group seed; ingest_panel REFUSES while INSIDER_PARSER_FIX=0
+— the hard order is code, not a memo); endpoints /flow/status /flow/accuracy /flow/prereg
+(internal-key). Firewall: 11 modules, 0 violations, 6 acknowledged exceptions. CORRECTED
+CALIBRATION run (all 4 accountability fixes: pre-arrived excluded per multiple; -ln(1-p)x365/60;
+universe FROZEN in tools/calibration_universe_2026-07-26.txt; ticker-clustered bootstrap):
+3.0x corrected 60d null **19.6% [13.8-26.0]** — the ~20-25% regime; mechanical read = 3.0x.
+**PRE-REGISTRATION LOCKED** (id 261716973f6968b4, registered 2026-07-27T04:19Z, git timestamp
+3ca1bda BEFORE the lock): breadth>=3/10d · mult 3.0 · primary 90d · censor 180d ·
+min_episodes 120 · stratified log-rank primary · falsifiers pre-registered. Re-lock costless
+until row 1. Transient still hot (AAPL -3.96 / MSFT -4.19) -> flip waits; persistent monitor
+armed to notify when all |z|<1.5. Remaining chain: flip -> INSIDER_FLOW=1 -> FLOW_ENROLL=1 ->
+pending_treated>=1/pending_control>=3.
+
 **PENDING CHAIRMAN RULINGS:** R-a arrival target (Board: 3.0-3.5x; gates prereg lock — the
 only calendar dependency) · R-b parser-flip GO (transient must decay <|1.5|; -1.93 today)
 · R-c ACTOR_ID_SALT (write-once, BEFORE INSIDER_FLOW) · R-e momentum signed-vs-magnitude
