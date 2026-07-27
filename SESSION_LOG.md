@@ -2798,3 +2798,65 @@ fabricated). DECISION PENDING: (a) restore the 07-06 row + tighten endpoint FLOO
 - E1+E2 both closed. Open docket: E3 (D8 defer-with-tripwires), E4 (hardening quartet incl. the
   detection_score=None->intensity fallback fix), E5 (cold-start posture doc); S1 future gate;
   D9 A/B accumulating (weekly stop-rule watch); D10 fast-lane live; GHOST_FEEDS trial to ~07-29.
+
+## 2026-07-27 — Board review 2 remediation + prereg RE-LOCK (engine v290)
+
+**Board review 2** (`audits/board/BOARD_review-current-changes_2026-07-27.md`, 5 archetypes):
+chassis good, claims survived contact — but the never-reviewed `flow_enrollment.py` carried
+two defect classes the Board had already named, one of which would have corrupted row 1
+permanently. Verdict: parser flip may proceed on its gate; **FLOW_ENROLL waits**.
+
+**All blocking findings fixed, deployed v290, self-tests green, firewall CLEAN:**
+- **B1** treated rows would have enrolled with `sector=''`/`size_decile=None` (`run_cycle` read
+  `prof["match_facets"]`, a key that never existed) — the strata the pre-registered analysis
+  stratifies on, missing forever in a never-delete ledger. Fixed via one `facets_of()` used by
+  both arms. **Regression VERIFIED by reintroducing the defect** (test fails with `sector=''`).
+  The old test missed it by hand-building the treated dict; it now runs `run_cycle` end-to-end
+  and asserts on the STORED row.
+- **B2** (all five archetypes) registered `enroll_threshold` was decorative — hashed, compared
+  to nothing; `below_threshold` counter incremented nowhere. `enroll()` now refuses + counts;
+  `run_cycle` HALTS when env disagrees with the registration.
+- **B3** "10 trading days" was 10 calendar days (~7 sessions) → `window_start()` walks weekdays.
+- **B4** `ingest()` wrote NULL-hash rows without a salt (mixed eras double-count one person →
+  two real buyers + one fracture fabricate the 3-buyer trigger). Now refuses.
+- **B5** pre-arrival used env mult, not the prereg's. **B6** "ADV band" was the screener's
+  CURRENT-SESSION volume and `adv_matched:True` was stamped even when skipped → ADV is now the
+  frozen 60-session baseline median; missing data REFUSES. Taint query gained `<= asof`
+  (lookahead) and now taints on a QUALIFYING cluster (matching the registered exclusion —
+  excluding any-insider-buying selected quieter controls, which flattered us).
+- **B7 THE RE-LOCK.** Qualify window, persistence rule, echo threshold (a FALSIFIER input) and
+  match-key spec were env-enforceable but absent from the SHA. `flow_prereg.extra_terms`
+  (hashed, forward-only DDL) + `prereg_terms()` as the one reader; sweep resolves persistence
+  and echo per row. **New lock `2d65eac796c28476`** registered 2026-07-27T18:17:27Z; doc
+  committed at 08:42:24-07:00 BEFORE the post (git timestamp = the pre-registration).
+  Superseded `261716973f6968b4` holds **ZERO rows** — the only reason this was free. The
+  2026-07-26 doc is retained unaltered and marked, never edited to match the code.
+- **B8** the stratified log-rank named PRIMARY existed NOWHERE in code (only the secondary
+  publication gate). Implemented + **validated against the published Freireich 6-MP trial
+  (chi2 16.7929, p 4.2e-05 — matches), type-I 0.053/0.057 vs 0.05, 95% power on a true 2x
+  hazard gap**; opposite-direction results read as REFUTATION. Wired into `report()`.
+- **B9** source-liveness tripwire (`insider_flow.liveness`): every prior watchdog asked whether
+  our PROCESS ran, not whether the SOURCE returned usable data — which is why the insider
+  source died for ~30 days unalarmed. RED on stale/zero-rows/coverage-collapse; on
+  `/flow/status` + alarmed from the scheduler. **B10** hourly ingest tick (the ~200-row cap vs
+  the 4-10pm ET burst; heavy days ARE cluster days).
+- Also: crypto `by_flow` served **100.0% on n=1** while the headline was withheld, and the floor
+  shipped at n=20 vs the demanded 30 (nobody argued it down). One `CRYPTO_MIN_PUBLISH_N=30`
+  now governs headline, sub-rates and median lead. `ENROLL_PER_CYCLE_MAX` 5->3 (measured worst
+  case 25-30 min inside `_collect_phase` vs ~20 min headroom).
+
+**Live verified (v290):** new prereg active with every term inside the SHA; `term_drift: []`;
+flags still all `0`; `primary_analysis` present (honestly "no observations" at n=0); crypto
+sub-rate leak gone.
+
+**R7 gate — READ HONESTLY:** scanning all 300 served risk items, only 3 insider components
+carry a z at all and **max |z| = 0.64** (Alphabet -0.64, JPMorgan -0.10, drawdown 0.0). BUT the
+three originally-tracked names (AAPL -3.96, MSFT -4.19, NVDA -1.88) **no longer appear with an
+insider z at all**, so this is NOT the same measurement as "those three decayed" — plausibly
+because A7 set `DARK_POS_WEIGHT=0`. Chairman's call: accept "no served insider component
+|z| >= 1.5 anywhere" as the gate, or restore a per-name read first.
+
+**Open docket unchanged** plus: B11 (`CRYPTO_LEDGER_CLEAN_COHORT_START` must be stamped with
+the ACTUAL flip date in the same `config:set` as the flip), screener-random calibration
+robustness re-run before publication, gate-5 recurring, `market_momentum` raw-series dump,
+R-e (momentum signed vs magnitude), R-f (panel name).
