@@ -478,8 +478,29 @@ def liveness(db_path: str = DB_PATH) -> dict:
     have caught the dead parser: rows arrived, rows were refused, coverage collapsed to a
     handful of names. Read-only; alarms, never repairs.
     """
+    # ⚠ S2 UN-GATED (Board 2026-07-28, Guardian): this used to return {"status": "OFF"} whenever
+    # INSIDER_FLOW != 1 — which is the live config — so the tripwire built in response to a
+    # 30-day silent source death was itself watching NOTHING. *"A liveness check that turns off
+    # with the feature is not a liveness check."* The SOURCE is consulted by the risk module
+    # regardless of this flag, so its health is now always reported: the generic
+    # `collector_health` row (written at the fetch site) is the authority, and the panel-ingest
+    # view below is an ADDITIONAL check that only applies while ingestion is enabled.
+    src = {}
+    try:
+        import collector_health as _ch
+        src = (_ch.get_health_report(db_path) or {}).get("collectors", {}).get(
+            "finviz_insider", {})
+    except Exception as e:
+        src = {"status": "UNKNOWN", "detail": f"health report unavailable ({e})"}
     if os.getenv("INSIDER_FLOW", "0") != "1":
-        return {"status": "OFF", "detail": "INSIDER_FLOW is not enabled — nothing to watch"}
+        # Not ingesting — but still reporting the SOURCE, which is what died last time.
+        st = src.get("status")
+        return {"status": ("RED" if st in ("DOWN", "DEGRADED") else
+                           "OK" if st == "HEALTHY" else "UNKNOWN"),
+                "ingest_enabled": False,
+                "source_health": src,
+                "detail": "panel ingestion is off (INSIDER_FLOW=0); the SOURCE is still "
+                          "watched via collector_health['finviz_insider']"}
     conn = _connect(db_path)
     try:
         row = conn.execute("SELECT * FROM insider_coverage "
@@ -516,6 +537,8 @@ def liveness(db_path: str = DB_PATH) -> dict:
             "last_ingest_at": cov.get("ingest_at"), "age_hours": age_h,
             "raw_rows": raw, "distinct_tickers": tickers,
             "truncated": cov.get("truncated"),
+            "ingest_enabled": True,
+            "source_health": src,
             "floors": {"min_tickers": LIVENESS_MIN_TICKERS,
                        "max_age_hours": LIVENESS_MAX_AGE_H},
             "note": "Watches the SOURCE, not the process. A collector that runs cleanly and "

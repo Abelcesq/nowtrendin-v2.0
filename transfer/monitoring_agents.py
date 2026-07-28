@@ -82,8 +82,11 @@ def source_watchdog(conn=None, db_path=None) -> dict:
             alerts.append({"level": lvl, "block": "B2", "source": name,
                            "msg": f"STALE — {detail}"})
         elif st == "DEGRADED":
+            # S2: DEGRADED now covers TWO shapes — "ran, 0 signals" and the dead-parser
+            # signature (rows arrived, distinct entities collapsed). Do not hard-code the
+            # first; the detail already says which one it is.
             alerts.append({"level": "warn", "block": "B2", "source": name,
-                           "msg": f"DEGRADED (ran, 0 signals) — {detail}"})
+                           "msg": f"DEGRADED — {detail}"})
     return {
         "agent": "source_watchdog",
         "status": _roll_up(alerts),

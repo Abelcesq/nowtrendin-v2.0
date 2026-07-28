@@ -55,6 +55,16 @@ COLLECTOR_EXPECTATIONS = {
     "risk":          {"max_gap_minutes": 420, "mode": "risk", "critical": True},
     # Alpha Vantage retail/news coverage (free tier 25 req/day; supplementary)
     "alphavantage":  {"max_gap_minutes": 8 * 60, "mode": "risk", "critical": False},
+    # ── S2 (Board 2026-07-28): sub-sources that can fail INDEPENDENTLY of their parent ──
+    # The rule this encodes: any external endpoint that can fail on its own gets its own row
+    # here and one log_collector_run() call at its call site. Both of these died unwatched
+    # because `risk` stayed HEALTHY on its other sub-sources while these returned nothing —
+    # the Finviz insider parser for ~30 days, Finnhub congressional on a repeated 403.
+    # `min_distinct` is the dead-parser floor: rows arriving while distinct entities collapse.
+    # Both start critical: False — a quiet source must DEGRADE, never block should_trust_scores.
+    "finviz_insider": {"max_gap_minutes": 420, "mode": "risk", "critical": False,
+                       "min_distinct": 8},
+    "finnhub":        {"max_gap_minutes": 420, "mode": "risk", "critical": False},
     # Intentionally OFF (licensing) — tracked but never critical
     "reddit":        {"max_gap_minutes": 9999999, "mode": "attention", "critical": False},
 }
@@ -76,9 +86,19 @@ def init_health_db(db_path: str = DB_PATH, conn=None):
             last_signal_count INTEGER,
             consecutive_failures INTEGER DEFAULT 0,
             total_runs INTEGER DEFAULT 0,
-            total_signals INTEGER DEFAULT 0
+            total_signals INTEGER DEFAULT 0,
+            -- S2 (Board 2026-07-28): distinct entity keys seen on the last run. This is the
+            -- ONE field that catches the dead-parser class — rows keep arriving and parse
+            -- "successfully", but the distinct tickers/entities collapse to a handful. Row
+            -- counts alone stayed green through a 30-day outage of the primary insider
+            -- source; distinct keys would not have.
+            last_distinct_keys INTEGER
         )
     """)
+    try:
+        c.execute("ALTER TABLE collector_health ADD COLUMN last_distinct_keys INTEGER")
+    except Exception:
+        pass          # forward-only: column already present
     # Per-source, per-day API CALL counter (monitor usage/cost of every pull).
     c.execute("""
         CREATE TABLE IF NOT EXISTS api_usage (
@@ -148,9 +168,16 @@ def get_api_usage(db_path: str = DB_PATH, conn=None) -> dict:
 
 
 def log_collector_run(collector: str, signal_count: int = 0,
-                      status: str = "success", db_path: str = DB_PATH, conn=None):
+                      status: str = "success", db_path: str = DB_PATH, conn=None,
+                      distinct_keys: int = None):
     """Record a collector run. Call at the end of every collector.
-    status: 'success' (ran) | 'failure' (errored)."""
+    status: 'success' (ran) | 'failure' (errored).
+
+    `distinct_keys` (S2): how many DISTINCT entities the run actually covered — tickers,
+    symbols, feeds. Optional, but pass it wherever it is meaningful: it is the only signal
+    that separates "the source is quiet" from "the source is returning rows we can no longer
+    parse", which is how the primary insider source stayed green for ~30 days while dead.
+    """
     c, own = _conn(db_path, conn)
     now = datetime.now(timezone.utc).isoformat()
     try:
@@ -166,16 +193,18 @@ def log_collector_run(collector: str, signal_count: int = 0,
         c.execute("""
             INSERT INTO collector_health
                 (collector, last_success_at, last_run_at, last_signal_count,
-                 consecutive_failures, total_runs, total_signals)
-            VALUES (?,?,?,?,?,?,?)
+                 consecutive_failures, total_runs, total_signals, last_distinct_keys)
+            VALUES (?,?,?,?,?,?,?,?)
             ON CONFLICT(collector) DO UPDATE SET
                 last_success_at = excluded.last_success_at,
                 last_run_at = excluded.last_run_at,
                 last_signal_count = excluded.last_signal_count,
                 consecutive_failures = excluded.consecutive_failures,
                 total_runs = collector_health.total_runs + 1,
-                total_signals = collector_health.total_signals + excluded.last_signal_count
-        """, (collector, last_success, now, signal_count, new_fail, 1, signal_count))
+                total_signals = collector_health.total_signals + excluded.last_signal_count,
+                last_distinct_keys = excluded.last_distinct_keys
+        """, (collector, last_success, now, signal_count, new_fail, 1, signal_count,
+              distinct_keys))
         c.commit()
     except Exception as e:
         print(f"  collector_health log error ({collector}): {e}")
@@ -228,8 +257,21 @@ def get_health_report(db_path: str = DB_PATH, conn=None) -> dict:
                 status, detail = "STALE", f"last success {int(mins)}m ago (window {max_gap}m)"
             elif sigs == 0:
                 status, detail = "DEGRADED", f"ran {int(mins)}m ago but 0 signals"
+            elif (exp.get("min_distinct") is not None
+                  and rec.get("last_distinct_keys") is not None
+                  and rec["last_distinct_keys"] < exp["min_distinct"]):
+                # S2 — THE DEAD-PARSER SIGNATURE, generically. Rows arrive and parse
+                # "successfully", but the distinct entities they cover collapse. This is the
+                # one shape a row count cannot see, and it is exactly how the primary insider
+                # source read HEALTHY for ~30 days while returning nothing usable.
+                status, detail = "DEGRADED", (
+                    f"coverage collapse: {sigs} rows but only {rec['last_distinct_keys']} "
+                    f"distinct keys (floor {exp['min_distinct']}) — parse may be broken")
             else:
-                status, detail = "HEALTHY", f"{sigs} signals {int(mins)}m ago"
+                status, detail = "HEALTHY", (
+                    f"{sigs} signals {int(mins)}m ago"
+                    + (f", {rec['last_distinct_keys']} distinct"
+                       if rec.get("last_distinct_keys") is not None else ""))
         report[name] = {"status": status, "detail": detail,
                         "mode": exp["mode"], "critical": exp["critical"]}
         healthy += status == "HEALTHY"

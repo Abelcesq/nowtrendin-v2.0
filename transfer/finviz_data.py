@@ -262,6 +262,19 @@ def insider_feed(limit: int = 500) -> list:
     _LAST_FEED_RAW_ROWS = len([1 for r in re.findall(r"<tr[^>]*>(.*?)</tr>", html or "", re.S)
                                if len(re.findall(r"<td[^>]*>", r)) >= 9])
     rows = _parse_insider(html or "")
+    # ⚠ S2 (Board 2026-07-28) — SOURCE liveness, recorded at the one place that sees the raw
+    # source. This feed was DEAD for up to 30 days and nothing alarmed, because every watchdog
+    # asked whether our PROCESS ran, not whether the SOURCE returned usable data. Logged here
+    # rather than at a caller so it is observed regardless of INSIDER_FLOW — the earlier
+    # tripwire lived behind that flag and therefore watched nothing while the flag was off.
+    # Fires only on a real fetch (the result is 1h-cached), and never breaks the read path.
+    try:
+        import collector_health as _ch
+        _tk = len({(r.get("ticker") or "").upper() for r in rows if r.get("ticker")})
+        _ch.log_collector_run("finviz_insider", len(rows),
+                              "success" if rows else "failure", distinct_keys=_tk)
+    except Exception:
+        pass
     return rows[:limit]
 
 
