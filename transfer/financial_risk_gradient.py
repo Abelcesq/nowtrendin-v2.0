@@ -1272,6 +1272,21 @@ def run_risk_collection(db_path: str = DB_PATH) -> dict:
         "broadcast": collect_broadcast_risk_signals(conn),
         "yahoo_finance": collect_yahoo_finance_risk_signals(conn),
     }
+    # ⚠ S2 COVERAGE PROBE (added after live verification exposed a hole in the S2 fix itself).
+    # `insider_signal()` fetches PER TICKER (insidertrading.ashx?t=XXX) and never calls
+    # `insider_feed()`, so with INSIDER_FLOW=0 nothing exercised the market-wide read and the
+    # finviz_insider health row would have stayed "never recorded a successful run" FOREVER —
+    # a permanent false RED, which is worse than no alarm because it trains the reader to
+    # ignore it. One market-wide read per risk cycle fixes that. It is $0 (already-paid
+    # source), 1h-cached so it costs at most one HTTP call an hour, and `insider_feed()`
+    # writes its own health row including the distinct-ticker count that catches a dead parse.
+    try:
+        import finviz_data as _fv
+        if _fv.available():
+            _probe = _fv.insider_feed(limit=500) or []
+            print(f"[risk] finviz insider coverage probe: {len(_probe)} rows")
+    except Exception as _pe:
+        print(f"[risk] finviz coverage probe skipped: {_pe}")
     conn.close()
     print(f"[risk] collected: {counts}")
     return counts
