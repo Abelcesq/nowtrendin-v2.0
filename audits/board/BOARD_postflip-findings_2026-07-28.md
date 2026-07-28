@@ -162,3 +162,41 @@ Extend the `.githooks` cold-start gate to fire on **lane** changes, not just tic
 ---
 *Six memos, faithfully collated; full texts in the session record. Every correction in §0 was
 independently re-verified by the Chairman's agent before adoption. Nothing has been flipped.*
+
+---
+
+## S0 — EXECUTED 2026-07-28: entity-resolution audit. **CLEARS. The diligence-killer was a false alarm.**
+
+Verified against the data provider the engine actually uses (`fmp_data.profile`, the `/stable`
+path — note the v3 `/profile` endpoint 403s on this plan for EVERY ticker, so a 403 there is
+not a per-ticker signal).
+
+**SPCX is genuinely SpaceX.** `companyName: "Space Exploration Technologies Corp."` · NASDAQ ·
+`ipoDate: 2026-06-12` (matches the code comment exactly) · `isEtf: False` · `isFund: False` ·
+`isActivelyTrading: True` · Aerospace & Defense · description is unmistakably SpaceX (rockets,
+spacecraft, satellite broadband).
+
+**The financials are its own, and arithmetically correct.** Both income statements are stamped
+`symbol: SPCX`: FY2025 revenue **$18.674B**, net income **−$4.937B** → net margin
+**−26.44%**, which is exactly the served **−26.4%**; FY2024 revenue $14.015B → the served
+revenue growth **33.2%**. A negative margin on a just-IPO'd, capital-intensive launch business
+is unremarkable. **No lookalike ticker, no misattributed balance sheet.**
+
+**Full mapping audit — 23 of 23 correct:**
+- **16/16 `WATCHLIST_TICKERS`** resolve to the right entity (the single flag, IBM → *International
+  Business Machines Corporation*, was my matcher not knowing IBM is an initialism, not a defect).
+- **7/7 crypto-exposure proxies** resolve correctly AND their declared `kind` agrees with
+  reality: COIN → Coinbase Global (exchange), MSTR → Strategy Inc (treasury, not a fund),
+  IBIT/GBTC/ETHA/ETHE → the named spot ETFs, FBTC → Fidelity Wise Origin Bitcoin Fund.
+
+**Why the alarm looked credible, stated plainly:** the Outsider was reasoning from the pack's
+false claim that SpaceX is private — **my error**. Given that premise, hard financials under
+"the company's own reported financials" *would* have been damning. The premise was wrong, so
+the finding dissolves. The audit was still worth running: it converted an assumption into a
+measurement across 23 mappings, which is the standing obligation.
+
+**Cosmetic only (no action required):** the `MSTR` comment reads "MicroStrategy"; the company is
+now *Strategy Inc*. A stale comment, not a mapping error.
+
+**S0 verdict: CLOSED, no defect. S1 (un-gate + generalise liveness) is now the head of the queue
+and remains the one true blocker before `INSIDER_FLOW=1`.**
