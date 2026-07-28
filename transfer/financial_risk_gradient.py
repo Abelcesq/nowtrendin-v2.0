@@ -1148,22 +1148,29 @@ def collect_finnhub_risks(conn) -> int:
     # other sub-sources while Finnhub congressional 403'd five times in one cycle, silently
     # setting a Dark-Matter score input to zero. A sub-source that can fail independently must
     # be observable independently — hence its own collector_health row.
-    stage1 = 0
-    stage1_tickers = set()
+    # ⚠ CORRECTED after live verification (2026-07-28). The first version of this counted
+    # finnhub INSIDER and finnhub CONGRESSIONAL into ONE health row. The insider endpoint
+    # works, so the row read "HEALTHY — 409 stage-1" in the very same cycle whose log shows
+    # four `stock/congressional-trading: HTTP 403 Forbidden` — i.e. the 403 was invisible
+    # AGAIN. That is precisely the "parent stays green while a sub-source dies" failure this
+    # whole exercise exists to end, reproduced one level down by my own aggregation.
+    # The rule, applied properly: ONE ROW PER INDEPENDENTLY-FAILING ENDPOINT.
+    ins_n, ins_tk = 0, set()
+    con_n, con_tk = 0, set()
     for display, ticker in WATCHLIST_TICKERS.items():
         try:
             for s in nc.collect_finnhub_insider(ticker):
                 _persist_risk_signal(conn, display, "insider_transaction", "finnhub", 1,
                                      s["raw_signal"], s.get("tx_date", ""))
                 count += 1
-                stage1 += 1
-                stage1_tickers.add(ticker)
+                ins_n += 1
+                ins_tk.add(ticker)
             for s in nc.collect_finnhub_congressional(ticker):
                 _persist_risk_signal(conn, display, "congressional_trade", "finnhub", 1,
                                      s["raw_signal"], s.get("tx_date", ""))
                 count += 1
-                stage1 += 1
-                stage1_tickers.add(ticker)
+                con_n += 1
+                con_tk.add(ticker)
             for s in nc.collect_finnhub_news(ticker):
                 _persist_risk_signal(conn, display, "market_news", "finnhub", 4,
                                      s["raw_signal"], s.get("published", ""))
@@ -1171,13 +1178,16 @@ def collect_finnhub_risks(conn) -> int:
         except Exception as e:
             print(f"[risk] Finnhub {ticker} error: {e}")
     conn.commit()
-    print(f"[risk] finnhub: {count} signals ({stage1} stage-1 across "
-          f"{len(stage1_tickers)} tickers)")
+    print(f"[risk] finnhub: {count} signals (insider {ins_n}/{len(ins_tk)}tk, "
+          f"congress {con_n}/{len(con_tk)}tk)")
     try:
         import collector_health as _ch
-        _ch.log_collector_run("finnhub", stage1,
-                              "success" if stage1 else "failure",
-                              conn=conn, distinct_keys=len(stage1_tickers))
+        _ch.log_collector_run("finnhub_insider", ins_n,
+                              "success" if ins_n else "failure",
+                              conn=conn, distinct_keys=len(ins_tk))
+        _ch.log_collector_run("finnhub_congress", con_n,
+                              "success" if con_n else "failure",
+                              conn=conn, distinct_keys=len(con_tk))
     except Exception as _e:
         print(f"[risk] finnhub health log skipped: {_e}")
     return count

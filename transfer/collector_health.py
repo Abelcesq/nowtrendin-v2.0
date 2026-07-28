@@ -64,7 +64,12 @@ COLLECTOR_EXPECTATIONS = {
     # Both start critical: False — a quiet source must DEGRADE, never block should_trust_scores.
     "finviz_insider": {"max_gap_minutes": 420, "mode": "risk", "critical": False,
                        "min_distinct": 8},
-    "finnhub":        {"max_gap_minutes": 420, "mode": "risk", "critical": False},
+    # ⚠ ONE ROW PER INDEPENDENTLY-FAILING ENDPOINT. A single "finnhub" row was wrong: the
+    # insider endpoint works while stock/congressional-trading 403s, so the combined row read
+    # HEALTHY (409 stage-1) in the same cycle that logged four 403s — the sub-source failure
+    # hidden by aggregation, exactly what this registry exists to expose. Verified live.
+    "finnhub_insider":  {"max_gap_minutes": 420, "mode": "risk", "critical": False},
+    "finnhub_congress": {"max_gap_minutes": 420, "mode": "risk", "critical": False},
     # Intentionally OFF (licensing) — tracked but never critical
     "reddit":        {"max_gap_minutes": 9999999, "mode": "attention", "critical": False},
 }
