@@ -200,3 +200,74 @@ now *Strategy Inc*. A stale comment, not a mapping error.
 
 **S0 verdict: CLOSED, no defect. S1 (un-gate + generalise liveness) is now the head of the queue
 and remains the one true blocker before `INSIDER_FLOW=1`.**
+
+---
+
+## 7. EXTERNAL ANALYSIS INCORPORATED (Chairman-supplied) — every claim re-verified in repo
+
+### NEW BLOCKING FINDING — THE MARKET LEDGER'S ENTIRE LIFE IS CONTAMINATED, AND UNLABELLED
+
+**VERIFIED, and it outranks everything else on this page.** The contamination window is
+2026-06-25 → 2026-07-25 (onset unknowable, per `CONTAMINATION_insider-dead-parser_2026-07-25.md`).
+`MARKET_SIGNAL_V2=1` shipped 2026-06-25; Finviz became PRIMARY insider 2026-06-26.
+
+Measured live: **all 16 of 16** market-ledger rows carry `detection_date` between **2026-06-25**
+(the exact day the window opens) and **2026-07-11**. `grep dead_parser_era market_accuracy_ledger.py`
+→ **0 occurrences**; the crypto ledger has **3**. **The crypto ledger was annotated and the equity
+ledger was not.**
+
+So these currently-served numbers are 100% contaminated-era and carry no era label:
+`confirm_rate_pct: 50.0` · `by_flow.inflow 75.0%` (6/8) · `by_flow.outflow 25.0%` (2/8) ·
+`median_lead_days: 5.5`. **And the standing "the outflow lane is failing" hypothesis may have
+been measuring a dead parser rather than a real asymmetry** — which would make it a phantom we
+were about to design against.
+
+**This is the same defect class we fixed for crypto three days ago, on the ledger that actually
+faces institutional users, and nobody carried the fix across.**
+
+### The other four claims — all verified
+
+- **§13 violation, promoted from style to RULE BREACH (correct).** CLAUDE.md:275 states verbatim
+  *"Do NOT change this to a count-based prune."* `transfer/maint_dbfix.py` implements exactly
+  that: `KEEP_CYCLES=30`, `DELETE FROM velocity_scores ... WHERE ranked.rn > %s`. A documented
+  rule violation sitting in the repo, not a stylistic objection.
+- **R-e verified in TWO live paths:** `financial_risk_gradient.py:2130`
+  (`abs(price_return_12m) * 40`) and `market_signal_engine.py:558`
+  (`_norm(min(abs(...), 2.0)/2.0)`). A −50% crash and a +50% rally contribute **identically** to
+  momentum — direction-blind, in the live serving engine, inside a product whose entire premise
+  is *where money moves*. Backwards in exactly the regime that matters.
+- **R-f verified:** `nowtrendin_score` renders as `N`/`n` in `Dashboard.tsx`, `History.tsx`,
+  `Screener.tsx` — colliding with the deliberately-excluded N component. Cheap to rename now,
+  expensive after the N Market Score prototype ships.
+- **§16a / cold-start gate — the question is right, and the answer is that this was never its
+  job.** The `[cold-start-stated]` gate exists (`.githooks/commit-msg:61`) and fires on
+  universe-expansion-shaped diffs. `drawdown` is a macro theme with no ticker, so it never
+  tripped the trigger — *and more fundamentally it is a STALE PRE-GUARD ROW, not a new universe
+  entry.* The gate could not have caught it. Different failure class; both need covering.
+
+### One correction back to the external analysis
+
+Its claim that the KM estimate is buried while the tracked-race rate faces customers is **not
+accurate for the web terminal**: `Ledger.tsx:202` renders "Tracked-race hit rate" AND `:207-208`
+renders "KM eventual confirmation" explicitly labelled *"denominator-honest companion."* Both are
+shown. **The real problem is deeper than which rate is displayed** — per §2.1, `ledCorroborated
+= 0`: the independent referee has confirmed **zero** of the 11 LED wins, and 8 of 11 rest on a
+query the system itself flags as ambiguous. Every published rate, KM included, rests on that
+same unconfirmed 11. Fixing the display would not fix the evidence.
+
+## 8. REVISED ORDER (supersedes §6)
+
+**S0 ✅ CLOSED** — entity audit, no defect.
+**S1 (NEW, now first) — annotate the market ledger's contaminated era.** Mirror the crypto fix
+exactly: annotate rows by `detection_date` vs a clean-cohort start, never delete (§13/365-day
+retention), and withhold the blended and by-flow rates until a post-flip cohort reaches the
+pre-declared n. Re-open the "outflow lane" question only against clean-cohort data.
+**S2** — un-gate + generalise liveness (was S1; still the blocker for `INSIDER_FLOW=1`).
+**S3** — enrollment fails CLOSED + alarm; populate `topic_maturity` or delete the §14 claim.
+**S4** — ledger disclosure: suppress/asterisk rates while `ledCorroborated = 0`.
+**S5** — `series_epoch` on market baselines + `rail: true` stamp (F-1).
+**S6** — degenerate invariant (scale-relative) + stale-payload census; extend the cold-start gate
+to lanes AND to a "guard shipped after this row was scored" check.
+**S7** — **`INSIDER_FLOW=1`.**
+**S8 — next batch:** delete or neutralise `maint_dbfix.py` (§13 breach); fix R-e to a SIGNED
+momentum; rename the N collision (R-f); incremental prewarm; plain-English relabel.
