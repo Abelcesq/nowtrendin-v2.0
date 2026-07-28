@@ -354,10 +354,18 @@ def report(db_path=DB_PATH) -> dict:
     for r in rows:
         r["dead_parser_era"] = bool((r.get("detection_date") or "") < clean_start)
     era_rows = [r for r in rows if r["dead_parser_era"]]
-    confirmed = [r for r in rows if r.get("verdict") == "CONFIRMED"]
-    not_conf = [r for r in rows if r.get("verdict") == "NOT_CONFIRMED"]
-    no_move = [r for r in rows if r.get("verdict") == "NO_MOVE"]
+    # ⚠ S1 CORRECTION (Board 2026-07-28). The cohort note below promises era rows "never blend
+    # into a cited post-fix rate" — but every stat here was computed over ALL rows and gated
+    # only on a TOTAL resolved count, so once 30 resolved accumulated this WOULD have published
+    # a blended rate: exactly what the note forbids. A published rate must be a CLEAN-COHORT
+    # rate. Found while implementing the same split for the market ledger; corrected in both.
+    clean_rows = [r for r in rows if not r["dead_parser_era"]]
+    confirmed = [r for r in clean_rows if r.get("verdict") == "CONFIRMED"]
+    not_conf = [r for r in clean_rows if r.get("verdict") == "NOT_CONFIRMED"]
+    no_move = [r for r in clean_rows if r.get("verdict") == "NO_MOVE"]
     resolved = len(confirmed) + len(not_conf) + len(no_move)
+    resolved_all = sum(1 for r in rows
+                       if r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
     leads = [r["lead_time_days"] for r in confirmed if r.get("lead_time_days") is not None]
     # ⚠ Board review 2 (Outsider), TWO defects in one line:
     #  (a) The withholding floor shipped at 20 when the Outsider's condition was 30. Nobody
@@ -371,7 +379,7 @@ def report(db_path=DB_PATH) -> dict:
     by_flow = {}
     for f in ("inflow", "outflow"):
         c = sum(1 for r in confirmed if r.get("flow") == f)
-        nn = sum(1 for r in rows if r.get("flow") == f
+        nn = sum(1 for r in clean_rows if r.get("flow") == f
                  and r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
         by_flow[f] = {"confirmed": c, "resolved": nn,
                       "confirm_rate_pct": (round(100.0 * c / nn, 1)
@@ -383,7 +391,9 @@ def report(db_path=DB_PATH) -> dict:
         "ground_truth": "realized coin close direction (FMP crypto + AV)",
         "distinct_from": "trends ledger (Google Trends) AND market ledger (equity EOD price)",
         "move_threshold_pct": CRYPTO_MOVE_THRESHOLD_PCT, "timeout_days": CRYPTO_TIMEOUT_DAYS,
-        "resolved": resolved, "pending": pending,
+        "resolved": resolved_all, "resolved_clean": resolved, "pending": pending,
+        "rate_basis": "clean post-parser-fix cohort only; dead-parser-era rows are excluded "
+                      "from every rate and counted separately",
         "confirmed": len(confirmed), "not_confirmed": len(not_conf), "no_move": len(no_move),
         # HEADLINE DISCIPLINE (Outsider, master remediation): crypto publishes NO rate until
         # the post-fix cohort reaches a pre-declared n — a rate on proxy-degenerate-era data

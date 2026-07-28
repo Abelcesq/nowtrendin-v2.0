@@ -76,6 +76,14 @@ export interface MarketLedgerSummary {
   confirm_rate_pct?: number | null; median_lead_days?: number | null
   by_flow?: Record<string, { confirmed: number; resolved: number; confirm_rate_pct: number | null }>
   small_sample?: boolean; note?: string
+  // S1 (2026-07-28): rates are computed on the CLEAN post-parser-fix cohort only; detections
+  // enrolled while the primary insider source was dead are split out here, retained and
+  // labelled, and never contribute to a published rate.
+  resolved_clean?: number; rate_withheld_reason?: string | null; rate_basis?: string
+  dead_parser_era?: {
+    rows: number; resolved: number; confirmed: number; not_confirmed: number; no_move: number
+    clean_cohort_start: string; rate: null; why_no_rate?: string; affects_prior_reads?: string
+  }
 }
 
 export interface MarketLedgerRow {

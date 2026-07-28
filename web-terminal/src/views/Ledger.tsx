@@ -180,12 +180,18 @@ export function Ledger() {
             forecast or advice.
           </div>
           <div className="statstrip">
-            <div className="statcard"><div className="sl">Confirm rate</div><div className="sv good">{psum?.confirm_rate_pct != null ? psum.confirm_rate_pct.toFixed(1) + '%' : '—'}</div><div className="sf">CONFIRMED ÷ all resolved (misses counted)</div></div>
+            <div className="statcard"><div className="sl">Confirm rate</div><div className="sv good">{psum?.confirm_rate_pct != null ? psum.confirm_rate_pct.toFixed(1) + '%' : '—'}</div><div className="sf">{psum?.confirm_rate_pct != null ? 'CONFIRMED ÷ resolved in the clean cohort (misses counted)' : 'withheld — clean post-parser-fix cohort below the published minimum'}</div></div>
             <div className="statcard"><div className="sl">Median lead</div><div className="sv early">{psum?.median_lead_days != null ? psum.median_lead_days + 'd' : '—'}</div><div className="sf">days from detection to the confirming move</div></div>
             <div className="statcard"><div className="sl">Confirmed / Not / No-move</div><div className="sv">{psum?.confirmed ?? 0}/{psum?.not_confirmed ?? 0}/{psum?.no_move ?? 0}</div><div className="sf">directional outcome breakdown</div></div>
             <div className="statcard"><div className="sl">Inflow · outflow confirm</div><div className="sv">{psum?.by_flow?.inflow?.confirm_rate_pct != null ? psum.by_flow.inflow.confirm_rate_pct + '%' : '—'} · {psum?.by_flow?.outflow?.confirm_rate_pct != null ? psum.by_flow.outflow.confirm_rate_pct + '%' : '—'}</div><div className="sf">by detected flow direction</div></div>
-            <div className="statcard"><div className="sl">Resolved · in flight</div><div className="sv">{psum?.resolved ?? 0}·{psum?.pending ?? 0}</div><div className="sf">{psum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient'}</div></div>
+            <div className="statcard"><div className="sl">Resolved · in flight</div><div className="sv">{psum?.resolved ?? 0}·{psum?.pending ?? 0}</div><div className="sf">{psum?.resolved_clean != null && psum.resolved_clean !== psum.resolved ? `${psum.resolved_clean} in the clean cohort` : (psum?.small_sample ? 'small sample — interpret with care' : 'sample sufficient')}</div></div>
           </div>
+          {(psum?.dead_parser_era?.rows ?? 0) > 0 && (
+            <div className="note" style={{ marginTop: 8 }}>
+              <strong>{psum?.dead_parser_era?.rows} detection(s) predate the insider-source repair</strong> (before {psum?.dead_parser_era?.clean_cohort_start}) and are excluded from every rate above.
+              They are retained and shown in the table below, never deleted. A rate computed on those inputs is not defensible at any sample size, so none is published for them.
+            </div>
+          )}
         </>
       ) : (
         <>

@@ -48,6 +48,10 @@ MARKET_TIMEOUT_DAYS = int(os.getenv("MARKET_LEDGER_TIMEOUT_DAYS", "60"))
 # % EOD-close move (from the detection-day close) that counts as a real DIRECTIONAL move,
 # above price noise. Tunable; deliberately conservative so noise isn't scored as a hit.
 MOVE_THRESHOLD_PCT = float(os.getenv("MARKET_MOVE_THRESHOLD_PCT", "5.0"))
+#: Resolved episodes in the CLEAN post-parser-fix cohort required before ANY market rate is
+#: published — headline, by-flow, median lead, or episode rollup. Matches the crypto floor
+#: (Board review 2, Outsider: the same number must govern every rate in a payload).
+MARKET_MIN_PUBLISH_N = int(os.getenv("MARKET_MIN_PUBLISH_N", "30"))
 # Minimum movement intensity (0-1) for a money signal to be worth logging — keeps weak/noise
 # flows out of the ledger so only real money-movement detections get a falsifiable record.
 MIN_INTENSITY = float(os.getenv("MARKET_LEDGER_MIN_INTENSITY", "0.25"))
@@ -531,24 +535,70 @@ def report(db_path=DB_PATH) -> dict:
     except Exception:
         pass
     conn.close()
-    confirmed = [r for r in rows if r.get("verdict") == "CONFIRMED"]
-    not_conf = [r for r in rows if r.get("verdict") == "NOT_CONFIRMED"]
-    no_move = [r for r in rows if r.get("verdict") == "NO_MOVE"]
-    resolved = len(confirmed) + len(not_conf) + len(no_move)
+
+    # ⚠ S1 — DEAD-PARSER-ERA COHORT SPLIT (Board 2026-07-28, Chairman-supplied analysis,
+    # verified in repo). The contamination window is 2026-06-25 → 2026-07-25; MARKET_SIGNAL_V2
+    # shipped 2026-06-25 and Finviz became the PRIMARY insider source 2026-06-26. Measured at
+    # the time of this fix, ALL 16 of 16 rows in this ledger carried a detection_date inside
+    # that window — i.e. **this ledger's entire life is contaminated** — while it served
+    # confirm_rate_pct 50.0, inflow 75%, outflow 25% with NO era label at all. The crypto
+    # ledger was annotated three days earlier; the fix was never carried across to the ledger
+    # that institutional users actually read.
+    #
+    # Rows are NEVER deleted (§13 / 365-day retention) — they are LABELLED and split out.
+    #
+    # ⚠ AND A DEFECT INHERITED FROM THE CRYPTO FIX, CORRECTED HERE (and there): crypto's
+    # cohort note promised era rows "never blend into a cited post-fix rate", but its rates
+    # were computed over ALL rows and gated only on a total-row count — so at n >= 30 it
+    # WOULD have published a blended rate, exactly what the note forbade. A published rate
+    # must be a CLEAN-COHORT rate. Era rows are reported as their own cohort, with counts
+    # only: a rate computed on knowingly-contaminated inputs is not a number we can defend,
+    # at any n.
+    clean_start = os.getenv("MARKET_LEDGER_CLEAN_COHORT_START", "2026-07-27")
+    for r in rows:
+        r["dead_parser_era"] = bool((r.get("detection_date") or "") < clean_start)
+    era_rows = [r for r in rows if r["dead_parser_era"]]
+    clean_rows = [r for r in rows if not r["dead_parser_era"]]
+
+    def _split(src):
+        c = [r for r in src if r.get("verdict") == "CONFIRMED"]
+        nc = [r for r in src if r.get("verdict") == "NOT_CONFIRMED"]
+        nm = [r for r in src if r.get("verdict") == "NO_MOVE"]
+        return c, nc, nm, len(c) + len(nc) + len(nm)
+
+    # TOTALS (all rows) — denominators stay visible; they are the record.
+    _all_c, _all_nc, _all_nm, resolved_all = _split(rows)
+    # PUBLISHED cohort — clean rows only. Every served RATE is computed from these.
+    confirmed, not_conf, no_move, resolved = _split(clean_rows)
+    _era_c, _era_nc, _era_nm, resolved_era = _split(era_rows)
+
     leads = [r["lead_time_days"] for r in confirmed if r.get("lead_time_days") is not None]
+    # One floor governs EVERY rate in this payload — headline, by-flow, median lead and the
+    # episode rollups alike (the crypto lesson: a withholding rule that only covers the
+    # headline is not a withholding rule; its by_flow served 100% on n=1).
+    small_sample = resolved < MARKET_MIN_PUBLISH_N
+    _withheld = (f"small_sample: no market rate is published until the CLEAN post-parser-fix "
+                 f"cohort reaches {MARKET_MIN_PUBLISH_N} resolved episodes "
+                 f"(clean={resolved}, dead-parser-era={resolved_era}) — the denominators "
+                 f"above are the record") if small_sample else None
     by_flow = {}
     for f in ("inflow", "outflow"):
         c = sum(1 for r in confirmed if r.get("flow") == f)
-        n = sum(1 for r in rows if r.get("flow") == f and r.get("verdict") in
+        n = sum(1 for r in clean_rows if r.get("flow") == f and r.get("verdict") in
                 ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
         by_flow[f] = {"confirmed": c, "resolved": n,
-                      "confirm_rate_pct": round(100.0 * c / n, 1) if n else None}
+                      "confirm_rate_pct": (round(100.0 * c / n, 1)
+                                           if n and not small_sample else None),
+                      "rate_withheld_reason": _withheld if n and small_sample else None}
     # E4 EPISODE-COLLAPSE (board D8 session, Challenger): a persistent claim re-enrolls
     # on later dates (AAPL outflow x3 = ONE ongoing signal, not 3 independent trials).
     # Collapse resolved rows to distinct (ticker, flow) EPISODES so the reported rate
     # isn't a denominator game — row-level rate is kept alongside for transparency, and
     # the episode counts are the honest n for any interval/claim.
-    _res_rows = [r for r in rows if r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE")]
+    # S1: episodes roll up the CLEAN cohort only — an episode rate built from contaminated
+    # rows is contaminated however it is aggregated.
+    _res_rows = [r for r in clean_rows
+                 if r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE")]
     _ep = {}
     for r in _res_rows:
         key = ((r.get("ticker") or "").upper(), r.get("flow"))
@@ -560,7 +610,8 @@ def report(db_path=DB_PATH) -> dict:
     # reported as a RANGE [strict, any], never a single optimistic figure.
     def _ep_rate(rule):
         hits = sum(1 for v in _ep.values() if rule([x.get("verdict") == "CONFIRMED" for x in v]))
-        return hits, (round(100.0 * hits / len(_ep), 1) if _ep else None)
+        return hits, (round(100.0 * hits / len(_ep), 1)
+                      if _ep and not small_sample else None)
     ep_any_n, ep_any = _ep_rate(any)
     ep_strict_n, ep_strict = _ep_rate(all)
     ep_maj_n, ep_maj = _ep_rate(lambda bs: sum(bs) * 2 > len(bs))
@@ -589,13 +640,42 @@ def report(db_path=DB_PATH) -> dict:
         "distinct_from": "trends accuracy ledger (Google Trends breakout)",
         "move_threshold_pct": MOVE_THRESHOLD_PCT,
         "timeout_days": MARKET_TIMEOUT_DAYS,
-        "resolved": resolved,
+        # `resolved` remains the TOTAL (the record); `resolved_clean` is the denominator every
+        # published rate is actually computed on.
+        "resolved": resolved_all,
+        "resolved_clean": resolved,
         "pending": pending,
-        "confirmed": len(confirmed),
-        "not_confirmed": len(not_conf),
-        "no_move": len(no_move),
-        "confirm_rate_pct": round(100.0 * len(confirmed) / resolved, 1) if resolved else None,
-        "median_lead_days": round(statistics.median(leads), 1) if leads else None,
+        "confirmed": len(_all_c),
+        "not_confirmed": len(_all_nc),
+        "no_move": len(_all_nm),
+        "confirm_rate_pct": (round(100.0 * len(confirmed) / resolved, 1)
+                             if resolved and not small_sample else None),
+        "rate_withheld_reason": _withheld,
+        "rate_basis": "clean post-parser-fix cohort only; dead-parser-era rows excluded "
+                      "from every rate and reported separately below",
+        # S1: the contaminated cohort, retained and labelled — counts only, never a rate.
+        "dead_parser_era": {
+            "rows": len(era_rows),
+            "resolved": resolved_era,
+            "confirmed": len(_era_c),
+            "not_confirmed": len(_era_nc),
+            "no_move": len(_era_nm),
+            "clean_cohort_start": clean_start,
+            "rate": None,
+            "why_no_rate": "these detections were enrolled while the PRIMARY insider source "
+                           "was returning unusable rows (window 2026-06-25 → 2026-07-25, "
+                           "onset unknowable). A rate computed on knowingly-contaminated "
+                           "inputs is not defensible at any n. Rows are retained, never "
+                           "deleted (§13 / 365-day retention).",
+            "affects_prior_reads": "any market confirm-rate, by-flow split or lead figure "
+                                   "cited before 2026-07-28 was drawn from this cohort — "
+                                   "including the 'outflow lane is underperforming' "
+                                   "observation, which may have been measuring the dead "
+                                   "parser rather than a real asymmetry.",
+        },
+        "median_lead_days": (round(statistics.median(leads), 1)
+                             if leads and not small_sample else None),
+        "median_lead_n": len(leads),
         "by_flow": by_flow,
         "episodes": episodes,
         # ⚠ R1 PAYOFF-FIREWALL GATE (Board round 4, O2 — First-Principles Guardian).
@@ -627,7 +707,7 @@ def report(db_path=DB_PATH) -> dict:
         # (this process may never have enrolled), NOT 'nothing filtered'.
         "gate_rejects_durable": gate_durable,
         "gate_rejects_this_process_unflushed": dict(_GATE_REJECTS),
-        "small_sample": resolved < 20,
+        "small_sample": small_sample,
         "episode_small_sample": len(_ep) < 15,
         "note": "MEASUREMENT of the Money Gradient's own accuracy — did the realized market "
                 "move match the detected money flow, and how many days after. NOT a forecast, "
