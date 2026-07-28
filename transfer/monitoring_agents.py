@@ -503,6 +503,38 @@ def calibration_auditor() -> dict:
     import gravitational_anomaly_detector as g
     alerts, summary = [], {}
     led = {}
+    # ⚠ S3-c (Board 2026-07-28) — WATCH THE LEDGER'S INTAKE, not only its reads.
+    # This agent audited what the ledger CONTAINS and never whether it was still being fed.
+    # The intake died on consecutive cycles, printing "recorded 0 pending detections" — a line
+    # indistinguishable from a legitimately quiet cycle — and nothing alarmed. A legitimately
+    # empty cycle is now silent here BECAUSE success and emptiness are separate statuses.
+    try:
+        _c = g.get_db(g.DB_PATH)
+        try:
+            _rows = [dict(r) for r in _c.execute(
+                "SELECT cycle_at, status, enrolled, error_class FROM ledger_intake_log "
+                "ORDER BY id DESC LIMIT 4").fetchall()]
+        finally:
+            _c.close()
+        summary["intake"] = {"recent": _rows[:4],
+                             "last_status": (_rows[0]["status"] if _rows else None)}
+        _failed = [r for r in _rows if r.get("status") == "failed"]
+        if _rows and _rows[0].get("status") == "failed":
+            alerts.append({"level": "critical", "block": "B5",
+                           "msg": f"LEDGER INTAKE FAILED on the last cycle "
+                                  f"({_rows[0].get('error_class')}) — no detections are being "
+                                  f"enrolled; first-crossing candidates age out in 14 days"})
+        elif len(_failed) >= 2:
+            alerts.append({"level": "critical", "block": "B5",
+                           "msg": f"ledger intake failed {len(_failed)} of the last "
+                                  f"{len(_rows)} cycles — enrollment is unreliable"})
+        elif not _rows:
+            alerts.append({"level": "warn", "block": "B5",
+                           "msg": "no ledger intake attempts recorded yet — the intake log is "
+                                  "new, or the enrollment call site is not running"})
+    except Exception as _ie:
+        alerts.append({"level": "warn", "block": "B5",
+                       "msg": f"ledger intake log unreadable: {_ie}"})
     try:
         if getattr(g, "_LEDGER_PLUS_AVAILABLE", False):
             led = g.ledger_plus.generate_honest_report(g.DB_PATH) or {}

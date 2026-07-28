@@ -70,8 +70,11 @@ COLLECTOR_EXPECTATIONS = {
     # hidden by aggregation, exactly what this registry exists to expose. Verified live.
     "finnhub_insider":  {"max_gap_minutes": 420, "mode": "risk", "critical": False},
     "finnhub_congress": {"max_gap_minutes": 420, "mode": "risk", "critical": False},
-    # Intentionally OFF (licensing) — tracked but never critical
-    "reddit":        {"max_gap_minutes": 9999999, "mode": "attention", "critical": False},
+    # Intentionally OFF (licensing) — DISABLED, not DEGRADED. It was reporting
+    # "ran Nm ago but 0 signals" forever: a standing false amber on a source we chose to
+    # switch off. A deliberate off-switch is not a fault.
+    "reddit":        {"max_gap_minutes": 9999999, "mode": "attention", "critical": False,
+                      "disabled": True},
 }
 
 
@@ -100,10 +103,27 @@ def init_health_db(db_path: str = DB_PATH, conn=None):
             last_distinct_keys INTEGER
         )
     """)
-    try:
-        c.execute("ALTER TABLE collector_health ADD COLUMN last_distinct_keys INTEGER")
-    except Exception:
-        pass          # forward-only: column already present
+    for _ddl in ("ALTER TABLE collector_health ADD COLUMN last_distinct_keys INTEGER",
+                 # S3-d: when we first became responsible for watching this collector. Without
+                 # it, UNKNOWN has no expiry — and an UNKNOWN that never expires is a false
+                 # GREEN hiding a corpse, the same defect facing the other way.
+                 "ALTER TABLE collector_health ADD COLUMN registered_at TEXT"):
+        try:
+            c.execute(_ddl)
+        except Exception:
+            pass      # forward-only: column already present
+    # Stamp registration for every declared collector that has no row yet, so the grace
+    # window is measured from when WE started watching, not from process start (a dyno
+    # restart must not reset the clock).
+    _now = datetime.now(timezone.utc).isoformat()
+    for _name in COLLECTOR_EXPECTATIONS:
+        try:
+            c.execute("INSERT INTO collector_health (collector, registered_at) VALUES (?,?) "
+                      "ON CONFLICT(collector) DO UPDATE SET "
+                      "registered_at = COALESCE(collector_health.registered_at, excluded.registered_at)",
+                      (_name, _now))
+        except Exception:
+            pass
     # Per-source, per-day API CALL counter (monitor usage/cost of every pull).
     c.execute("""
         CREATE TABLE IF NOT EXISTS api_usage (
@@ -241,13 +261,42 @@ def get_health_report(db_path: str = DB_PATH, conn=None) -> dict:
         c.close()
 
     report = {}
-    healthy = degraded = stale = down = 0
+    healthy = degraded = stale = down = unknown = disabled = 0
     critical_problems = []
     for name, exp in COLLECTOR_EXPECTATIONS.items():
         max_gap = exp["max_gap_minutes"]
         rec = rows.get(name)
-        if not rec or not rec.get("last_success_at"):
-            status, detail = "DOWN", "never recorded a successful run"
+        # ⚠ S3-d (Board 2026-07-28) — THE STATE MODEL, keyed on RUN EVIDENCE, not on success.
+        # Two defects fixed here:
+        #  (1) FALSE RED: a collector registered but not yet observed reported DOWN, identical
+        #      to a genuinely dead one. Live proof: finnhub_insider (healthy) and
+        #      finnhub_congress (403 x4/cycle) served the SAME text. §16a already forbids this
+        #      for SCORES — a monitor with no observation must say UNKNOWN, exactly as a score
+        #      with no baseline says absent.
+        #  (2) UNREACHABLE ESCALATION: `elif fails >= 3` sat BELOW this branch, so a collector
+        #      that ran many times and failed EVERY time could never escalate — it reported
+        #      "never recorded a successful run", which is factually false. A source dead from
+        #      birth was structurally un-escalatable. That is finnhub_congress exactly.
+        # UNKNOWN is TIME-BOXED and can never be reached once a run has been observed, so
+        # "I don't know" can never become a hiding place for a corpse.
+        _ran = bool(rec and rec.get("last_run_at"))
+        _fails = int((rec or {}).get("consecutive_failures") or 0)
+        if exp.get("disabled"):
+            status, detail = "DISABLED", "intentionally off — reported, never alarmed"
+        elif not rec or not rec.get("last_success_at"):
+            if _ran:
+                status, detail = "DOWN", (
+                    f"ran {int(_minutes_since(rec.get('last_run_at')) or 0)}m ago but has "
+                    f"NEVER succeeded ({_fails} consecutive failures)")
+            else:
+                _reg_age = _minutes_since((rec or {}).get("registered_at") or "")
+                if _reg_age is None or _reg_age <= 2 * max_gap:
+                    status, detail = "UNKNOWN", (
+                        "registered, no run observed yet — not an outage, not a pass")
+                else:
+                    status, detail = "DOWN", (
+                        f"registered {int(_reg_age)}m ago; no run ever observed "
+                        f"(instrumentation gap or dead call site)")
         else:
             mins = _minutes_since(rec["last_success_at"])
             sigs = rec.get("last_signal_count", 0) or 0
@@ -283,13 +332,19 @@ def get_health_report(db_path: str = DB_PATH, conn=None) -> dict:
         degraded += status == "DEGRADED"
         stale += status == "STALE"
         down += status == "DOWN"
+        unknown += status == "UNKNOWN"
+        disabled += status == "DISABLED"
+        # UNKNOWN and DISABLED are NEVER critical: we do not page on absence of observation,
+        # nor on a source we deliberately turned off. Criticality is earned by a first
+        # successful observation.
         if exp["critical"] and status in ("STALE", "DOWN"):
             critical_problems.append(f"{name} ({status}: {detail})")
 
     return {
         "collectors": report,
         "summary": {"healthy": healthy, "degraded": degraded, "stale": stale,
-                    "down": down, "total": len(COLLECTOR_EXPECTATIONS)},
+                    "down": down, "unknown": unknown, "disabled": disabled,
+                    "total": len(COLLECTOR_EXPECTATIONS)},
         "critical_problems": critical_problems,
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }

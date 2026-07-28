@@ -613,6 +613,13 @@ def _record_top_detections(limit=20, min_detection=None):
         limit = max(limit, 60)     # widen the raw fetch so ordering acts on NEW candidates
     conn = get_db(DB_PATH)
     n = 0
+    # ⚠ S3-a (Board 2026-07-28) — INSTRUMENT BEFORE REMEDIATE. Every exit path from this
+    # function must WRITE what happened. Before this, a timeout and a genuinely quiet cycle
+    # both printed "recorded 0 pending detections" and wrote nothing: the ledger's intake
+    # could die silently and did, for at least three consecutive cycles, unnoticed.
+    _intake = {"status": "failed", "error": "", "error_class": "",
+               "candidates": 0, "enrolled": 0, "maturity_filter": "applied",
+               "started": datetime.now(timezone.utc)}
     try:
         _base_sql = """
             SELECT v.topic_key, v.topic_display, v.detection_score,
@@ -635,15 +642,32 @@ def _record_top_detections(limit=20, min_detection=None):
                 tm_join="LEFT JOIN topic_maturity tm ON v.topic_key=tm.topic_key",
                 tm_where="AND UPPER(COALESCE(tm.maturity_class, '')) NOT IN ('ESTABLISHED', 'MONITORING')",
             ), (floor, first_seen_cut, limit)).fetchall()
-        except Exception:
-            # topic_maturity absent/unreadable — enroll on first-crossing recency alone
-            # (fail OPEN on the maturity filter, never on enrollment itself).
+        except Exception as _me:
+            # ⚠ S3-b — FAIL CLOSED ON OPERATIONAL ERRORS (Board 2026-07-28, unanimous).
+            # This used to catch ANY exception and retry WITHOUT the maturity filter. A
+            # statement timeout is not "topic_maturity absent" — it is a LOAD failure, and the
+            # retry kept both full aggregates, so it re-fired a 300s-capped query at peak write
+            # pressure. Verified: the observed error surfaced from the OUTER handler, which is
+            # only reachable if the FALLBACK also raised — both arms died, burning ~10 min of a
+            # pooled connection per dead cycle (the 2026-07-06 convoy precondition).
+            # Only a genuine schema-absence may fail open, ONCE, and the row is STAMPED so the
+            # relaxation is visible later — fail-LABELLED, never fail-open-and-silent.
+            _txt = str(_me).lower()
+            _operational = ("timeout" in _txt or "canceling statement" in _txt
+                            or "connection" in _txt or "pool" in _txt
+                            or "deadlock" in _txt or "ssl" in _txt)
+            if _operational:
+                _intake["error_class"] = "operational"
+                raise
             try:
                 conn.rollback()
             except Exception:
                 pass
+            _intake["maturity_filter"] = "unavailable"
+            _intake["error_class"] = "maturity_absent"
             rows = conn.execute(_base_sql.format(tm_join="", tm_where=""),
                                 (floor, first_seen_cut, limit)).fetchall()
+        _intake["candidates"] = len(rows)
         import date_utils
         if not _ab:
             for r in rows:
@@ -718,14 +742,68 @@ def _record_top_detections(limit=20, min_detection=None):
             except Exception as _le:
                 print(f"[ledger-ab] log skipped: {_le}")
     except Exception as e:
-        print(f"[ledger] record_top_detections error: {e}")
+        _intake["error"] = str(e)[:400]
+        if not _intake["error_class"]:
+            _intake["error_class"] = "operational" if (
+                "timeout" in str(e).lower() or "canceling statement" in str(e).lower()
+            ) else "other"
+        print(f"[ledger] INTAKE FAILED ({_intake['error_class']}): {e}")
+    else:
+        # Reached ONLY when the query actually completed. This is what makes a legitimately
+        # empty cycle distinguishable from a dead one — the whole point of §18 no-null-collision.
+        _intake["status"] = "ok" if n else "empty"
+        _intake["enrolled"] = n
     finally:
-        conn.close()
-    if _ab:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        # ⚠ Written on a FRESH connection, in a finally. A timed-out Postgres transaction is
+        # ABORTED, so every subsequent write on `conn` dies with it — which is exactly why the
+        # existing enroll_ab_log write never recorded a failed cycle.
+        _log_ledger_intake(_intake)
+    if _intake["status"] == "failed":
+        print("[ledger] recorded 0 pending detections (INTAKE FAILURE — not an empty cycle)")
+    elif _ab:
         print(f"[ledger] recorded {n} pending detections (D9 arm {_arm}, cap {_ab_cap})")
     else:
         print(f"[ledger] recorded {n} pending detections")
     return n
+
+
+def _log_ledger_intake(rec: dict):
+    """S3-a: one durable row per enrollment attempt — including the failures.
+
+    THE LEDGER'S SHUTTER LOG. The accuracy ledger's promise is a COMPLETE time-stamped
+    detection history; rows are never deleted, but rows never WRITTEN are invisible, and a
+    never-delete guarantee says nothing about them. This table is what makes a gap in the
+    record auditable instead of silent. It never imputes or backfills what was not enrolled —
+    it only records that we tried and failed, and when.
+    """
+    try:
+        c = get_db(DB_PATH)
+    except Exception as e:
+        print(f"[ledger] intake log unavailable: {e}")
+        return
+    try:
+        c.execute("""CREATE TABLE IF NOT EXISTS ledger_intake_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, cycle_at TEXT, status TEXT,
+            candidates INTEGER, enrolled INTEGER, maturity_filter TEXT,
+            error_class TEXT, error TEXT, duration_ms INTEGER)""")
+        _ms = int((datetime.now(timezone.utc) - rec["started"]).total_seconds() * 1000)
+        c.execute("INSERT INTO ledger_intake_log (cycle_at,status,candidates,enrolled,"
+                  "maturity_filter,error_class,error,duration_ms) VALUES (?,?,?,?,?,?,?,?)",
+                  (datetime.now(timezone.utc).isoformat(timespec="seconds"), rec["status"],
+                   rec["candidates"], rec["enrolled"], rec["maturity_filter"],
+                   rec["error_class"], rec["error"], _ms))
+        c.commit()
+    except Exception as e:
+        print(f"[ledger] intake log write skipped: {e}")
+    finally:
+        try:
+            c.close()
+        except Exception:
+            pass
     print(f"[startup] google_trends_validation unavailable: {_acc_exc}")
 
 try:
@@ -7071,6 +7149,52 @@ def _ledger_epoch_stamp() -> dict:
                 pass
 
 
+
+def _enrollment_completeness() -> dict:
+    """S3-e: how complete is the intake behind the published rates?
+
+    Reports attempts, successes and failures from `ledger_intake_log`. It NEVER imputes or
+    backfills what was not enrolled — we do not know what we did not see, and a modelled
+    correction to the moat's own denominator would be the worst thing this system could ship.
+    It only says: we tried this many times, we failed this many, here is the window.
+    """
+    out = {"available": False,
+           "note": "intake log is new (S3, 2026-07-28); it does not cover cycles before that, "
+                   "so earlier gaps are unmeasured rather than absent"}
+    try:
+        c = get_db(DB_PATH)
+        try:
+            rows = [dict(r) for r in c.execute(
+                "SELECT cycle_at, status, enrolled FROM ledger_intake_log "
+                "ORDER BY id DESC LIMIT 200").fetchall()]
+        finally:
+            c.close()
+    except Exception as e:
+        out["error"] = str(e)[:160]
+        return out
+    if not rows:
+        return out
+    att = len(rows)
+    ok = sum(1 for r in rows if r.get("status") in ("ok", "empty"))
+    failed = [r for r in rows if r.get("status") == "failed"]
+    out.update({
+        "available": True,
+        "cycles_recorded": att,
+        "cycles_completed": ok,
+        "cycles_failed": len(failed),
+        "completeness_pct": round(100.0 * ok / att, 1) if att else None,
+        "window_start": rows[-1].get("cycle_at"),
+        "window_end": rows[0].get("cycle_at"),
+        "last_status": rows[0].get("status"),
+        "enrolled_in_window": sum(int(r.get("enrolled") or 0) for r in rows),
+        "gap_note": (f"{len(failed)} of the last {att} enrollment cycles FAILED — detections "
+                     f"that first crossed during those cycles may never have been enrolled, "
+                     f"and first-crossing candidates age out after "
+                     f"{os.getenv('LEDGER_ENROLL_RECENT_DAYS', '14')} days. Rates below are "
+                     f"computed over the rows that were enrolled." if failed else None),
+    })
+    return out
+
 @app.get("/accuracy/ledger")
 def accuracy_ledger_report():
     """The Accuracy Ledger — documented lead time vs Google Trends breakout.
@@ -7082,6 +7206,12 @@ def accuracy_ledger_report():
             if h.get("status") == "ok":
                 return {
                     "status": "ok",
+                    # ⚠ S3-e (Board 2026-07-28) — EVERY RATE BELOW IS SERVED BESIDE THE
+                    # COMPLETENESS OF THE INTAKE THAT PRODUCED IT. A hit rate whose enrolment
+                    # had silent gaps is not wrong, it is INCOMPLETE, and the two are not the
+                    # same disclosure. Friedman & Schwartz's rule, applied: a long series is
+                    # evidence only if collection was consistent — and labelled where it wasn't.
+                    "enrollmentCompleteness": _enrollment_completeness(),
                     "hitRate": h["honest_hit_rate_pct"],
                     "naiveHitRate": h["naive_hit_rate_pct"],
                     "avgLead": h["mean_lead_days"],
