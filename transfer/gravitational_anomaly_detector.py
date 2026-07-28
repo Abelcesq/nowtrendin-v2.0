@@ -6187,6 +6187,22 @@ async def startup_auto_collect():
             try:
                 ledger_plus.init_pending_db(DB_PATH)
                 print("[startup] accuracy ledger (pending + ledger) tables ensured.")
+                # S3-a: create the intake log at BOOT, not lazily on first write. Created
+                # lazily, `/accuracy/ledger` served a raw Postgres 'relation does not exist'
+                # string into a CUSTOMER-FACING payload until the first enrollment cycle ran.
+                try:
+                    _ic = get_db(DB_PATH)
+                    try:
+                        _ic.execute("""CREATE TABLE IF NOT EXISTS ledger_intake_log (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT, cycle_at TEXT, status TEXT,
+                            candidates INTEGER, enrolled INTEGER, maturity_filter TEXT,
+                            error_class TEXT, error TEXT, duration_ms INTEGER)""")
+                        _ic.commit()
+                        print("[startup] ledger_intake_log ensured (intake shutter log).")
+                    finally:
+                        _ic.close()
+                except Exception as _ile:
+                    print(f"[startup] ledger_intake_log init skipped: {_ile}")
             except Exception as _le:
                 print(f"[startup] ledger init error: {_le}")
         if _MARKET_LEDGER_AVAILABLE:
@@ -7170,7 +7186,11 @@ def _enrollment_completeness() -> dict:
         finally:
             c.close()
     except Exception as e:
-        out["error"] = str(e)[:160]
+        # Never leak a raw driver/schema string into a customer-facing payload; say what a
+        # reader needs (we cannot report completeness) without exposing internals.
+        out["note"] = ("intake completeness is not readable right now — treat the rates below "
+                       "as unaccompanied by a completeness figure")
+        print(f"[ledger] enrollment completeness unavailable: {e}")
         return out
     if not rows:
         return out
