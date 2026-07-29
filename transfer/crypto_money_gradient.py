@@ -96,6 +96,25 @@ def _crypto_analysis(d, c, gap, flow) -> str:
     return " ".join(parts)
 
 
+
+def _max_votable(coin: str) -> int:
+    """How many of this coin's proxies could EVER cast a vote, given what they are.
+
+    THE REACHABILITY TEST (Board 2026-07-29, proposed §16a stage 0). ETFs and trusts file no
+    Form 4s, so on the insider path they are structurally silent — counting them as "proxies"
+    inflates apparent coverage and makes a permanently-unreachable read look merely thin. Only
+    operating companies (treasury/exchange kinds) can emit an insider vote today. When an
+    ETF-flow leg ships, ETFs become votable and this function is what must change with it.
+    """
+    try:
+        import crypto_signals as _cs
+        c = _cs.COIN_UNIVERSE.get((coin or "").upper()) or {}
+        insider_votable = {"treasury", "exchange"}
+        return sum(1 for p in (c.get("proxies") or [])
+                   if p.get("kind") in insider_votable)
+    except Exception:
+        return 0
+
 def compute_crypto_signal(coin: str, name: str, components_current: dict,
                           baselines: Optional[dict] = None, flow: str = "neutral",
                           price: Optional[dict] = None, dm: Optional[dict] = None) -> dict:
@@ -136,11 +155,24 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
     # the silent post-flip revival).
     money_data_absent = False
     absence_reason = None
+    absence_class = None
     _cov_gate = os.getenv("CRYPTO_COVERAGE_GATE", "1") == "1"
     if _cov_gate and ((dm or {}).get("proxy_coverage") == "thin" or covered < 2):
         money_data_absent = True
         money_movement = None
-        absence_reason = "proxy_coverage_thin"
+        # ⚠ STRUCTURAL vs TRANSIENT (Board 2026-07-29, unanimous). The old single reason
+        # "proxy_coverage_thin" let the surface say "not YET available" — a promise about the
+        # future the mechanism cannot underwrite. VERIFIED: 5 of the 7 crypto proxies (IBIT,
+        # FBTC, GBTC, ETHA, ETHE) are ETFs and trusts, which have NO Form-4 insiders and so can
+        # never emit the signal the vote reads. With a floor of 2 voting proxies, 11 of 12 coins
+        # can NEVER produce a money read — not today, not ever, under this design.
+        # The Guardian's rule: absence is transient only if the instrument AS BUILT has a
+        # reachable state. Where it does not, saying "not yet" is a false claim about the future.
+        _reachable = int((dm or {}).get("proxies_total") or 0)
+        absence_reason = ("single_proxy_structural" if _reachable <= 1
+                          else "insufficient_voting_proxies")
+        absence_class = ("structural" if _reachable <= 1 or _max_votable(coin) < 2
+                         else "transient")
     elif getattr(mse, "MONEY_MOVEMENT_EXCLUDE", False):
         mm_live = [c for c in CRYPTO_MM_WEIGHTS
                    if c in scored and not scored[c].get("degenerate_baseline")]
@@ -175,6 +207,15 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         # Which absence this is — "proxy_coverage_thin" (structural: <2 voting proxies) vs
         # "degenerate_baseline" (cold-start: no variance yet). Two different truths.
         "absence_reason": absence_reason,
+        # Board 2026-07-29: these MUST live at the top level. They previously sat inside the
+        # `dark_matter` block, which the contradiction guard OMITS whenever money is absent —
+        # so the surface was structurally unable to tell the user WHY (e.g. "this coin has one
+        # proxy"). Two different truths were computed and then discarded at the boundary.
+        "absence_class": absence_class,          # "structural" (never) vs "transient" (not now)
+        "proxies_total": int((dm or {}).get("proxies_total") or 0),
+        "proxies_covered": int(covered or 0),
+        "proxies_votable_max": _max_votable(coin),
+        "money_floor_required": 2,
         "tier": ("ABSENT" if money_data_absent
                  else mse._level((money_movement + market_confirmation) / 2)),
         "detection_level": ("ABSENT" if money_data_absent else mse._level(money_movement)),

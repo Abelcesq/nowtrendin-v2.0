@@ -62,7 +62,10 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
       </div>
       {c.money_data_absent && (
         <div className="narr" style={{ margin: '8px 0', background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
-          ℹ <b>Market-Confirmation only.</b> No proxy money-positioning data exists for this coin yet — the Money Movement read is <b>absent, not zero</b>. Only the coin's own price confirmation (M) is shown.
+          ℹ <b>Market-Confirmation only.</b> The Money Movement read is <b>absent, not zero</b>; only the coin's own price confirmation (M) is shown.
+          {' '}{(c as any).absence_class === 'structural'
+            ? <>This coin <b>cannot</b> produce a money read under the current design: it has {(c as any).proxies_votable_max ?? 0} usable money-positioning source(s) and the read requires {(c as any).money_floor_required ?? 2}. That is a limit of the sources, not a temporary gap.</>
+            : <>No money-positioning source reported for this coin this cycle ({(c as any).proxies_covered ?? 0} of {(c as any).money_floor_required ?? 2} required).</>}
         </div>
       )}
 
@@ -162,9 +165,11 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
           <div className="main-title">Crypto</div>
           <div className="main-sub">
             {allMoneyAbsent
-              ? <>Crypto <b>Market Confirmation</b> — proxy money-positioning data is not yet available
-                for any coin, so this view shows each coin's own price confirmation (M) only, not a
-                money read. Measurement, not advice.</>
+              ? <>Crypto <b>Market Confirmation</b> — this view shows each coin's own price
+                confirmation only. It does <b>not</b> include a money read: our crypto money
+                signal is derived from crypto-exposure equities, and for these coins the
+                available sources cannot produce one — <b>not merely today</b>. Measurement,
+                not advice.</>
               : <>Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
                 vs Market Confirmation (the coin's own price). Measurement, not advice.</>}
           </div>
