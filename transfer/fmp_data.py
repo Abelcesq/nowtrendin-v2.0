@@ -237,3 +237,27 @@ def fundamental_score(ticker: str) -> Optional[dict]:
         "ticker":           ticker.upper(),
         "source":           "Financial Modeling Prep",
     }
+
+def etf_info(ticker: str) -> Optional[dict]:
+    """ETF fund facts — AUM and NAV. Used to derive SHARE COUNT (§16 gate 4 verified
+    2026-07-29 on the paid Starter plan: etf/info returns assetsUnderManagement + nav for
+    IBIT/FBTC/GBTC/ETHA/ETHE; etf/holdings is 402 and is not needed).
+
+    ⚠ WHY SHARES AND NEVER AUM (Board 2026-07-29, Executioner). AUM = shares x NAV, and NAV
+    tracks the coin — so an AUM-delta "money movement" would be driven by the same price that
+    drives Market Confirmation, i.e. a CIRCULAR metric, which is banned outright. Dividing AUM
+    by NAV removes the price and leaves the quantity: net creations and redemptions, which is
+    the actual institutional flow. Callers must use `shares`, never `aum`.
+    """
+    d = _cached(f"etfinfo:{ticker.upper()}",
+                lambda: _get("etf/info", {"symbol": ticker.upper()}))
+    row = (d[0] if isinstance(d, list) and d else d) or {}
+    aum, nav = row.get("assetsUnderManagement"), row.get("nav")
+    try:
+        shares = (float(aum) / float(nav)) if aum and nav else None
+    except (TypeError, ValueError, ZeroDivisionError):
+        shares = None
+    if shares is None:
+        return None
+    return {"ticker": ticker.upper(), "aum": float(aum), "nav": float(nav),
+            "shares": shares, "source": "Financial Modeling Prep"}

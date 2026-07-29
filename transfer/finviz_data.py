@@ -32,6 +32,8 @@ FINVIZ_API_KEY = os.getenv("FINVIZ_API_KEY", "")
 _BASE = "https://elite.finviz.com"
 _UA = {"User-Agent": "Mozilla/5.0 (NowTrendIn/2.0 research)"}
 MIN_USD = float(os.getenv("FINVIZ_INSIDER_MIN_USD", "250000"))      # materiality floor (match AV)
+#: Board 2026-07-29: require buying to DOMINATE, not merely clear a floor.
+INSIDER_ACCUM_DOMINANCE = os.getenv("INSIDER_ACCUM_DOMINANCE", "0") == "1"
 INSIDER_WINDOW_DAYS = int(os.getenv("FINVIZ_INSIDER_WINDOW_DAYS", "90"))
 _TTL = float(os.getenv("FINVIZ_TTL_SEC", "3600"))                   # 1h cache (insider refreshes intraday)
 _MIN_INTERVAL = float(os.getenv("FINVIZ_MIN_INTERVAL_SEC", "1.0"))  # gentle self-throttle (fair use)
@@ -333,7 +335,23 @@ def insider_signal(ticker: str, name: str = "") -> dict:
     # selling is structurally dominant (stock comp / diversification / 10b5-1) and low-information, so
     # it is NOT treated as bearish — only material BUYING flags accumulation. (Unusual-selling-vs-
     # baseline detection is a future enhancement.) `flow`/`net_usd` are kept as factual context.
-    signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
+    # ⚠ DOMINANCE TEST (Board 2026-07-29, Challenger) — flag-gated, default OFF.
+    # The old rule was a GROSS-BUY THRESHOLD: `buy_usd >= MIN_USD`, with `sell_usd` absent from
+    # the expression entirely. So ONE $250K purchase anywhere in the 90-day window latched a
+    # full-strength "accumulation" against ANY amount of selling — live, MSTR showed
+    # accumulation while net insider flow was -$21.8M. The vote is also unweighted, so $250K
+    # and $250M read identically.
+    # The original insight stands and is NOT being reversed: routine net selling is
+    # low-information and must never be treated as bearish. This adds the missing other half —
+    # BUYING only counts as accumulation when it actually DOMINATES the tape, not merely when
+    # it clears a floor beside a wall of selling.
+    # SCORE-AFFECTING: consumed by crypto_signals._proxy_vote AND positioning_intel (equity
+    # insider direction), so it ships behind a flag, default off, per flag-never-force.
+    if INSIDER_ACCUM_DOMINANCE:
+        signal = ("accumulation" if (buy_usd >= MIN_USD and buy_usd > sell_usd)
+                  else "neutral")
+    else:
+        signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
     return {"available": bool(rows), "source": "finviz", "window_days": INSIDER_WINDOW_DAYS,
             "buy_usd": round(buy_usd), "sell_usd": round(sell_usd), "net_usd": round(net),
             "buys": buy_n, "sells": sell_n, "flow": flow, "signal": signal,

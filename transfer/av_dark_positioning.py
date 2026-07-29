@@ -25,6 +25,8 @@ from datetime import datetime, timezone, timedelta
 AV_KEY = os.getenv("ALPHAVANTAGE_RESEARCH_KEY") or os.getenv("ALPHAVANTAGE_API_KEY", "")
 _BASE = "https://www.alphavantage.co/query"
 MIN_USD = float(os.getenv("AV_DARKPOS_MIN_USD", "250000"))          # $250K materiality floor
+#: Board 2026-07-29: require buying to DOMINATE, not merely clear a floor.
+INSIDER_ACCUM_DOMINANCE = os.getenv("INSIDER_ACCUM_DOMINANCE", "0") == "1"
 INSIDER_WINDOW_DAYS = int(os.getenv("AV_INSIDER_WINDOW_DAYS", "90"))
 _TTL = float(os.getenv("AV_DARKPOS_TTL_SEC", "86400"))             # 24h cache
 _CACHE: dict = {}
@@ -111,7 +113,23 @@ def insider_signal(ticker: str) -> dict:
     flow = "inflow" if net > MIN_USD else "outflow" if net < -MIN_USD else "neutral"
     # Insider BUYING is the rare high-conviction signal; routine net selling is low-information →
     # neutral, not bearish (matches finviz_data.insider_signal). flow/net_usd kept as factual context.
-    signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
+    # ⚠ DOMINANCE TEST (Board 2026-07-29, Challenger) — flag-gated, default OFF.
+    # The old rule was a GROSS-BUY THRESHOLD: `buy_usd >= MIN_USD`, with `sell_usd` absent from
+    # the expression entirely. So ONE $250K purchase anywhere in the 90-day window latched a
+    # full-strength "accumulation" against ANY amount of selling — live, MSTR showed
+    # accumulation while net insider flow was -$21.8M. The vote is also unweighted, so $250K
+    # and $250M read identically.
+    # The original insight stands and is NOT being reversed: routine net selling is
+    # low-information and must never be treated as bearish. This adds the missing other half —
+    # BUYING only counts as accumulation when it actually DOMINATES the tape, not merely when
+    # it clears a floor beside a wall of selling.
+    # SCORE-AFFECTING: consumed by crypto_signals._proxy_vote AND positioning_intel (equity
+    # insider direction), so it ships behind a flag, default off, per flag-never-force.
+    if INSIDER_ACCUM_DOMINANCE:
+        signal = ("accumulation" if (buy_usd >= MIN_USD and buy_usd > sell_usd)
+                  else "neutral")
+    else:
+        signal = "accumulation" if buy_usd >= MIN_USD else "neutral"
     return {"available": bool(rows), "source": "alphavantage", "window_days": INSIDER_WINDOW_DAYS,
             "buy_usd": round(buy_usd), "sell_usd": round(sell_usd), "net_usd": round(net),
             "buys": buy_n, "sells": sell_n, "flow": flow, "signal": signal}

@@ -1298,6 +1298,17 @@ def run_risk_collection(db_path: str = DB_PATH) -> dict:
             print(f"[risk] finviz insider coverage probe: {len(_probe)} rows")
     except Exception as _pe:
         print(f"[risk] finviz coverage probe skipped: {_pe}")
+    # ETF share-count snapshot (Board 2026-07-29) — RECORD-ONLY, feeds no score. §16 gate 4
+    # passed on ACCESS; CURRENCY (do the counts actually move?) needs ~a week of observation,
+    # which this starts. Wiring a vote before that evidence exists would repeat the mistake
+    # this is meant to correct.
+    try:
+        import etf_flow as _ef
+        _snap = _ef.snapshot(db_path)
+        print(f"[risk] etf share snapshot: {_snap.get('written')} written"
+              + (f", missing {_snap['missing']}" if _snap.get("missing") else ""))
+    except Exception as _ee:
+        print(f"[risk] etf snapshot skipped: {_ee}")
     conn.close()
     print(f"[risk] collected: {counts}")
     return counts
