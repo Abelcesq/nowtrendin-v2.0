@@ -1156,7 +1156,6 @@ def collect_finnhub_risks(conn) -> int:
     # whole exercise exists to end, reproduced one level down by my own aggregation.
     # The rule, applied properly: ONE ROW PER INDEPENDENTLY-FAILING ENDPOINT.
     ins_n, ins_tk = 0, set()
-    con_n, con_tk = 0, set()
     for display, ticker in WATCHLIST_TICKERS.items():
         try:
             for s in nc.collect_finnhub_insider(ticker):
@@ -1165,12 +1164,14 @@ def collect_finnhub_risks(conn) -> int:
                 count += 1
                 ins_n += 1
                 ins_tk.add(ticker)
-            for s in nc.collect_finnhub_congressional(ticker):
-                _persist_risk_signal(conn, display, "congressional_trade", "finnhub", 1,
-                                     s["raw_signal"], s.get("tx_date", ""))
-                count += 1
-                con_n += 1
-                con_tk.add(ticker)
+            # ⚠ RETIRED 2026-07-29 (founder decision). Finnhub's stock/congressional-trading
+            # is premium-gated on our plan and returned HTTP 403 on EVERY call — 4 per cycle,
+            # contributing ZERO rows while looking like a live Dark-Matter input. Removing it
+            # is numerically a NO-OP (it supplied nothing) and stops the wasted calls.
+            # Congressional trades remain covered: QUIVER is the live path
+            # (positioning_intel._build_congress -> /beta/live/congresstrading). VERIFIED live
+            # before retiring — 33/33 tickers carrying real member/buy/sell counts (AAPL 9
+            # members, MSFT 11, NVDA 8). The capability is retained; only the dead feed is cut.
             for s in nc.collect_finnhub_news(ticker):
                 _persist_risk_signal(conn, display, "market_news", "finnhub", 4,
                                      s["raw_signal"], s.get("published", ""))
@@ -1178,16 +1179,16 @@ def collect_finnhub_risks(conn) -> int:
         except Exception as e:
             print(f"[risk] Finnhub {ticker} error: {e}")
     conn.commit()
-    print(f"[risk] finnhub: {count} signals (insider {ins_n}/{len(ins_tk)}tk, "
-          f"congress {con_n}/{len(con_tk)}tk)")
+    print(f"[risk] finnhub: {count} signals (insider {ins_n}/{len(ins_tk)}tk; "
+          f"congress RETIRED -> Quiver)")
     try:
         import collector_health as _ch
         _ch.log_collector_run("finnhub_insider", ins_n,
                               "success" if ins_n else "failure",
                               conn=conn, distinct_keys=len(ins_tk))
-        _ch.log_collector_run("finnhub_congress", con_n,
-                              "success" if con_n else "failure",
-                              conn=conn, distinct_keys=len(con_tk))
+        # finnhub_congress is RETIRED — no row is logged. Its registry entry is marked
+        # disabled (not deleted) so the history stays readable and it reports DISABLED
+        # rather than a DOWN nobody should act on.
     except Exception as _e:
         print(f"[risk] finnhub health log skipped: {_e}")
     return count

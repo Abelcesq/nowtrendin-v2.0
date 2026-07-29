@@ -430,7 +430,14 @@ def collect_finnhub_insider(ticker: str) -> list[dict]:
 def collect_finnhub_congressional(ticker: str) -> list[dict]:
     """
     Collect congressional trading — STAGE 1 (Dark Positioning).
-    May be premium-gated on free tier; degrades gracefully if so.
+
+    ⚠ RETIRED 2026-07-29 — NO LONGER CALLED. Premium-gated on our Finnhub plan; it returned
+    HTTP 403 on every call while appearing to be a live Dark-Matter input, and the parent
+    `risk` collector stayed HEALTHY on its other sub-sources so nothing alarmed for weeks.
+    Congressional trades are supplied by QUIVER (positioning_intel._build_congress ->
+    /beta/live/congresstrading), verified live at retirement (33/33 tickers with real counts).
+    Kept for reference only: do NOT re-wire this without confirming the plan entitlement AND
+    running the §16 five gates — gate 4 (CURRENCY + ACCESS) is what it fails.
     """
     data = _finnhub_get("stock/congressional-trading", {"symbol": ticker})
     if not data or not data.get("data"):
@@ -493,10 +500,10 @@ def collect_finnhub_risk(conn, risk_topics: list[str],
                 sig["risk_topic"] = topic
                 _store_news_signal(conn, "risk", topic, sig)
                 stored += 1
-            for sig in collect_finnhub_congressional(ticker):
-                sig["risk_topic"] = topic
-                _store_news_signal(conn, "risk", topic, sig)
-                stored += 1
+            # RETIRED 2026-07-29 — collect_finnhub_congressional is premium-gated (403 on
+            # every call, zero rows). Congress data comes from Quiver; see that function's
+            # docstring. Removed here too: retiring an endpoint means ALL call sites, not the
+            # first one found.
             # Stage 4 — media coverage
             for sig in collect_finnhub_news(ticker):
                 sig["risk_topic"] = topic

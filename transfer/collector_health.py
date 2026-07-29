@@ -69,7 +69,13 @@ COLLECTOR_EXPECTATIONS = {
     # HEALTHY (409 stage-1) in the same cycle that logged four 403s — the sub-source failure
     # hidden by aggregation, exactly what this registry exists to expose. Verified live.
     "finnhub_insider":  {"max_gap_minutes": 420, "mode": "risk", "critical": False},
-    "finnhub_congress": {"max_gap_minutes": 420, "mode": "risk", "critical": False},
+    # RETIRED 2026-07-29: Finnhub's congressional endpoint is premium-gated on our plan and
+    # returned 403 on every call, contributing zero rows. The call site is removed; this row is
+    # marked disabled rather than DELETED so the failure history stays readable and it reports
+    # DISABLED instead of a DOWN nobody should act on. Congress data now comes solely from
+    # QUIVER (positioning_intel._build_congress), verified live at retirement.
+    "finnhub_congress": {"max_gap_minutes": 420, "mode": "risk", "critical": False,
+                         "disabled": True},
     # Intentionally OFF (licensing) — DISABLED, not DEGRADED. It was reporting
     # "ran Nm ago but 0 signals" forever: a standing false amber on a source we chose to
     # switch off. A deliberate off-switch is not a fault.
