@@ -895,7 +895,6 @@ def _log_ledger_intake(rec: dict):
             c.close()
         except Exception:
             pass
-    print(f"[startup] google_trends_validation unavailable: {_acc_exc}")
 
 try:
     import x_signal_module as xsig
