@@ -47,6 +47,11 @@ COIN_UNIVERSE: dict = {
             {"ticker": "IBIT", "kind": "etf",      "weight": 1.0},   # BlackRock spot BTC ETF (largest)
             {"ticker": "FBTC", "kind": "etf",      "weight": 0.8},   # Fidelity spot BTC ETF
             {"ticker": "GBTC", "kind": "etf",      "weight": 0.7},   # Grayscale BTC trust/ETF
+            # Stage 0 (Board 2026-08-01, [cold-start-stated]): roster breadth for the ETF
+            # share-flow leg. AUM+NAV verified on our FMP plan for every ticker below.
+            {"ticker": "ARKB", "kind": "etf",      "weight": 0.6},   # ARK 21Shares spot BTC
+            {"ticker": "BITB", "kind": "etf",      "weight": 0.6},   # Bitwise spot BTC
+            {"ticker": "HODL", "kind": "etf",      "weight": 0.5},   # VanEck spot BTC
             {"ticker": "MSTR", "kind": "treasury", "weight": 0.9},   # MicroStrategy — largest corp BTC holder
             {"ticker": "COIN", "kind": "exchange", "weight": 0.5},   # Coinbase — broad crypto exposure
         ],
@@ -56,18 +61,34 @@ COIN_UNIVERSE: dict = {
         "proxies": [
             {"ticker": "ETHA", "kind": "etf",      "weight": 1.0},   # BlackRock spot ETH ETF
             {"ticker": "ETHE", "kind": "etf",      "weight": 0.7},   # Grayscale ETH trust/ETF
+            {"ticker": "FETH", "kind": "etf",      "weight": 0.8},   # Fidelity spot ETH (Stage 0)
+            {"ticker": "ETHW", "kind": "etf",      "weight": 0.5},   # Bitwise spot ETH (Stage 0)
             {"ticker": "COIN", "kind": "exchange", "weight": 0.5},
         ],
     },
     "SOL": {
         "name": "Solana", "fmp": "SOLUSD", "av": "SOL",
         "proxies": [
-            {"ticker": "COIN", "kind": "exchange", "weight": 0.5},   # no dedicated spot ETF in roster → thin
+            # Stage 0 (2026-08-01): US spot SOL ETFs now exist and our FMP plan serves their
+            # AUM+NAV (verified: BSOL $588M, GSOL $95M, TSOL $3M). They vote ONLY when the
+            # ETF share-flow leg ships (CRYPTO_ETF_FLOW); until then SOL remains honestly
+            # structural — _max_votable counts ETFs iff the flag is on (Guardian condition:
+            # absence_class describes the instrument AS DEPLOYED, never as committed).
+            {"ticker": "BSOL", "kind": "etf",      "weight": 1.0},   # Bitwise spot SOL (largest)
+            {"ticker": "GSOL", "kind": "etf",      "weight": 0.7},   # Grayscale SOL
+            {"ticker": "TSOL", "kind": "etf",      "weight": 0.3},   # 21Shares SOL — BELOW the
+            # AUM voting floor; snapshots for evidence, must not vote (Board: quantization
+            # noise 0.14%/day + ~2.3% creation-basket granularity at $3M AUM).
+            {"ticker": "COIN", "kind": "exchange", "weight": 0.5},
         ],
     },
     "XRP": {
         "name": "XRP", "fmp": "XRPUSD", "av": "XRP",
         "proxies": [
+            # Stage 0 (2026-08-01): US spot XRP ETFs verified on our plan (XRPC $272M,
+            # TOXR $124M). Same deployment rule as SOL above.
+            {"ticker": "XRPC", "kind": "etf",      "weight": 1.0},   # Canary XRP (largest)
+            {"ticker": "TOXR", "kind": "etf",      "weight": 0.8},   # 21Shares XRP
             {"ticker": "COIN", "kind": "exchange", "weight": 0.4},
         ],
     },

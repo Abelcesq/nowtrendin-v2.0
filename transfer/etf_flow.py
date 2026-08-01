@@ -43,8 +43,30 @@ import db_compat
 
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
 
-#: The spot-crypto ETFs currently used as crypto-exposure proxies (crypto_signals.COIN_UNIVERSE).
-ETF_PROXIES = ("IBIT", "FBTC", "GBTC", "ETHA", "ETHE")
+#: The spot-crypto ETF roster. DERIVED from crypto_signals.COIN_UNIVERSE (kind=="etf") so a
+#: proxy added there starts its §16 gate-4 CURRENCY clock automatically — the Challenger
+#: caught this list still hard-coded to the original five while the Board was being asked to
+#: flip SOL/XRP on evidence that was never being collected for them. One source of truth;
+#: the tuple below survives only as the fallback if the import ever fails.
+_FALLBACK_PROXIES = ("IBIT", "FBTC", "GBTC", "ETHA", "ETHE")
+
+
+def _roster() -> tuple:
+    try:
+        import crypto_signals as _cs
+        out, seen = [], set()
+        for c in _cs.COIN_UNIVERSE.values():
+            for pr in (c.get("proxies") or []):
+                tk = pr.get("ticker")
+                if pr.get("kind") == "etf" and tk and tk not in seen:
+                    seen.add(tk)
+                    out.append(tk)
+        return tuple(out) if out else _FALLBACK_PROXIES
+    except Exception:
+        return _FALLBACK_PROXIES
+
+
+ETF_PROXIES = _roster()
 
 
 def _connect(db_path: str = DB_PATH):
