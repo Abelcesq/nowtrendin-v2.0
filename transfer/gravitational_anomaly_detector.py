@@ -8559,6 +8559,24 @@ def _humanize_instrument_name(topic_key: str, display: str = "") -> str:
     return f"{name} ({ticker})" if ticker else name
 
 
+def _explainer_is_refusal(text: str) -> bool:
+    """True when an 'explainer' is actually the MODEL DECLINING — meta-commentary about its
+    own limitations, not a definition. The F6 fix stopped garbled names CAUSING refusals,
+    but refusals persisted BEFORE it are still stored, and the UPSERT's empty-only guard
+    means they can never be overwritten — so the cached refusal serves first every time
+    (the INHD 'I don't have reliable current information…' glitch, founder-reported
+    2026-08-01). A refusal is not a definition; it must be treated as ABSENT wherever it
+    appears — serve time, write time, and cache."""
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    markers = ("i don't have", "i do not have", "i cannot", "i can't provide",
+               "i should be honest", "i'm unable", "i am unable", "as an ai",
+               "could you provide", "i would need", "training data",
+               "rather than fabricate", "i apologize")
+    return any(m in t[:400] for m in markers)
+
+
 def _clean_explainer(short, full):
     """Repair an explainer whose `short` is a raw/fenced JSON blob (the
     '```json {"short": ...}' leak). Strips the fence and recovers the real short
@@ -8608,9 +8626,23 @@ def topic_explainer(topic_key: str, topic: str = ""):
         ).fetchone()
         if row and row["short"]:
             _s, _f = _clean_explainer(row["short"], row["full_text"] or "")
-            out = {"available": True, "short": _s, "full": _f, "cached": True}
-            _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
-            return out
+            if _explainer_is_refusal(_s) or _explainer_is_refusal(_f):
+                # A stored refusal is NOT a definition. Blank the row IN PLACE so the
+                # empty-only UPSERT below can finally replace it, and fall through to
+                # regeneration (which now has the F6 humanized name + source context the
+                # original call lacked). Without this, the refusal serves forever and any
+                # good regeneration is blocked by its own overwrite guard.
+                try:
+                    conn.execute("UPDATE topic_explainers SET short='', full_text='' "
+                                 "WHERE topic_key = ?", (topic_key,))
+                    conn.commit()
+                    print(f"[explainer] purged stored refusal for {topic_key}")
+                except Exception as _pe:
+                    print(f"[explainer] refusal purge failed ({topic_key}): {_pe}")
+            else:
+                out = {"available": True, "short": _s, "full": _f, "cached": True}
+                _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
+                return out
     except Exception as e:
         print(f"[explainer] read error: {e}")
     finally:
@@ -8632,6 +8664,13 @@ def topic_explainer(topic_key: str, topic: str = ""):
     # explainer describes the SPECIFIC trend, not a dictionary definition.
     _ctx = _topic_source_context(topic_key)
     ex = ai_grade.explain_topic(name, context=_ctx)   # no DB connection held during this call
+    if ex.get("available") and (_explainer_is_refusal(ex.get("short") or "")
+                                or _explainer_is_refusal(ex.get("full") or "")):
+        # The model declined. Serving that text as "AI CONTEXT" is the glitch this fixes;
+        # persisting it would freeze the refusal into the cache for every future viewer.
+        # Honest absence instead — the UI already renders its own no-definition state.
+        return {"available": False, "reason": "definition_declined — the model could not "
+                "ground this instrument; nothing cached, will retry on a later view"}
     if ex.get("available") and ex.get("short"):
         _record_ai_cost("definition", name, ex.get("cost") or {})
         conn = None
@@ -8689,7 +8728,11 @@ def topic_explainer_stream(topic_key: str, topic: str = ""):
                 (topic_key,)).fetchone()
             if row and row["short"]:
                 _s, _f = _clean_explainer(row["short"], row["full_text"] or "")
-                out = {"available": True, "short": _s, "full": _f, "cached": True}
+                if _explainer_is_refusal(_s) or _explainer_is_refusal(_f):
+                    # Same rule as the non-stream path: a stored refusal is ABSENT, never
+                    # streamed. The row is left for the non-stream path's purge+regenerate.
+                    _s, _f = "", ""
+                out = {"available": bool(_s), "short": _s, "full": _f, "cached": True}
                 _cache.set(cache_key, out, CACHE_TTL_XSIGNAL)
                 yield _sse({"type": "full_text", "short": _s, "full": _f})
                 yield _sse({"type": "done"})
