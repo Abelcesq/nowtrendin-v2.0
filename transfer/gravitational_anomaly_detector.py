@@ -878,8 +878,16 @@ def _log_ledger_intake(rec: dict):
             error_class TEXT, error TEXT, duration_ms INTEGER)""")
         try:
             c.execute("ALTER TABLE ledger_intake_log ADD COLUMN enroll_path TEXT")
+            c.commit()
         except Exception:
-            pass          # forward-only: column already present
+            # ⚠ On Postgres a failed ALTER ABORTS the transaction — without this rollback the
+            # INSERT below dies with "current transaction is aborted" and the intake row is
+            # SILENTLY LOST. Verified live 2026-08-01: the 13:39 and 19:40 failure cycles
+            # wrote no row, blinding the very log built to make failures visible.
+            try:
+                c.rollback()
+            except Exception:
+                pass
         _ms = int((datetime.now(timezone.utc) - rec["started"]).total_seconds() * 1000)
         c.execute("INSERT INTO ledger_intake_log (cycle_at,status,candidates,enrolled,"
                   "maturity_filter,error_class,error,duration_ms,enroll_path) "

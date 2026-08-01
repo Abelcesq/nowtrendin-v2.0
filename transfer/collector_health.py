@@ -116,8 +116,12 @@ def init_health_db(db_path: str = DB_PATH, conn=None):
                  "ALTER TABLE collector_health ADD COLUMN registered_at TEXT"):
         try:
             c.execute(_ddl)
+            c.commit()
         except Exception:
-            pass      # forward-only: column already present
+            try:
+                c.rollback()  # PG: a failed ALTER aborts the txn; the registered_at stamps
+            except Exception:  # below would otherwise silently fail every boot after the first
+                pass
     # Stamp registration for every declared collector that has no row yet, so the grace
     # window is measured from when WE started watching, not from process start (a dyno
     # restart must not reset the clock).

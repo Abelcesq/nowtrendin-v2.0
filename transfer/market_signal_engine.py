@@ -623,8 +623,12 @@ def init_market_signal_db(db_path: str = DB_PATH, conn=None):
     # rows drop out of the baseline instead of contaminating it for ~3 days.
     try:
         c.execute("ALTER TABLE market_signal_history ADD COLUMN series_epoch TEXT")
+        c.commit()
     except Exception:
-        pass          # forward-only: column already present
+        try:
+            c.rollback()      # PG: a failed ALTER aborts the txn; later statements die silently
+        except Exception:
+            pass
     c.commit()
     if own:
         c.close()
