@@ -2931,3 +2931,32 @@ under the corrected n=30 floor), `dead_parser_era_rows: 1`, `clean_cohort_start:
 **Captures archived** in `audits/board/postflip/` (6 endpoints, same set as `preflip/`).
 **Next gate:** watch one full collect cycle, then `INSIDER_FLOW=1` (panel begins accruing;
 hourly ingest tick + liveness tripwire go live with it), then `FLOW_ENROLL=1`.
+
+## 2026-07-31 — Crypto n/a remediation COMPLETE (v299-v301) + dominance flag FLIPPED
+
+**Deployed and live-verified (v300):** the structural-truth disclosure. `/crypto` now serves
+`absence_class` at top level: **11 coins `structural`, 1 (BTC) `transient`** — computed by the
+new `_max_votable()` reachability test (proposed §16a stage 0). `proxies_total / covered /
+votable_max / money_floor_required` moved OUT of the omitted `dark_matter` block to the top
+level, so the surface can finally say WHY (it previously could not — the truth was computed
+and discarded at the boundary). Web terminal (gh-pages) states it per coin: "this coin has N
+usable money-positioning source(s) and the read requires 2. That is a limit of the sources,
+not a temporary gap." The false "not YET available" is gone.
+
+**Dominance flag FLIPPED (founder "please fix", v301):** `INSIDER_ACCUM_DOMINANCE=1`.
+Verified live post-flip: **MSTR insider = neutral** ($998,756 buys vs $22,123,950 sells —
+buying was 4.4% of the tape and the old gross-buy threshold called it "accumulation").
+COIN neutral. Impact measured before flipping: exactly 1 of 12 sampled tickers changes, and
+that one was the ONLY insider vote across all 12 coins — the entire crypto Dark Matter read
+had rested on it. Before-captures in `audits/board/dominance-flip/`. Served crypto payloads
+roll at the next collect cycle (prewarm-cached).
+
+**ETF share-flow evidence collector live (v300):** `etf_flow.snapshot()` records
+shares = AUM/NAV for IBIT/FBTC/GBTC/ETHA/ETHE once per risk cycle — RECORD-ONLY, feeds no
+score. §16 gate 4 ACCESS verified on the paid FMP plan (5/5 proxies); CURRENCY accumulates
+~a week of snapshots, then `currency_report()` renders its verdict. SHARES, never AUM
+(AUM = shares × NAV → circular with M). Even fully wired this fixes BTC+ETH only (2 of 12).
+
+**Open:** flip decision on wiring the ETF vote awaits the currency verdict (~2026-08-05);
+Board doc `BOARD_crypto-money-na_2026-07-29.md`; unanimous CUTs stand (no floor-lowering,
+no on-chain spend).
