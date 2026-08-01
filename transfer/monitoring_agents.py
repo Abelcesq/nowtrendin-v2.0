@@ -159,6 +159,30 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     alerts = []
     summary = {}
 
+    # S6 — STALE PRE-GUARD PAYLOAD CENSUS (Board 2026-07-28). Every display-integrity guard
+    # is forward-only: a row scored BEFORE a guard shipped keeps serving its pre-guard payload
+    # verbatim under INV-1 until it re-scores — which a dead topic never does. The drawdown
+    # row served a fabricated 30.0/z=0.0 for 23 days this way, and NOTHING counted it. This
+    # counts that class so it can never be invisible again. The date is the newest
+    # display-guard ship date; bump it when a new guard lands.
+    _GUARD_SHIP_DATE = "2026-07-20"          # D7 degenerate guard (newest display guard)
+    try:
+        _row = conn.execute(
+            "SELECT COUNT(*) AS n FROM risk_scores WHERE scored_at < ?",
+            (_GUARD_SHIP_DATE,)).fetchone()
+        _stale = int((_row["n"] if hasattr(_row, "keys") else _row[0]) or 0)
+        summary["stale_preguard_rows"] = _stale
+        if _stale:
+            alerts.append({"level": "warn", "block": "B3",
+                           "msg": f"{_stale} served risk row(s) predate the newest display "
+                                  f"guard ({_GUARD_SHIP_DATE}) and still serve their pre-guard "
+                                  f"payload — verify each is honest or has aged out"})
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
     # B4 — scoring freshness: latest score must be within ~1 cycle + margin.
     try:
         row = conn.execute("SELECT MAX(scored_at) m FROM velocity_scores").fetchone()

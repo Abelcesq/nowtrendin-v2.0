@@ -63,7 +63,7 @@ esac
 UNIV_FILES="transfer/financial_risk_gradient.py transfer/crypto_signals.py transfer/crypto_money_gradient.py transfer/market_signal_engine.py"
 uadded="$(git diff --cached --unified=0 -- $UNIV_FILES 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+')"
 if [ -n "$uadded" ]; then
-  uhits="$(printf '%s\n' "$uadded" | grep -Eic 'WATCHLIST_TICKERS|CRYPTO_COINS|COIN_PROXY|_UNIVERSE|add.*ticker|new (asset|instrument|coin|region)')"
+  uhits="$(printf '%s\n' "$uadded" | grep -Eic 'WATCHLIST_TICKERS|CRYPTO_COINS|COIN_PROXY|_UNIVERSE|add.*ticker|new (asset|instrument|coin|region)|_market_lane|na_components|_MARKET_MACRO_NA')"
   if [ "${uhits:-0}" -gt 0 ]; then
     cat >&2 <<'EOF'
 

@@ -11,6 +11,15 @@ Env:  KEEP_CYCLES (default 30)
 import os
 import psycopg2
 
+raise SystemExit(
+    "REFUSED (Board 2026-07-28 / CLAUDE.md S13): this script implements a COUNT-BASED prune "
+    "of velocity_scores (rn > KEEP_CYCLES), which S13 forbids verbatim - 'Do NOT change this "
+    "to a count-based prune; count-based deletes valid history for frequently-scored topics.' "
+    "Retention is handled by _prune_velocity_scores() on the 365-day window. This file is "
+    "retained for the audit record only. Do not re-enable without a founder-signed S13 "
+    "amendment.")
+
+
 KEEP_CYCLES = int(os.getenv("KEEP_CYCLES", "30"))
 
 conn = psycopg2.connect(os.environ["DATABASE_URL"], sslmode="require")

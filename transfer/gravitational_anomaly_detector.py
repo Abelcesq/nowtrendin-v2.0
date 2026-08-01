@@ -580,6 +580,87 @@ def _apify_sweep_budget_ok(reserve_usd: float = None) -> dict:
         return {"ok": True, "used": None, "cap": None, "reserve": reserve, "note": f"read error: {e}"}
 
 
+#: S4-rewrite (Board falsered-review 2026-07-28; EVIDENCE GATE MET: the S3 intake log shows
+#: 16 of 16 cycles FAILED on the statement timeout — the outage is constant, not load-
+#: dependent, and first-crossers begin aging out of the 14-day window ~2026-08-12). The fast
+#: path answers "which topics crossed recently?" from `topic_lifecycle` — one indexed range
+#: scan — then reads ONLY those topics' latest velocity rows in chunked seeks, instead of two
+#: full GROUP-BY aggregates over a 365-day-retention table at peak write pressure.
+LEDGER_ENROLL_FAST = os.getenv("LEDGER_ENROLL_FAST", "0") == "1"
+LEDGER_ENROLL_SCAN = int(os.getenv("LEDGER_ENROLL_SCAN", "1500"))
+LEDGER_ENROLL_CHUNK = int(os.getenv("LEDGER_ENROLL_CHUNK", "50"))
+LEDGER_ENROLL_CHUNK_PAUSE_S = float(os.getenv("LEDGER_ENROLL_CHUNK_PAUSE_S", "0.2"))
+
+
+def _enroll_candidates_fast(conn, floor, first_seen_cut, limit, intake):
+    """First-crossing candidates via `topic_lifecycle` recency — the O(entities) path.
+
+    EQUIVALENCE CONTRACT: the base query's recency key is
+    COALESCE(lc.first_detected_at, MIN(scored_at)) — lifecycle first, MIN as fallback.
+    `_update_topic_lifecycle` writes lifecycle in the SAME transaction as every score row, so
+    the fallback should never bind; /diag/enroll-equivalence measures that claim on live data
+    and is the deploy gate for flipping LEDGER_ENROLL_FAST. A topic somehow missing from
+    lifecycle is SKIPPED, never enrolled under a guessed date — detection_date is a canonical
+    (S14) column and a wrong date is worse than a missed cycle, because the row is never
+    deleted.
+
+    S13-paced: chunked seeks on idx_velocity_topic with a breather between chunks. Worst case
+    ~30 cheap queries + ~6s of pauses, replacing the 2x300s timeout.
+    """
+    import time as _t
+    intake["enroll_path"] = "fast"
+    lc = conn.execute(
+        "SELECT topic_key, first_detected_at FROM topic_lifecycle "
+        "WHERE first_detected_at >= ? ORDER BY first_detected_at DESC LIMIT ?",
+        (first_seen_cut, LEDGER_ENROLL_SCAN)).fetchall()
+
+    def g(r, k, i):
+        return r[k] if hasattr(r, "keys") else r[i]
+    cand = [(g(r, "topic_key", 0), g(r, "first_detected_at", 1)) for r in lc]
+    intake["lifecycle_candidates"] = len(cand)
+    out = []
+    for i in range(0, len(cand), LEDGER_ENROLL_CHUNK):
+        chunk = cand[i:i + LEDGER_ENROLL_CHUNK]
+        keys = [k for k, _ in chunk]
+        ph = ",".join("?" * len(keys))
+        latest = conn.execute(
+            "SELECT v.topic_key, v.topic_display, v.detection_score, v.platforms_active "
+            "FROM velocity_scores v "
+            "INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores "
+            "            WHERE topic_key IN (" + ph + ") GROUP BY topic_key) l "
+            "  ON v.topic_key = l.topic_key AND v.scored_at = l.m "
+            "WHERE v.detection_score >= ?", (*keys, floor)).fetchall()
+        # Maturity as its OWN cheap read, filtered in Python — this deletes the fail-open
+        # trap for good: a maturity failure is caught here, STAMPED, and the cycle proceeds
+        # fail-LABELLED rather than silently relaxed.
+        excl = set()
+        try:
+            for r in conn.execute(
+                    "SELECT topic_key, maturity_class FROM topic_maturity "
+                    "WHERE topic_key IN (" + ph + ")", keys):
+                if str(g(r, "maturity_class", 1) or "").upper() in ("ESTABLISHED", "MONITORING"):
+                    excl.add(g(r, "topic_key", 0))
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            intake["maturity_filter"] = "unavailable"
+        first_by = dict(chunk)
+        for r in latest:
+            tk = g(r, "topic_key", 0)
+            if tk in excl:
+                continue
+            out.append({"topic_key": tk, "topic_display": g(r, "topic_display", 1),
+                        "detection_score": g(r, "detection_score", 2),
+                        "platforms_active": g(r, "platforms_active", 3),
+                        "det_date": first_by.get(tk)})
+        if LEDGER_ENROLL_CHUNK_PAUSE_S and i + LEDGER_ENROLL_CHUNK < len(cand):
+            _t.sleep(LEDGER_ENROLL_CHUNK_PAUSE_S)
+    out.sort(key=lambda r: str(r.get("det_date") or ""), reverse=True)
+    return out[:limit]
+
+
 def _record_top_detections(limit=20, min_detection=None):
     """Log detections as PENDING ledger entries — FIRST-CROSSING enrollment.
 
@@ -619,6 +700,7 @@ def _record_top_detections(limit=20, min_detection=None):
     # could die silently and did, for at least three consecutive cycles, unnoticed.
     _intake = {"status": "failed", "error": "", "error_class": "",
                "candidates": 0, "enrolled": 0, "maturity_filter": "applied",
+               "enroll_path": "base",
                "started": datetime.now(timezone.utc)}
     try:
         _base_sql = """
@@ -637,12 +719,16 @@ def _record_top_detections(limit=20, min_detection=None):
               {tm_where}
             ORDER BY COALESCE(lc.first_detected_at, fs.first_at) DESC LIMIT ?
         """
-        try:
+        rows = None
+        if LEDGER_ENROLL_FAST:
+            rows = _enroll_candidates_fast(conn, floor, first_seen_cut, limit, _intake)
+        if rows is None:
+          try:
             rows = conn.execute(_base_sql.format(
                 tm_join="LEFT JOIN topic_maturity tm ON v.topic_key=tm.topic_key",
                 tm_where="AND UPPER(COALESCE(tm.maturity_class, '')) NOT IN ('ESTABLISHED', 'MONITORING')",
             ), (floor, first_seen_cut, limit)).fetchall()
-        except Exception as _me:
+          except Exception as _me:
             # ⚠ S3-b — FAIL CLOSED ON OPERATIONAL ERRORS (Board 2026-07-28, unanimous).
             # This used to catch ANY exception and retry WITHOUT the maturity filter. A
             # statement timeout is not "topic_maturity absent" — it is a LOAD failure, and the
@@ -790,12 +876,17 @@ def _log_ledger_intake(rec: dict):
             id INTEGER PRIMARY KEY AUTOINCREMENT, cycle_at TEXT, status TEXT,
             candidates INTEGER, enrolled INTEGER, maturity_filter TEXT,
             error_class TEXT, error TEXT, duration_ms INTEGER)""")
+        try:
+            c.execute("ALTER TABLE ledger_intake_log ADD COLUMN enroll_path TEXT")
+        except Exception:
+            pass          # forward-only: column already present
         _ms = int((datetime.now(timezone.utc) - rec["started"]).total_seconds() * 1000)
         c.execute("INSERT INTO ledger_intake_log (cycle_at,status,candidates,enrolled,"
-                  "maturity_filter,error_class,error,duration_ms) VALUES (?,?,?,?,?,?,?,?)",
+                  "maturity_filter,error_class,error,duration_ms,enroll_path) "
+                  "VALUES (?,?,?,?,?,?,?,?,?)",
                   (datetime.now(timezone.utc).isoformat(timespec="seconds"), rec["status"],
                    rec["candidates"], rec["enrolled"], rec["maturity_filter"],
-                   rec["error_class"], rec["error"], _ms))
+                   rec["error_class"], rec["error"], _ms, rec.get("enroll_path") or "base"))
         c.commit()
     except Exception as e:
         print(f"[ledger] intake log write skipped: {e}")
@@ -1452,6 +1543,8 @@ CREATE INDEX IF NOT EXISTS idx_velocity_score
     ON velocity_scores (overall_score DESC, scored_at DESC);
 CREATE INDEX IF NOT EXISTS idx_author_history
     ON author_history (author, platform, community);
+CREATE INDEX IF NOT EXISTS idx_lifecycle_first
+    ON topic_lifecycle (first_detected_at DESC);
 CREATE INDEX IF NOT EXISTS idx_lifecycle_persistence
     ON topic_lifecycle (persistence_rate DESC, current_streak_cycles DESC);
 CREATE INDEX IF NOT EXISTS idx_topic_queries_key
@@ -7215,6 +7308,86 @@ def _enrollment_completeness() -> dict:
     })
     return out
 
+
+@app.get("/diag/enroll-equivalence", dependencies=[Depends(_require_internal)])
+def diag_enroll_equivalence(sample: int = 200):
+    """THE FLIP GATE for LEDGER_ENROLL_FAST (Board condition, falsered review 2026-07-28).
+
+    The fast path takes detection_date from `topic_lifecycle.first_detected_at`; the base
+    query's key is COALESCE(lifecycle, MIN(scored_at)). detection_date is a canonical (S14)
+    column, so before the fast path may run, this measures — per topic, on live data —
+    whether the two agree. Lifecycle is written in the same transaction as every score row,
+    so they SHOULD be identical; this converts "should" into a count. Read-only, chunked
+    seeks only, never the full aggregate.
+    """
+    conn = get_db(DB_PATH)
+    try:
+        cut = (datetime.now(timezone.utc) - timedelta(
+            days=int(os.getenv("LEDGER_ENROLL_RECENT_DAYS", "14")))).isoformat()
+        lc = conn.execute(
+            "SELECT topic_key, first_detected_at FROM topic_lifecycle "
+            "WHERE first_detected_at >= ? ORDER BY first_detected_at DESC LIMIT ?",
+            (cut, max(10, min(int(sample), 1000)))).fetchall()
+
+        def g(r, k, i):
+            return r[k] if hasattr(r, "keys") else r[i]
+        pairs = [(g(r, "topic_key", 0), str(g(r, "first_detected_at", 1) or "")) for r in lc]
+        eq = div = no_vel = 0
+        div_samples = []
+        for i in range(0, len(pairs), 50):
+            keys = [k for k, _ in pairs[i:i + 50]]
+            ph = ",".join("?" * len(keys))
+            mins = {}
+            for r in conn.execute(
+                    "SELECT topic_key, MIN(scored_at) m FROM velocity_scores "
+                    "WHERE topic_key IN (" + ph + ") GROUP BY topic_key", keys):
+                mins[g(r, "topic_key", 0)] = str(g(r, "m", 1) or "")
+            for k, fd in pairs[i:i + 50]:
+                m = mins.get(k)
+                if not m:
+                    no_vel += 1
+                    continue
+                if fd[:10] == m[:10]:
+                    eq += 1
+                else:
+                    div += 1
+                    if len(div_samples) < 5:
+                        div_samples.append({"topic_key": k, "lifecycle": fd[:19],
+                                            "min_scored_at": m[:19]})
+        return {
+            "sampled": len(pairs), "date_equal": eq, "diverged": div,
+            "lifecycle_without_velocity_rows": no_vel,
+            "diverged_samples": div_samples,
+            "window_days": int(os.getenv("LEDGER_ENROLL_RECENT_DAYS", "14")),
+            "verdict": ("EQUIVALENT — lifecycle recency is a faithful stand-in for "
+                        "MIN(scored_at); LEDGER_ENROLL_FAST may flip"
+                        if div == 0 else
+                        "NOT IDENTICAL — divergent topics would enroll under a different "
+                        "detection_date on the fast path; inspect samples before flipping"),
+            "note": "the velocity-side converse (score rows with NO lifecycle row) cannot be "
+                    "measured endpoint-cheaply; the fast path therefore SKIPS any such topic "
+                    "rather than guessing a date",
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/diag/etf-flow", dependencies=[Depends(_require_internal)])
+def diag_etf_flow():
+    """S16 gate-4 CURRENCY evidence for the crypto ETF share-flow leg (Board 2026-07-29).
+
+    Answers the founder's question directly: ARE we receiving data on large crypto purchases
+    and sales? Share-count deltas on the spot ETFs (creations/redemptions) ARE institutional
+    crypto flow — two-sided, daily, price-independent (shares = AUM/NAV, dividing out the
+    price that drives Market Confirmation). This serves the accumulating snapshot evidence;
+    the vote wires ONLY after this verdict passes (S16 gate 5: test before link).
+    """
+    try:
+        import etf_flow
+        return etf_flow.currency_report(DB_PATH)
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
 @app.get("/accuracy/ledger")
 def accuracy_ledger_report():
     """The Accuracy Ledger — documented lead time vs Google Trends breakout.
@@ -7262,6 +7435,19 @@ def accuracy_ledger_report():
                     # Match-validity: LED wins corroborated by the independent Wikipedia
                     # referee vs unchecked (rows resolved before the metadata existed).
                     "ledCorroborated": h.get("led_referee_corroborated"),
+                    # S4: the caveat travels WITH the rate, machine-readable, so no surface
+                    # can render hitRate without being handed its evidentiary status. The
+                    # independent referee has confirmed zero of the LED wins to date, and
+                    # most rest on queries the system itself flags as ambiguous — a reader
+                    # citing the rate without that is citing a number we cannot defend.
+                    "hitRateProvisional": not bool(h.get("led_referee_corroborated")),
+                    "hitRateCaveat": (
+                        None if h.get("led_referee_corroborated")
+                        else "PROVISIONAL: no LED win has yet been corroborated by the "
+                             "independent Wikipedia-pageviews referee "
+                             f"({h.get('led_referee_uncorroborated') or 0} uncorroborated, "
+                             f"{h.get('led_ambiguous_query') or 0} on ambiguous queries). "
+                             "The rate is served for transparency, not citation."),
                     "ledUncorroborated": h.get("led_referee_uncorroborated"),
                     "ledUnchecked": h.get("led_referee_unchecked"),
                     "ledAmbiguousQuery": h.get("led_ambiguous_query"),
@@ -7272,7 +7458,20 @@ def accuracy_ledger_report():
                     # Maturity-segmented — early detection of EMERGING topics is the claim;
                     # established topics can only resolve LAGGED (coverage latency, not the thesis).
                     "byMaturity": h.get("by_maturity"),
-                    "earlyDetectionHitRate": h.get("early_detection_hit_rate_pct"),
+                    # S4 (Board 2026-07-28): while topic_maturity coverage is ZERO the
+                    # "early-detection cohort" is a PARTITION INTO ONE CELL — identical to
+                    # the blended rate and therefore not a cohort. Serving it as one implied
+                    # a purified denominator no code was providing. Withheld with the reason,
+                    # not silently dropped; restored automatically once coverage is real.
+                    "earlyDetectionHitRate": (
+                        h.get("early_detection_hit_rate_pct")
+                        if ((h.get("maturity_coverage") or {}).get("by_topic_maturity") or 0) > 0
+                        else None),
+                    "earlyDetectionWithheldReason": (
+                        None if ((h.get("maturity_coverage") or {}).get("by_topic_maturity") or 0) > 0
+                        else "topic_maturity coverage is 0, so this cohort equals the blended "
+                             "rate — a segmentation label without a segmentation. Withheld "
+                             "until the maturity table actually covers resolved rows."),
                     "earlyDetectionSample": h.get("early_detection_sample"),
                     "maturityCoverage": h.get("maturity_coverage"),
                     # ── ENGINE-EPOCH stamp (board condition, 1.0-DB disposition review

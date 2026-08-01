@@ -200,6 +200,14 @@ def _level(score: float) -> str:
 
 
 # ── Baseline-relative component scoring ─────────────────────────────
+#: S5 — the market series epoch. Bump at ANY parser or definitional change to the inputs
+#: (the event that made every post-flip z a break statistic on 2026-07-27). Legacy NULL rows
+#: read as the DEFAULT epoch, so setting a NEW value instantly retires them from baselines
+#: and the affected components read CALIBRATING until MIN_BASELINE_CYCLES accrue in-epoch.
+_DEFAULT_EPOCH = "e2-parserfix-20260727"
+SERIES_EPOCH = os.getenv("MARKET_SERIES_EPOCH", _DEFAULT_EPOCH)
+
+
 def _z_to_unit(z: float) -> float:
     """z=0 (at baseline) → 0.30; z=2 → ~0.74; z=3+ → ~0.96. Below-baseline floors low."""
     if z <= 0:
@@ -231,11 +239,24 @@ def score_component(current: float, baseline: Optional[dict]) -> dict:
         # constant-proxy case). A current that deviates from the constant is a real
         # signal and is never stamped. Display-only: the component still participates
         # in the weighted score UNCHANGED — score-side exclusion (D8) stays gated.
-        degenerate = (baseline.get("stdev", 1.0) <= 0.05 and current == mean)
-        return {"score": round(_z_to_unit(z), 3), "z": round(z, 2),
+        # S6 (Board 2026-07-28, Economist/Expansionist): the old predicate was FLOAT-EXACT —
+        # `current == mean` against a 3dp-ROUNDED stored mean, so a constant series whose
+        # value is not representable at 3dp (0.3333...) defeated the guard and served 30.0
+        # wearing the measured badge (the drawdown row). Tolerance is half the stdev floor:
+        # scale-relative to the 0-1 component range, and any genuine signal clears it.
+        degenerate = (baseline.get("stdev", 1.0) <= 0.05
+                      and abs(current - mean) < 0.025)
+        unit = _z_to_unit(z)
+        # S5 (Challenger): _z_to_unit clamps at 0.05 and 1.0, so z=-3.15 and z=-10 render the
+        # SAME 5.0 — a left-censored value that looks most precise exactly where it is least
+        # informative. A railed value keeps its number but is stamped, so no reader (human or
+        # ledger) can mistake a censoring boundary for a measurement.
+        railed = (unit <= 0.05) or (unit >= 1.0)
+        return {"score": round(unit, 3), "z": round(z, 2),
                 "baseline_relative": (not calibrating) and not degenerate,
                 "calibrating": calibrating,
                 "degenerate_baseline": degenerate,
+                "rail": railed,
                 "baseline_samples": samples, "current": current}
     return {"score": round(_norm(current) * 0.6, 3), "baseline_relative": False,
             "calibrating": True, "baseline_samples": samples, "current": current}
@@ -594,6 +615,16 @@ def init_market_signal_db(db_path: str = DB_PATH, conn=None):
         )
     """)
     c.execute("CREATE INDEX IF NOT EXISTS idx_ms_item ON market_signal_history(item_key)")
+    # S5 (Board 2026-07-28, F-1): the SERIES EPOCH. The parser flip changed the data-
+    # generating process while the 12-cycle baseline window straddled it, so every post-flip
+    # insider z was measured against a dead-parser mean (the SpaceX z=-3.15 artifact). The
+    # epoch column lets get_market_baselines refuse to standardise across a definitional
+    # break: bump MARKET_SERIES_EPOCH at the NEXT parser/definitional change and old-epoch
+    # rows drop out of the baseline instead of contaminating it for ~3 days.
+    try:
+        c.execute("ALTER TABLE market_signal_history ADD COLUMN series_epoch TEXT")
+    except Exception:
+        pass          # forward-only: column already present
     c.commit()
     if own:
         c.close()
@@ -627,8 +658,9 @@ def record_market_cycle(item_key: str, components_current: dict,
                 continue
             rid = hashlib.md5(f"{item_key}-{comp}-{sig_date}T{sig_time}".encode()).hexdigest()[:16]
             c.execute("INSERT OR IGNORE INTO market_signal_history "
-                      "(id, item_key, component, value, signal_date, signal_time) VALUES (?,?,?,?,?,?)",
-                      (rid, item_key, comp, float(val), sig_date, sig_time))
+                      "(id, item_key, component, value, signal_date, signal_time, series_epoch) "
+                      "VALUES (?,?,?,?,?,?,?)",
+                      (rid, item_key, comp, float(val), sig_date, sig_time, SERIES_EPOCH))
         c.commit()
     except Exception as e:
         print(f"  [market_signal] record error ({item_key}): {e}")
@@ -642,9 +674,14 @@ def get_market_baselines(item_key: str, lookback: int = 12,
     own = conn is None
     c = conn or _conn(db_path)
     try:
+        # S5: only rows from the CURRENT series epoch may form a baseline. Legacy rows
+        # (series_epoch NULL, written before the column existed) belong to the DEFAULT epoch,
+        # so today this filter changes nothing; the moment MARKET_SERIES_EPOCH is bumped at a
+        # definitional change, pre-break rows stop feeding the mean instead of poisoning it.
         rows = c.execute("SELECT component, value, signal_date, signal_time FROM market_signal_history "
-                         "WHERE item_key = ? ORDER BY signal_date DESC, signal_time DESC",
-                         (item_key,)).fetchall()
+                         "WHERE item_key = ? AND COALESCE(series_epoch, ?) = ? "
+                         "ORDER BY signal_date DESC, signal_time DESC",
+                         (item_key, _DEFAULT_EPOCH, SERIES_EPOCH)).fetchall()
     except Exception:
         rows = []
     finally:
