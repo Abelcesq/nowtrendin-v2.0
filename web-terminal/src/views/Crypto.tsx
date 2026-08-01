@@ -166,10 +166,10 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
           <div className="main-sub">
             {allMoneyAbsent
               ? <>Crypto <b>Market Confirmation</b> — this view shows each coin's own price
-                confirmation only. It does <b>not</b> include a money read: our crypto money
-                signal is derived from crypto-exposure equities, and for these coins the
-                available sources cannot produce one — <b>not merely today</b>. Measurement,
-                not advice.</>
+                confirmation only. It does <b>not</b> include a money read: for most of these
+                coins the available sources <b>cannot</b> produce one (a limit of the sources,
+                not a temporary gap); for the rest, no money-positioning source reported this
+                cycle. Each coin's panel states which case applies. Measurement, not advice.</>
               : <>Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
                 vs Market Confirmation (the coin's own price). Measurement, not advice.</>}
           </div>

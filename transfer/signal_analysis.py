@@ -146,9 +146,18 @@ def _money(item: dict, ledger: dict, asset: str) -> dict:
     scope += "It is descriptive, not prescriptive."
     sections.append({"heading": "Scope & limitations", "body": scope})
 
-    strength_lbl = ("early-stage" if (gap is not None and gap >= 16) else
-                    "later-stage" if (gap is not None and gap <= -16) else "balanced")
-    headline = f"{tier + ' — ' if tier else ''}{strength_lbl} money read".strip()
+    # D2 (founder-supplied analysis, verified 2026-08-01): when the money read is ABSENT,
+    # `gap` is None and this label defaulted to "balanced" — producing the production
+    # headline "ABSENT — balanced money read". "Balanced" asserts an OBSERVED-AND-NETTED
+    # neutral flow three inches under a panel saying "absent, not zero". A word that can
+    # only be earned by measurement was being served by a fallback branch. Absence now
+    # names itself; "balanced" is reserved for a measured near-zero gap.
+    if gap is None:
+        headline = f"{tier + ' — ' if tier else ''}no money read (absence, not neutral)".strip()
+    else:
+        strength_lbl = ("early-stage" if gap >= 16 else
+                        "later-stage" if gap <= -16 else "balanced")
+        headline = f"{tier + ' — ' if tier else ''}{strength_lbl} money read".strip()
     return {"title": "Signal Analysis", "kind": asset, "item": name, "headline": headline,
             "facts": facts, "sections": sections,
             "disclaimer": (_DISCLAIMER_CRYPTO if crypto else _DISCLAIMER),
