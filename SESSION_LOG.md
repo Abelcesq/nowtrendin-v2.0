@@ -2960,3 +2960,28 @@ score. §16 gate 4 ACCESS verified on the paid FMP plan (5/5 proxies); CURRENCY 
 **Open:** flip decision on wiring the ETF vote awaits the currency verdict (~2026-08-05);
 Board doc `BOARD_crypto-money-na_2026-07-29.md`; unanimous CUTs stand (no floor-lowering,
 no on-chain spend).
+
+## 2026-08-01 (late) — S7 EXECUTED: INSIDER_FLOW=1 (v308). The insider panel is accruing.
+
+**Pre-flight gates, all green before the flip:** INSIDER_PARSER_FIX=1 (ingest refusal
+satisfied) · ACTOR_ID_SALT set 64-hex (B4 refusal satisfied) · prereg `2d65eac796c28476`
+active, term_drift [] · liveness OK (finviz_insider HEALTHY: 154 signals, 87 distinct) ·
+collectors 18 healthy / 0 down · /scores 200 in 0.56s. FLOW_ENROLL stays 0 — the panel
+accrues; NOTHING enrolls until the founder fires the last flag in the chain.
+
+**What turns on with this flip:** hourly market-wide Form-4 ingestion into the append-only
+`insider_events` panel (B10 tick, first fire ~1h post-boot); §16a universe promotion
+(candidate→calibrating, never auto-active); the panel-ingest layer of the liveness tripwire
+(the source layer was already un-gated). First-ingest watch armed (panel.events > 0).
+
+**Also this session, same day:** trend-ledger intake RESURRECTED (first fast-path cycle:
+recorded 3, status ok, pending 1096→1099, after 17 straight failures); PG txn-abort ALTER
+bug fixed across 3 sites (verified live: 'current transaction is aborted' was eating intake
+rows); crypto flow Board ruling + Stage 0 (15-ETF roster dark, SOL/XRP §16 clocks started);
+D1/D2 display lies fixed (absence may never wear a measured word); COT bitemporal rule
+adopted for the next onboarding. Known follow-up: the S6 stale-payload census over-counts
+(60,879 = ALL historical risk rows, needs latest-row-per-topic denominator).
+
+**Remaining flips, in order:** FLOW_ENROLL=1 (after ≥2 clean panel days; opens flow-ledger
+enrollment under the re-locked prereg) · CRYPTO_ETF_FLOW=1 (Stage 2, ~08-10, after the
+currency verdict + shadow votes + reconciliation).
