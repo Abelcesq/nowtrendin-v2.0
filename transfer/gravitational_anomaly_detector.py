@@ -7390,8 +7390,34 @@ def diag_etf_flow():
     the vote wires ONLY after this verdict passes (S16 gate 5: test before link).
     """
     try:
-        import etf_flow
-        return etf_flow.currency_report(DB_PATH)
+        import etf_flow, crypto_signals as _cs
+        rep = etf_flow.currency_report(DB_PATH)
+        # STAGE 1 SHADOW VOTES (Board 2026-08-01, Executioner): compute what each fund WOULD
+        # vote, through the REAL _etf_flow_vote, against the production snapshot table — so
+        # the leg is verified same-hour instead of waiting a 6h cycle, and GBTC's chronic
+        # redemption is visible BEFORE the flip rather than discovered after it.
+        shadow, elig = {}, 0
+        for t in etf_flow.ETF_PROXIES:
+            try:
+                v, d = _cs._etf_flow_vote(t)
+            except Exception as _ve:
+                shadow[t] = {"error": str(_ve)[:80]}
+                continue
+            f = (d or {}).get("etf_flow") or {}
+            shadow[t] = {"would_vote": v, "delta_pct_per_day": f.get("delta_pct_per_day"),
+                         "gap_days": f.get("gap_days"),
+                         "note": f.get("reason") or f.get("ineligible")}
+            if v is not None:
+                elig += 1
+        rep["shadow_votes"] = shadow
+        rep["eligible_voters"] = elig
+        rep["flag"] = {"CRYPTO_ETF_FLOW": os.getenv("CRYPTO_ETF_FLOW", "0"),
+                       "min_aum": _cs.ETF_VOTE_MIN_AUM,
+                       "floor_pct_per_day": _cs.ETF_VOTE_FLOOR_PCT,
+                       "scale_pct": _cs.ETF_VOTE_SCALE_PCT}
+        rep["note"] = ("shadow_votes are what WOULD be cast if CRYPTO_ETF_FLOW were on; "
+                       "nothing here is served or scored while the flag is off")
+        return rep
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
 

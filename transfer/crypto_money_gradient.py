@@ -109,9 +109,17 @@ def _max_votable(coin: str) -> int:
     try:
         import crypto_signals as _cs
         c = _cs.COIN_UNIVERSE.get((coin or "").upper()) or {}
-        insider_votable = {"treasury", "exchange"}
+        # Guardian condition (Board 2026-08-01): ETF kinds count as votable ONLY when the
+        # share-flow leg is actually DEPLOYED. Counting them the moment proxies land in the
+        # universe would serve SOL/XRP as "transient" while the runtime instrument still
+        # cannot emit a value — a "not yet" promise contingent on an unflipped flag, i.e.
+        # the same false-promise defect in the optimistic direction. absence_class must
+        # describe the instrument AS DEPLOYED, and it flips atomically with the flag.
+        votable = {"treasury", "exchange"}
+        if getattr(_cs, "CRYPTO_ETF_FLOW", False):
+            votable = votable | {"etf"}
         return sum(1 for p in (c.get("proxies") or [])
-                   if p.get("kind") in insider_votable)
+                   if p.get("kind") in votable)
     except Exception:
         return 0
 

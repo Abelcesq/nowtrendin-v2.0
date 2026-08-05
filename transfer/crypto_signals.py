@@ -223,6 +223,49 @@ def price_momentum(coin: str) -> dict:
 
 
 # ── MONEY MOVEMENT (D): informed money via proxy securities ─────────────────────────────────
+#: --- ETF SHARE-FLOW LEG (Stage 1; Board 2026-08-01) - flag-gated, DEFAULT OFF ---------
+#: The two-sided crypto money read: net creations (+) / redemptions (-) of the spot funds.
+#: BRIDGE CONSTANTS (16a stage-1 CALIBRATING read - explicitly NOT the destination): the
+#: Board rejected these numbers as 4-day-derived and pre-declared the replacement - per-fund
+#: floors read off a >=30-trading-day study via the committed formula, then a robust z on the
+#: coin's own aggregate flow (see audits/board/CRYPTO_FLOW_SPEC_v1_2026-08-02.md). Tuning
+#: these quietly instead of running that study is the forbidden path.
+CRYPTO_ETF_FLOW = os.getenv("CRYPTO_ETF_FLOW", "0") == "1"
+ETF_VOTE_MIN_AUM = float(os.getenv("ETF_VOTE_MIN_AUM", "50000000"))    # $50M eligibility floor
+ETF_VOTE_FLOOR_PCT = float(os.getenv("ETF_VOTE_FLOOR_PCT", "0.10"))    # per-day materiality
+ETF_VOTE_SCALE_PCT = float(os.getenv("ETF_VOTE_SCALE_PCT", "1.0"))     # |delta| where vote = +/-1
+
+
+def _etf_flow_vote(ticker: str):
+    """(vote, detail) for one spot-fund proxy from recorded share-count deltas.
+
+    Vote semantics, PRE-DECLARED (Board conditions):
+      - fund below ETF_VOTE_MIN_AUM -> None (INELIGIBLE - a $3M fund's creation basket is
+        ~2.3% of its shares; it would vote on quantization, so it never votes at all);
+      - stale / discontinuity / no data -> None (no read, not a zero);
+      - |delta| below the floor -> vote 0.0, IN the denominator - a measured quiet day is
+        information (the sub-floor rule the Challenger required be declared: unanimous
+        sub-floor days read as measured-neutral, never as absence);
+      - else sign(delta) * min(1, |delta|/scale) - magnitude-scaled, never the binary latch
+        that broke the insider vote ($250K and $250M reading identically).
+    """
+    import etf_flow
+    d = etf_flow.latest_delta(ticker)
+    detail = {"etf_flow": d}
+    if not d.get("available"):
+        return None, detail
+    aum = d.get("aum_latest") or 0.0
+    if aum < ETF_VOTE_MIN_AUM:
+        detail["etf_flow"] = {**d, "ineligible": f"AUM ${aum:,.0f} below "
+                              f"${ETF_VOTE_MIN_AUM:,.0f} voting floor"}
+        return None, detail
+    delta = d["delta_pct_per_day"]
+    if abs(delta) < ETF_VOTE_FLOOR_PCT:
+        return 0.0, detail
+    vote = (1.0 if delta > 0 else -1.0) * min(1.0, abs(delta) / ETF_VOTE_SCALE_PCT)
+    return round(vote, 3), detail
+
+
 def _proxy_vote(sig: dict) -> Optional[float]:
     """Signed [-1,1] directional vote for ONE proxy from av_dark_positioning.signal_for output.
     Insider: BUYING (signal=='accumulation') → +1; routine net selling is low-information → no insider
@@ -260,16 +303,29 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
     num = 0.0          # weighted signed direction
     den = 0.0          # sum of weights that produced a usable vote
     for p in proxies:
-        sig = avdp.signal_for(p["ticker"], name=p["ticker"], with_institutional=CRYPTO_FULL_DM)
-        vote = _proxy_vote(sig)
-        ins = (sig or {}).get("insider") or {}
-        inst = (sig or {}).get("institutional") or {}
-        detail.append({
-            "ticker": p["ticker"], "kind": p["kind"], "weight": p["weight"],
-            "vote": vote, "combined_flow": (sig or {}).get("combined_flow"),
-            "insider_net_usd": ins.get("net_usd"), "inst_net_shares": inst.get("net_shares"),
-            "has_data": vote is not None,
-        })
+        if p.get("kind") == "etf" and CRYPTO_ETF_FLOW:
+            # The share-flow leg: two-sided, price-independent, from recorded snapshots
+            # only - no network call on this path (prewarm serves crypto; S13).
+            vote, _fd = _etf_flow_vote(p["ticker"])
+            _f = _fd.get("etf_flow") or {}
+            detail.append({
+                "ticker": p["ticker"], "kind": p["kind"], "weight": p["weight"],
+                "vote": vote,
+                "etf_flow_delta_pct": _f.get("delta_pct_per_day"),
+                "etf_flow_note": _f.get("reason") or _f.get("ineligible"),
+                "has_data": vote is not None,
+            })
+        else:
+            sig = avdp.signal_for(p["ticker"], name=p["ticker"], with_institutional=CRYPTO_FULL_DM)
+            vote = _proxy_vote(sig)
+            ins = (sig or {}).get("insider") or {}
+            inst = (sig or {}).get("institutional") or {}
+            detail.append({
+                "ticker": p["ticker"], "kind": p["kind"], "weight": p["weight"],
+                "vote": vote, "combined_flow": (sig or {}).get("combined_flow"),
+                "insider_net_usd": ins.get("net_usd"), "inst_net_shares": inst.get("net_shares"),
+                "has_data": vote is not None,
+            })
         if vote is not None:
             num += p["weight"] * vote
             den += p["weight"]

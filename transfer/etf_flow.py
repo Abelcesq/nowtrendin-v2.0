@@ -192,3 +192,50 @@ if __name__ == "__main__":
     print(json.dumps(snapshot(), indent=1))
     print("\n--- currency evidence so far ---")
     print(json.dumps(currency_report(), indent=1))
+
+def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
+    """Day-over-day share-count change for one ETF — the raw material of a flow vote.
+
+    Uses the last two DISTINCT snapshot dates. Rules (Board 2026-08-01, Executioner):
+      - gap of 2-3 days (weekend/missed cycle): the delta is PER-DAY NORMALIZED;
+      - gap > 5 days: STALE, no vote (a stale read must never pass as today's flow);
+      - |delta| > 20%/day: DISCONTINUITY, no vote (reverse split / closure / provider
+        garbage — a real institutional day measured so far is ~1-3%).
+    Returns shares-based numbers ONLY; `aum_latest` rides along for the ELIGIBILITY floor,
+    never for the signal (the circularity rule).
+    """
+    c = _connect(db_path)
+    try:
+        rows = [dict(r) for r in c.execute(
+            "SELECT snapshot_date, shares, aum FROM etf_share_snapshots "
+            "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 8", (ticker.upper(),)).fetchall()]
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:100]}
+    finally:
+        c.close()
+    seen, distinct = set(), []
+    for r in rows:
+        if r["snapshot_date"] not in seen and r.get("shares"):
+            seen.add(r["snapshot_date"])
+            distinct.append(r)
+    if len(distinct) < 2:
+        return {"available": False, "reason": "fewer than 2 snapshot days"}
+    b, a = distinct[0], distinct[1]          # newest, previous
+    try:
+        d_new = datetime.strptime(b["snapshot_date"], "%Y-%m-%d")
+        d_old = datetime.strptime(a["snapshot_date"], "%Y-%m-%d")
+        gap = max(1, (d_new - d_old).days)
+    except Exception:
+        gap = 1
+    if gap > 5:
+        return {"available": False, "reason": f"stale: {gap}-day gap between snapshots",
+                "stale": True, "gap_days": gap}
+    pct_per_day = round(100.0 * (b["shares"] - a["shares"]) / a["shares"] / gap, 4)
+    if abs(pct_per_day) > 20.0:
+        return {"available": False, "reason": f"discontinuity: {pct_per_day}%/day "
+                "(split/closure-scale step, not flow)", "discontinuity": True,
+                "delta_pct_per_day": pct_per_day, "gap_days": gap}
+    return {"available": True, "delta_pct_per_day": pct_per_day, "gap_days": gap,
+            "from_date": a["snapshot_date"], "to_date": b["snapshot_date"],
+            "shares_from": a["shares"], "shares_to": b["shares"],
+            "aum_latest": b.get("aum")}
