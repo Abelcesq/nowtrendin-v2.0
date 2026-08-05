@@ -3022,3 +3022,36 @@ published flows; #5 venue_diffusion freeze for crypto (designed, NOT coded); lat
 the only liveness noise was the false RED above. Recommend: observe one clean GREEN ingest
 post-v309, then the founder may fire FLOW_ENROLL=1 (success = pending_treated ≥1,
 pending_control ≥3, treated rows carrying sector+size).
+
+## 2026-08-04 (PT, evening) — Chairman rulings executed: A1 + U2 + S6 shipped; FLOW_ENROLL=1 LIVE
+
+**Board session** (`BOARD_status-review_2026-08-04.md`): six independent memos on the health
+check + recent updates. Unanimous: F2 flips on gates, not the calendar. Split: F1 timing
+(five said days; Challenger demanded the window floor). Chairman ruled; all rulings executed:
+
+- **A1 (prereg amendment, pre-enrollment — `FLOW_PREREG_AMENDMENT_A1_2026-08-04.md`), v310:**
+  (1) window floor — `qualify_clusters` refuses until `window_start >= panel_start`
+  (Challenger's left-censoring condition; live: window 07-22 < panel 08-02 → refusing,
+  spans ~mid-Aug mechanically); (2) canonical-identity counting — name variants collapse
+  per context (same normalized name + same ticker + compatible role; conflicts flagged
+  never merged; panel untouched); new read-only **similar_fragmentation agent** in
+  run_all (live: 0 boundary crossings on the real panel — no fabricated clusters exist);
+  (3) jurisdiction column (default 'US') on insider_events + flow_pending_detections +
+  flow_ledger, stamped at ingest/enroll; (4) stamp convention: prose/comments PT, data
+  stays UTC (§14 untouched).
+- **U2 trio, v312:** committed all-duplicate regression in the self-test (asserts STORED
+  coverage rows); `insider_coverage.parsed_tickers` + `method='v2-dual'` epoch stamp
+  (old rows untouched, NULL-fallback in liveness); liveness alarms on PARSED tickers
+  (rows the parser read) closing the residual sub-$250K false-RED class + reconciling
+  with collector_health's denominator.
+- **S6, v312:** stale pre-guard census = latest-row-per-topic (served exposure):
+  60,879 rows → **5 topics** (actionable; verify or age out).
+- **FLOW_ENROLL=1 (config v311, Chairman-fired):** full chain armed — INSIDER_FLOW=1 +
+  FLOW_ENROLL=1, prereg 2d65eac796c28476 active, drift [], liveness GREEN post-fix
+  (54 scorable tickers, hourly). Enrollment self-starts when the floor spans; success
+  check: pending_treated ≥ 1, pending_control ≥ 3, strata populated.
+
+**Next:** F2 gate work (venue_diffusion freeze + latency stamps in one dark change →
+reconciliation harness with PRE-DECLARED tolerance band → founder flips CRYPTO_ETF_FLOW=1
++ cohort start same command); key rotations (QUIVER/FMP); referee corroboration; the 5
+stale pre-guard topics; S8 conflict + Economist prescriptions await Chairman ruling.
