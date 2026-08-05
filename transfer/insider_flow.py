@@ -298,6 +298,14 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
                 txn_iso = None
 
             tkr = (r.get("ticker") or "").upper().strip()
+            # Coverage counts every ticker that SURVIVED PARSING — before the duplicate
+            # check. The liveness alarm exists to catch a dead parser; a duplicate is
+            # proof the parser worked (it re-derived the identical id). Counting only
+            # NEW inserts made every steady-state hourly pass of a slow-moving feed
+            # read as "170 raw → 4 distinct", firing the dead-parser RED on a healthy
+            # source (first observed 2026-08-05; collector_health saw 81 distinct from
+            # the same pull).
+            stats["tickers"].add(tkr)
             name = r.get("owner") or ""
             ah = actor_id(name)
             rid = hashlib.md5(
@@ -337,7 +345,6 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
                 f"events_seen=market_universe.events_seen+1",
                 (tkr, now, filed_iso))
             stats["written"] += 1
-            stats["tickers"].add(tkr)
 
         # Defect D: judge truncation on the SOURCE's raw row count, not on what survived
         # parsing — dropping malformed rows would otherwise make a capped day look uncapped.
