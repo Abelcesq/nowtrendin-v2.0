@@ -132,7 +132,8 @@ def init_flow_db(db_path: str = DB_PATH):
             baseline_window_start TEXT, baseline_window_end TEXT,
             pre_arrived INTEGER DEFAULT 0, size_decile INTEGER, sector TEXT,
             prereg_id TEXT, param_version TEXT,
-            timeout_date TEXT, last_checked TEXT, status TEXT DEFAULT 'pending')
+            timeout_date TEXT, last_checked TEXT, status TEXT DEFAULT 'pending',
+            jurisdiction TEXT DEFAULT 'US')
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS flow_ledger (
@@ -145,8 +146,23 @@ def init_flow_db(db_path: str = DB_PATH):
             scheduled TEXT, disclosure_echo INTEGER DEFAULT 0,
             verdict TEXT, pre_arrived INTEGER DEFAULT 0,
             size_decile INTEGER, sector TEXT,
-            prereg_id TEXT, param_version TEXT, resolved_at TEXT)
+            prereg_id TEXT, param_version TEXT, resolved_at TEXT,
+            jurisdiction TEXT DEFAULT 'US')
     """)
+    # Jurisdiction stamped from row one (Board 2026-08-04, Expansionist; founder-ordered):
+    # an append-only ledger must never need a migration after a year of accrual. Each
+    # ALTER carries its own rollback guard — a failed forward-only ALTER on PG aborts the
+    # transaction and silently kills the writes behind it (the 2026-08-01 lesson).
+    for _jd in ("ALTER TABLE flow_pending_detections ADD COLUMN jurisdiction TEXT DEFAULT 'US'",
+                "ALTER TABLE flow_ledger ADD COLUMN jurisdiction TEXT DEFAULT 'US'"):
+        try:
+            conn.execute(_jd)
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS flow_gate_rejects (
             reason TEXT PRIMARY KEY, count INTEGER DEFAULT 0, updated_at TEXT)
@@ -333,7 +349,8 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
         cols = ("id,cohort,match_group,ticker,name,detection_date,disclosure_ts,"
                 "observable_value,direction,baseline_median,baseline_samples,"
                 "baseline_window_start,baseline_window_end,pre_arrived,size_decile,"
-                "sector,prereg_id,param_version,timeout_date,last_checked,status")
+                "sector,prereg_id,param_version,timeout_date,last_checked,status,"
+                "jurisdiction")
         written = 0
         for cohort, r in rows:
             rb = r.get("baseline") or {}
@@ -349,7 +366,7 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
             rid = _mk_id(cohort, r.get("ticker"), det, pre["id"], group)
             cur = conn.execute(
                 f"INSERT INTO flow_pending_detections ({cols}) "
-                f"VALUES ({','.join([ph] * 21)}) ON CONFLICT (id) DO NOTHING",
+                f"VALUES ({','.join([ph] * 22)}) ON CONFLICT (id) DO NOTHING",
                 (rid, cohort, group, (r.get("ticker") or "").upper(), r.get("name") or "",
                  _canon_date(r.get("detection_date")) or det, r.get("disclosure_ts") or "",
                  float(r.get("observable_value") or 0), int(r.get("direction") or 0),
@@ -357,7 +374,8 @@ def enroll(treated: dict, controls: Sequence[dict], db_path: str = DB_PATH) -> d
                  rb.get("window_start") or "", rb.get("window_end") or "",
                  1 if r.get("pre_arrived") else 0,
                  r.get("size_decile"), r.get("sector") or "",
-                 pre["id"], pre.get("param_version") or "", timeout, "", "pending"))
+                 pre["id"], pre.get("param_version") or "", timeout, "", "pending",
+                 r.get("jurisdiction") or "US"))
             # Count ACTUAL inserts, never loop iterations — that conflation is what let the
             # parity check pass on a swallowed insert.
             # If rowcount is unavailable we must NOT assume success — that silently
@@ -549,15 +567,17 @@ def sweep(db_path: str = DB_PATH, arrival_fn=None, limit: int = 200, today: str 
                 lcols = ("id,cohort,match_group,ticker,name,detection_date,disclosure_ts,"
                          "observable_value,direction,baseline_median,arrival_date,"
                          "lead_days,ratio_to_baseline,scheduled,disclosure_echo,verdict,"
-                         "pre_arrived,size_decile,sector,prereg_id,param_version,resolved_at")
+                         "pre_arrived,size_decile,sector,prereg_id,param_version,resolved_at,"
+                         "jurisdiction")
                 conn.execute(
-                    f"INSERT INTO flow_ledger ({lcols}) VALUES ({','.join([ph] * 22)}) "
+                    f"INSERT INTO flow_ledger ({lcols}) VALUES ({','.join([ph] * 23)}) "
                     f"ON CONFLICT (id) DO NOTHING",
                     (p["id"], p["cohort"], p["match_group"], p["ticker"], p.get("name") or "",
                      det, p.get("disclosure_ts") or "", p.get("observable_value"),
                      p.get("direction"), p.get("baseline_median"), arrival_date, lead, ratio,
                      sched, echo, verdict, p.get("pre_arrived") or 0, p.get("size_decile"),
-                     p.get("sector") or "", p.get("prereg_id"), p.get("param_version"), _now()))
+                     p.get("sector") or "", p.get("prereg_id"), p.get("param_version"), _now(),
+                     p.get("jurisdiction") or "US"))
                 conn.execute(f"UPDATE flow_pending_detections SET status='resolved', "
                              f"last_checked={ph} WHERE id={ph}", (_now(), p["id"]))
                 out[{"ARRIVED": "arrived", "PRE_ARRIVED": "pre_arrived",

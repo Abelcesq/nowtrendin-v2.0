@@ -180,8 +180,23 @@ def init_insider_db(db_path: str = DB_PATH):
             ticker TEXT, signal_date TEXT, txn_date TEXT,
             actor_hash TEXT, role_raw TEXT, role_class TEXT,
             txn_code TEXT, value_usd REAL, shares REAL, price REAL,
-            source TEXT, ingested_at TEXT)
+            source TEXT, ingested_at TEXT,
+            jurisdiction TEXT DEFAULT 'US')
     """)
+    # Jurisdiction column (Board 2026-08-04, Expansionist; founder-ordered same day):
+    # stamped NOW, at 397 rows, precisely so an append-only panel never needs the
+    # migration-after-a-year-of-accrual. 'US' is the only live value (SEC Form 4 via
+    # Finviz); a future PDMR/SEDI collector writes its own. Forward-only ALTER with the
+    # rollback guard — a failed ALTER on PG aborts the transaction and would silently
+    # kill every write behind it (the 2026-08-01 txn-abort lesson).
+    try:
+        conn.execute("ALTER TABLE insider_events ADD COLUMN jurisdiction TEXT DEFAULT 'US'")
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
     # Identity lives apart from the event, with its own retention clock (GDPR Art. 6/17).
     conn.execute("""
         CREATE TABLE IF NOT EXISTS actor_reference (
@@ -303,8 +318,8 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
             # proof the parser worked (it re-derived the identical id). Counting only
             # NEW inserts made every steady-state hourly pass of a slow-moving feed
             # read as "170 raw → 4 distinct", firing the dead-parser RED on a healthy
-            # source (first observed 2026-08-05; collector_health saw 81 distinct from
-            # the same pull).
+            # source (first observed 2026-08-04 PT; collector_health saw 81 distinct
+            # from the same pull).
             stats["tickers"].add(tkr)
             name = r.get("owner") or ""
             ah = actor_id(name)
@@ -318,10 +333,11 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
             # like a successful write. Same shape, same fix.
             cur = conn.execute(
                 f"INSERT INTO insider_events (id,ticker,signal_date,txn_date,actor_hash,"
-                f"role_raw,role_class,txn_code,value_usd,shares,price,source,ingested_at) "
-                f"VALUES ({','.join([ph]*13)}) ON CONFLICT (id) DO NOTHING",
+                f"role_raw,role_class,txn_code,value_usd,shares,price,source,ingested_at,"
+                f"jurisdiction) "
+                f"VALUES ({','.join([ph]*14)}) ON CONFLICT (id) DO NOTHING",
                 (rid, tkr, filed_iso, txn_iso, ah, role_raw, _role_class(role_raw), code,
-                 val, _num(r.get("shares")), _num(r.get("cost")), "finviz", now))
+                 val, _num(r.get("shares")), _num(r.get("cost")), "finviz", now, "US"))
             # rowcount unavailable -> treat as NOT inserted rather than assuming
             # success (assuming success is the original defect).
             try:
@@ -461,6 +477,152 @@ def _role_class(role_raw: str) -> str:
     if "officer" in r or "chief" in r or "svp" in r or "evp" in r or "vp" in r:
         return "officer"
     return "other"
+
+
+# ── IDENTITY FRAGMENTATION (the "similar fragmentation" agent's core) ────────────────────
+# Board 2026-08-04, the Challenger's U1 attack; founder-ordered fix same day:
+# `actor_id()` hashes the exact name string, so "John Smith" / "John A. Smith" /
+# "SMITH JOHN A" are THREE distinct buyers — and the F1 enrollment trigger is
+# COUNT(DISTINCT buyer) >= 3, the exact quantity name-formatting noise inflates. Two real
+# buyers plus one respelling would fabricate a qualifying cluster.
+#
+# Resolution model (context-confirmed, per the founder's rule): two identities merge ONLY
+# when (a) their names normalize to the same form, (b) they appear on the SAME ticker
+# (never merged across tickers — same name, different company may be a different person),
+# and (c) their role categories are compatible (equal, or one side unclassified). A group
+# with the same name but CONFLICTING roles (e.g. director vs officer — a father/son
+# signature) is NEVER auto-merged; it is FLAGGED for human review (flag-never-force).
+#
+# The append-only panel is NEVER rewritten: resolution applies at COUNTING time
+# (qualify_clusters counts canonical identities) and the merged identity's events
+# aggregate — one buyer, the sum of their purchases.
+
+_NAME_STOP = frozenset({"JR", "SR", "II", "III", "IV", "V", "MR", "MRS", "MS", "DR",
+                        "MD", "PHD", "ESQ", "CPA"})
+
+
+def normalize_name(name: str) -> str:
+    """Canonical form of a person's name: uppercase, punctuation stripped, suffixes and
+    single-letter tokens (middle initials) dropped, tokens SORTED so word order never
+    splits an identity ("SMITH JOHN A" == "John A. Smith")."""
+    s = re.sub(r"[^A-Za-z ]+", " ", (name or "").upper())
+    toks = sorted(t for t in s.split() if len(t) > 1 and t not in _NAME_STOP)
+    return " ".join(toks)
+
+
+def identity_map(db_path: str = DB_PATH, since: str = "", until: str = "") -> dict:
+    """{actor_hash: canonical_id} for open-market purchase rows in the window.
+
+    Only hashes belonging to a context-confirmed variant group get an entry; everything
+    else counts under its own hash. Deterministic and read-only — the panel itself is
+    untouched (append-only rule)."""
+    conn = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    where, args = "e.txn_code='P' AND e.actor_hash IS NOT NULL", []
+    if since:
+        where += f" AND e.signal_date >= {ph}"
+        args.append(since)
+    if until:
+        where += f" AND e.signal_date <= {ph}"
+        args.append(until)
+    try:
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT DISTINCT e.ticker, e.actor_hash, e.role_class, "
+            f"COALESCE(a.display_name,'') AS display_name "
+            f"FROM insider_events e LEFT JOIN actor_reference a "
+            f"ON a.actor_hash = e.actor_hash WHERE {where}", tuple(args)).fetchall()]
+    except Exception:
+        rows = []
+    finally:
+        conn.close()
+
+    groups = {}
+    for r in rows:
+        norm = normalize_name(r["display_name"])
+        if not norm:
+            continue                      # an empty/unknown name never merges anything
+        groups.setdefault((r["ticker"], norm), []).append(r)
+
+    out = {}
+    for (tkr, norm), members in groups.items():
+        hashes = {m["actor_hash"] for m in members}
+        if len(hashes) < 2:
+            continue
+        roles = {(m.get("role_class") or "") for m in members} - {"", "other"}
+        if len(roles) > 1:
+            continue                      # conflicting categories: flag, never auto-merge
+        canon = "grp:" + hashlib.md5(f"{tkr}|{norm}".encode()).hexdigest()[:16]
+        for h in hashes:
+            out[h] = canon
+    return out
+
+
+def identity_fragmentation_audit(db_path: str = DB_PATH, since: str = "",
+                                 until: str = "", min_buyers: int = 3) -> dict:
+    """READ-ONLY report for the similar-fragmentation agent: which name-variant groups
+    exist, which were context-confirmed as one person, which are flagged (role conflict),
+    and — the load-bearing number — which tickers' distinct-buyer count CROSSES the
+    cluster boundary once variants collapse (raw >= min_buyers but canonical < min_buyers:
+    a cluster that name noise fabricated)."""
+    conn = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    where, args = "e.txn_code='P'", []
+    if since:
+        where += f" AND e.signal_date >= {ph}"
+        args.append(since)
+    if until:
+        where += f" AND e.signal_date <= {ph}"
+        args.append(until)
+    try:
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT e.ticker, e.actor_hash, e.role_raw, e.role_class, "
+            f"COALESCE(a.display_name,'') AS display_name "
+            f"FROM insider_events e LEFT JOIN actor_reference a "
+            f"ON a.actor_hash = e.actor_hash WHERE {where}", tuple(args)).fetchall()]
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:120]}
+    finally:
+        conn.close()
+
+    imap = identity_map(db_path, since, until)
+
+    merged, flagged = [], []
+    seen_groups = {}
+    for r in rows:
+        norm = normalize_name(r["display_name"])
+        if norm and r.get("actor_hash"):
+            seen_groups.setdefault((r["ticker"], norm), set()).add(
+                (r["actor_hash"], r.get("role_class") or ""))
+    for (tkr, norm), pairs in seen_groups.items():
+        hashes = {h for h, _ in pairs}
+        if len(hashes) < 2:
+            continue
+        roles = {rc for _, rc in pairs} - {"", "other"}
+        entry = {"ticker": tkr, "name_form": norm, "variants": len(hashes)}
+        if len(roles) > 1:
+            flagged.append({**entry, "roles": sorted(roles),
+                            "note": "same name, conflicting roles — human review, "
+                                    "never auto-merged"})
+        else:
+            merged.append(entry)
+
+    per, boundary = {}, []
+    for r in rows:
+        key = imap.get(r.get("actor_hash") or "",
+                       r.get("actor_hash") or r.get("role_raw") or "")
+        raw = r.get("actor_hash") or r.get("role_raw") or ""
+        d = per.setdefault(r["ticker"], {"raw": set(), "canon": set()})
+        d["raw"].add(raw)
+        d["canon"].add(key)
+    for tkr, d in per.items():
+        if len(d["raw"]) >= min_buyers > len(d["canon"]):
+            boundary.append({"ticker": tkr, "raw_buyers": len(d["raw"]),
+                             "canonical_buyers": len(d["canon"]),
+                             "note": "cluster fabricated by name variants — "
+                                     "canonical count is the true one"})
+    return {"available": True, "window": {"since": since or None, "until": until or None},
+            "groups_merged": merged, "groups_flagged": flagged,
+            "boundary_crossings": boundary, "min_buyers": min_buyers}
 
 
 #: Liveness floors. A market-wide Form-4 feed that returns fewer distinct tickers than this,

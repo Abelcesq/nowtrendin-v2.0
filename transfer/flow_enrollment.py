@@ -106,6 +106,45 @@ def window_start(asof: str, sessions: int = None) -> str:
     return d.strftime("%Y-%m-%d")
 
 
+def panel_first_date(db_path: str = DB_PATH) -> str:
+    """The panel's birth certificate: the date of the first coverage watermark. Empty
+    string while the panel has never ingested."""
+    conn = _connect(db_path)
+    try:
+        row = conn.execute("SELECT MIN(ingest_at) AS f FROM insider_coverage").fetchone()
+        v = (dict(row) if row else {}).get("f") or ""
+    except Exception:
+        v = ""
+    finally:
+        conn.close()
+    if not v:
+        return ""
+    try:
+        from date_utils import to_iso_date
+        return to_iso_date(str(v)) or ""
+    except Exception:
+        return ""
+
+
+def qualification_floor(db_path: str = DB_PATH, asof: str = "",
+                        window_sessions: int = None) -> dict:
+    """AMENDMENT A1 (Board 2026-08-04, the Challenger; founder-ruled same day,
+    pre-enrollment — zero rows enrolled at adoption): qualification REFUSES any window
+    that extends before the panel existed. A 10-session window evaluated over a 3-day
+    panel is LEFT-CENSORED: treated-side censoring is merely conservative, but controls
+    "with no qualifying disclosure of their own in the window" would pass on
+    UNVERIFIABLE cleanliness — first-era rows measured under different information
+    conditions than every later row, under the same prereg SHA. The floor makes the flip
+    safe to fire early: enrollment simply does not begin until window_start >=
+    panel_start, with no human remembering required."""
+    asof = asof or _now_date()
+    ws = window_start(asof, window_sessions)
+    ps = panel_first_date(db_path)
+    return {"asof": asof, "window_start": ws, "panel_start": ps or None,
+            "spanned": bool(ps) and ws >= ps,
+            "rule": "window_start >= panel_start (prereg amendment A1, 2026-08-04 PT)"}
+
+
 def qualify_clusters(db_path: str = DB_PATH, asof: str = "",
                      min_buyers: int = None, window_sessions: int = None) -> list:
     """Tickers whose panel shows >= `min_buyers` distinct open-market buyers within the
@@ -119,24 +158,55 @@ def qualify_clusters(db_path: str = DB_PATH, asof: str = "",
     would let ONE person appear as both a hash and a role string and count TWICE — enough to
     fabricate the 3-buyer trigger itself. `insider_flow.ingest()` now REFUSES to write
     unsalted rows, so the fallback is a reader for legacy rows, never a live path.
+
+    IDENTITY RESOLUTION (Board 2026-08-04, Challenger U1; founder-ordered): the count is
+    over CANONICAL identities — context-confirmed name variants of the same person on the
+    same ticker collapse to one buyer (insider_flow.identity_map; conflicting-role groups
+    are never auto-merged). Name-formatting noise must not be able to fabricate the
+    3-buyer trigger. Applied at COUNTING time only; the append-only panel is untouched.
+
+    WINDOW FLOOR (amendment A1): refuses until the window is fully inside the panel's
+    lifetime — see qualification_floor().
     """
     asof = asof or _now_date()
     min_buyers = QUALIFY_MIN_BUYERS if min_buyers is None else int(min_buyers)
     since = window_start(asof, window_sessions)
+
+    floor = qualification_floor(db_path, asof, window_sessions)
+    if not floor["spanned"]:
+        return []                        # left-censored window: refuse, never approximate
+
+    try:
+        import insider_flow as _iflow
+        idmap = _iflow.identity_map(db_path, since, asof)
+    except Exception:
+        idmap = {}
+
     conn = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
     try:
-        rows = [dict(r) for r in conn.execute(
-            f"SELECT ticker, COUNT(DISTINCT COALESCE(actor_hash, role_raw)) AS buyers, "
-            f"MAX(signal_date) AS latest_filing, SUM(value_usd) AS total_usd "
+        raw = [dict(r) for r in conn.execute(
+            f"SELECT ticker, actor_hash, role_raw, signal_date, value_usd "
             f"FROM insider_events WHERE txn_code='P' AND signal_date >= {ph} "
-            f"AND signal_date <= {ph} GROUP BY ticker "
-            f"HAVING COUNT(DISTINCT COALESCE(actor_hash, role_raw)) >= {ph} "
-            f"ORDER BY MAX(signal_date) DESC", (since, asof, min_buyers)).fetchall()]
+            f"AND signal_date <= {ph}", (since, asof)).fetchall()]
     except Exception:
-        rows = []
+        raw = []
     finally:
         conn.close()
+
+    per = {}
+    for r in raw:
+        rid = r.get("actor_hash") or r.get("role_raw") or ""
+        canon = idmap.get(r.get("actor_hash") or "", rid)
+        d = per.setdefault(r["ticker"], {"buyers": set(), "latest": "", "usd": 0.0})
+        d["buyers"].add(canon)
+        d["latest"] = max(d["latest"], r.get("signal_date") or "")
+        d["usd"] += float(r.get("value_usd") or 0)
+
+    rows = [{"ticker": t, "buyers": len(d["buyers"]), "latest_filing": d["latest"],
+             "total_usd": round(d["usd"], 2)}
+            for t, d in per.items() if len(d["buyers"]) >= min_buyers]
+    rows.sort(key=lambda r: r["latest_filing"], reverse=True)
     for r in rows:
         r["window_start"] = since
         r["asof"] = asof
@@ -530,6 +600,7 @@ def status(db_path: str = DB_PATH) -> dict:
             "qualify_rule": {"min_buyers": QUALIFY_MIN_BUYERS,
                              "window_sessions": QUALIFY_WINDOW_SESSIONS,
                              "window_basis": "weekdays; US market holidays not excluded"},
+            "qualification_floor": qualification_floor(db_path),
             "term_drift": drift,
             "enrollment_halted": bool(drift)}
 

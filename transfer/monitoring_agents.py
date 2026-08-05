@@ -1750,6 +1750,53 @@ def flow_integrity(conn) -> dict:
             "summary": summary, "checked_at": _now().isoformat()}
 
 
+def similar_fragmentation_agent(db_path=None) -> dict:
+    """SIMILAR-NAME FRAGMENTATION (founder-ordered 2026-08-04, from the Challenger's U1
+    attack): the insider panel hashes exact name strings, so formatting variants of ONE
+    person ("John Smith" / "John A. Smith" / "SMITH JOHN A") count as distinct buyers —
+    and ≥3 distinct buyers is the flow-ledger enrollment trigger itself.
+
+    READ-ONLY. Assesses each same-name group IN CONTEXT (same ticker, compatible role
+    category) to confirm whether the variants refer to the same person; confirmed groups
+    collapse to one identity at counting time (qualify_clusters), conflicting-role groups
+    are flagged for human review, never auto-merged. Alerts when a variant collapse
+    CROSSES the cluster boundary — a qualifying cluster that name noise fabricated.
+    Silent-by-design while the panel is empty."""
+    alerts, summary = [], {}
+    try:
+        import insider_flow, flow_enrollment
+        asof = _now().strftime("%Y-%m-%d")
+        since = flow_enrollment.window_start(asof)
+        rep = insider_flow.identity_fragmentation_audit(
+            since=since, until=asof, min_buyers=flow_enrollment.QUALIFY_MIN_BUYERS)
+        if not rep.get("available"):
+            return {"agent": "similar_fragmentation", "status": "not_started",
+                    "alerts": [], "summary": {"note": rep.get("reason") or
+                                              "insider panel not readable"},
+                    "checked_at": _now().isoformat()}
+        merged = rep.get("groups_merged") or []
+        flagged = rep.get("groups_flagged") or []
+        boundary = rep.get("boundary_crossings") or []
+        summary = {"window": rep.get("window"), "variant_groups_merged": len(merged),
+                   "groups_flagged_role_conflict": len(flagged),
+                   "boundary_crossings": len(boundary)}
+        for b in boundary:
+            alerts.append({"level": "warn", "block": "FLOW",
+                           "msg": f"{b['ticker']}: {b['raw_buyers']} raw buyers collapse "
+                                  f"to {b['canonical_buyers']} once name variants merge — "
+                                  f"a cluster name noise fabricated; canonical count "
+                                  f"governs (already enforced in qualify_clusters)"})
+        for f in flagged[:5]:
+            alerts.append({"level": "info", "block": "FLOW",
+                           "msg": f"{f['ticker']}: same name form '{f['name_form']}' with "
+                                  f"conflicting roles {f.get('roles')} — human review; "
+                                  f"never auto-merged"})
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "FLOW", "msg": f"check failed: {e}"})
+    return {"agent": "similar_fragmentation", "status": _roll_up(alerts), "alerts": alerts,
+            "summary": summary, "checked_at": _now().isoformat()}
+
+
 def run_all(conn, db_path=None) -> dict:
     # HEAVY DATA-SCANNING auditors excluded from this synchronous roll-up — they
     # do full-table scans that push /monitor past Heroku's 30s router limit (503):
@@ -1765,7 +1812,9 @@ def run_all(conn, db_path=None) -> dict:
               # Both are cheap: the firewall is an AST pass over ~17 files (no DB, no
               # network); flow_integrity is four COUNT(*)s. Neither threatens the ~3-5s
               # budget that keeps /monitor inside Heroku's 30s router limit.
-              heldout_firewall(), flow_integrity(conn)]
+              heldout_firewall(), flow_integrity(conn),
+              # Cheap: the panel is small and the audit is two indexed reads.
+              similar_fragmentation_agent(db_path=db_path)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

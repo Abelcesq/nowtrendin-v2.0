@@ -6,8 +6,11 @@ since the last board sessions, and (c) recommend on the two pending founder flip
 prioritization of the outstanding build items. Nothing here is pre-approved; the board informs,
 the Chairman rules.
 
-All facts below were verified LIVE against the deployed engine on 2026-08-04 (UTC 02:00-02:40),
-not quoted from documentation.
+All facts below were verified LIVE against the deployed engine on 2026-08-04, 19:00–19:40 PT
+(America/Los_Angeles; 2026-08-05 02:00–02:40 UTC), not quoted from documentation.
+*(Stamp corrected per the Chairman's 2026-08-04 ruling: narrative docs stamp Pacific Time,
+with UTC in parentheses; stored data timestamps remain UTC per the §14 canon. This resolves
+the internal inconsistency four board archetypes flagged.)*
 
 ## 1. SERVICES + FLEET (verified live)
 
