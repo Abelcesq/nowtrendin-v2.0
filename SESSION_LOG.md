@@ -2985,3 +2985,40 @@ adopted for the next onboarding. Known follow-up: the S6 stale-payload census ov
 **Remaining flips, in order:** FLOW_ENROLL=1 (after ≥2 clean panel days; opens flow-ledger
 enrollment under the re-locked prereg) · CRYPTO_ETF_FLOW=1 (Stage 2, ~08-10, after the
 currency verdict + shadow votes + reconciliation).
+
+## 2026-08-04 — Full health check + Stage 1 deployed (v309) + liveness false-RED fixed
+
+**Health sweep (founder-ordered, /nowtrendin2.0):** engine/backend/gh-pages all UP; web build
+clean (3.3s); monitor fleet 9 agents — 7 ok, 2 warn (both known: S6 census over-count 60,879;
+Cost Sentinel $592.81 = 85% of cap, DOWN from $718 — the Apify drop landed). Collectors
+18 HEALTHY / 0 down / 2 deliberately DISABLED (finnhub_congress retired, reddit). Catmaps warm
+(source=live, 60,146 entries). Trend intake: last=ok, enrolled=45 in window, completeness
+46.9% (the 17 fails are the pre-fix dead era, denominator honesty). Market ledger 25 resolved /
+6 pending, rate honestly withheld (n<30); crypto ledger 1/1, same floor. Prewarm fresh.
+
+**Liveness false-RED root-caused + fixed (f1e97af):** the insider panel's coverage watermark
+counted distinct tickers ONLY for newly-INSERTED rows — every steady-state hourly ingest of the
+slow-moving Finviz feed (~100% idempotent duplicates) collapsed to "170 raw → 4 distinct" and
+fired the dead-parser RED on a healthy source (collector_health parsed 81 distinct from the
+same pull; first ingest's 61 masked it because the panel was empty). Coverage now counts every
+ticker that SURVIVES the reject gates, before the duplicate check — a duplicate is proof the
+parser worked. Regression proven BOTH directions (all-duplicate pass reads full coverage GREEN;
+a genuinely dead parser still fires RED). The stored RED clears at the first post-deploy hourly
+ingest (~1h after boot).
+
+**Stage 1 DEPLOYED (v309, dark):** the crypto ETF share-flow vote (63661dd) is now on the
+engine, CRYPTO_ETF_FLOW=0. Shadow votes verified live through the REAL _etf_flow_vote on
+/diag/etf-flow: FBTC −1.0 (capped, −1.47%/day redemption), GBTC −0.618 (measured, not pinned),
+BITB +0.12, quiet funds 0.0 measured-quiet, no discontinuity stamps. days_observed=8; all
+15/15 tickers now have ≥5 obs → flip preconditions #1–#3 look green (sanity continues to
+accrue daily).
+
+**Crypto flip still blocked on (spec §8):** #4 reconciliation of derived Δshares vs issuers'
+published flows; #5 venue_diffusion freeze for crypto (designed, NOT coded); latency stamps
+(flow_basis/signal_latency_days) on payload+ledger rows; then founder flips CRYPTO_ETF_FLOW=1
++ moves CRYPTO_LEDGER_CLEAN_COHORT_START in the same command.
+
+**FLOW_ENROLL readiness:** panel accruing since 08-01 (397 events / 244 universe / 3+ days);
+the only liveness noise was the false RED above. Recommend: observe one clean GREEN ingest
+post-v309, then the founder may fire FLOW_ENROLL=1 (success = pending_treated ≥1,
+pending_control ≥3, treated rows carrying sector+size).
