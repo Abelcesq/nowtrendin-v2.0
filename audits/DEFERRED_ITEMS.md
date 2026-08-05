@@ -165,3 +165,30 @@ witness-corruption fix (absent → NULL).
 fraction; S1 via the market-ledger EPISODE counts) and returns FIRE/HOLD per item. The weekly
 **improve-system** audit reads it each run (checklist item) and surfaces any FIRE. An
 un-scheduled shelf becomes furniture — this endpoint + the weekly read is the walk.
+
+---
+
+## S8 — DISPOSITION (Chairman-ruled 2026-08-05 PT; resolves the Executioner-vs-Outsider board split)
+
+The 2026-08-04 board split: the Executioner CUT the S8 batch from the flip window (score-
+affecting changes and flag flips must never share a deploy window — when a number moves you
+must know which change moved it); the Outsider PULLED the plain-English relabel FORWARD (the
+internal vocabulary — "Dark Matter", "LED", "catch-all", "N" — loses an institutional client
+in the first meeting; a revenue item, not cosmetics). Ruling splits S8 by what each piece
+actually touches:
+
+1. **Signed momentum — DEFERRED as its own project** (score-affecting; owes its own design +
+   backtest-before-ship). REACTIVATION TRIGGERS: (a) the F2 flip (`CRYPTO_ETF_FLOW=1`) has
+   been live ≥ 1 week with no open incident, AND (b) no other flag flip is scheduled inside
+   the same deploy window. Never rides another change's deploy.
+2. **Plain-English relabel — QUEUED, display-only** (moves no number; the Executioner's
+   deploy-window rule does not bind it). SEQUENCE GATES: (a) the founder's **"N" naming
+   ruling** lands FIRST (so surfaces are relabeled once, not twice — earlier candidate:
+   "N Market Analysis"); (b) ships AFTER the F2 flip settles (~days, not weeks), BEFORE any
+   sales/demo push; (c) three-platform parity pass (`/frontend-consistency`) in the same
+   change — a relabel that diverges across surfaces is worse than the jargon.
+3. **Incremental prewarm — UNBLOCKED, low priority** (pure serve-path performance; may ride
+   any quiet window).
+
+Logged by rule so the split never re-litigates: momentum waits on triggers, the relabel waits
+only on the N ruling + flip settling, prewarm waits on nothing.
