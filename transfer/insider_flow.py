@@ -207,8 +207,24 @@ def init_insider_db(db_path: str = DB_PATH):
         CREATE TABLE IF NOT EXISTS insider_coverage (
             ingest_at TEXT PRIMARY KEY, rows_returned INTEGER, rows_requested INTEGER,
             distinct_tickers INTEGER, truncated INTEGER,
-            rejected_misaligned INTEGER, rejected_form144 INTEGER, rejected_unknown INTEGER)
+            rejected_misaligned INTEGER, rejected_form144 INTEGER, rejected_unknown INTEGER,
+            parsed_tickers INTEGER, method TEXT)
     """)
+    # U2 hardening (Chairman-ruled 2026-08-04 PT): `parsed_tickers` = the liveness
+    # denominator (rows the parser READ); `method` stamps the counting semantics so the
+    # series' meaning-change is visible to any future auditor instead of reading as a
+    # real coverage collapse (rows before v309 counted NEW INSERTS; the unstamped
+    # 61→4→4 era is that defect, not a dead source). Old rows are never rewritten.
+    for _cv in ("ALTER TABLE insider_coverage ADD COLUMN parsed_tickers INTEGER",
+                "ALTER TABLE insider_coverage ADD COLUMN method TEXT"):
+        try:
+            conn.execute(_cv)
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS market_universe (
             ticker TEXT PRIMARY KEY, first_seen TEXT, last_event_date TEXT,
@@ -275,23 +291,40 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
 
     conn = db_compat.connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
+    # TWO DENOMINATORS, both recorded (U2 hardening, Chairman-ruled 2026-08-04 PT).
+    # The liveness alarm's question is "is the PARSER alive", so its denominator is
+    # `parsed` — tickers from rows the parser successfully read (aligned + recognized
+    # transaction code, INCLUDING Form 144s and M/A/G compensation rows we then refuse
+    # on content grounds). `stats["tickers"]` stays the SCORABLE set (survived every
+    # content gate) for the panel's own accounting. Keying the alarm on gate survivors
+    # left a residual false-RED class: a healthy day dominated by sub-$250K filings
+    # would still read "collapsed" — staleness-of-content mistaken for death-of-parser,
+    # the same conflation the first fix removed one layer up. This also reconciles the
+    # permanent denominator disagreement with collector_health (which counts raw parses).
+    parsed = set()
     try:
         for r in rows:
+            tkr = (r.get("ticker") or "").upper().strip()
             code = classify_transaction(r.get("transaction"))
             # Defect A: Form 144 is an INTENT, not a transaction. Refuse it explicitly and
             # count it — it is 26.5% of the feed, so a silent drop would look like a
-            # collection failure later.
+            # collection failure later. (The parser READ it fine → counts as parsed.)
             if code == "F144":
                 stats["rejected_form144"] += 1
+                if tkr:
+                    parsed.add(tkr)
                 continue
             # Defect B: column-shifted rows read the wrong fields. Refuse rather than ingest
-            # a plausible-looking wrong number.
+            # a plausible-looking wrong number. (A mis-split row is a PARSE failure —
+            # never counts as parsed; this is the dead-parser signature itself.)
             if not row_is_aligned(r):
                 stats["rejected_misaligned"] += 1
                 continue
             if code == "UNKNOWN":
-                stats["rejected_unknown"] += 1
+                stats["rejected_unknown"] += 1      # unrecognized code = parser gap
                 continue
+            if tkr:
+                parsed.add(tkr)                     # aligned + recognized = parser alive
             if code not in _SCORABLE:
                 stats["rejected_nonscorable"] += 1      # M/A/G — compensation, not movement
                 continue
@@ -312,14 +345,12 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
             except Exception:
                 txn_iso = None
 
-            tkr = (r.get("ticker") or "").upper().strip()
-            # Coverage counts every ticker that SURVIVED PARSING — before the duplicate
-            # check. The liveness alarm exists to catch a dead parser; a duplicate is
-            # proof the parser worked (it re-derived the identical id). Counting only
-            # NEW inserts made every steady-state hourly pass of a slow-moving feed
-            # read as "170 raw → 4 distinct", firing the dead-parser RED on a healthy
-            # source (first observed 2026-08-04 PT; collector_health saw 81 distinct
-            # from the same pull).
+            # Scorable coverage counts every ticker that SURVIVED all gates — before the
+            # duplicate check. A duplicate is proof the parser worked (it re-derived the
+            # identical id). Counting only NEW inserts made every steady-state hourly
+            # pass of a slow-moving feed read as "170 raw → 4 distinct", firing the
+            # dead-parser RED on a healthy source (first observed 2026-08-04 PT;
+            # collector_health saw 81 distinct from the same pull).
             stats["tickers"].add(tkr)
             name = r.get("owner") or ""
             ah = actor_id(name)
@@ -374,16 +405,17 @@ def ingest(db_path: str = DB_PATH, feed_fn=None, limit: int = 500) -> dict:
         conn.execute(
             f"INSERT INTO insider_coverage (ingest_at,rows_returned,rows_requested,"
             f"distinct_tickers,truncated,rejected_misaligned,rejected_form144,"
-            f"rejected_unknown) VALUES ({','.join([ph]*8)}) "
+            f"rejected_unknown,parsed_tickers,method) VALUES ({','.join([ph]*10)}) "
             f"ON CONFLICT (ingest_at) DO NOTHING",
             (now, len(rows), limit, len(stats["tickers"]), truncated,
              stats["rejected_misaligned"], stats["rejected_form144"],
-             stats["rejected_unknown"]))
+             stats["rejected_unknown"], len(parsed), "v2-dual"))
         conn.commit()
     finally:
         conn.close()
 
     stats["tickers"] = len(stats["tickers"])
+    stats["parsed_tickers"] = len(parsed)
     stats["ingested"] = True
     stats["source_raw_rows"] = raw_rows
     stats["truncated"] = bool(truncated)
@@ -690,7 +722,12 @@ def liveness(db_path: str = DB_PATH) -> dict:
         age_h = round((datetime.now(timezone.utc) - last).total_seconds() / 3600.0, 2)
     except Exception:
         pass
-    tickers = int(cov.get("distinct_tickers") or 0)
+    # U2: the alarm keys on PARSED tickers (rows the parser read) — content gates like
+    # the $250K materiality floor must not be able to make a healthy small-filing day
+    # look like a dead parser. `parsed_tickers` is NULL on pre-v2-dual rows; fall back
+    # to `distinct_tickers` there rather than fabricating a value.
+    parsed_v = cov.get("parsed_tickers")
+    tickers = int(parsed_v if parsed_v is not None else (cov.get("distinct_tickers") or 0))
     raw = int(cov.get("rows_returned") or 0)
     alarms = []
     if age_h is not None and age_h > LIVENESS_MAX_AGE_H:
@@ -704,7 +741,8 @@ def liveness(db_path: str = DB_PATH) -> dict:
     return {"status": "RED" if alarms else "OK",
             "alarms": alarms,
             "last_ingest_at": cov.get("ingest_at"), "age_hours": age_h,
-            "raw_rows": raw, "distinct_tickers": tickers,
+            "raw_rows": raw, "distinct_tickers": int(cov.get("distinct_tickers") or 0),
+            "parsed_tickers": parsed_v, "coverage_method": cov.get("method"),
             "truncated": cov.get("truncated"),
             "ingest_enabled": True,
             "source_health": src,
@@ -800,6 +838,40 @@ if __name__ == "__main__":
     out2 = ingest(db_path=tmp, feed_fn=lambda limit=500: feed)
     assert out2["written"] == 0, out2
     print("  re-ingest writes 0 (idempotent)  OK")
+
+    # ── U2 REGRESSIONS (Chairman-ruled 2026-08-04 PT; Challenger + Executioner) ─────────
+    # (1) THE ALL-DUPLICATE PASS — the exact path that shipped the false-RED. Asserted on
+    # the STORED coverage rows, not the return value: both passes must record the full
+    # parsed set even though the second inserted nothing. Before this test existed, the
+    # both-directions proof had run once in a session and was not re-runnable from the
+    # repo — "proven" must mean committed.
+    _c = db_compat.connect(tmp)
+    _covs = [tuple(r) for r in _c.execute(
+        "SELECT parsed_tickers, distinct_tickers, method FROM insider_coverage "
+        "ORDER BY ingest_at").fetchall()]
+    _c.close()
+    assert len(_covs) == 2, _covs
+    for _p, _d, _mth in _covs:
+        assert _p == 4, ("every pass must record FULL parsed coverage (AAA buy + BBB "
+                         "F144 + CCC option-exercise + DDD immaterial)", _covs)
+        assert _d == 1 and _mth == "v2-dual", _covs
+    print("  U2: all-duplicate re-ingest keeps FULL parsed coverage in the stored row  OK")
+
+    # (2) A healthy day dominated by sub-floor / compensation filings must NOT read as a
+    # dead parser: parsed high, scorable low -> OK. Content gates are not parser death —
+    # the residual false-RED class the two-denominator watermark exists to close.
+    _c = db_compat.connect(tmp)
+    _c.execute("DELETE FROM insider_coverage")
+    _c.execute("INSERT INTO insider_coverage (ingest_at,rows_returned,rows_requested,"
+               "distinct_tickers,truncated,rejected_misaligned,rejected_form144,"
+               "rejected_unknown,parsed_tickers,method) VALUES (?,?,?,?,?,?,?,?,?,?)",
+               (datetime.now(timezone.utc).isoformat(), 180, 500, 3, 0, 0, 40, 0,
+                95, "v2-dual"))
+    _c.commit()
+    _c.close()
+    _lv = liveness(db_path=tmp)
+    assert _lv["status"] == "OK", _lv
+    print("  U2: small-filing day (95 parsed / 3 scorable) reads OK — content != death  OK")
 
     # Salt present -> a pseudonym, never a reversible identity; absent -> no identity at all.
     assert actor_id("Jane Doe") is None or _m.ACTOR_SALT

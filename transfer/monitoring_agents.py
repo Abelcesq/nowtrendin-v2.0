@@ -167,16 +167,25 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     # display-guard ship date; bump it when a new guard lands.
     _GUARD_SHIP_DATE = "2026-07-20"          # D7 degenerate guard (newest display guard)
     try:
+        # S6 DENOMINATOR FIX (Chairman-ruled 2026-08-04 PT): count TOPICS whose NEWEST
+        # row predates the guard — only the latest row per topic is ever served, so
+        # counting every historical row (the 365-day retention tail) read 60,879 where
+        # the served exposure was orders of magnitude smaller. A permanently-yellow
+        # monitor on a knowingly wrong denominator trains people to ignore the fleet —
+        # the same cry-wolf poison as the liveness false-RED.
         _row = conn.execute(
-            "SELECT COUNT(*) AS n FROM risk_scores WHERE scored_at < ?",
+            "SELECT COUNT(*) AS n FROM ("
+            "  SELECT risk_topic, MAX(scored_at) AS m FROM risk_scores "
+            "  GROUP BY risk_topic) t WHERE t.m < ?",
             (_GUARD_SHIP_DATE,)).fetchone()
         _stale = int((_row["n"] if hasattr(_row, "keys") else _row[0]) or 0)
-        summary["stale_preguard_rows"] = _stale
+        summary["stale_preguard_topics"] = _stale
+        summary["stale_basis"] = "latest row per topic (served exposure), not all history"
         if _stale:
             alerts.append({"level": "warn", "block": "B3",
-                           "msg": f"{_stale} served risk row(s) predate the newest display "
-                                  f"guard ({_GUARD_SHIP_DATE}) and still serve their pre-guard "
-                                  f"payload — verify each is honest or has aged out"})
+                           "msg": f"{_stale} risk topic(s) whose NEWEST row predates the "
+                                  f"newest display guard ({_GUARD_SHIP_DATE}) — these still "
+                                  f"serve a pre-guard payload; verify honest or aged out"})
     except Exception:
         try:
             conn.rollback()
