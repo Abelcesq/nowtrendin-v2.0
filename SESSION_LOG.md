@@ -3055,3 +3055,44 @@ check + recent updates. Unanimous: F2 flips on gates, not the calendar. Split: F
 reconciliation harness with PRE-DECLARED tolerance band → founder flips CRYPTO_ETF_FLOW=1
 + cohort start same command); key rotations (QUIVER/FMP); referee corroboration; the 5
 stale pre-guard topics; S8 conflict + Economist prescriptions await Chairman ruling.
+
+## 2026-08-05 (PT) — Book-canon board + Chairman rulings executed: F1–F8, C1/C2 live, X cost halved
+
+**Book-canon board** (`BOARD_bookprinciples_2026-08-05.md`, 6 independent memos, all
+code-verified): A1 held up to six cold code reads; findings F1–F8 (4 seats independently
+caught the class-budget spec≠code gap; Challenger found the pre-strike fabricated-quiet
+and the flip-as-baseline-break). C-items: C7 unanimous, C2/C1 top display picks, C5/C6
+unanimously shelved, C4 rename urged by 3 seats — **Chairman OVERRULED the rename** (name
+stays utility-vs-speculative; recorded in amendment A1.6).
+
+**F1–F8 all fixed** (commit 9c8f5a7, dark; committed harness `test_crypto_flow_a1.py` 9/9):
+pinned etf_class_budget per coin · value-distinct strike compare (no fabricated quiet) ·
+CRYPTO_SERIES_EPOCH (crypto-scoped baseline reset at flip) · trading-day gap normalization ·
+committed regressions · venue-class proxy_coverage · pre-declared reconciliation floor
+(max($10M, 0.05% AUM)) · per-coin unconditional first-crossing null as a PUBLICATION
+PRECONDITION (crossing detector force-proven both directions).
+
+**C1+C2 SHIPPED** (engine + web): `supply_facts` — network value (FMP marketCap÷price),
+pre-declared crypto-native bands (mega ≥$100B / large ≥$10B / mid ≥$1B), circulating-vs-FDV
++ % outstanding, honest "no max supply" for uncapped coins, lost-coins caveat; §17
+omit-when-absent; Crypto rail section + band chip (gh-pages 75d6755). **C3**: SUPPLY_MODEL
+curated from CURRENT protocol docs (post-merge ETH — the book's 2018 mechanics rejected as
+source), as_of+source stamped, **owner = weekly improve-system** (checklist line added).
+**C5/C6**: one shelf entry, no-proxy prohibitions written (exchange volume ≠ on-chain; no
+sampled realized cap). **C7**: sweep artifact `audits/copy-sweep/CRYPTO_COPY_SWEEP_
+2026-08-05.md` — zero violations, one watch item; standing weekly line. **C8**: design
+pre-registered (`DIVERGENCE_DETECTOR_PREREG_2026-08-05.md`) — coverage-gated on measurable
+flow, nulls registered, no mania language; build after flip + 30d.
+
+**X COST RULING (founder escalation: spend doubled to ~$400/mo).** Mechanism traced:
+scan cron 4×/day → HALVED to 00/12 UTC (`X_SCAN_HOURS`); daily pull cap 4→2; monthly
+budget 14,880→**4,800 posts ≈ $198 hard ceiling** (observed effective ~$0.0413/post).
+August was already pacing 528 posts/day (2,640 by day 5) — the new budget will exhaust
+mid-month by design; free volume scans continue. CLAUDE.md §6 updated.
+
+**Why the Cost Sentinel missed it (assessed + fixed):** the X line was a CONFIGURED $200
+from the subscription era whose own comment said "migrating to Pay-Per-Use 2026-06-21 —
+update then" — a reminder with no tripwire (the §16a lesson); and the post watcher tracked
+QUANTITY vs the old 15k cap, so 58%-of-posts = $356 sailed under both. Fixed: the sentinel
+now METERS X dollars from counted posts (X_COST_PER_POST_USD), books metered excess into
+the total, and alarms on >10% pacing divergence (critical >50%) from the declared line.
