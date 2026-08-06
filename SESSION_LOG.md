@@ -3096,3 +3096,43 @@ update then" — a reminder with no tripwire (the §16a lesson); and the post wa
 QUANTITY vs the old 15k cap, so 58%-of-posts = $356 sailed under both. Fixed: the sentinel
 now METERS X dollars from counted posts (X_COST_PER_POST_USD), books metered excess into
 the total, and alarms on >10% pacing divergence (critical >50%) from the declared line.
+
+## 2026-08-05 (PT, late) — Gate 4 first pass: FAIL. Flip BLOCKED — FMP share counts fail CURRENCY
+
+Founder called for the CRYPTO_ETF_FLOW=1 flip; the just-deployed reconciliation harness ran its
+first live pass first (per protocol) and returned **gate_status FAIL**: 6 material comparisons,
+4 out of band, incl. direction failures (FBTC 08-05 derived −$153.0M vs published +$11.3M;
+IBIT 07-30 derived −$47.0M vs published +$183.4M). Flip NOT executed.
+
+**Root cause traced to the mechanism (verify-before-fix), two layers:**
+1. **Harness join defect (secondary):** `_derived_by_date` keys Δshares to the strike's
+   `snapshot_date` and compares against the SAME published trade-date — but strikes are captured
+   00:00–06:00 UTC (prior US evening) and shares settle T+1, so derived[D] reflects trades from
+   D−1/D−2. The module's own pre-declaration names the ±1-day smear an "expected artifact class"
+   yet the comparison never implements it. Two of the four failures reconcile IN BAND at the
+   correct lag (IBIT 07-30 ↔ published 07-28: −47.0 vs −54.8; FBTC 07-31 ↔ 07-29: −29.5 vs −43.1).
+2. **The real blocker: FMP `etf/info` shares outstanding is NOT currency-grade** (the exact §16
+   CURRENCY question etf_flow.py's header says was never proven — Gate 4 just answered it, negative).
+   Evidence from raw strikes + tonight's fresh 4h observations: **IBIT frozen at
+   1,304,652,500 sh / nav 35.66 from 08-02 through 08-06** across three live pulls tonight —
+   while issuers published +$111.4M (08-03) + $170.3M (08-04) of inflows (a stale source
+   fabricates "quiet" through ~$282M of real flow); **FBTC zigzags** 183.8M→181.3M→186.6M→183.8M
+   shares (±$150–290M phantom swings) while published flows that week never exceeded ±$55M.
+   Cumulative Δshares over the window: derived −1.65M sh vs published −0.31M sh — diverges even
+   lag-corrected, so the join fix alone cannot turn this FAIL into a PASS.
+
+Gate 4 did exactly what it was built for: it caught the defect BEFORE the flip, not after.
+The shadow votes (FBTC −1.0 capped, etc.) are polluted by the same source noise — another
+reason the flip stays blocked. etf_reconcile_watch is now firing in the fleet by design.
+
+**Awaiting Chairman ruling on the path forward:**
+- (a) Harness join fix — implement the pre-declared smear (lag-aware matching + exclude the
+  still-moving latest day). Cleans the measurement; does NOT cure the source.
+- (b) Derived-leg source replacement/supplement for daily shares outstanding. NOTE the
+  circularity trap: Farside is the REFEREE — using it as the data source would have the
+  verifier verifying itself. Candidate §16-compliant direct sources: the issuers' own product
+  pages (iShares/Fidelity publish daily shares outstanding, official/direct). Full 5-gate
+  onboarding required.
+- (c) Timeline: the ~08-10 flip target slips until a clean PASS on a currency-grade source.
+
+FLOW_ENROLL=1 (insider flow) is unaffected — separate chain.
