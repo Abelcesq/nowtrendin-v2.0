@@ -302,6 +302,7 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
     detail = []
     num = 0.0          # weighted signed direction
     den = 0.0          # sum of weights that produced a usable vote
+    etf_votes = []     # (proxy, vote, aum) — sized AFTER the loop (A1 AUM-relative weights)
     for p in proxies:
         if p.get("kind") == "etf" and CRYPTO_ETF_FLOW:
             # The share-flow leg: two-sided, price-independent, from recorded snapshots
@@ -313,9 +314,20 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
                 "vote": vote,
                 "etf_flow_delta_pct": _f.get("delta_pct_per_day"),
                 "etf_flow_note": _f.get("reason") or _f.get("ineligible"),
+                "aum_usd": _f.get("aum_latest"),
                 "has_data": vote is not None,
             })
-        else:
+            if vote is not None:
+                # A1 (Chairman 2026-08-05, grounded in the per-asset-metric doctrine —
+                # funds are measured by AUM, coins by circulating-supply cap): each fund
+                # is tracked separately and its vote is sized by its AUM share WITHIN the
+                # coin's fund class, folded after the loop. An $80B fund's redemption day
+                # and a $60M fund's must not read as equal votes. NOT circular: every
+                # fund of one coin tracks the same coin price, so the price multiplies
+                # all AUMs equally and CANCELS in the relative weights.
+                etf_votes.append((p, vote, float(_f.get("aum_latest") or 0.0)))
+            continue
+        if True:
             sig = avdp.signal_for(p["ticker"], name=p["ticker"], with_institutional=CRYPTO_FULL_DM)
             vote = _proxy_vote(sig)
             ins = (sig or {}).get("insider") or {}
@@ -329,19 +341,66 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
         if vote is not None:
             num += p["weight"] * vote
             den += p["weight"]
+
+    # A1: fold the fund class in ONE step, each fund sized by its AUM share within the
+    # class. The class's total voice in the coin keeps the CONFIGURED weight budget
+    # (Σ configured etf weights), so wiring more funds redistributes voice WITHIN the
+    # class — it never grows the class's share of the coin. Measured-quiet (vote 0.0)
+    # funds stay in the denominator, per the declared sub-floor rule.
+    if etf_votes:
+        class_budget = sum(p["weight"] for p, _, _ in etf_votes)
+        aum_sum = sum(a for _, _, a in etf_votes)
+        if aum_sum > 0:
+            class_vote = sum(v * (a / aum_sum) for _, v, a in etf_votes)
+        else:
+            class_vote = sum(v for _, v, _ in etf_votes) / len(etf_votes)
+        num += class_budget * class_vote
+        den += class_budget
+
     covered = sum(1 for d in detail if d["has_data"])
     total = len(c["proxies"])
     net = (num / den) if den else 0.0
     flow = "inflow" if net > 0.15 else "outflow" if net < -0.15 else ("mixed" if den else "no_data")
-    # Intensity: direction magnitude × coverage confidence (more proxies reporting = more defensible).
-    coverage_conf = covered / total if total else 0.0
+
+    # VENUE CLASSES (A1, the gate-5 fix): coverage/diffusion is measured over KINDS of
+    # venue — insider-equity filings = one class, fund share-flow = one class — never
+    # over instrument count. Flipping 6 funds live must not read as diffusion: adding
+    # thermometers is not a temperature change. Coverage-invariant by construction, so
+    # the next fund (or a future non-US ETP) never moves a score by existing.
+    kinds_reachable = set()
+    for p in c["proxies"]:
+        if p.get("kind") == "etf":
+            if CRYPTO_ETF_FLOW:
+                kinds_reachable.add("etf_flow")
+        else:
+            kinds_reachable.add("insider_equity")
+    kinds_active = {("etf_flow" if d["kind"] == "etf" else "insider_equity")
+                    for d in detail if d["has_data"]}
+
+    if CRYPTO_ETF_FLOW:
+        # Intensity's coverage confidence also moves to the class basis — the fund-count
+        # basis would jump 1→6 at the flip on roster alone (the same artifact).
+        coverage_conf = (len(kinds_active) / len(kinds_reachable)) if kinds_reachable else 0.0
+    else:
+        # Flag off: byte-identical legacy behavior.
+        coverage_conf = covered / total if total else 0.0
     intensity = round(min(100.0, abs(net) * 100.0 * (0.5 + 0.5 * coverage_conf)), 1)
-    return {
+
+    out = {
         "available": den > 0, "flow": flow, "net_direction": round(net, 3), "intensity": intensity,
         "proxies_covered": covered, "proxies_total": total,
         "proxy_coverage": "strong" if total >= 4 and covered >= 2 else "thin" if total <= 1 else "partial",
         "detail": detail,
     }
+    if CRYPTO_ETF_FLOW:
+        out["venue_classes_active"] = sorted(kinds_active)
+        out["venue_classes_reachable"] = sorted(kinds_reachable)
+        if etf_votes:
+            # Gate-6 latency stamps (spec §5): a creation is money ARRIVING, observed at
+            # T+1. Lead 0-1 is parity, never prescience; never subtracted back.
+            out["flow_basis"] = "etf_creations"
+            out["signal_latency_days"] = 1
+    return out
 
 
 # ── Combined per-coin Money Gradient ────────────────────────────────────────────────────────
@@ -364,7 +423,7 @@ def signal_for(coin: str, with_dark_matter: bool = True, max_proxies: Optional[i
     else:
         consensus = d_flow or m_dir or "no_data"
 
-    return {
+    out_sig = {
         "available": bool(m.get("available") or d.get("available")),
         "coin": coin, "name": c["name"], "held_out": True,
         "money_movement": {                       # D — informed money (proxies)
@@ -382,6 +441,13 @@ def signal_for(coin: str, with_dark_matter: bool = True, max_proxies: Optional[i
         "note": "HELD-OUT crypto research (proxy-based Dark Matter + price momentum). NOT in any score yet; "
                 "backtest-before-ship. A FACT of where money is moving — not advice, not a prediction.",
     }
+    # Gate-6 latency stamps ride to the top-level payload (and from there to ledger
+    # rows) whenever the fund-flow leg contributed — spec §5: T+1, parity never
+    # prescience, never subtracted back.
+    if d.get("flow_basis"):
+        out_sig["flow_basis"] = d["flow_basis"]
+        out_sig["signal_latency_days"] = d.get("signal_latency_days")
+    return out_sig
 
 
 def research(coins: Optional[list] = None, with_dark_matter: bool = False,

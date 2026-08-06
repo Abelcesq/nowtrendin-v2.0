@@ -6132,6 +6132,27 @@ def _prewarm_loop():
 INSIDER_INGEST_INTERVAL_MIN = int(os.getenv("INSIDER_INGEST_INTERVAL_MIN", "60"))
 
 
+def _etf_snapshot_loop():
+    """A1 (Chairman 2026-08-05): ETF share snapshots every ETF_SNAPSHOT_INTERVAL_MIN
+    (default 240 = 4h → up to 6 looks/day), so the day's NAV strike is captured within
+    ~4h of the provider posting it instead of up to 24h late. RECORD-ONLY, $0 marginal
+    (15 FMP calls/run against a paid plan; Apify never touched). The risk-cycle call
+    remains as the safety net; writes are idempotent/strike-guarded either way."""
+    import time as _t
+    interval = max(60, int(os.getenv("ETF_SNAPSHOT_INTERVAL_MIN", "240")))
+    while True:
+        _t.sleep(interval * 60)
+        if os.getenv("ETF_FLOW_SNAPSHOT", "1") != "1":
+            continue
+        try:
+            import etf_flow
+            r = etf_flow.snapshot(DB_PATH)
+            print(f"[etf-snapshot] {r.get('date')}: new={r.get('written', 0)} "
+                  f"strikes={r.get('strikes_updated', 0)} missing={len(r.get('missing') or [])}")
+        except Exception as _e:
+            print(f"[etf-snapshot] loop error: {_e}")
+
+
 def _insider_ingest_loop():
     import time as _t
     while True:
@@ -6187,6 +6208,15 @@ async def startup_auto_collect():
               f"(every {INSIDER_INGEST_INTERVAL_MIN}m; gated on INSIDER_FLOW).")
     except Exception as _iie:
         print(f"[startup] insider-ingest failed to start: {_iie}")
+
+    # A1: 4h ETF share-snapshot loop (record-only; ETF_FLOW_SNAPSHOT=0 disables).
+    try:
+        threading.Thread(target=_etf_snapshot_loop, daemon=True,
+                         name="etf-snapshot").start()
+        print(f"[startup] etf-snapshot started "
+              f"(every {os.getenv('ETF_SNAPSHOT_INTERVAL_MIN', '240')}m; record-only).")
+    except Exception as _ese:
+        print(f"[startup] etf-snapshot failed to start: {_ese}")
 
     # Category enrichment: build the topic_key→category override maps (situation
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
@@ -7417,6 +7447,12 @@ def diag_etf_flow():
                        "scale_pct": _cs.ETF_VOTE_SCALE_PCT}
         rep["note"] = ("shadow_votes are what WOULD be cast if CRYPTO_ETF_FLOW were on; "
                        "nothing here is served or scored while the flag is off")
+        # A1 (Chairman 2026-08-05): the 24h observation cycle — 4h looks per fund, when
+        # the day's NAV strike landed. Timeliness evidence; still ONE flow point per day.
+        try:
+            rep["intraday"] = etf_flow.intraday_report(DB_PATH)
+        except Exception as _ie:
+            rep["intraday"] = {"available": False, "reason": str(_ie)[:80]}
         return rep
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}

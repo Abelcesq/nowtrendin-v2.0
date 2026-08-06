@@ -53,7 +53,15 @@ def assemble_crypto_components(coin: str, sig: Optional[dict] = None) -> dict:
     pm = sig.get("_price") or {}
     proxy_pos = (dm.get("intensity") or 0.0) / 100.0          # Dark-Matter intensity → 0-1
     covered, total = dm.get("proxies_covered") or 0, dm.get("proxies_total") or 1
-    venue = covered / total if total else 0.0
+    # A1 / gate-5 (Chairman 2026-08-05): when the flow leg serves venue CLASSES, diffusion
+    # is classes-active / classes-reachable — instrument count must never masquerade as
+    # diffusion (flipping 6 funds live is more thermometers, not more temperature).
+    # Absent the class fields (flag off / legacy payloads), the fund-count basis remains.
+    _cls_r = dm.get("venue_classes_reachable")
+    if _cls_r:
+        venue = len(dm.get("venue_classes_active") or []) / len(_cls_r)
+    else:
+        venue = covered / total if total else 0.0
     price_avail = bool(pm.get("available"))
     return {
         "proxy_positioning": round(mse._norm(proxy_pos), 3),

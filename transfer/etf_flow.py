@@ -95,6 +95,27 @@ def init_etf_db(db_path: str = DB_PATH, conn=None):
                 PRIMARY KEY (ticker, snapshot_date)
             )
         """)
+        # SPEC AMENDMENT A1 (Chairman-ruled 2026-08-05 PT): every pull is RECORDED as an
+        # observation (4h cadence → up to 6/day), so the day's NAV strike is captured
+        # within hours of the provider posting it instead of up to 24h late. HONESTY
+        # BOUNDARY, stated so it can never be narrated otherwise: NAV strikes ONCE per
+        # trading day — six observations are six looks at at most ONE genuine flow
+        # point, never six flow points. Intraday AUM wiggle is the coin's own price
+        # moving (the banned circularity), which is exactly why the daily row updates
+        # ONLY when the NAV itself changes (a real strike), never on AUM alone.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS etf_share_observations (
+                ticker TEXT NOT NULL,
+                captured_at TEXT NOT NULL,        -- full instant, UTC (§14 operational)
+                shares REAL, aum REAL, nav REAL,
+                PRIMARY KEY (ticker, captured_at)
+            )
+        """)
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_etf_obs_t "
+                      "ON etf_share_observations(captured_at)")
+        except Exception:
+            pass
         c.commit()
     finally:
         if conn is None:
@@ -115,10 +136,11 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
     except Exception:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    out = {"date": today, "written": 0, "missing": [], "tickers": {}}
+    out = {"date": today, "written": 0, "strikes_updated": 0, "missing": [], "tickers": {}}
     init_etf_db(db_path)
     c = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
     try:
         for t in (tickers or ETF_PROXIES):
             info = None
@@ -130,20 +152,79 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
                 out["missing"].append(t)
                 continue
             try:
+                # Every pull is an observation (A1: 4h cadence, 6 looks/day).
                 c.execute(
-                    f"INSERT INTO etf_share_snapshots "
-                    f"(ticker,snapshot_date,shares,aum,nav,captured_at) "
-                    f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) "
-                    f"ON CONFLICT (ticker,snapshot_date) DO NOTHING",
-                    (t, today, info["shares"], info["aum"], info["nav"],
-                     datetime.now(timezone.utc).isoformat(timespec="seconds")))
-                out["written"] += 1
+                    f"INSERT INTO etf_share_observations (ticker,captured_at,shares,aum,nav) "
+                    f"VALUES ({ph},{ph},{ph},{ph},{ph}) ON CONFLICT DO NOTHING",
+                    (t, now_iso, info["shares"], info["aum"], info["nav"]))
+                # Daily row: insert on first sight; UPDATE only when the NAV itself moved
+                # (a genuine later strike) — never on AUM alone (that is price noise).
+                row = c.execute(
+                    f"SELECT nav FROM etf_share_snapshots WHERE ticker={ph} "
+                    f"AND snapshot_date={ph}", (t, today)).fetchone()
+                if row is None:
+                    c.execute(
+                        f"INSERT INTO etf_share_snapshots "
+                        f"(ticker,snapshot_date,shares,aum,nav,captured_at) "
+                        f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) "
+                        f"ON CONFLICT (ticker,snapshot_date) DO NOTHING",
+                        (t, today, info["shares"], info["aum"], info["nav"], now_iso))
+                    out["written"] += 1
+                else:
+                    old_nav = (row["nav"] if hasattr(row, "keys") else row[0]) or 0.0
+                    new_nav = info.get("nav") or 0.0
+                    if old_nav and new_nav and abs(new_nav - old_nav) / old_nav > 1e-9:
+                        c.execute(
+                            f"UPDATE etf_share_snapshots SET shares={ph}, aum={ph}, "
+                            f"nav={ph}, captured_at={ph} WHERE ticker={ph} "
+                            f"AND snapshot_date={ph}",
+                            (info["shares"], info["aum"], new_nav, now_iso, t, today))
+                        out["strikes_updated"] += 1
                 out["tickers"][t] = round(info["shares"])
             except Exception as e:
                 print(f"[etf-flow] {t} write: {e}")
         c.commit()
     finally:
         c.close()
+    return out
+
+
+def intraday_report(db_path: str = DB_PATH, hours: float = 24.0) -> dict:
+    """A1 (Chairman 2026-08-05): the 24h observation cycle — per fund, how many looks we
+    took, whether the day's NAV strike has landed yet, and when. READ-ONLY. This is a
+    TIMELINESS report; the flow measurement itself stays one genuine point per trading
+    day (latest_delta), detected within ~4h instead of up to 24."""
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
+    c = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    try:
+        rows = [dict(r) if hasattr(r, "keys") else
+                {"ticker": r[0], "captured_at": r[1], "nav": r[2]}
+                for r in c.execute(
+                    f"SELECT ticker, captured_at, nav FROM etf_share_observations "
+                    f"WHERE captured_at >= {ph} ORDER BY ticker, captured_at",
+                    (since,)).fetchall()]
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:120]}
+    finally:
+        c.close()
+    by = {}
+    for r in rows:
+        by.setdefault(r["ticker"], []).append(r)
+    out = {"available": True, "window_hours": hours, "tickers": {}}
+    for t, rs in by.items():
+        navs = [r["nav"] for r in rs if r.get("nav")]
+        distinct = len({round(n, 6) for n in navs})
+        strike_at = None
+        for a, b in zip(rs, rs[1:]):
+            if a.get("nav") and b.get("nav") and \
+                    abs(b["nav"] - a["nav"]) / a["nav"] > 1e-9:
+                strike_at = b["captured_at"]
+        out["tickers"][t] = {"observations": len(rs), "distinct_navs": distinct,
+                             "strike_detected_at": strike_at,
+                             "note": ("strike captured this window" if strike_at else
+                                      "no NAV change observed this window")}
     return out
 
 

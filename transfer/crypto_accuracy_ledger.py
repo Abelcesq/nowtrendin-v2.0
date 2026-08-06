@@ -99,6 +99,21 @@ def init_crypto_ledger_db(db_path: str = DB_PATH):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_crypto_pending_status ON crypto_pending_detections(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_crypto_ledger_verdict ON crypto_accuracy_ledger(verdict)")
     conn.commit()
+    # Gate-6 latency stamps (spec §5 / amendment A1): every row carries WHAT the money
+    # observable was and HOW LATE it is observed (etf_creations = T+1; lead 0-1 is
+    # parity, never prescience). Guarded forward-only ALTERs (the txn-abort lesson).
+    for _ddl in ("ALTER TABLE crypto_pending_detections ADD COLUMN flow_basis TEXT",
+                 "ALTER TABLE crypto_pending_detections ADD COLUMN signal_latency_days INTEGER",
+                 "ALTER TABLE crypto_accuracy_ledger ADD COLUMN flow_basis TEXT",
+                 "ALTER TABLE crypto_accuracy_ledger ADD COLUMN signal_latency_days INTEGER"):
+        try:
+            conn.execute(_ddl)
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     conn.close()
 
 
@@ -126,7 +141,8 @@ def _close_on_or_after(px: dict, date_str: str, max_skip: int = _MAX_SKIP):
 
 
 def record_crypto_detection(coin, name, detection_date, flow, money_movement,
-                            db_path=DB_PATH, conn=None, gate=True):
+                            db_path=DB_PATH, conn=None, gate=True,
+                            flow_basis=None, signal_latency_days=None):
     """Log a crypto MONEY-MOVEMENT (D) detection as PENDING. Idempotent on (coin, detection_date, flow);
     at most ONE open detection per (coin, flow) — a persistent read is the same ongoing signal, not many.
     flow MUST be directional ('inflow'/'outflow'). When gate=True the money_movement floor applies;
@@ -169,10 +185,12 @@ def record_crypto_detection(coin, name, detection_date, flow, money_movement,
         if not ex:
             conn.execute("""
                 INSERT OR IGNORE INTO crypto_pending_detections
-                    (id, coin, name, detection_date, flow, money_movement, timeout_date, last_checked, status)
-                VALUES (?,?,?,?,?,?,?,?,'pending')
+                    (id, coin, name, detection_date, flow, money_movement, timeout_date,
+                     last_checked, status, flow_basis, signal_latency_days)
+                VALUES (?,?,?,?,?,?,?,?,'pending',?,?)
             """, (rec_id, cn, name or cn, detection_date, flow,
-                  float(money_movement) if money_movement is not None else None, timeout_dt, now))
+                  float(money_movement) if money_movement is not None else None, timeout_dt, now,
+                  flow_basis, signal_latency_days))
             conn.commit()
     except Exception as e:
         print(f"[crypto-ledger] record error: {e}")
@@ -217,7 +235,10 @@ def record_from_serve(payload: dict, db_path=DB_PATH) -> dict:
                 continue
             # Store the dual-ring Money Movement score as context; the gate above is on proxy intensity.
             record_crypto_detection(c.get("coin"), c.get("item_name"), today, flow,
-                                    c.get("money_movement"), conn=conn, gate=False)
+                                    c.get("money_movement"), conn=conn, gate=False,
+                                    flow_basis=(dm.get("flow_basis") or c.get("flow_basis")),
+                                    signal_latency_days=(dm.get("signal_latency_days")
+                                                         or c.get("signal_latency_days")))
             n += 1
     finally:
         conn.close()
@@ -229,14 +250,16 @@ def _upsert_ledger(conn, rec_id, p, price0, price1, change_pct, move_date, lead_
     conn.execute("""
         INSERT INTO crypto_accuracy_ledger
             (id, coin, name, detection_date, flow, money_movement,
-             price_at_detection, price_at_move, price_change_pct, move_date, lead_time_days, verdict, validated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+             price_at_detection, price_at_move, price_change_pct, move_date, lead_time_days,
+             verdict, validated_at, flow_basis, signal_latency_days)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             price_at_detection=EXCLUDED.price_at_detection, price_at_move=EXCLUDED.price_at_move,
             price_change_pct=EXCLUDED.price_change_pct, move_date=EXCLUDED.move_date,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict, validated_at=EXCLUDED.validated_at
     """, (rec_id, p["coin"], p.get("name"), p["detection_date"], p.get("flow"),
-          p.get("money_movement"), price0, price1, change_pct, move_date, lead_days, verdict, now))
+          p.get("money_movement"), price0, price1, change_pct, move_date, lead_days, verdict, now,
+          p.get("flow_basis"), p.get("signal_latency_days")))
 
 
 def _evaluate(px: dict, p: dict):
