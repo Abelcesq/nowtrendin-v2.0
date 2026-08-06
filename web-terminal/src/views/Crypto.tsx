@@ -77,6 +77,26 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
         </div>
       )}
 
+      {/* C1+C2 (2026-08-05): Network Value & Supply — display-only facts; the engine omits
+          the block entirely when live data is absent (§17), so this renders only when real. */}
+      {c.supply && (
+        <div className="sect">
+          <h4>Network Value & Supply</h4>
+          <div className="comp-row"><span className="cl">Network value (circulating)</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>${(c.supply.network_value_usd! / 1e9).toFixed(1)}B{c.supply.size_band ? ` · ${c.supply.size_band.toUpperCase()}` : ''}</span></div>
+          {c.supply.circulating_supply != null && <div className="comp-row"><span className="cl">Circulating supply</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>{c.supply.circulating_supply.toLocaleString()}</span></div>}
+          {c.supply.max_supply
+            ? <>
+                <div className="comp-row"><span className="cl">Max supply · % outstanding</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>{c.supply.max_supply.toLocaleString()}{c.supply.pct_of_max_outstanding != null ? ` · ${c.supply.pct_of_max_outstanding}%` : ''}</span></div>
+                {c.supply.fdv_usd != null && <div className="comp-row"><span className="cl">Fully diluted value</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>${(c.supply.fdv_usd / 1e9).toFixed(1)}B</span></div>}
+              </>
+            : <div className="comp-row"><span className="cl">Max supply / FDV</span><span className="cv">no max supply{c.supply.supply_schedule ? ` (${c.supply.supply_schedule.replace(/_/g, ' ')})` : ''}</span></div>}
+          {c.supply.supply_schedule && <div className="comp-row"><span className="cl">Issuance model</span><span className="cv">{c.supply.supply_schedule.replace(/_/g, ' ')}{c.supply.supply_as_of ? ` · as of ${c.supply.supply_as_of}` : ''}</span></div>}
+          <div className="disc" style={{ marginTop: 6 }}>
+            {c.supply.band_basis}{c.supply.caveat ? ` ${c.supply.caveat}.` : ''} Reference facts, not a valuation or advice.
+          </div>
+        </div>
+      )}
+
       {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
       <SignalAnalysisPanel kind="crypto" item={{ item_name: c.item_name, detection: c.money_movement, confidence: c.market_confirmation, flow: c.flow, tier: c.tier, dark_matter: (c as any).dark_matter }} />
 
@@ -220,7 +240,7 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
                   <tr key={c.coin} className={c.coin === sel ? 'sel' : ''} onClick={() => select(c)}>
                     <td>
                       <div className="topic-name">{c.item_name} <span style={{ color: 'var(--text-3)' }}>· {c.coin}</span>{c.calibrating && <span className="cal-chip">cal</span>}{flowChip(c.flow)}</div>
-                      <div className="topic-cat">crypto</div>
+                      <div className="topic-cat">crypto{c.supply?.size_band ? <span title={c.supply.band_basis || ''} style={{ marginLeft: 6, textTransform: 'uppercase', fontWeight: 700, fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>{c.supply.size_band}</span> : null}</div>
                     </td>
                     <td className="r"><span className="score-cell det" style={c.money_data_absent ? { opacity: 0.4 } : undefined}>{c.money_data_absent ? 'n/a' : c.money_movement}</span></td>
                     <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>

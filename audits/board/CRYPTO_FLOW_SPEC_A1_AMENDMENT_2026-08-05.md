@@ -74,6 +74,44 @@ The harness runs as a standing daily check with an alarm (a divergence fires the
 forever — not a one-time pre-flip ceremony). Flip precondition: the harness is LIVE, its
 first comparison has completed inside the band, and the alarm is armed.
 
+## A1.6 — F-FIX ADDENDUM (Board 2026-08-05 findings; Chairman-ordered same day; all
+## adopted PRE-FLIP, zero cohort rows, before any comparison has run)
+
+- **F1:** the fund class's voice is a PINNED per-coin constant (`etf_class_budget`: BTC 4.2,
+  ETH 3.0, SOL 2.0, XRP 1.8 — frozen at the 2026-08-05 configured sums). Roster growth and
+  day-to-day data availability redistribute voice WITHIN the class; neither moves the
+  class-vs-insider mix. Changing a budget is a deliberate ruling, never a side effect.
+- **F2:** flow deltas compare VALUE-DISTINCT strike days — a pre-strike daily copy (same
+  shares+NAV, new date) is the same strike seen again, never a "measured quiet" 0.0. The
+  genuine latest flow point serves until a new strike lands. Known disclosed artifact: a
+  real strike repeating values exactly reads as no-new-strike (harness artifact class).
+- **F3:** `CRYPTO_SERIES_EPOCH` (crypto-scoped) — set in the SAME config change as the flip
+  so crypto baselines reset to CALIBRATING across the definitional break while every equity
+  baseline is untouched. The flip command is now THREE stamps: `CRYPTO_ETF_FLOW=1` +
+  `CRYPTO_LEDGER_CLEAN_COHORT_START=<flip date>` + `CRYPTO_SERIES_EPOCH=e1-flowleg-<date>`.
+- **F4:** gap normalization is by TRADING days (Mon–Fri; US holidays deliberately not
+  excluded — same declared basis as the flow-ledger window). Monday flow reads full-strength.
+- **F5:** the committed regression harness is `transfer/test_crypto_flow_a1.py` (9 checks:
+  fold arithmetic, dominance sign, F1 budget invariance, F2 pre-strike, F4 Monday, F6 class
+  coverage, retained guards, ledger stamps, flag-off equivalence). Run before the flip.
+- **F6:** `proxy_coverage` grades on venue classes when the flag is on (strong = both kinds
+  reporting; partial = one; thin = none); `proxies_covered` keeps its labeled
+  instrument-count meaning for the ≥2-fund corroboration check.
+- **F7 (pre-declared BEFORE the first comparison — the Bernstein rule, closed):** the
+  reconciliation harness direction-tests a fund-day ONLY when the issuer-published net flow
+  exceeds that fund's **materiality floor = max($10M, 0.05% of the fund's AUM)**. Inside the
+  band: direction must match; magnitude within ±25% or ±$20M (whichever more forgiving); a
+  persistent one-direction bias fails even inside the band. These numbers are fixed now, at
+  n=0 comparisons; changing them after data exists is a new spec identity.
+- **F8:** the crypto ledger serves the per-coin UNCONDITIONAL first-crossing base rate
+  (`compute_null_baseline`, deterministic over the coin's own retained history) beside any
+  confirm rate, as a PUBLICATION PRECONDITION — no rate publishes without its luck-alone
+  twin, adopted at n=0.
+- **Chairman ruling recorded (C4):** the attention-beside-flow display keeps the
+  utility-vs-speculative framing (the board's rename condition is OVERRULED); the
+  methodology note will state attention-heat and fund-flow are the OBSERVABLE PROXIES for
+  the two components. Build remains post-flip.
+
 ## Unchanged
 
 Shares-never-AUM (§1); the vote table's stale/discontinuity/eligibility refusals (§2); the

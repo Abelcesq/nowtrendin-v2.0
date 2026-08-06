@@ -43,6 +43,10 @@ except Exception:                       # pragma: no cover
 COIN_UNIVERSE: dict = {
     "BTC": {
         "name": "Bitcoin", "fmp": "BTCUSD", "av": "BTC",
+        #: F1 (Board 2026-08-05, 4 seats independently; Chairman-ordered): the fund
+        #: class's voice in D is PINNED — roster growth redistributes within the
+        #: class, never grows it. Changing this number is a deliberate ruling.
+        "etf_class_budget": 4.2,
         "proxies": [
             {"ticker": "IBIT", "kind": "etf",      "weight": 1.0},   # BlackRock spot BTC ETF (largest)
             {"ticker": "FBTC", "kind": "etf",      "weight": 0.8},   # Fidelity spot BTC ETF
@@ -58,6 +62,7 @@ COIN_UNIVERSE: dict = {
     },
     "ETH": {
         "name": "Ethereum", "fmp": "ETHUSD", "av": "ETH",
+        "etf_class_budget": 3.0,   # F1 pinned (see BTC note)
         "proxies": [
             {"ticker": "ETHA", "kind": "etf",      "weight": 1.0},   # BlackRock spot ETH ETF
             {"ticker": "ETHE", "kind": "etf",      "weight": 0.7},   # Grayscale ETH trust/ETF
@@ -68,6 +73,7 @@ COIN_UNIVERSE: dict = {
     },
     "SOL": {
         "name": "Solana", "fmp": "SOLUSD", "av": "SOL",
+        "etf_class_budget": 2.0,   # F1 pinned (see BTC note)
         "proxies": [
             # Stage 0 (2026-08-01): US spot SOL ETFs now exist and our FMP plan serves their
             # AUM+NAV (verified: BSOL $588M, GSOL $95M, TSOL $3M). They vote ONLY when the
@@ -84,6 +90,7 @@ COIN_UNIVERSE: dict = {
     },
     "XRP": {
         "name": "XRP", "fmp": "XRPUSD", "av": "XRP",
+        "etf_class_budget": 1.8,   # F1 pinned (see BTC note)
         "proxies": [
             # Stage 0 (2026-08-01): US spot XRP ETFs verified on our plan (XRPC $272M,
             # TOXR $124M). Same deployment rule as SOL above.
@@ -118,6 +125,114 @@ COIN_UNIVERSE: dict = {
 }
 
 PRICE_LOOKBACK_DAYS = int(os.getenv("CRYPTO_PRICE_LOOKBACK_DAYS", "45"))
+
+# ── C3: SUPPLY SEMANTICS (per-asset, Lewis doctrine) — curated REFERENCE metadata ─────────
+# Chairman-ruled 2026-08-05 with an OWNER attached: the weekly /improve-system audit reviews
+# these stamps (checklist line), and any coin's protocol upgrade triggers a re-verify. Board
+# condition honored: sourced from CURRENT protocol documentation, never from the book (the
+# Challenger's catch — Lewis's 2018 ETH mechanics predate the merge and EIP-1559).
+# schedule: fixed_schedule (hard cap, algorithmic) · policy_changeable (issuance amendable
+# by protocol upgrade) · pre_mined (fixed genesis supply, no ongoing issuance) ·
+# deflationary_burn (supply engineered to shrink). max_supply None = NO cap exists — FDV is
+# UNDEFINED and must render "no max supply", never a fabricated number (§17).
+SUPPLY_MODEL: dict = {
+    "BTC":  {"schedule": "fixed_schedule", "max_supply": 21_000_000,
+             "notes": "halving schedule; hard cap 21M",
+             "source": "Bitcoin protocol documentation", "as_of": "2026-08-05"},
+    "ETH":  {"schedule": "policy_changeable", "max_supply": None,
+             "notes": "post-merge PoS issuance + EIP-1559 fee burn; no cap; policy has "
+                      "changed by upgrade repeatedly",
+             "source": "ethereum.org protocol documentation", "as_of": "2026-08-05"},
+    "SOL":  {"schedule": "policy_changeable", "max_supply": None,
+             "notes": "disinflationary schedule toward ~1.5% terminal inflation; no cap",
+             "source": "Solana protocol documentation", "as_of": "2026-08-05"},
+    "XRP":  {"schedule": "pre_mined", "max_supply": 100_000_000_000,
+             "notes": "100B created at genesis, escrowed releases; supply only shrinks "
+                      "via fee burn",
+             "source": "XRPL documentation", "as_of": "2026-08-05"},
+    "DOGE": {"schedule": "policy_changeable", "max_supply": None,
+             "notes": "no cap; ~5B new DOGE per year fixed absolute issuance",
+             "source": "Dogecoin protocol documentation", "as_of": "2026-08-05"},
+    "BNB":  {"schedule": "deflationary_burn", "max_supply": None,
+             "notes": "auto-burn from 200M genesis toward a 100M target; FDV undefined "
+                      "in the capped-supply sense",
+             "source": "BNB Chain documentation", "as_of": "2026-08-05"},
+    "ADA":  {"schedule": "fixed_schedule", "max_supply": 45_000_000_000,
+             "notes": "hard cap 45B", "source": "Cardano documentation", "as_of": "2026-08-05"},
+    "AVAX": {"schedule": "fixed_schedule", "max_supply": 720_000_000,
+             "notes": "hard cap 720M; fees burned",
+             "source": "Avalanche documentation", "as_of": "2026-08-05"},
+    "LINK": {"schedule": "pre_mined", "max_supply": 1_000_000_000,
+             "notes": "1B created at genesis; no ongoing issuance",
+             "source": "Chainlink documentation", "as_of": "2026-08-05"},
+    "DOT":  {"schedule": "policy_changeable", "max_supply": None,
+             "notes": "inflationary, parameters governance-amendable; no cap",
+             "source": "Polkadot documentation", "as_of": "2026-08-05"},
+    "LTC":  {"schedule": "fixed_schedule", "max_supply": 84_000_000,
+             "notes": "hard cap 84M; halving schedule",
+             "source": "Litecoin protocol documentation", "as_of": "2026-08-05"},
+    "BCH":  {"schedule": "fixed_schedule", "max_supply": 21_000_000,
+             "notes": "hard cap 21M; halving schedule",
+             "source": "Bitcoin Cash protocol documentation", "as_of": "2026-08-05"},
+}
+
+# ── C1: SIZE BANDS by circulating-supply network value (Burniske's sizing doctrine) ───────
+# PRE-DECLARED crypto-native edges (Board condition: the $10B/$2B equity convention makes
+# every top-12 coin "large" — no discriminating power). Chosen 2026-08-05 so the tracked
+# universe splits meaningfully; the band describes VOLATILITY/LIQUIDITY CHARACTER as the
+# historical property of the size class — never quality, never a forward-looking claim.
+CRYPTO_BANDS = (  # (floor_usd, label)
+    (100e9, "mega"), (10e9, "large"), (1e9, "mid"), (0, "small"))
+CRYPTO_SUPPLY_FACTS = os.getenv("CRYPTO_SUPPLY_FACTS", "1") == "1"
+
+
+def supply_facts(coin: str) -> Optional[dict]:
+    """C1+C2 (Chairman-ruled 2026-08-05): network value (circulating cap), size band,
+    circulating-vs-FDV and % of max supply — the per-asset-metric doctrine on display.
+    DISPLAY-ONLY (never a scoring input). §17: returns None when live data is absent —
+    the section is omitted, never fabricated. FDV for uncapped coins is honestly
+    'no max supply', never a made-up denominator."""
+    if not CRYPTO_SUPPLY_FACTS or not fmp_data:
+        return None
+    c = COIN_UNIVERSE.get(coin.upper())
+    if not c:
+        return None
+    try:
+        q = fmp_data.coin_quote(c["fmp"])
+    except Exception:
+        q = None
+    if not q:
+        return None
+    cap, price = q["market_cap"], q["price"]
+    band = next(lbl for floor, lbl in CRYPTO_BANDS if cap >= floor)
+    sm = SUPPLY_MODEL.get(coin.upper()) or {}
+    maxs = sm.get("max_supply")
+    circ = q["circulating_supply"]
+    out = {
+        "network_value_usd": round(cap),          # Burniske: price × circulating supply
+        "circulating_supply": round(circ),
+        "size_band": band,
+        "band_basis": "circulating-supply network value; bands pre-declared 2026-08-05 "
+                      "(mega ≥$100B, large ≥$10B, mid ≥$1B, small <$1B)",
+        "supply_schedule": sm.get("schedule"),
+        "supply_notes": sm.get("notes"),
+        "supply_source": sm.get("source"),
+        "supply_as_of": sm.get("as_of"),
+        "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "caveat": "circulating supply is the vendor-reported figure and includes "
+                  "provably-lost coins where they cannot be distinguished — network "
+                  "value can overstate spendable supply",
+    }
+    if maxs:
+        out["max_supply"] = maxs
+        out["fdv_usd"] = round(price * maxs)      # fully diluted valuation
+        out["pct_of_max_outstanding"] = round(100.0 * circ / maxs, 1)
+    else:
+        out["max_supply"] = None
+        out["fdv_usd"] = None
+        out["fdv_note"] = "no max supply (" + (sm.get("schedule") or "uncapped") + \
+                          ") — FDV is undefined for this asset, not omitted by error"
+    return out
 # AV 13F institutional self-throttles 13s/call → too slow for the LIVE roster (the page would hang).
 # Default to the FAST Finviz-insider-only Dark Matter; set CRYPTO_FULL_DM=1 to add AV 13F (slow, for
 # background research only). Finviz insider (uncapped) is the primary D read either way.
@@ -343,12 +458,18 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
             den += p["weight"]
 
     # A1: fold the fund class in ONE step, each fund sized by its AUM share within the
-    # class. The class's total voice in the coin keeps the CONFIGURED weight budget
-    # (Σ configured etf weights), so wiring more funds redistributes voice WITHIN the
-    # class — it never grows the class's share of the coin. Measured-quiet (vote 0.0)
-    # funds stay in the denominator, per the declared sub-floor rule.
+    # class. F1 FIX (Board 2026-08-05 — found independently by FOUR seats; Chairman-
+    # ordered): the budget was Σ weights of the funds that VOTED, so roster growth grew
+    # the class's voice against insider-equity and a stale fund shrank it — availability,
+    # not information, moved the mix. The budget is now the coin's PINNED
+    # `etf_class_budget` constant (fallback: Σ over the FULL configured roster) — a
+    # fixed design intent for how much of D the fund class carries. Whenever ANY fund
+    # votes, the class speaks with its full pinned voice; funds redistribute WITHIN it
+    # by AUM share. Measured-quiet (vote 0.0) funds stay in the denominator.
     if etf_votes:
-        class_budget = sum(p["weight"] for p, _, _ in etf_votes)
+        class_budget = float(c.get("etf_class_budget") or
+                             sum(p["weight"] for p in c["proxies"]
+                                 if p.get("kind") == "etf"))
         aum_sum = sum(a for _, _, a in etf_votes)
         if aum_sum > 0:
             class_vote = sum(v * (a / aum_sum) for _, v, a in etf_votes)
@@ -386,13 +507,25 @@ def proxy_dark_matter(coin: str, max_proxies: Optional[int] = None) -> dict:
         coverage_conf = covered / total if total else 0.0
     intensity = round(min(100.0, abs(net) * 100.0 * (0.5 + 0.5 * coverage_conf)), 1)
 
+    # F6 (Board 2026-08-05, Challenger): the venue-class principle applies to the
+    # SIBLING coverage fields too — `proxy_coverage` graded on instrument count would
+    # keep the thermometer artifact alive in the exact field the ledger's enrollment
+    # gate consults. Flag on: strong = both venue kinds reporting; partial = one;
+    # thin = none. `proxies_covered` keeps its honest instrument-count meaning (it is
+    # labeled as such) for display and the >=2-fund corroboration check.
+    if CRYPTO_ETF_FLOW:
+        pcov = ("strong" if len(kinds_active) >= 2 else
+                "partial" if kinds_active else "thin")
+    else:
+        pcov = "strong" if total >= 4 and covered >= 2 else "thin" if total <= 1 else "partial"
     out = {
         "available": den > 0, "flow": flow, "net_direction": round(net, 3), "intensity": intensity,
         "proxies_covered": covered, "proxies_total": total,
-        "proxy_coverage": "strong" if total >= 4 and covered >= 2 else "thin" if total <= 1 else "partial",
+        "proxy_coverage": pcov,
         "detail": detail,
     }
     if CRYPTO_ETF_FLOW:
+        out["coverage_basis"] = "venue_classes"
         out["venue_classes_active"] = sorted(kinds_active)
         out["venue_classes_reachable"] = sorted(kinds_reachable)
         if etf_votes:

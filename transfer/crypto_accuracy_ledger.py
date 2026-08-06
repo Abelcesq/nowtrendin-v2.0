@@ -354,6 +354,113 @@ def sweep_crypto_pending(db_path=DB_PATH, fetch_price_fn=None, limit=None) -> di
     return out
 
 
+def compute_null_baseline(coin: str, db_path=DB_PATH, fetch_price_fn=None,
+                          lookback_days: int = 365) -> dict:
+    """F8 (Board 2026-08-05, the Challenger; Chairman-ordered — a PUBLICATION
+    PRECONDITION adopted while n=0, before anyone is attached to a number).
+
+    The UNCONDITIONAL first-crossing base rate: from every possible start day in the
+    retained price history, what fraction of random starts cross +THRESHOLD before
+    -THRESHOLD within the TIMEOUT window? On assets with 2-4% daily vol and positive
+    long-run drift, an 8%/45d first-crossing has a HIGH accidental hit probability that
+    asymmetrically favors "inflow" — a published confirm rate without this null beside
+    it is the easiest number in the program for a skeptic to discredit. Deterministic
+    (every start day, no sampling), measurement-only, cached per coin+parameters."""
+    fetch = fetch_price_fn or _crypto_price_fetch
+    to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    frm = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    px = fetch(coin, frm, to) or {}
+    dates = sorted(px.keys())
+    if len(dates) < CRYPTO_TIMEOUT_DAYS + 10:
+        return {"available": False, "coin": coin,
+                "reason": f"insufficient price history ({len(dates)} days)"}
+    up_hits = dn_hits = neither = 0
+    n = 0
+    for i, d0 in enumerate(dates):
+        # every start must have the FULL window available — no truncated windows
+        # (a truncated window undercounts crossings and flatters the signal).
+        window = dates[i + 1: i + 1 + CRYPTO_TIMEOUT_DAYS]
+        if len(window) < CRYPTO_TIMEOUT_DAYS:
+            break
+        try:
+            p0 = float(px[d0])
+        except (TypeError, ValueError):
+            continue
+        if p0 <= 0:
+            continue
+        up_lvl = p0 * (1.0 + CRYPTO_MOVE_THRESHOLD_PCT / 100.0)
+        dn_lvl = p0 * (1.0 - CRYPTO_MOVE_THRESHOLD_PCT / 100.0)
+        hit = None
+        for d in window:
+            try:
+                p = float(px[d])
+            except (TypeError, ValueError):
+                continue
+            if p >= up_lvl:
+                hit = "up"
+                break
+            if p <= dn_lvl:
+                hit = "down"
+                break
+        n += 1
+        if hit == "up":
+            up_hits += 1
+        elif hit == "down":
+            dn_hits += 1
+        else:
+            neither += 1
+    if not n:
+        return {"available": False, "coin": coin, "reason": "no evaluable start days"}
+    out = {"available": True, "coin": coin, "n_starts": n,
+           "threshold_pct": CRYPTO_MOVE_THRESHOLD_PCT, "window_days": CRYPTO_TIMEOUT_DAYS,
+           "lookback_days": lookback_days,
+           "up_first_rate_pct": round(100.0 * up_hits / n, 1),
+           "down_first_rate_pct": round(100.0 * dn_hits / n, 1),
+           "neither_rate_pct": round(100.0 * neither / n, 1),
+           "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "meaning": ("what a COIN-FLIP detection would score by luck alone: an "
+                       "'inflow' call confirms at ~up_first_rate unconditionally — the "
+                       "cohort's confirm rate must be read AGAINST this, never alone")}
+    conn = _connect(db_path)
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS crypto_null_baseline (
+                coin TEXT PRIMARY KEY, computed_at TEXT, n_starts INTEGER,
+                threshold_pct REAL, window_days INTEGER,
+                up_first_rate_pct REAL, down_first_rate_pct REAL, neither_rate_pct REAL)
+        """)
+        ph = "%s" if db_compat.USE_PG else "?"
+        conn.execute(
+            f"INSERT INTO crypto_null_baseline (coin,computed_at,n_starts,threshold_pct,"
+            f"window_days,up_first_rate_pct,down_first_rate_pct,neither_rate_pct) "
+            f"VALUES ({','.join([ph]*8)}) ON CONFLICT (coin) DO UPDATE SET "
+            f"computed_at=EXCLUDED.computed_at, n_starts=EXCLUDED.n_starts, "
+            f"threshold_pct=EXCLUDED.threshold_pct, window_days=EXCLUDED.window_days, "
+            f"up_first_rate_pct=EXCLUDED.up_first_rate_pct, "
+            f"down_first_rate_pct=EXCLUDED.down_first_rate_pct, "
+            f"neither_rate_pct=EXCLUDED.neither_rate_pct",
+            (coin.upper(), out["computed_at"], n, CRYPTO_MOVE_THRESHOLD_PCT,
+             CRYPTO_TIMEOUT_DAYS, out["up_first_rate_pct"], out["down_first_rate_pct"],
+             out["neither_rate_pct"]))
+        conn.commit()
+    except Exception as e:
+        print(f"[crypto-ledger] null-baseline store: {e}")
+    finally:
+        conn.close()
+    return out
+
+
+def _stored_null_baselines(db_path=DB_PATH) -> list:
+    c = _connect(db_path)
+    try:
+        return [dict(r) if hasattr(r, "keys") else {} for r in c.execute(
+            "SELECT * FROM crypto_null_baseline ORDER BY coin").fetchall()]
+    except Exception:
+        return []
+    finally:
+        c.close()
+
+
 def report(db_path=DB_PATH) -> dict:
     """Honest accuracy report for the Crypto Money Gradient — hit_rate counts the misses too."""
     conn = _connect(db_path)
@@ -399,6 +506,14 @@ def report(db_path=DB_PATH) -> dict:
     #      withholding rule that only covers the headline is not a withholding rule; the same
     #      floor now governs EVERY rate in this payload, sub-rates and median lead included.
     small_sample = resolved < CRYPTO_MIN_PUBLISH_N
+    # F8 PUBLICATION PRECONDITION (Chairman-ruled 2026-08-05, adopted at n=0): no confirm
+    # rate is ever published without the per-coin UNCONDITIONAL first-crossing null
+    # served beside it. A rate that beats nothing is a narrative.
+    nulls = _stored_null_baselines(db_path)
+    cohort_coins = {r.get("coin") for r in clean_rows if r.get("coin")}
+    null_coins = {r.get("coin") for r in nulls}
+    null_missing = sorted(cohort_coins - null_coins)
+    rate_blocked = small_sample or bool(null_missing)
     by_flow = {}
     for f in ("inflow", "outflow"):
         c = sum(1 for r in confirmed if r.get("flow") == f)
@@ -406,10 +521,13 @@ def report(db_path=DB_PATH) -> dict:
                  and r.get("verdict") in ("CONFIRMED", "NOT_CONFIRMED", "NO_MOVE"))
         by_flow[f] = {"confirmed": c, "resolved": nn,
                       "confirm_rate_pct": (round(100.0 * c / nn, 1)
-                                           if nn and not small_sample else None),
-                      "rate_withheld_reason": ("small_sample: sub-rates follow the same "
-                                               f"{CRYPTO_MIN_PUBLISH_N}-resolved floor as the "
-                                               "headline" if nn and small_sample else None)}
+                                           if nn and not rate_blocked else None),
+                      "rate_withheld_reason": (("small_sample: sub-rates follow the same "
+                                                f"{CRYPTO_MIN_PUBLISH_N}-resolved floor as "
+                                                "the headline") if nn and small_sample else
+                                               ("null_baseline_missing: no rate publishes "
+                                                "without its luck-alone twin (F8)")
+                                               if nn and rate_blocked else None)}
     return {
         "ground_truth": "realized coin close direction (FMP crypto + AV)",
         "distinct_from": "trends ledger (Google Trends) AND market ledger (equity EOD price)",
@@ -422,11 +540,22 @@ def report(db_path=DB_PATH) -> dict:
         # the post-fix cohort reaches a pre-declared n — a rate on proxy-degenerate-era data
         # is a liability, not a metric. Denominators stay served; the rate is withheld.
         "confirm_rate_pct": (round(100.0 * len(confirmed) / resolved, 1)
-                             if resolved and not small_sample else None),
-        "rate_withheld_reason": (f"small_sample: no crypto rate is published below "
-                                 f"{CRYPTO_MIN_PUBLISH_N} resolved episodes — the "
-                                 "denominators above are the record"
-                                 if small_sample and resolved else None),
+                             if resolved and not rate_blocked else None),
+        "rate_withheld_reason": ((f"small_sample: no crypto rate is published below "
+                                  f"{CRYPTO_MIN_PUBLISH_N} resolved episodes — the "
+                                  "denominators above are the record")
+                                 if small_sample and resolved else
+                                 (f"null_baseline_missing for {null_missing}: no confirm "
+                                  "rate publishes without the per-coin unconditional "
+                                  "first-crossing base rate beside it (F8 precondition)")
+                                 if resolved and null_missing else None),
+        # F8: the luck-alone twin. An 'inflow' call on a drifting, volatile coin confirms
+        # at ~up_first_rate_pct UNCONDITIONALLY — the cohort rate is only meaningful read
+        # against these. Computed deterministically from the coin's own retained history
+        # (compute_null_baseline), cached, and re-computable by anyone.
+        "null_baseline": {"coins": nulls or None,
+                          "missing_for_cohort": null_missing or None,
+                          "publication_precondition": True},
         "dead_parser_era_rows": len(era_rows),
         "clean_cohort_start": clean_start,
         "cohort_note": ("detections before clean_cohort_start were enrolled off proxy dark "

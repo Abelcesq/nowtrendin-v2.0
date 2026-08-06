@@ -261,3 +261,24 @@ def etf_info(ticker: str) -> Optional[dict]:
         return None
     return {"ticker": ticker.upper(), "aum": float(aum), "nav": float(nav),
             "shares": shares, "source": "Financial Modeling Prep"}
+
+
+def coin_quote(symbol: str) -> Optional[dict]:
+    """Live crypto quote — price + marketCap (C2 supply facts, Chairman-ruled 2026-08-05).
+    §16 field verification 2026-08-05: /stable/quote serves price + marketCap for the coin
+    symbols on our plan; sharesOutstanding is null, so CIRCULATING SUPPLY is derived as
+    marketCap ÷ price — the same divide-the-price-out discipline as shares = AUM ÷ NAV
+    (the vendor's cap is price × circulating by definition, so the quotient recovers the
+    quantity). Display-only consumer; never a scoring input."""
+    d = _cached(f"coinquote:{symbol.upper()}",
+                lambda: _get("quote", {"symbol": symbol.upper()}))
+    row = (d[0] if isinstance(d, list) and d else d) or {}
+    price, cap = row.get("price"), row.get("marketCap")
+    try:
+        price, cap = float(price), float(cap)
+    except (TypeError, ValueError):
+        return None
+    if price <= 0 or cap <= 0:
+        return None
+    return {"symbol": symbol.upper(), "price": price, "market_cap": cap,
+            "circulating_supply": cap / price, "source": "Financial Modeling Prep"}

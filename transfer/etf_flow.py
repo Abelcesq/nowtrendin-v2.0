@@ -36,7 +36,7 @@ ten COIN-only coins remain structurally unreadable. This is 2 of 12, not a crypt
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import db_compat
@@ -274,49 +274,83 @@ if __name__ == "__main__":
     print("\n--- currency evidence so far ---")
     print(json.dumps(currency_report(), indent=1))
 
-def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
-    """Day-over-day share-count change for one ETF — the raw material of a flow vote.
+def _trading_days_between(d_old, d_new) -> int:
+    """Weekday count in (d_old, d_new] — Mon–Fri, US holidays deliberately not excluded
+    (same declared basis as the flow-ledger window; no market-calendar dependency)."""
+    days, d = 0, d_old
+    while d < d_new:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            days += 1
+    return days
 
-    Uses the last two DISTINCT snapshot dates. Rules (Board 2026-08-01, Executioner):
-      - gap of 2-3 days (weekend/missed cycle): the delta is PER-DAY NORMALIZED;
-      - gap > 5 days: STALE, no vote (a stale read must never pass as today's flow);
-      - |delta| > 20%/day: DISCONTINUITY, no vote (reverse split / closure / provider
-        garbage — a real institutional day measured so far is ~1-3%).
-    Returns shares-based numbers ONLY; `aum_latest` rides along for the ELIGIBILITY floor,
-    never for the signal (the circularity rule).
+
+def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
+    """Share-count change for one ETF — the raw material of a flow vote.
+
+    F2 FIX (Board 2026-08-05, the Challenger; Chairman-ordered): the daily row is
+    inserted at FIRST SIGHT after UTC midnight carrying the PRIOR day's strike values,
+    so a naive newest-two-dates compare read delta = 0.0 for the ~13–21h before the
+    day's NAV strike landed — and all weekend — fabricating "measured quiet" votes and
+    shadowing the genuine flow point. The compare now runs over VALUE-DISTINCT days:
+    consecutive rows with identical (shares, nav) are one observation (the same strike
+    seen again), so the genuine latest flow point keeps serving until a NEW strike
+    actually lands. A real strike that repeats values exactly is a known, disclosed
+    artifact class for the reconciliation harness (Guardian note), not handled here.
+
+    F4 FIX (same ruling): the delta is normalized by TRADING days in the gap, not
+    calendar days — Monday's one-session flow was being read at 1/3 strength.
+
+    Rules retained (Board 2026-08-01): trading-gap > 5 = STALE, no vote; |delta| >
+    20%/day = DISCONTINUITY, no vote. Shares-based numbers ONLY; `aum_latest` rides
+    along for the ELIGIBILITY floor, never for the signal (the circularity rule).
     """
     c = _connect(db_path)
     try:
         rows = [dict(r) for r in c.execute(
-            "SELECT snapshot_date, shares, aum FROM etf_share_snapshots "
-            "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 8", (ticker.upper(),)).fetchall()]
+            "SELECT snapshot_date, shares, aum, nav FROM etf_share_snapshots "
+            "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 12",
+            (ticker.upper(),)).fetchall()]
     except Exception as e:
         return {"available": False, "reason": str(e)[:100]}
     finally:
         c.close()
-    seen, distinct = set(), []
+    seen, by_date = set(), []
     for r in rows:
         if r["snapshot_date"] not in seen and r.get("shares"):
             seen.add(r["snapshot_date"])
-            distinct.append(r)
+            by_date.append(r)
+    # Collapse value-identical consecutive days: one strike = one observation.
+    distinct = []
+    for r in by_date:                        # newest → oldest
+        if distinct:
+            prev = distinct[-1]
+            same = (abs((prev["shares"] or 0) - (r["shares"] or 0)) < 1e-9 and
+                    abs((prev.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9)
+            if same:
+                # keep the OLDER date for the strike (it happened then; the newer row
+                # is the pre-strike copy) — replace so from/to dates stay truthful.
+                distinct[-1] = r
+                continue
+        distinct.append(r)
     if len(distinct) < 2:
-        return {"available": False, "reason": "fewer than 2 snapshot days"}
-    b, a = distinct[0], distinct[1]          # newest, previous
+        return {"available": False, "reason": "fewer than 2 value-distinct snapshot days"}
+    b, a = distinct[0], distinct[1]          # newest strike, previous strike
     try:
         d_new = datetime.strptime(b["snapshot_date"], "%Y-%m-%d")
         d_old = datetime.strptime(a["snapshot_date"], "%Y-%m-%d")
-        gap = max(1, (d_new - d_old).days)
+        gap = max(1, _trading_days_between(d_old, d_new))
     except Exception:
         gap = 1
     if gap > 5:
-        return {"available": False, "reason": f"stale: {gap}-day gap between snapshots",
-                "stale": True, "gap_days": gap}
+        return {"available": False, "reason": f"stale: {gap} trading-day gap between "
+                "strikes", "stale": True, "gap_days": gap}
     pct_per_day = round(100.0 * (b["shares"] - a["shares"]) / a["shares"] / gap, 4)
     if abs(pct_per_day) > 20.0:
         return {"available": False, "reason": f"discontinuity: {pct_per_day}%/day "
                 "(split/closure-scale step, not flow)", "discontinuity": True,
                 "delta_pct_per_day": pct_per_day, "gap_days": gap}
     return {"available": True, "delta_pct_per_day": pct_per_day, "gap_days": gap,
-            "from_date": a["snapshot_date"], "to_date": b["snapshot_date"],
-            "shares_from": a["shares"], "shares_to": b["shares"],
-            "aum_latest": b.get("aum")}
+            "gap_basis": "trading_days", "from_date": a["snapshot_date"],
+            "to_date": b["snapshot_date"], "shares_from": a["shares"],
+            "shares_to": b["shares"], "aum_latest": b.get("aum")}

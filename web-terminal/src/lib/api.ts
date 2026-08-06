@@ -181,6 +181,14 @@ export interface CryptoCoin {
   price?: { last_close?: number; change_7d_pct?: number | null; change_30d_pct?: number | null; trend?: string; as_of?: string } | null
   dark_matter?: { coverage?: string; flow?: string; intensity?: number; proxies_covered?: number } | null
   detection_fp?: string; confidence_fp?: string; disclaimer?: string
+  // C1+C2 (2026-08-05): display-only supply facts — omitted by the engine when unavailable
+  supply?: {
+    network_value_usd?: number; circulating_supply?: number; size_band?: string
+    band_basis?: string; max_supply?: number | null; fdv_usd?: number | null
+    pct_of_max_outstanding?: number; fdv_note?: string
+    supply_schedule?: string; supply_notes?: string; supply_source?: string
+    supply_as_of?: string; as_of?: string; caveat?: string
+  } | null
 }
 export interface CryptoFeed {
   available: boolean; held_out?: boolean; status?: string; note?: string

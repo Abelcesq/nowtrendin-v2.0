@@ -5852,11 +5852,14 @@ def start_scheduler():
                     _x_velocity_scan(limit=int(os.getenv("X_SCAN_LIMIT", "100")))
                 except Exception as _xe:
                     print(f"[scheduler] x-scan error: {_xe}")
-            # Fixed clock times (00:00 / 06:00 / 12:00 / 18:00 UTC) instead of a
-            # boot-relative interval, so the every-6h pull lands at predictable
-            # times and the external monitor can run a deterministic 10 minutes
-            # after each pull (00:10 / 06:10 / 12:10 / 18:10 UTC).
-            _sched.add_job(_scheduled_x_scan, "cron", hour="0,6,12,18", minute=0,
+            # Fixed clock times, env-driven. COST RULING (Chairman 2026-08-05 PT):
+            # X pay-per-use spend hit ~$400/mo ($356.60/30d usage; $200 auto-recharges
+            # ~every 2 weeks), so the scan cadence is HALVED to 2x/day (00:00/12:00
+            # UTC) with the pull caps and monthly budget cut to match — target run
+            # rate <= $200/mo, hard-capped by X_MONTHLY_POST_BUDGET below. The old
+            # 4-slot cadence is one env away (X_SCAN_HOURS="0,6,12,18") if ruled back.
+            _sched.add_job(_scheduled_x_scan, "cron",
+                           hour=os.getenv("X_SCAN_HOURS", "0,12"), minute=0,
                            id="x_velocity_scan", max_instances=1,
                            coalesce=True, misfire_grace_time=600)
         # Google realtime-trends discovery every 6h. One Apify actor run (~$0.57)
@@ -8272,14 +8275,15 @@ def _x_candidate_topics(limit: int = None) -> list:
 # budget so a 100-topic scan can never overrun the cap — once exhausted, the
 # scan keeps doing FREE volume checks but spends no more search pulls.
 _X_POSTS_PER_PULL      = int(os.getenv("X_POSTS_PER_PULL", "120"))
-# Cadence: 120 posts every 6h (1 pull/scan x 4 scans/day) = 480 posts/day.
-# 480 x 31 = 14,880 posts/mo — the most a 31-day month can spend, still under
-# the hard 15,000-post monthly cap (~120-post safety margin). Must match the
-# X module's X_SAMPLE_SIZE so budget accounting stays accurate.
-_X_MONTHLY_POST_BUDGET = int(os.getenv("X_MONTHLY_POST_BUDGET", "14880"))
-# Daily ceiling: 4 pulls/day x 120 = 480 posts/day. With per-scan cap of 1 and
-# 4 scans/day this is the natural rate; it also guards against bursts.
-_X_DAILY_PULL_CAP      = int(os.getenv("X_DAILY_PULL_CAP", "4"))
+# COST RULING (Chairman 2026-08-05 PT): X billing doubled (~$400/mo run rate;
+# console: $356.60/30d for 8,630 posts => ~$0.041 effective per post). Cadence
+# halved to 2 scans/day (X_SCAN_HOURS above) and the monthly budget is now the
+# HARD $200 CEILING: 4,800 posts x ~$0.041 = ~$198 worst case. The 2x/day
+# natural rate (2 pulls x 120 x 31 = 7,440) stays ABOVE the budget on purpose —
+# the dollar cap binds first, so a heavy-mover month cannot overrun $200.
+_X_MONTHLY_POST_BUDGET = int(os.getenv("X_MONTHLY_POST_BUDGET", "4800"))
+# Daily ceiling: 2 pulls/day x 120 = 240 posts/day (2 scans x 1 pull/scan).
+_X_DAILY_PULL_CAP      = int(os.getenv("X_DAILY_PULL_CAP", "2"))
 
 
 def _x_pulls_today() -> int:
@@ -8422,8 +8426,9 @@ def _x_velocity_scan(topics=None, threshold=None, limit=10) -> dict:
     topics = topics or _x_candidate_topics(limit if limit != 10 else None)
     spent = _x_posts_spent_this_month()
     pulls_today = _x_pulls_today()
-    # Per-scan deep-pull cap. Runs every 6h, so 1 pull/scan = 100 posts/6h =
-    # 400 posts/day = ~12,400/mo — matching the planned budget under the 15k cap.
+    # Per-scan deep-pull cap. Runs every 12h (Chairman cost ruling 2026-08-05),
+    # so 1 pull/scan = 120 posts/12h = 240/day; the monthly POST BUDGET (~$200
+    # hard ceiling) binds before the natural rate does.
     per_scan_cap = int(os.getenv("X_PULLS_PER_SCAN", "1"))
     # Pace the free volume polls — hitting counts/recent for many topics
     # back-to-back rate-limits after ~5 and silently shrinks the scan.

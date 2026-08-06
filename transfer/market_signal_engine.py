@@ -206,6 +206,22 @@ def _level(score: float) -> str:
 #: and the affected components read CALIBRATING until MIN_BASELINE_CYCLES accrue in-epoch.
 _DEFAULT_EPOCH = "e2-parserfix-20260727"
 SERIES_EPOCH = os.getenv("MARKET_SERIES_EPOCH", _DEFAULT_EPOCH)
+#: F3 (Board 2026-08-05, Challenger; Chairman-ordered): the CRYPTO_ETF_FLOW flip changes
+#: the DATA-GENERATING PROCESS of the crypto components (class-fold intensity, venue-class
+#: diffusion) — months of near-zero pre-flip baselines + the stdev floor would serve a
+#: day-one z>=3 "Money Movement" that is a break statistic, not a measurement (the SpaceX
+#: artifact class S5 exists for). But MARKET_SERIES_EPOCH is GLOBAL — bumping it for
+#: crypto would retire every EQUITY baseline as collateral. Crypto item_keys therefore
+#: carry their OWN epoch: set CRYPTO_SERIES_EPOCH in the SAME config change as the flip
+#: and only crypto baselines reset (components read CALIBRATING until in-epoch history
+#: accrues); equities are untouched.
+CRYPTO_SERIES_EPOCH = os.getenv("CRYPTO_SERIES_EPOCH", "")
+
+
+def _epoch_for(item_key: str) -> str:
+    if CRYPTO_SERIES_EPOCH and str(item_key or "").startswith("crypto:"):
+        return CRYPTO_SERIES_EPOCH
+    return SERIES_EPOCH
 
 
 def _z_to_unit(z: float) -> float:
@@ -664,7 +680,8 @@ def record_market_cycle(item_key: str, components_current: dict,
             c.execute("INSERT OR IGNORE INTO market_signal_history "
                       "(id, item_key, component, value, signal_date, signal_time, series_epoch) "
                       "VALUES (?,?,?,?,?,?,?)",
-                      (rid, item_key, comp, float(val), sig_date, sig_time, SERIES_EPOCH))
+                      (rid, item_key, comp, float(val), sig_date, sig_time,
+                       _epoch_for(item_key)))
         c.commit()
     except Exception as e:
         print(f"  [market_signal] record error ({item_key}): {e}")
@@ -685,7 +702,7 @@ def get_market_baselines(item_key: str, lookback: int = 12,
         rows = c.execute("SELECT component, value, signal_date, signal_time FROM market_signal_history "
                          "WHERE item_key = ? AND COALESCE(series_epoch, ?) = ? "
                          "ORDER BY signal_date DESC, signal_time DESC",
-                         (item_key, _DEFAULT_EPOCH, SERIES_EPOCH)).fetchall()
+                         (item_key, _DEFAULT_EPOCH, _epoch_for(item_key))).fetchall()
     except Exception:
         rows = []
     finally:

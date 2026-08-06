@@ -215,6 +215,9 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
     return {
         "item_key": f"crypto:{coin}", "coin": coin, "item_name": name, "section": "Crypto",
         "model_version": "crypto-v1",
+        # C1+C2 (Chairman 2026-08-05): network value, size band, circulating-vs-FDV —
+        # DISPLAY-ONLY supply facts; omitted entirely when live data is absent (§17).
+        **({"supply": _supply} if (_supply := _supply_facts_safe(coin)) else {}),
         # dual-ring aliases (frontend renders detection/confidence rings)
         "detection": money_movement, "confidence": market_confirmation, "gap": gap,
         "money_movement": money_movement, "market_confirmation": market_confirmation,
@@ -299,6 +302,14 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
                         if (dm and dm.get("available") and not money_data_absent) else None),
         "disclaimer": _DISCLAIMER,
     }
+
+
+def _supply_facts_safe(coin: str):
+    """Never let a display fact break the serve path — absent on any failure (§17)."""
+    try:
+        return cs.supply_facts(coin)
+    except Exception:
+        return None
 
 
 def apply_crypto_signal(coin: str, record_this_cycle: bool = True,

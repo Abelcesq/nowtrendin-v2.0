@@ -168,10 +168,12 @@ Never hardcode a tier check anywhere else.
 
 **Data-aging waterfall:** a new score is Enterprise-only at first (live, the moment
 it is obtained) → at 12 h it becomes visible to Business → at 24 h to Consumer →
-(future) at 1 day+ to partners. X is scanned every 6h over the top-100 topics:
-the volume scan (counts/recent) is FREE vs the 15k post cap; deep author-gradient
-pulls (search/recent, ~100 posts each) fire only on movers and are hard-capped at
-X_MONTHLY_POST_BUDGET (12,000 posts/mo) — status at GET /x/budget. Consumer/Business
+(future) at 1 day+ to partners. X is scanned every 12h (00:00/12:00 UTC;
+founder cost ruling 2026-08-05 — pay-per-use spend had hit ~$400/mo) over the top-100
+topics; deep author-gradient pulls (search/recent, ~120 posts each) fire only on movers,
+max 2/day, hard-capped at X_MONTHLY_POST_BUDGET (4,800 posts/mo ≈ the $200/mo ceiling at
+the observed ~$0.041/post effective rate) — status at GET /x/budget; old cadence is one
+env away (X_SCAN_HOURS). Consumer/Business
 cannot run queries; Enterprise can run direct queries at 1 token per search.
 Enforced purely by `dataFreshness` + `isDataAccessible(tier, age)` on the score's age.
 **Retention:** engine persists all scores in Postgres (≥30-day history); monthly

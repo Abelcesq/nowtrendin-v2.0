@@ -192,3 +192,36 @@ actually touches:
 
 Logged by rule so the split never re-litigates: momentum waits on triggers, the relabel waits
 only on the N ruling + flip settling, prewarm waits on nothing.
+
+---
+
+## C5/C6 — NVT metric + realized-cap corrective (Chairman-ruled shelf, 2026-08-05 PT)
+
+**One shelf entry, one trigger, two riders.** Both require on-chain data that no free or
+already-licensed source provides today ($0 directive binding). Both were REJECTED as build
+items and APPROVED as shelved — the board (6/6) recorded that refusing to fake them is the
+deliverable.
+
+**REACTIVATION TRIGGER (necessary AND sufficient together):** a free or licensed on-chain
+data source passes ALL FIVE §16 gates, AND a validation study of the specific field passes:
+- **C5 (NVT = network value ÷ on-chain transaction volume):** the denominator must be
+  GENUINE on-chain transaction volume. **PROHIBITED PROXY (written here so the temptation
+  is pre-refused):** FMP/exchange trading volume is NOT on-chain volume — an "NVT" computed
+  from it is a different metric wearing the book's name, a fabricated read with a citation
+  for cover. Also validate against L2 drain (L2s remove transactions from the L1
+  denominator → NVT drifts on ecosystem maturation, not valuation).
+- **C6 (realized cap = Σ coins at price-when-last-moved):** requires FULL-coverage UTXO /
+  account history. **PROHIBITED PROXY:** no sampled approximation, no price-history-only
+  reconstruction — partial coverage fabricates the metric.
+
+Walked by `/monitor/deferred-triggers` + the weekly improve-system read, like every shelf
+entry. C5 ships before C6 when the trigger fires (higher ceiling; C6 rides the same source).
+
+## C8 — attention-flow divergence detector (Chairman-approved; gated build)
+
+Design pre-registered in `audits/board/DIVERGENCE_DETECTOR_PREREG_2026-08-05.md`. Build
+begins only after: CRYPTO_ETF_FLOW flip + ≥30 trading days of live measured flow. Hard
+conditions (board, 6/6): divergence display hard-gated on flow being MEASURABLE (reuses
+`absence_class` — on structurally-blind coins the mania signature is instrument blindness);
+thresholds pre-registered BEFORE first render; held-out with its own ledger before anything
+score-adjacent; user copy says "attention-flow divergence", never "mania"/"bubble".
