@@ -1838,6 +1838,43 @@ def similar_fragmentation_agent(db_path=None) -> dict:
             "summary": summary, "checked_at": _now().isoformat()}
 
 
+def etf_reconcile_watch(db_path=None) -> dict:
+    """GATE-4 TRIPWIRE (A1.5, Chairman 2026-08-05): the reconciliation harness is a
+    STANDING daily check, not a pre-flip ceremony — a material day out of band, or a
+    persistent one-direction bias, fires here forever. READ-ONLY (reads the log the
+    daily loop writes). Silent-by-design before the first pass (NOT_RUN ≠ ok: it
+    reports not_started so the fleet can't read all-green on an unbuilt gate)."""
+    alerts, summary = [], {}
+    try:
+        import etf_flow_reconcile as rec
+        rep = rec.report(db_path or rec.DB_PATH, days=7)
+        if not rep.get("available"):
+            return {"agent": "etf_reconcile", "status": "not_started", "alerts": [],
+                    "summary": {"note": rep.get("reason") or "harness not run",
+                                "gate_status": rep.get("gate_status", "NOT_RUN")},
+                    "checked_at": _now().isoformat()}
+        summary = {"gate_status": rep.get("gate_status"),
+                   "material_comparisons": rep.get("material_comparisons"),
+                   "funds": {t: {k: v for k, v in d.items() if k in ("pass", "fail")}
+                             for t, d in (rep.get("funds") or {}).items()}}
+        for f in (rep.get("open_failures") or []):
+            alerts.append({"level": "critical", "block": "B7",
+                           "msg": f"etf-flow reconcile OUT OF BAND: {f['ticker']} "
+                                  f"{f['snapshot_date']} derived "
+                                  f"${(f.get('derived_usd') or 0)/1e6:.1f}M vs published "
+                                  f"${(f.get('published_usd') or 0)/1e6:.1f}M — derived "
+                                  f"flow diverges from issuer-published truth"})
+        for b in (rep.get("bias_flags") or []):
+            alerts.append({"level": "critical", "block": "B7",
+                           "msg": f"etf-flow reconcile BIAS: {b['ticker']} "
+                                  f"{b['consecutive_same_sign_error']} consecutive "
+                                  f"same-sign errors — fails even inside the band (F7)"})
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B7", "msg": f"check failed: {e}"})
+    return {"agent": "etf_reconcile", "status": _roll_up(alerts), "alerts": alerts,
+            "summary": summary, "checked_at": _now().isoformat()}
+
+
 def run_all(conn, db_path=None) -> dict:
     # HEAVY DATA-SCANNING auditors excluded from this synchronous roll-up — they
     # do full-table scans that push /monitor past Heroku's 30s router limit (503):
@@ -1855,7 +1892,9 @@ def run_all(conn, db_path=None) -> dict:
               # budget that keeps /monitor inside Heroku's 30s router limit.
               heldout_firewall(), flow_integrity(conn),
               # Cheap: the panel is small and the audit is two indexed reads.
-              similar_fragmentation_agent(db_path=db_path)]
+              similar_fragmentation_agent(db_path=db_path),
+              # Gate-4 tripwire: reads the daily reconcile log; no network.
+              etf_reconcile_watch(db_path=db_path)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

@@ -6156,6 +6156,29 @@ def _etf_snapshot_loop():
             print(f"[etf-snapshot] loop error: {_e}")
 
 
+def _etf_reconcile_loop():
+    """A1.5 / gate 4: ONE reconciliation pass per day against the issuers' published
+    flows (the comparator updates evenings US time; our pass runs daily and upserts are
+    idempotent, so exact timing is uncritical). Record-only; alarm surfaced by the
+    monitor agent. ETF_RECONCILE=0 disables."""
+    import time as _t
+    _t.sleep(1800)                                   # let the day's snapshot land first
+    interval = max(360, int(os.getenv("ETF_RECONCILE_INTERVAL_MIN", "1440")))
+    while True:
+        if os.getenv("ETF_RECONCILE", "1") == "1":
+            try:
+                import etf_flow_reconcile as _rec
+                r = _rec.reconcile(DB_PATH)
+                print(f"[etf-reconcile] checked={r.get('checked')} pass={r.get('pass')} "
+                      f"fail={r.get('fail')} immaterial={r.get('immaterial')}")
+                if r.get("fail"):
+                    print(f"[ALERT][etf-reconcile] {r['fail']} material day(s) OUT OF "
+                          f"BAND — derived flow diverges from issuer-published")
+            except Exception as _e:
+                print(f"[etf-reconcile] loop error: {_e}")
+        _t.sleep(interval * 60)
+
+
 def _insider_ingest_loop():
     import time as _t
     while True:
@@ -6220,6 +6243,14 @@ async def startup_auto_collect():
               f"(every {os.getenv('ETF_SNAPSHOT_INTERVAL_MIN', '240')}m; record-only).")
     except Exception as _ese:
         print(f"[startup] etf-snapshot failed to start: {_ese}")
+
+    # A1.5 / gate 4: daily reconciliation vs issuer-published flows (record-only).
+    try:
+        threading.Thread(target=_etf_reconcile_loop, daemon=True,
+                         name="etf-reconcile").start()
+        print("[startup] etf-reconcile started (daily; held-out verifier).")
+    except Exception as _ere:
+        print(f"[startup] etf-reconcile failed to start: {_ere}")
 
     # Category enrichment: build the topic_key→category override maps (situation
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
@@ -7410,6 +7441,22 @@ def diag_enroll_equivalence(sample: int = 200):
         }
     finally:
         conn.close()
+
+
+@app.get("/diag/etf-reconcile", dependencies=[Depends(_require_internal)])
+def diag_etf_reconcile(run: int = 0):
+    """Spec §8 gate 4 / A1.5: the reconciliation harness — derived Δshares×NAV vs the
+    issuers' published daily flows, band + materiality floor pre-declared (F7).
+    `?run=1` triggers a fresh pass (otherwise serves the stored log's report)."""
+    try:
+        import etf_flow_reconcile as rec
+        out = {}
+        if run:
+            out["run"] = rec.reconcile(DB_PATH)
+        out.update(rec.report(DB_PATH))
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
 
 
 @app.get("/diag/etf-flow", dependencies=[Depends(_require_internal)])
