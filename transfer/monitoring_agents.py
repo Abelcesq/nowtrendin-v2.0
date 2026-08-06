@@ -1838,6 +1838,76 @@ def similar_fragmentation_agent(db_path=None) -> dict:
             "summary": summary, "checked_at": _now().isoformat()}
 
 
+def crypto_price_referee() -> dict:
+    """HELD-OUT PRICE/SUPPLY REFEREE (founder-approved 2026-08-05; §16 review:
+    audits/source-onboarding/COINGECKO_CMC_KEYLESS_REVIEW_2026-08-05.md).
+    Cross-checks the SERVED crypto data against two independent aggregators:
+      • FMP price (the M-leg input) vs CoinGecko: >1% warn, >3% critical
+      • CoinGecko vs CoinMarketCap self-check: >1% warn (referee sanity)
+      • FMP-implied supply vs CoinGecko: INFO (served supply is CoinGecko-primary
+        since the A2 batch; FMP drift = evidence for the 2026-09-05 drop/keep re-eval)
+    FAIL-OPEN: an unavailable referee reports itself blind (warn), never blocks.
+    Feeds nothing; batched keyless calls (1 per vendor per 15-min TTL)."""
+    alerts, summary = [], {}
+    try:
+        import coingecko_data as cg
+        import fmp_data
+        m = cg.markets()
+        if not m:
+            return {"agent": "crypto_price_referee", "status": "warn",
+                    "alerts": [{"level": "warn", "block": "B7",
+                                "msg": "price referee BLIND: CoinGecko unavailable "
+                                       "(fail-open — nothing blocked)"}],
+                    "summary": {"note": "CoinGecko unavailable"},
+                    "checked_at": _now().isoformat()}
+        cmc = cg.cmc_prices() or {}
+        checked, worst = 0, 0.0
+        for sym in ("BTC", "ETH", "SOL", "XRP"):
+            g = m.get(sym)
+            if not g or not g.get("price"):
+                continue
+            gp = float(g["price"])
+            checked += 1
+            c2 = cmc.get(sym)
+            if c2:
+                d = abs(float(c2) - gp) / gp
+                if d > 0.01:
+                    alerts.append({"level": "warn", "block": "B7",
+                                   "msg": f"referee self-check: CoinGecko vs CMC "
+                                          f"{sym} differ {100*d:.1f}%"})
+            try:
+                fq = fmp_data.coin_quote(sym + "USD")
+            except Exception:
+                fq = None
+            if fq and fq.get("price"):
+                d = abs(fq["price"] - gp) / gp
+                worst = max(worst, d)
+                if d > 0.03:
+                    alerts.append({"level": "critical", "block": "B7",
+                                   "msg": f"SERVED price diverges: FMP {sym} "
+                                          f"{100*d:.1f}% off CoinGecko — M-leg input "
+                                          f"accuracy at risk"})
+                elif d > 0.01:
+                    alerts.append({"level": "warn", "block": "B7",
+                                   "msg": f"FMP {sym} price {100*d:.1f}% off "
+                                          f"CoinGecko"})
+                if fq.get("circulating_supply") and g.get("circulating_supply"):
+                    ds = abs(fq["circulating_supply"] - g["circulating_supply"]) / \
+                        g["circulating_supply"]
+                    if ds > 0.005:
+                        alerts.append({"level": "info", "block": "B7",
+                                       "msg": f"FMP-implied {sym} supply "
+                                              f"{100*ds:.2f}% off CoinGecko "
+                                              f"(re-eval evidence, 2026-09-05)"})
+        summary = {"coins_checked": checked, "worst_fmp_price_drift_pct":
+                   round(100 * worst, 2), "vendors": "CoinGecko + CMC (keyless)"}
+    except Exception as e:
+        alerts.append({"level": "warn", "block": "B7",
+                       "msg": f"price referee failed: {e}"})
+    return {"agent": "crypto_price_referee", "status": _roll_up(alerts),
+            "alerts": alerts, "summary": summary, "checked_at": _now().isoformat()}
+
+
 def etf_reconcile_watch(db_path=None) -> dict:
     """GATE-4 TRIPWIRE (A1.5, Chairman 2026-08-05): the reconciliation harness is a
     STANDING daily check, not a pre-flip ceremony — a material day out of band, or a
@@ -1913,7 +1983,10 @@ def run_all(conn, db_path=None) -> dict:
               # Cheap: the panel is small and the audit is two indexed reads.
               similar_fragmentation_agent(db_path=db_path),
               # Gate-4 tripwire: reads the daily reconcile log; no network.
-              etf_reconcile_watch(db_path=db_path)]
+              etf_reconcile_watch(db_path=db_path),
+              # Held-out price/supply referee: 2 batched keyless calls per 15-min
+              # TTL window (cached between run_alls) + cached FMP quotes — cheap.
+              crypto_price_referee()]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

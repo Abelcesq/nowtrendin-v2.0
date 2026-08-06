@@ -192,15 +192,34 @@ def supply_facts(coin: str) -> Optional[dict]:
     DISPLAY-ONLY (never a scoring input). §17: returns None when live data is absent —
     the section is omitted, never fabricated. FDV for uncapped coins is honestly
     'no max supply', never a made-up denominator."""
-    if not CRYPTO_SUPPLY_FACTS or not fmp_data:
+    if not CRYPTO_SUPPLY_FACTS:
         return None
     c = COIN_UNIVERSE.get(coin.upper())
     if not c:
         return None
+    # VENDOR ORDER (Chairman ruling 2026-08-05): CoinGecko PRIMARY — it publishes
+    # circulating supply DIRECTLY, where FMP's figure had to be derived as
+    # marketCap ÷ price and FMP's marketCap basis was proven ~7 months stale for BTC
+    # (served 19,972,590 vs CoinGecko 20,066,368; verified at the raw vendor quote).
+    # FMP stays as FALLBACK + silent comparison; drop/keep re-eval 2026-09-05.
+    q, vendor = None, None
     try:
-        q = fmp_data.coin_quote(c["fmp"])
+        import coingecko_data
+        g = coingecko_data.coin_market(coin)
+        if g and g.get("price") and g.get("market_cap") and g.get("circulating_supply"):
+            q = {"price": float(g["price"]), "market_cap": float(g["market_cap"]),
+                 "circulating_supply": float(g["circulating_supply"])}
+            vendor = "CoinGecko"
     except Exception:
         q = None
+    fq = None
+    if fmp_data:
+        try:
+            fq = fmp_data.coin_quote(c["fmp"])
+        except Exception:
+            fq = None
+    if not q and fq:
+        q, vendor = fq, "Financial Modeling Prep (fallback — CoinGecko unavailable)"
     if not q:
         return None
     cap, price = q["market_cap"], q["price"]
@@ -211,6 +230,7 @@ def supply_facts(coin: str) -> Optional[dict]:
     out = {
         "network_value_usd": round(cap),          # Burniske: price × circulating supply
         "circulating_supply": round(circ),
+        "supply_vendor": vendor,
         "size_band": band,
         "band_basis": "circulating-supply network value; bands pre-declared 2026-08-05 "
                       "(mega ≥$100B, large ≥$10B, mid ≥$1B, small <$1B)",
@@ -223,6 +243,15 @@ def supply_facts(coin: str) -> Optional[dict]:
                   "provably-lost coins where they cannot be distinguished — network "
                   "value can overstate spendable supply",
     }
+    # Silent-comparison disclosure (never averaged, never hidden): when both vendors
+    # answer and disagree materially, say so — evidence for the 2026-09-05 re-eval.
+    if vendor == "CoinGecko" and fq and fq.get("circulating_supply") and circ:
+        drift = abs(fq["circulating_supply"] - circ) / circ
+        if drift > 0.005:
+            out["vendor_divergence_note"] = (
+                f"FMP-derived supply differs from CoinGecko by {100*drift:.1f}% "
+                f"(FMP marketCap÷price = {round(fq['circulating_supply']):,}) — "
+                f"FMP under silent-comparison review")
     if maxs:
         out["max_supply"] = maxs
         out["fdv_usd"] = round(price * maxs)      # fully diluted valuation
