@@ -116,6 +116,19 @@ def init_etf_db(db_path: str = DB_PATH, conn=None):
                       "ON etf_share_observations(captured_at)")
         except Exception:
             pass
+        # A2.3 (Chairman 2026-08-05): SOURCE PROVENANCE — every row names the source
+        # that produced it ('fmp' | an issuer-page adapter id). Δshares is NEVER
+        # computed across a src seam (a provider cutover's step offset would read as
+        # flow under the 20%/day guard — the splice rule). Additive, NULL≡'fmp'.
+        for tbl in ("etf_share_snapshots", "etf_share_observations"):
+            try:
+                c.execute(f"ALTER TABLE {tbl} ADD COLUMN src TEXT")
+                c.commit()
+            except Exception:
+                try:
+                    c.rollback()
+                except Exception:
+                    pass
         c.commit()
     finally:
         if conn is None:
@@ -154,9 +167,9 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
             try:
                 # Every pull is an observation (A1: 4h cadence, 6 looks/day).
                 c.execute(
-                    f"INSERT INTO etf_share_observations (ticker,captured_at,shares,aum,nav) "
-                    f"VALUES ({ph},{ph},{ph},{ph},{ph}) ON CONFLICT DO NOTHING",
-                    (t, now_iso, info["shares"], info["aum"], info["nav"]))
+                    f"INSERT INTO etf_share_observations (ticker,captured_at,shares,aum,nav,src) "
+                    f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) ON CONFLICT DO NOTHING",
+                    (t, now_iso, info["shares"], info["aum"], info["nav"], "fmp"))
                 # Daily row: insert on first sight; UPDATE only when the NAV itself moved
                 # (a genuine later strike) — never on AUM alone (that is price noise).
                 row = c.execute(
@@ -165,10 +178,11 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
                 if row is None:
                     c.execute(
                         f"INSERT INTO etf_share_snapshots "
-                        f"(ticker,snapshot_date,shares,aum,nav,captured_at) "
-                        f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) "
+                        f"(ticker,snapshot_date,shares,aum,nav,captured_at,src) "
+                        f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph}) "
                         f"ON CONFLICT (ticker,snapshot_date) DO NOTHING",
-                        (t, today, info["shares"], info["aum"], info["nav"], now_iso))
+                        (t, today, info["shares"], info["aum"], info["nav"], now_iso,
+                         "fmp"))
                     out["written"] += 1
                 else:
                     old_nav = (row["nav"] if hasattr(row, "keys") else row[0]) or 0.0
@@ -176,9 +190,10 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
                     if old_nav and new_nav and abs(new_nav - old_nav) / old_nav > 1e-9:
                         c.execute(
                             f"UPDATE etf_share_snapshots SET shares={ph}, aum={ph}, "
-                            f"nav={ph}, captured_at={ph} WHERE ticker={ph} "
+                            f"nav={ph}, captured_at={ph}, src={ph} WHERE ticker={ph} "
                             f"AND snapshot_date={ph}",
-                            (info["shares"], info["aum"], new_nav, now_iso, t, today))
+                            (info["shares"], info["aum"], new_nav, now_iso, "fmp",
+                             t, today))
                         out["strikes_updated"] += 1
                 out["tickers"][t] = round(info["shares"])
             except Exception as e:
@@ -307,10 +322,16 @@ def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
     """
     c = _connect(db_path)
     try:
-        rows = [dict(r) for r in c.execute(
-            "SELECT snapshot_date, shares, aum, nav FROM etf_share_snapshots "
-            "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 12",
-            (ticker.upper(),)).fetchall()]
+        try:
+            rows = [dict(r) for r in c.execute(
+                "SELECT snapshot_date, shares, aum, nav, src FROM etf_share_snapshots "
+                "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 12",
+                (ticker.upper(),)).fetchall()]
+        except Exception:                            # pre-src schema
+            rows = [dict(r) for r in c.execute(
+                "SELECT snapshot_date, shares, aum, nav FROM etf_share_snapshots "
+                "WHERE ticker = ? ORDER BY snapshot_date DESC LIMIT 12",
+                (ticker.upper(),)).fetchall()]
     except Exception as e:
         return {"available": False, "reason": str(e)[:100]}
     finally:
@@ -336,6 +357,14 @@ def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
     if len(distinct) < 2:
         return {"available": False, "reason": "fewer than 2 value-distinct snapshot days"}
     b, a = distinct[0], distinct[1]          # newest strike, previous strike
+    # A2.3 SPLICE RULE (Chairman 2026-08-05): never compute a delta across a source
+    # seam — a provider cutover's level restatement would read as flow (and at ~1-2%
+    # would sail UNDER the 20%/day discontinuity guard). NULL src ≡ 'fmp' (pre-A2 rows).
+    if (b.get("src") or "fmp") != (a.get("src") or "fmp"):
+        return {"available": False, "splice": True,
+                "reason": f"source seam: {a.get('src') or 'fmp'} → "
+                          f"{b.get('src') or 'fmp'} — no delta across src boundary; "
+                          "the new source re-earns its own history"}
     try:
         d_new = datetime.strptime(b["snapshot_date"], "%Y-%m-%d")
         d_old = datetime.strptime(a["snapshot_date"], "%Y-%m-%d")

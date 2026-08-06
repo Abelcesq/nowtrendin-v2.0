@@ -330,9 +330,350 @@ def report(db_path: str = DB_PATH, days: int = 21) -> dict:
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# AMENDMENT A2 (Chairman-ruled 2026-08-05 PT; spec CRYPTO_FLOW_SPEC_A2_AMENDMENT_
+# 2026-08-05.md, pre-declared at commit 51adb9d BEFORE any A2-scored pass).
+# The A1.5 exact-calendar-date join above is FROZEN with its first-pass log
+# (archived: audits/board/ETF_RECONCILE_FIRSTPASS_LOG_2026-08-05.json) — old
+# verdicts are kept, never rewritten. A2 verdicts live in etf_reconcile_log2,
+# each stamped rule_version + verdict_at (the date+time of the revised verdict).
+#
+# A2 join, derived from MECHANISM (never fitted per-row):
+#   T(strike) = settled-through trade date: captured_at → US/Eastern; ET time
+#   before 06:00 belongs to the prior ET date; weekends roll back to the last
+#   trading day; T = the previous trading day of that effective date. Each pair
+#   of consecutive VALUE-DISTINCT strikes a→b covers published trade dates in
+#   (T(a), T(b)] and is compared CUMULATIVELY against their sum (lag-invariant;
+#   drains the weekend NO_PUBLISHED leak). F7 floor/band UNTOUCHED.
+# Honest states: PENDING_FINAL (still-moving edge, not scored) · EMPTY_INTERVAL
+#   (material derived flow over zero covered trade days — phantom flow, fails) ·
+#   NO_DERIVED (material published day with no derived coverage after a
+#   2-trading-day grace — a frozen source reads as FAILURE, never silence).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RULE_VERSION = "A2"
+NO_DERIVED_GRACE_TDAYS = int(os.getenv("RECONCILE_NO_DERIVED_GRACE", "2"))
+
+try:
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+except Exception:                                   # tzdata-less fallback (dev boxes)
+    _ET = timezone(timedelta(hours=-4))
+
+
+def _last_bday(d):
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+def _prev_bday(d):
+    return _last_bday(d - timedelta(days=1))
+
+
+def _tdays_range(d_from_excl, d_to_incl):
+    """Trading days in (d_from_excl, d_to_incl] — Mon–Fri, holidays not excluded
+    (same declared basis as latest_delta's gap normalization)."""
+    out, d = [], d_from_excl
+    while d < d_to_incl:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            out.append(d)
+    return out
+
+
+def t_of(captured_at: str):
+    """A2.1: the settled-through TRADE date a share-count capture reflects."""
+    try:
+        dt = datetime.fromisoformat(str(captured_at).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        et = dt.astimezone(_ET)
+        eff = et.date()
+        if et.hour < 6:                             # pre-dawn ET = prior evening's book
+            eff -= timedelta(days=1)
+        return _prev_bday(_last_bday(eff))
+    except Exception:
+        return None
+
+
+def init_reconcile_db2(db_path: str = DB_PATH):
+    c = _connect(db_path)
+    try:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS etf_reconcile_log2 (
+                interval_end_date TEXT NOT NULL,      -- canonical YYYY-MM-DD (§14)
+                ticker TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                interval_start_date TEXT,
+                derived_usd REAL, published_usd REAL,
+                material INTEGER, direction_match INTEGER, within_band INTEGER,
+                verdict TEXT, src TEXT, comparator TEXT,
+                verdict_at TEXT,                      -- Chairman ruling a: date+time stamp
+                PRIMARY KEY (interval_end_date, ticker, rule_version)
+            )
+        """)
+        c.commit()
+    finally:
+        c.close()
+
+
+def _strikes_with_capture(ticker: str, db_path: str = DB_PATH):
+    """Value-distinct strikes with captured_at + src (splice-aware: a src seam ends
+    the comparable series — no Δ across it, per A2.3)."""
+    c = _connect(db_path)
+    try:
+        try:
+            rows = [dict(r) for r in c.execute(
+                "SELECT snapshot_date, shares, aum, nav, captured_at, src "
+                "FROM etf_share_snapshots WHERE ticker = ? ORDER BY snapshot_date ASC",
+                (ticker.upper(),)).fetchall()]
+        except Exception:                            # pre-src schema
+            rows = [dict(r) for r in c.execute(
+                "SELECT snapshot_date, shares, aum, nav, captured_at "
+                "FROM etf_share_snapshots WHERE ticker = ? ORDER BY snapshot_date ASC",
+                (ticker.upper(),)).fetchall()]
+    except Exception:
+        rows = []
+    finally:
+        c.close()
+    distinct = []
+    for r in rows:
+        if not r.get("shares") or not r.get("captured_at"):
+            continue
+        r.setdefault("src", None)
+        if distinct:
+            p = distinct[-1]
+            if (abs((p["shares"] or 0) - (r["shares"] or 0)) < 1e-9 and
+                    abs((p.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9):
+                continue
+        distinct.append(r)
+    return distinct
+
+
+def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") -> dict:
+    """One A2 harness pass: interval comparisons + the NO_DERIVED sweep, upserted into
+    etf_reconcile_log2 under RULE_VERSION with a fresh verdict_at. Idempotent, daily."""
+    import crypto_signals as cs
+    init_reconcile_db2(db_path)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    today_t = _prev_bday(_last_bday(datetime.now(_ET).date()))
+    summary = {"rule_version": RULE_VERSION, "checked": 0, "pass": 0, "fail": 0,
+               "immaterial": 0, "pending_final": 0, "empty_interval": 0,
+               "no_derived": 0, "no_published": 0, "no_comparator_coins": [], "at": now}
+    conn = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+
+    def _upsert(end_d, tkr, start_d, dusd, pusd, material, dirm, band, verdict, src):
+        conn.execute(
+            f"INSERT INTO etf_reconcile_log2 (interval_end_date,ticker,rule_version,"
+            f"interval_start_date,derived_usd,published_usd,material,direction_match,"
+            f"within_band,verdict,src,comparator,verdict_at) "
+            f"VALUES ({','.join([ph]*13)}) "
+            f"ON CONFLICT (interval_end_date,ticker,rule_version) DO UPDATE SET "
+            f"interval_start_date=EXCLUDED.interval_start_date, "
+            f"derived_usd=EXCLUDED.derived_usd, published_usd=EXCLUDED.published_usd, "
+            f"material=EXCLUDED.material, direction_match=EXCLUDED.direction_match, "
+            f"within_band=EXCLUDED.within_band, verdict=EXCLUDED.verdict, "
+            f"src=EXCLUDED.src, comparator=EXCLUDED.comparator, "
+            f"verdict_at=EXCLUDED.verdict_at",
+            (end_d, tkr, RULE_VERSION, start_d,
+             None if dusd is None else round(dusd, 2), pusd,
+             None if material is None else int(bool(material)),
+             None if dirm is None else int(bool(dirm)),
+             None if band is None else int(bool(band)),
+             verdict, src or "fmp", source, now))
+        summary["checked"] += 1
+
+    try:
+        for coin, cfg in cs.COIN_UNIVERSE.items():
+            if coins and coin not in coins:
+                continue
+            etfs = [p["ticker"] for p in cfg.get("proxies", []) if p.get("kind") == "etf"]
+            if not etfs:
+                continue
+            pub = fetch_published(coin, source)
+            if not pub.get("available"):
+                if pub.get("reason") == "no_comparator":
+                    summary["no_comparator_coins"].append(coin)
+                else:
+                    summary.setdefault("fetch_errors", []).append(
+                        {"coin": coin, "reason": pub.get("reason")})
+                continue
+            by_date = pub["by_date"]
+            pub_dates = sorted(datetime.strptime(d, "%Y-%m-%d").date() for d in by_date)
+            max_pub = pub_dates[-1] if pub_dates else None
+            for tkr in etfs:
+                strikes = _strikes_with_capture(tkr, db_path)
+                covered = set()
+                aum_latest = (strikes[-1].get("aum") if strikes else 0.0) or 0.0
+                for i, (a, b) in enumerate(zip(strikes, strikes[1:])):
+                    ta, tb = t_of(a["captured_at"]), t_of(b["captured_at"])
+                    if not ta or not tb or tb <= ta:
+                        continue
+                    if (a.get("src") or "fmp") != (b.get("src") or "fmp"):
+                        continue                     # A2.3 splice rule: no Δ across seam
+                    days = _tdays_range(ta, tb)
+                    covered.update(days)
+                    end_d, start_d = tb.isoformat(), ta.isoformat()
+                    dusd = (b["shares"] - a["shares"]) * (b.get("nav") or 0.0)
+                    is_latest = (i == len(strikes) - 2)
+                    still_moving = is_latest or (max_pub and tb >= max_pub)
+                    vals = [(by_date.get(d.isoformat()) or {}).get(tkr) for d in days]
+                    if still_moving:
+                        _upsert(end_d, tkr, start_d, dusd, None, None, None, None,
+                                "PENDING_FINAL", b.get("src"))
+                        summary["pending_final"] += 1
+                        continue
+                    floor = max(FLOOR_ABS_USD, FLOOR_AUM_FRAC * ((b.get("aum") or 0.0)))
+                    if not days:
+                        continue
+                    if any(v is None for v in vals):
+                        _upsert(end_d, tkr, start_d, dusd, None, None, None, None,
+                                "NO_PUBLISHED", b.get("src"))
+                        summary["no_published"] += 1
+                        continue
+                    psum = float(sum(vals))
+                    material = abs(psum) > floor
+                    if not material and abs(dusd) > floor:
+                        # Material derived flow the issuer says never happened —
+                        # phantom flow (the FBTC weekend zigzag class). FAILS.
+                        _upsert(end_d, tkr, start_d, dusd, psum, 1, 0, 0,
+                                "EMPTY_INTERVAL", b.get("src"))
+                        summary["empty_interval"] += 1
+                        continue
+                    if not material:
+                        _upsert(end_d, tkr, start_d, dusd, psum, 0, None, None,
+                                "IMMATERIAL", b.get("src"))
+                        summary["immaterial"] += 1
+                        continue
+                    dirm = (dusd > 0) == (psum > 0)
+                    band = abs(dusd - psum) <= max(BAND_REL * abs(psum), BAND_ABS_USD)
+                    verdict = "PASS" if (dirm and band) else "FAIL"
+                    _upsert(end_d, tkr, start_d, dusd, psum, 1, dirm, band, verdict,
+                            b.get("src"))
+                    summary["pass" if verdict == "PASS" else "fail"] += 1
+                # A2.1.4 — NO_DERIVED sweep: material published days we never covered.
+                floor_nd = max(FLOOR_ABS_USD, FLOOR_AUM_FRAC * aum_latest)
+                src_latest = (strikes[-1].get("src") if strikes else None) or "fmp"
+                for d in pub_dates:
+                    if max_pub and d >= max_pub:
+                        continue                     # comparator's edge not final
+                    if len(_tdays_range(d, today_t)) < NO_DERIVED_GRACE_TDAYS:
+                        continue                     # inside settlement/capture grace
+                    if d in covered:
+                        continue
+                    v = (by_date.get(d.isoformat()) or {}).get(tkr)
+                    if v is None or abs(v) <= floor_nd:
+                        continue
+                    _upsert(d.isoformat(), tkr, None, None, float(v), 1, None, None,
+                            "NO_DERIVED", src_latest)
+                    summary["no_derived"] += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return summary
+
+
+def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
+    """A2 gate evidence. gate_status = ALARM semantics over ALL rows (a divergence
+    fires forever). re_arm = flip-readiness per A2.4, counted ONLY on non-FMP src
+    rows (FMP is silent-comparison, disqualified as a flip basis; re-eval 2026-09-05)."""
+    init_reconcile_db2(db_path)
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    c = _connect(db_path)
+    ph = "%s" if db_compat.USE_PG else "?"
+    try:
+        rows = [dict(r) for r in c.execute(
+            f"SELECT * FROM etf_reconcile_log2 WHERE interval_end_date >= {ph} "
+            f"AND rule_version = {ph} ORDER BY ticker, interval_end_date",
+            (since, RULE_VERSION)).fetchall()]
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:120]}
+    finally:
+        c.close()
+    if not rows:
+        return {"available": False, "reason": "A2 harness has not run yet",
+                "rule_version": RULE_VERSION, "gate_status": "NOT_RUN"}
+    by, fails, no_derived = {}, [], []
+    for r in rows:
+        t = by.setdefault(r["ticker"], {"pass": 0, "fail": 0, "immaterial": 0,
+                                        "pending_final": 0, "empty_interval": 0,
+                                        "no_derived": 0, "no_published": 0,
+                                        "errors": []})
+        v = r.get("verdict")
+        key = {"PASS": "pass", "FAIL": "fail", "IMMATERIAL": "immaterial",
+               "PENDING_FINAL": "pending_final", "EMPTY_INTERVAL": "empty_interval",
+               "NO_DERIVED": "no_derived", "NO_PUBLISHED": "no_published"}.get(v)
+        if key:
+            t[key] += 1
+        rec = {k: r.get(k) for k in ("interval_end_date", "interval_start_date",
+                                     "ticker", "derived_usd", "published_usd",
+                                     "src", "verdict", "verdict_at")}
+        if v in ("FAIL", "EMPTY_INTERVAL"):
+            fails.append(rec)
+        elif v == "NO_DERIVED":
+            no_derived.append(rec)
+        if r.get("material") and r.get("published_usd") is not None and \
+                r.get("derived_usd") is not None and v in ("PASS", "FAIL"):
+            t["errors"].append(1 if r["derived_usd"] > r["published_usd"] else -1)
+    bias = []
+    for t, d in by.items():
+        errs = d.pop("errors")
+        run, prev, worst = 0, 0, 0
+        for e in errs:
+            run = run + 1 if e == prev else 1
+            prev = e
+            worst = max(worst, run)
+        if worst >= BIAS_RUN:
+            bias.append({"ticker": t, "consecutive_same_sign_error": worst})
+    material_total = sum(d["pass"] + d["fail"] for d in by.values())
+    gate = ("FAIL" if fails or bias or no_derived else
+            "PASS" if material_total >= 1 else "NO_MATERIAL_DAYS_YET")
+    # A2.4 re-arm: non-FMP src only (issuer-page source), Chairman standard = 5.
+    np_rows = [r for r in rows if (r.get("src") or "fmp") != "fmp"]
+    np_pass = [r for r in np_rows if r.get("verdict") == "PASS" and r.get("material")]
+    np_bad = [r for r in np_rows if r.get("verdict") in
+              ("FAIL", "EMPTY_INTERVAL", "NO_DERIVED")]
+    re_arm = {
+        "standard": "A2.4: >=5 material in-band comparisons on the issuer-page source, "
+                    ">=2 funds, >=3 distinct trading days, zero FAIL/EMPTY_INTERVAL/"
+                    "NO_DERIVED, zero bias; clocks restarted; FMP rows never count",
+        "pass_comparisons": len(np_pass),
+        "funds": len({r["ticker"] for r in np_pass}),
+        "trading_days": len({r["interval_end_date"] for r in np_pass}),
+        "open_bad": len(np_bad),
+        "ready": (len(np_pass) >= 5 and len({r["ticker"] for r in np_pass}) >= 2 and
+                  len({r["interval_end_date"] for r in np_pass}) >= 3 and
+                  not np_bad and not bias),
+    }
+    fmp_fails = [f for f in fails if (f.get("src") or "fmp") == "fmp"]
+    live_fails = [f for f in fails if (f.get("src") or "fmp") != "fmp"]
+    return {
+        "available": True, "rule_version": RULE_VERSION, "window_days": days,
+        "funds": by, "material_comparisons": material_total,
+        "open_failures": fails or None,
+        "open_failures_fmp": len(fmp_fails),
+        "open_failures_live_source": live_fails or None,
+        "no_derived": no_derived or None, "bias_flags": bias or None,
+        "re_arm": re_arm,
+        "no_comparator": ["XRP funds (XRPC/TOXR) — no published-flow page exists; "
+                          "honest absence, never implied covered"],
+        "band": {"floor": "max($10M, 0.05% AUM)", "direction": "mandatory on material "
+                 "intervals", "magnitude": "±25% or ±$20M (more forgiving)",
+                 "bias_rule": f">={BIAS_RUN} consecutive same-sign errors fail",
+                 "join": "A2 interval-cumulative (T(strike) settled-through mapping)"},
+        "gate_status": gate,
+        "note": "Held-out verifier under amendment A2 (51adb9d). First-pass A1.5 log "
+                "frozen + archived. FMP rows are silent-comparison only (re-eval "
+                "2026-09-05); re-arm counts issuer-source rows exclusively. Post-swap "
+                "PASSes verify pipeline fidelity, not independent confirmation.",
+    }
+
+
 if __name__ == "__main__":
     import json
-    print("=== etf_flow_reconcile — one live pass ===")
-    print(json.dumps(reconcile(), indent=1)[:1200])
-    print("\n--- report ---")
-    print(json.dumps(report(), indent=1)[:2000])
+    print("=== etf_flow_reconcile — one live A2 pass ===")
+    print(json.dumps(reconcile_a2(), indent=1)[:1400])
+    print("\n--- A2 report ---")
+    print(json.dumps(report_a2(), indent=1)[:2400])

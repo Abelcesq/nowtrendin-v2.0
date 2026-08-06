@@ -1847,23 +1847,42 @@ def etf_reconcile_watch(db_path=None) -> dict:
     alerts, summary = [], {}
     try:
         import etf_flow_reconcile as rec
-        rep = rec.report(db_path or rec.DB_PATH, days=7)
+        # A2 (Chairman 2026-08-05, 51adb9d): read the versioned A2 log. FMP rows are
+        # silent-comparison (disqualified, known-divergent; re-eval 2026-09-05) — their
+        # divergences report INFO; the LIVE (issuer-page) source firing is CRITICAL.
+        rep = rec.report_a2(db_path or rec.DB_PATH, days=7)
         if not rep.get("available"):
             return {"agent": "etf_reconcile", "status": "not_started", "alerts": [],
                     "summary": {"note": rep.get("reason") or "harness not run",
                                 "gate_status": rep.get("gate_status", "NOT_RUN")},
                     "checked_at": _now().isoformat()}
-        summary = {"gate_status": rep.get("gate_status"),
+        summary = {"rule_version": rep.get("rule_version"),
+                   "gate_status": rep.get("gate_status"),
                    "material_comparisons": rep.get("material_comparisons"),
-                   "funds": {t: {k: v for k, v in d.items() if k in ("pass", "fail")}
+                   "open_failures_fmp": rep.get("open_failures_fmp"),
+                   "re_arm": rep.get("re_arm"),
+                   "funds": {t: {k: v for k, v in d.items()
+                                 if k in ("pass", "fail", "empty_interval", "no_derived")}
                              for t, d in (rep.get("funds") or {}).items()}}
-        for f in (rep.get("open_failures") or []):
+        for f in (rep.get("open_failures_live_source") or []):
             alerts.append({"level": "critical", "block": "B7",
-                           "msg": f"etf-flow reconcile OUT OF BAND: {f['ticker']} "
-                                  f"{f['snapshot_date']} derived "
+                           "msg": f"etf-flow reconcile OUT OF BAND (live source): "
+                                  f"{f['ticker']} {f['interval_end_date']} derived "
                                   f"${(f.get('derived_usd') or 0)/1e6:.1f}M vs published "
                                   f"${(f.get('published_usd') or 0)/1e6:.1f}M — derived "
                                   f"flow diverges from issuer-published truth"})
+        for f in (rep.get("no_derived") or []):
+            if (f.get("src") or "fmp") != "fmp":
+                alerts.append({"level": "critical", "block": "B7",
+                               "msg": f"etf-flow reconcile NO_DERIVED (live source): "
+                                      f"{f['ticker']} {f['interval_end_date']} — material "
+                                      f"published day with NO derived coverage; a frozen "
+                                      f"source reads as FAILURE, never silence (A2.1.4)"})
+        if rep.get("open_failures_fmp"):
+            alerts.append({"level": "info", "block": "B7",
+                           "msg": f"fmp silent-comparison: {rep['open_failures_fmp']} "
+                                  f"divergent/phantom interval(s) on the disqualified FMP "
+                                  f"leg — evidence for the 2026-09-05 drop/keep re-eval"})
         for b in (rep.get("bias_flags") or []):
             alerts.append({"level": "critical", "block": "B7",
                            "msg": f"etf-flow reconcile BIAS: {b['ticker']} "

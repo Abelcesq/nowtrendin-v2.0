@@ -6168,12 +6168,16 @@ def _etf_reconcile_loop():
         if os.getenv("ETF_RECONCILE", "1") == "1":
             try:
                 import etf_flow_reconcile as _rec
-                r = _rec.reconcile(DB_PATH)
-                print(f"[etf-reconcile] checked={r.get('checked')} pass={r.get('pass')} "
-                      f"fail={r.get('fail')} immaterial={r.get('immaterial')}")
-                if r.get("fail"):
-                    print(f"[ALERT][etf-reconcile] {r['fail']} material day(s) OUT OF "
-                          f"BAND — derived flow diverges from issuer-published")
+                # A2 (Chairman 2026-08-05): interval-cumulative join; the A1.5
+                # first-pass log is FROZEN (archived) — only log2 is written now.
+                r = _rec.reconcile_a2(DB_PATH)
+                print(f"[etf-reconcile] A2 checked={r.get('checked')} "
+                      f"pass={r.get('pass')} fail={r.get('fail')} "
+                      f"empty={r.get('empty_interval')} no_derived={r.get('no_derived')}")
+                if r.get("fail") or r.get("empty_interval") or r.get("no_derived"):
+                    print(f"[ALERT][etf-reconcile] A2: {r.get('fail')} out-of-band, "
+                          f"{r.get('empty_interval')} phantom-flow, "
+                          f"{r.get('no_derived')} uncovered material day(s)")
             except Exception as _e:
                 print(f"[etf-reconcile] loop error: {_e}")
         _t.sleep(interval * 60)
@@ -7444,16 +7448,22 @@ def diag_enroll_equivalence(sample: int = 200):
 
 
 @app.get("/diag/etf-reconcile", dependencies=[Depends(_require_internal)])
-def diag_etf_reconcile(run: int = 0):
-    """Spec §8 gate 4 / A1.5: the reconciliation harness — derived Δshares×NAV vs the
-    issuers' published daily flows, band + materiality floor pre-declared (F7).
-    `?run=1` triggers a fresh pass (otherwise serves the stored log's report)."""
+def diag_etf_reconcile(run: int = 0, firstpass: int = 0):
+    """Spec §8 gate 4 under AMENDMENT A2 (Chairman 2026-08-05, commit 51adb9d):
+    interval-cumulative reconciliation, versioned verdicts in etf_reconcile_log2.
+    `?run=1` triggers a fresh A2 pass; `?firstpass=1` serves the FROZEN A1.5
+    first-pass report (historical record — that log is never written again)."""
     try:
         import etf_flow_reconcile as rec
+        if firstpass:
+            out = rec.report(DB_PATH)
+            out["frozen"] = ("A1.5 first-pass record (gate FAIL 2026-08-05) — "
+                             "archived in audits/board/; superseded by A2 for scoring")
+            return out
         out = {}
         if run:
-            out["run"] = rec.reconcile(DB_PATH)
-        out.update(rec.report(DB_PATH))
+            out["run"] = rec.reconcile_a2(DB_PATH)
+        out.update(rec.report_a2(DB_PATH))
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
