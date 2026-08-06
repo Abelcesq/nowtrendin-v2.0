@@ -461,15 +461,47 @@ def cost_sentinel() -> dict:
         src = "itemized" if (name == "Data API subscriptions" and subs_itemized > 0) else "configured"
         lines.append({"item": name, "usd": round(usd, 2), "source": src})
 
-    # 4) X posts — operational budget (posts, not $)
+    # 4) X posts — operational budget (posts) + METERED DOLLARS.
+    # ⚠ ROOT-CAUSE FIX (founder escalation 2026-08-05: X spend doubled to ~$400/mo and
+    # NOTHING alarmed). Two blind spots, both structural: (a) the fixed line above books
+    # a CONFIGURED $200 — set in the subscription era; the code's own comment said
+    # "migrating to Pay-Per-Use 2026-06-21 — update then" and that reminder had no
+    # tripwire behind it (the §16a lesson: MUST without a gate is aspiration); (b) this
+    # section watched POSTS vs a 14,880 budget calibrated to the OLD plan's 15k post
+    # CAP — a quantity ceiling, not a dollar one — so 8,630 posts (58%) = $356 sailed
+    # under both watchers. The sentinel now METERS X dollars from the posts it already
+    # counts (effective $/post from the console read: $356.60/8,630 ≈ $0.0413, request
+    # overhead embedded) and ALARMS on divergence from the configured line — the
+    # pricing-model class of failure can't be silent again.
     x_line = {}
     try:
         xs = g._x_posts_spent_this_month(); xb = g._X_MONTHLY_POST_BUDGET
-        x_line = {"posts": xs, "budget": xb, "pct": round(xs / xb * 100, 1) if xb else 0}
+        x_rate = float(os.getenv("X_COST_PER_POST_USD", "0.0413"))
+        x_metered = round(xs * x_rate, 2)
+        x_declared = float(os.getenv("COST_X_API_USD", "200"))
+        # Month-to-date → full-month projection (linear on day-of-month).
+        _dom = max(1, datetime.now(timezone.utc).day)
+        x_projected = round(x_metered * 30.4 / _dom, 2)
+        x_line = {"posts": xs, "budget": xb, "pct": round(xs / xb * 100, 1) if xb else 0,
+                  "metered_usd_mtd": x_metered, "projected_usd_month": x_projected,
+                  "declared_usd": x_declared, "usd_per_post": x_rate}
+        if x_metered > x_declared:
+            # Metered ACTUALS exceed the configured line → count the excess in the
+            # total so the cap math is honest (never book less than reality).
+            total += (x_metered - x_declared)
+            lines.append({"item": "X Developer API (metered excess over configured)",
+                          "usd": round(x_metered - x_declared, 2), "source": "metered"})
         if xb and xs >= xb:
             alerts.append({"level": "critical", "block": "B7", "msg": f"X post budget EXHAUSTED {xs}/{xb}"})
         elif xb and xs / xb >= 0.8:
             alerts.append({"level": "warn", "block": "B7", "msg": f"X posts at {xs / xb * 100:.0f}% of {xb}/mo"})
+        if x_projected > x_declared * 1.1:
+            alerts.append({"level": "critical" if x_projected > x_declared * 1.5 else "warn",
+                           "block": "B7",
+                           "msg": f"X pay-per-use pacing ${x_projected:.0f}/mo vs the "
+                                  f"${x_declared:.0f} configured line ({xs} posts MTD × "
+                                  f"${x_rate}/post) — metered actuals diverging from the "
+                                  f"declared cost"})
     except Exception:
         pass
 
