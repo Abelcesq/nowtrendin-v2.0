@@ -3136,3 +3136,26 @@ reason the flip stays blocked. etf_reconcile_watch is now firing in the fleet by
 - (c) Timeline: the ~08-10 flip target slips until a clean PASS on a currency-grade source.
 
 FLOW_ENROLL=1 (insider flow) is unaffected — separate chain.
+
+## 2026-08-05 (PT, late-2) — Board convened on the Gate-4 FAIL; Chairman ruled; A2 pre-declared
+
+Six independent memos (`BOARD_gate4-fail_2026-08-05.md`): unanimous — FAIL stands, flip
+blocked, FMP dead as flip basis, issuer pages via full §16, clocks restart, A2 before any
+scored pass, first-pass log preserved, ~08-10 dead. Chairman rulings executed:
+(a) A2 join fix approved — old verdicts KEPT, new verdicts date+time-stamped under A2;
+plus the DEVELOPMENT-PHASE STATEMENT recorded in A2.0 (fixing errors before public
+launch is the job, not manipulation — Board directed to adopt this framing).
+(b) Issuer-page daily shares = primary; FMP silent-comparison, drop/keep re-eval
+2026-09-05; CURRENCY pass of 08-02 formally REVOKED; CG/CMC replace FMP where proven
+inaccurate (first: supply_facts circulating supply) + onboard as held-out price/supply
+referee (founder-approved; `COINGECKO_CMC_KEYLESS_REVIEW_2026-08-05.md` — live test
+found our BTC circulating supply ~94k coins (~7mo issuance) below CoinGecko's).
+(c) Re-arm = 5 material in-band comparisons (≥2 funds, ≥3 days, zero fails/bias/
+NO_DERIVED, clocks restarted); redemption-day + $100M extras NOT adopted.
+(d) FAIL accepted; harness hardenings #1 (NO_DERIVED sweep) + #2 (history-keeping
+versioned log) adopted; #3-#5 not adopted this round.
+Executed so far: first-pass log archived verbatim (34 rows,
+`ETF_RECONCILE_FIRSTPASS_LOG_2026-08-05.json`) BEFORE any re-run; A2 amendment
+committed (`CRYPTO_FLOW_SPEC_A2_AMENDMENT_2026-08-05.md`); issuer-page §16 TEST survey
+running (background agent). NEXT: A2 harness code (join + NO_DERIVED + log2 + src
+column), issuer adapters per survey, CG/CMC referee, FMP supply verify-before-fix.
