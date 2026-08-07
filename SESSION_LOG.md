@@ -3159,3 +3159,54 @@ Executed so far: first-pass log archived verbatim (34 rows,
 committed (`CRYPTO_FLOW_SPEC_A2_AMENDMENT_2026-08-05.md`); issuer-page §16 TEST survey
 running (background agent). NEXT: A2 harness code (join + NO_DERIVED + log2 + src
 column), issuer adapters per survey, CG/CMC referee, FMP supply verify-before-fix.
+
+## 2026-08-07 (PT) — Two scraper-vendor §16 reviews (verdict: hold/lane-gated) + DDN-lessons board convened
+
+**Socialcrawl + Scrape Creators reviewed under §16** (founder-submitted, 100 free credits
+each; live TESTs run, ~21 + 2 credits; full record
+`audits/source-onboarding/SOCIALCRAWL_SCRAPECREATORS_REVIEW_2026-08-07.md`). NOTHING
+LINKED. Socialcrawl = CONDITIONAL PASS lane-by-lane: `google_trends/rising` is
+entity-grade discovery (rising queries + growth %, e.g. "ray dalio ai bubble warning"
++7000%) — ready to wire DARK on Chairman go; `google_trends/explore` hourly curves are a
+candidate ALTERNATIVE to the compute-expensive Apify ledger-sweep actor (moat-adjacent —
+requires held-out side-by-side validation first); IG reels trending = only IG-trend source
+available, moderate caption-grade quality; TikTok/social feeds caption-grade — do not
+wire. Scrape Creators = HOLD: `get-trending-feed` FAILED the gate-5 eyeball (dupes, mixed
+regions, weeks-old resurging content, descriptor hashtags); the RIGHT endpoint
+(`videos/popular` ← TikTok Creative Center) is upstream-503 — re-test when back; cheapest
+per call (~$0.002, credits never expire). Cross-cutting: both are UNOFFICIAL SCRAPERS of
+TikTok/IG (a step beyond the Apify precedent — Chairman acknowledgment requested); BOTH
+API KEYS were pasted into the chat → transcript-exposed → ROTATE after wiring decisions;
+values to Heroku config vars only.
+
+**DDN/Bouzari-lessons board convened** (founder-submitted outside-Claude analysis +
+founder framing "our value = grading accuracy + transparent, logged grading mechanisms").
+Six independent memos collated in `audits/board/BOARD_ddn-lessons_2026-08-07.md`; items
+I1–I6 (bottleneck-layer doctrine · source economics · defensibility gaps · picks-and-
+shovels utilization lane · private-company blind-spot annotation · strategic framing).
+Notable: TWO seats independently caught the evidence pack's own verification being 2/4
+wrong (OpenBB ruling EXISTS at repo root; knowable_at lives in the 08-04 COT pack —
+operator greps were scoped too narrowly; corrected in the record). Headline convergences:
+I1/I5/I6 broadly approved with wording conditions; I2 blocked on WHICH operating
+definition of "margin-positive" (four proposals — Chairman must pick before the first
+weekly verdict); I3 "already law" EXCEPT four concrete named gaps (n+intervals on
+published rates · referee-verified/unverified split · published naive baseline (Malkiel
+null) · client-facing one-page accuracy statement); I4 unanimous conditions: held-out,
+§16, ≥2-supplier corroboration, incentive metadata, backtest MUST include a
+false-positive basket (2000-telecom class), weight EARNED never assigned. Economist filed
+7 canon prescriptions (null-baseline picker, tail-capture metric, Kindleberger
+stage-tagging, R&R signature library, first-timer-inflow as attention "money supply",
+incentive metadata, cohort intervals). ALL RULINGS PENDING THE CHAIRMAN.
+
+**S8 plain-English relabel COMMITTED** (was sitting uncommitted across 19
+frontend/web-terminal files from the unlogged 08-06 session): display-only label mapping
+(LED→"Detected First", PRE_BROKEN→"Pre-existing breakout", Dark Matter→"Under-the-Radar
+Signals"/"Insider Tracking" (crypto/market), N→"Platform Indicator (N)"); verdict
+keys/values + CSS keys untouched; web-terminal build green. gh-pages + mobile-preview
+DEPLOYS HELD pending founder go (operator could not verify the S8 Chairman ruling from
+the log — the 08-06 session left no SESSION_LOG entry).
+
+**Open/next:** Chairman rulings on the two source-review decision lists + board I1–I6;
+key rotations (Socialcrawl, Scrape Creators, + standing QUIVER/FMP); S8 deploy go;
+re-test Scrape Creators videos/popular when Creative Center returns; A2 re-arm watch
+(5 in-band comparisons) unchanged.
