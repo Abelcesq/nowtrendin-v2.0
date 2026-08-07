@@ -124,10 +124,10 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
       {/* Price & Dark Matter facts — only what contributed (§17) */}
       {(p?.change_7d_pct != null || dm) && (
         <div className="sect">
-          <h4>Price &amp; Dark Matter</h4>
+          <h4>Price &amp; Insider Tracking</h4>
           {p?.change_7d_pct != null && <div className="comp-row"><span className="cl">Price trend</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>7d {p.change_7d_pct}% · 30d {p.change_30d_pct ?? '—'}%</span></div>}
-          {dm && <div className="comp-row"><span className="cl">Dark Matter (proxies)</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>{dm.flow} · {dm.intensity} · {dm.coverage}</span></div>}
-          <div className="disc">Price via FMP (coin) · Dark Matter via crypto-exposure proxy 13F / insider. Measurement only.</div>
+          {dm && <div className="comp-row"><span className="cl">Insider Tracking (proxies)</span><span className="cv" style={{ fontFamily: 'var(--mono)' }}>{dm.flow} · {dm.intensity} · {dm.coverage}</span></div>}
+          <div className="disc">Price via FMP (coin) · Insider tracking via crypto-exposure proxy 13F / insider. Measurement only.</div>
         </div>
       )}
 
@@ -216,7 +216,7 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
         ) : err ? (
           <div className="center-state">Couldn't load the crypto feed.<div className="muted">{err}</div></div>
         ) : feed && !feed.available ? (
-          <div className="center-state">Crypto Money Gradient is in held-out research.<div className="muted">{feed.note || ''}</div></div>
+          <div className="center-state">Crypto Money Gradient is in pre-release research — not yet live.<div className="muted">{feed.note || ''}</div></div>
         ) : feed?.status === 'warming' ? (
           <div className="center-state"><div className="spinner" />Warming the crypto money gradient…<div className="muted">Loading the roster — one moment.</div></div>
         ) : coins.length === 0 ? (

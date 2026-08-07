@@ -257,7 +257,7 @@ function TileBuilder({ topics, onAdd, onCancel }: { topics: { key: string; name:
   const [topicKey, setTopicKey] = useState('')
   const [name, setName] = useState('')
 
-  const TREND_RANK = [['n', 'N'], ['det', 'Detection'], ['conf', 'Confidence'], ['mingap', 'Min gap']]
+  const TREND_RANK = [['n', 'Platform Indicator (N)'], ['det', 'Detection'], ['conf', 'Confidence'], ['mingap', 'Min gap']]
   const MKT_RANK = [['det', 'Money Movement'], ['leverage', 'Leverage']]
   const STAGES = ['', 'BREAKOUT', 'STRONG', 'EMERGING', 'WATCHING', 'MONITORING']
   const TIERS = ['', 'ELEVATED', 'ACTIVE', 'MODERATE', 'ROUTINE', 'DORMANT']

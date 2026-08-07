@@ -24,7 +24,7 @@ const BASELINE_META: Record<string, { color: string; label: string }> = {
 };
 
 const PIPELINE = [
-  { key: 'Dark Positioning', label: 'Dark Positioning', desc: 'Insider Form 4 / 13F — smart money', detect: true },
+  { key: 'Dark Positioning', label: 'Insider Tracking', desc: 'Insider Form 4 / 13F — smart money', detect: true },
   { key: 'Expert Warning', label: 'Expert Warning', desc: '8-K material events, macro stress', detect: false },
   { key: 'Consumer Concern', label: 'Consumer Concern', desc: 'Financial communities', detect: false },
   { key: 'Media Coverage', label: 'Media Coverage', desc: 'News flow', detect: false },
@@ -33,7 +33,7 @@ const PIPELINE = [
 
 const COMPONENT_LABELS: Record<string, string> = {
   gradient_strength: 'Niche Concentration',
-  dark_matter: 'Dark matter (insider positioning)',
+  dark_matter: 'Insider Tracking (positioning)',
   inertia: 'Inertia (acceleration)',
   medium_sequence: 'Diffusion (cross-stage)',
   confidence_decay: 'Freshness',

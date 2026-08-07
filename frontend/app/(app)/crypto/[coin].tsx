@@ -174,7 +174,7 @@ export default function CryptoDetail() {
       {/* Price & Dark Matter facts — only what contributed (§17) */}
       {(c.change7dPct != null || c.darkMatter) && (
         <View className="bg-card rounded-3xl p-5 mt-4">
-          <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mb-3">Price & Dark Matter</Text>
+          <Text className="text-textPrimary text-sm font-extrabold tracking-[1.8px] uppercase mb-3">Price & Insider Tracking</Text>
           {c.change7dPct != null && (
             <View className="flex-row justify-between mb-2">
               <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Price trend</Text>
@@ -185,14 +185,14 @@ export default function CryptoDetail() {
           )}
           {!!c.darkMatter && (
             <View className="flex-row justify-between mb-2">
-              <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Dark Matter (proxies)</Text>
+              <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Insider Tracking (proxies)</Text>
               <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
                 {c.darkMatter.flow ?? '—'} · {c.darkMatter.intensity ?? '—'} · {c.darkMatter.coverage ?? '—'}
               </Text>
             </View>
           )}
           <Text className="text-textMuted text-xs mt-1">
-            Price via FMP (coin) · Dark Matter via crypto-exposure proxy 13F / insider. Measurement only.
+            Price via FMP (coin) · Insider tracking via crypto-exposure proxy 13F / insider. Measurement only.
           </Text>
         </View>
       )}

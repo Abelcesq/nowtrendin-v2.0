@@ -19,7 +19,7 @@ export function WhyScoresDiverge({ signal }: { signal: Signal }) {
   const rows: { label: string; value: string; favors: 'DET' | 'CONF'; note: string }[] = [];
 
   if (signal.darkMatter != null)
-    rows.push({ label: 'DARK MATTER (D)', value: `${Math.round(signal.darkMatter)}/100`,
+    rows.push({ label: 'UNDER-THE-RADAR (D)', value: `${Math.round(signal.darkMatter)}/100`,
       favors: 'DET', note: 'hidden early activity → lifts Detection' });
   if (ftPct != null)
     rows.push({ label: 'FIRST-TIMER RATIO', value: `${ftPct}%`,

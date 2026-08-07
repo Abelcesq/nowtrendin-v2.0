@@ -20,7 +20,10 @@ function normalizeStage(raw: string | undefined): Stage {
 // (Detection/Confidence are the composites; this is one input to them).
 const LABEL_OVERRIDES: Record<string, string> = {
   gradient_strength: 'Niche Concentration',
-  nowtrendin_demand: 'Now Trending (internal demand)',
+  nowtrendin_demand: 'Platform Indicator (N)',
+  // S8 plain-English relabel (2026-08-05): engine key stays dark_matter; the
+  // user-facing label is the plain-English term (display mapping only).
+  dark_matter: 'Under-the-Radar Signals',
 };
 
 function prettify(key: string): string {

@@ -62,7 +62,7 @@ export const GAP_BANDS = [
   { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#00C896' },
   { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#D4A017' },
   { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#CF2A1B' },
-  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#8B5CF6' },
+  { max: Infinity, range: '60+ pts', label: 'Speculative — under-the-radar signal only', color: '#8B5CF6' },
 ]
 export function gapBandIndex(gap: number): number {
   const i = GAP_BANDS.findIndex((b) => Math.abs(gap) <= b.max)

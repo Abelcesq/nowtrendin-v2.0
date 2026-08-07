@@ -54,13 +54,13 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
       <View className="flex-row items-center gap-2 mb-2">
         <Orbit size={16} color="#6B4FA0" />
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
-          Dark Matter · {dm ?? 0}/100
+          Under-the-Radar Signals · {dm ?? 0}/100
         </Text>
       </View>
       <View className="rounded-xl px-4 py-3 mb-3" style={{ borderColor: '#6B4FA033', backgroundColor: '#6B4FA008' }}>
         <Text className="text-textSecondary text-xs leading-5">
-          Like dark matter in cosmology, the earliest signals live in private channels we can't see —
-          but their effects on public data are measurable. These indicators infer that unseen activity.
+          The earliest signals live in private channels we can't see — but their effects on public
+          data are measurable. These indicators infer that unseen activity.
         </Text>
       </View>
 
@@ -70,8 +70,8 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         active={ftr >= 0.35}
         desc={
           ftr >= 0.35
-            ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → dark-social signal inferred.`
-            : `${ftrPct}% new participants — below the dark-social threshold; monitor for an increase.`
+            ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → private-channel activity inferred.`
+            : `${ftrPct}% new participants — below the private-channel threshold; monitor for an increase.`
         }
       />
       <Indicator
@@ -86,8 +86,8 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
       />
 
       <Text className="text-textMuted text-[12px] mt-1 leading-4">
-        Dark Matter is probabilistic, not deterministic — it flags public behavior that has historically
-        preceded trend emergence, not a confirmed private signal.
+        Under-the-radar signals are probabilistic, not deterministic — they flag public behavior that
+        has historically preceded trend emergence, not a confirmed private signal.
       </Text>
     </View>
   );

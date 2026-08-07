@@ -114,12 +114,12 @@ function deriveGroups(components: any): BGroup[] {
       { label: 'Persistence', value: P, desc: 'Held above threshold across cycles' },
     ] },
     { title: 'Signal Context', status: cs, note: 'Hidden early activity + signal freshness', items: [
-      { label: 'Dark Matter', value: D, desc: 'Hidden early activity (first-timers, deep engagement)' },
+      { label: 'Under-the-Radar Signals', value: D, desc: 'Hidden early activity (first-timers, deep engagement)' },
       { label: 'Freshness (Decay)', value: C, desc: 'How fresh vs decaying the signal is' },
     ] },
-    { title: 'Platform Indicator', status: N >= 50 ? 'HIGH' : N >= 20 ? 'MODERATE' : 'LOW',
+    { title: 'Platform Indicator (N)', status: N >= 50 ? 'HIGH' : N >= 20 ? 'MODERATE' : 'LOW',
       note: 'Now TrendIn platform tracking — separate signal, NOT part of the Gradient', items: [
-      { label: 'Now Trending (N)', value: N, desc: 'How often this topic is triggered + surfaced as a tracked topic across the platform — shown, never fed into the score' },
+      { label: 'Platform Indicator (N)', value: N, desc: 'How often this topic is triggered + surfaced as a tracked topic across the platform — shown, never fed into the score' },
     ] },
   ]
 }
@@ -130,7 +130,7 @@ function deriveGroups(components: any): BGroup[] {
 function deriveDivergence(components: any, gap: number) {
   const rows: { label: string; value: string; favors: 'DET' | 'CONF'; note: string }[] = []
   const d = components?.D_dark_matter, m = components?.M_platform_diversity
-  if (d?.score != null) rows.push({ label: 'DARK MATTER', value: `${Math.round(d.score)}/100`, favors: 'DET', note: 'hidden early activity → lifts Detection' })
+  if (d?.score != null) rows.push({ label: 'UNDER-THE-RADAR (D)', value: `${Math.round(d.score)}/100`, favors: 'DET', note: 'hidden early activity → lifts Detection' })
   if (d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
   if (d?.asymmetry_detected != null) rows.push({ label: 'ENGAGEMENT ASYMMETRY', value: d.asymmetry_detected ? 'Detected' : 'Normal', favors: 'DET', note: 'deep discussion vs surface votes → lifts Detection' })
   const pc = Array.isArray(m?.platforms) ? m.platforms.length : null
@@ -209,7 +209,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this topic.')
   const onExport = () => exportEntityCsv(`${row.topic_key}_nowtrendin.csv`, [
     ['Topic', row.topic_display], ['Detection', det], ['Confidence', conf], ['Gap', gap],
-    ['N (Now Trending)', N], ['Stage', row.stage], ['Category', catLabel(row.category)],
+    ['Platform Indicator (N)', N], ['Stage', row.stage], ['Category', catLabel(row.category)],
     ['Mentions', row.total_mentions ?? ''], ['Updated (min ago)', row.ageMin],
   ])
   const ntgD = r.nowtrending_gradient_detection, ntgC = r.nowtrending_gradient_confidence
@@ -315,13 +315,13 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
         <div className="n-card">
           <div className="n-head">
             <span className="n-flame">🔥</span>
-            <span className="n-brand"><b style={{ color: MC.orange }}>Now</b><b style={{ color: MC.maroon }}>TrendIn</b> · N component</span>
+            <span className="n-brand"><b style={{ color: MC.orange }}>Now</b><b style={{ color: MC.maroon }}>TrendIn</b> · Platform Indicator (N)</span>
             <span className="n-val">{N}</span>
           </div>
           <div className="n-desc">A platform-tracking signal — how often this topic is triggered and surfaced as a tracked topic across the Now TrendIn platform (feeds, queries, grades). A platform-internal read no public source has.</div>
           {N > 0 && ntgD != null && ntgC != null ? (
             <div className="ntg">
-              <div className="ntg-head"><span style={{ color: MC.orange, fontWeight: 800, fontSize: 9, letterSpacing: '.1em' }}>NOW TRENDING GRADIENT SCORE</span><span className="ntg-tag">SEPARATE · N-INCLUSIVE</span></div>
+              <div className="ntg-head"><span style={{ color: MC.orange, fontWeight: 800, fontSize: 9, letterSpacing: '.1em' }}>N-INCLUSIVE GRADIENT SCORE</span><span className="ntg-tag">SEPARATE · N-INCLUSIVE</span></div>
               <div className="ntg-sub">A what-if read — where the score lands if the platform-tracking signal (N) is folded in. The headline Detection/Confidence stay N-free (external world only).</div>
               <div className="ntg-pair">
                 <div className="ntg-cell" style={{ borderColor: MC.detection + '33', background: MC.detection + '0A' }}><div className="ntg-l">DETECTION + N</div><div className="ntg-n" style={{ color: MC.detection }}>{Math.round(ntgD)}</div></div>
@@ -394,7 +394,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
               {grp.items.map((it) => (
                 <div className="comp-row" key={it.label} title={it.desc}>
                   <span className="cl">{it.label}</span>
-                  <span className="comp-bar"><i style={{ width: `${Math.min(100, it.value)}%`, background: grp.title === 'Platform Indicator' ? MC.orange : MC.detection }} /></span>
+                  <span className="comp-bar"><i style={{ width: `${Math.min(100, it.value)}%`, background: grp.title === 'Platform Indicator (N)' ? MC.orange : MC.detection }} /></span>
                   <span className="cv">{it.value}</span>
                 </div>
               ))}
@@ -426,9 +426,9 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       {/* Dark Matter signatures */}
       {dm > 0 && (
         <div className="sect">
-          <h4>Dark Matter</h4>
+          <h4>Under-the-Radar Signals</h4>
           <div className="narr" style={{ marginBottom: 8 }}>Inferred private-conversation activity — early movement that hasn't surfaced publicly yet.</div>
-          <div className="comp-row"><span className="cl">Dark matter score</span><span className="comp-bar"><i style={{ width: `${Math.min(100, dm)}%`, background: MC.purple }} /></span><span className="cv">{dm}</span></div>
+          <div className="comp-row"><span className="cl">Under-the-radar score</span><span className="comp-bar"><i style={{ width: `${Math.min(100, dm)}%`, background: MC.purple }} /></span><span className="cv">{dm}</span></div>
           {ftPct != null && <div className="comp-row"><span className="cl">First-timer ratio</span><span className="comp-bar"><i style={{ width: `${Math.min(100, ftPct)}%`, background: MC.detection }} /></span><span className="cv">{ftPct}%</span></div>}
           {asym != null && <div className="kv"><span>Engagement asymmetry</span><b style={{ color: asym ? MC.detection : MC.muted }}>{asym ? 'Detected' : 'Normal'}</b></div>}
         </div>
@@ -558,7 +558,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
       {/* Methodology */}
       <div className="sect">
         <h4>How the Gradient Score Works</h4>
-        <div className="narr">Two scores from one engine. <b style={{ color: MC.detection }}>Detection</b> weights early-edge components (niche concentration, dark matter, acceleration) — speed. <b style={{ color: MC.confidence }}>Confidence</b> weights cross-platform confirmation — precision. The gap between them is how early you are. The N (Now Trending) demand signal is shown separately and never feeds the Gradient (objectivity).</div>
+        <div className="narr">Two scores from one engine. <b style={{ color: MC.detection }}>Detection</b> weights early-edge components (niche concentration, under-the-radar signals, acceleration) — speed. <b style={{ color: MC.confidence }}>Confidence</b> weights cross-platform confirmation — precision. The gap between them is how early you are. The Platform Indicator (N) is shown separately and never feeds the Gradient (objectivity).</div>
       </div>
 
       {/* Legal disclaimer — bottom, above the actions */}
@@ -760,7 +760,7 @@ export function Screener({ onRail, query = '', preset, focus }: { onRail: (node:
             <thead>
               <tr>
                 <th onClick={() => sort('topic_display')} className={sortKey === 'topic_display' ? 'sorted' : ''} style={{ textAlign: 'center' }}>Topic <span className="sort">{arrow('topic_display')}</span></th>
-                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Now Trending — proprietary N (community-demand) score" style={{ textAlign: 'center' }}>N <span className="sort">{arrow('n')}</span></th>
+                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Platform Indicator (N) — how often this topic is triggered + surfaced as a tracked topic across the platform; never part of the Gradient Score" style={{ textAlign: 'center' }}>N <span className="sort">{arrow('n')}</span></th>
                 <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Det <span className="sort">{arrow('det')}</span></th>
                 <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Conf <span className="sort">{arrow('conf')}</span></th>
                 <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')} style={{ textAlign: 'center' }}>Gap <span className="sort">{arrow('gap')}</span></th>

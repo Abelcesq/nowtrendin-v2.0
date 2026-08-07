@@ -243,7 +243,7 @@ export default function Dashboard() {
         {mode === 'attention' && (
           <>
             <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
-              {isNRanked ? 'What is gaining attention across platforms — ranked by N, our on-platform tracking signal (ties keep feed order).' : 'What is gaining attention across platforms — ranked by Detection.'} {tier === 'enterprise' ? 'Live data.' : `Your plan serves ${dataWindowLabel(tier)}.`}
+              {isNRanked ? 'What is gaining attention across platforms — ranked by the Platform Indicator (N), our on-platform tracking signal (ties keep feed order).' : 'What is gaining attention across platforms — ranked by Detection.'} {tier === 'enterprise' ? 'Live data.' : `Your plan serves ${dataWindowLabel(tier)}.`}
             </Text>
             <TouchableOpacity onPress={() => router.push('/profile/accuracy')} activeOpacity={0.7}>
               <Text className="text-[12px] font-bold mt-2" style={{ color: '#2A5B9E' }}>Our track record — the Accuracy Ledger →</Text>

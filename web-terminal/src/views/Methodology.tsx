@@ -12,7 +12,7 @@ const COMPONENTS = [
   ['G', 'Gradient strength', 'Niche/expert concentration vs. mainstream — how much runway is left.'],
   ['I', 'Inertia', 'Acceleration sustained across consecutive scoring windows.'],
   ['M', 'Platform diversity', 'How many independent surfaces carry the signal.'],
-  ['D', 'Dark matter', 'First-timer asymmetry — inferred pre-public, insider activity.'],
+  ['D', 'Under-the-radar signals', 'First-time participant influx — inferred pre-public, early activity.'],
   ['C', 'Confidence decay', 'Signal freshness and directional momentum.'],
   ['P', 'Persistence', 'Sustained elevation across cycles — has it held.'],
 ]
@@ -111,9 +111,9 @@ export function Methodology() {
 
         {/* The N factor — separate from the Gradient Score */}
         <section className="mth-sec">
-          <h3>The N factor — Now Trending (platform indicator)</h3>
+          <h3>The Platform Indicator (N)</h3>
           <div className="mth-card" style={{ borderColor: '#EE6A2A55', background: '#EE6A2A0C' }}>
-            <div className="mth-tag" style={{ color: '#EE6A2A' }}>● N · Now Trending</div>
+            <div className="mth-tag" style={{ color: '#EE6A2A' }}>● Platform Indicator (N)</div>
             <p className="mth-p">
               <b>N</b> is our <b>platform-tracking</b> signal — how often a topic is triggered and
               surfaced as a tracked topic across the Now TrendIn platform (its feeds, queries, and
@@ -135,8 +135,8 @@ export function Methodology() {
               of our platform.
             </p>
             <p className="mth-p" style={{ marginTop: 10 }}>
-              The signal-detail page also shows a clearly-labelled, demand-inclusive
-              <b> "Now Trending Gradient Score"</b> as a what-if read — what the score would be if N
+              The signal-detail page also shows a clearly-labelled, N-inclusive
+              <b> "N-Inclusive Gradient Score"</b> as a what-if read — what the score would be if N
               were folded in. That view is informational only; the headline Gradient Score always
               remains N-free.
             </p>
@@ -184,7 +184,7 @@ export function Methodology() {
         <section className="mth-sec">
           <h3>The Money Gradient — where money is moving</h3>
           <div className="mth-card">
-            <p className="mth-p">Alongside the Attention Gradient, Now TrendIn runs a parallel <b>Money Gradient</b> on the same Dark-Matter→Mainstream pattern. <b>Money Movement</b> measures early/informed money — insider Form-4, smart-money 13F filings, and quality finance analysts (the Dark-Matter layer). <b>Market Confirmation</b> measures the broad market + economic data (the Mainstream layer). The <b>flow</b> (IN/OUT) is a fact read straight from the filings, and an objective <b>leverage</b> read states balance-sheet facts. It is a measurement of movement and a leverage-facts read — never a buy/sell recommendation, a price prediction, or investment advice.</p>
+            <p className="mth-p">Alongside the Attention Gradient, Now TrendIn runs a parallel <b>Money Gradient</b> on the same early-signal→broad-confirmation pattern. <b>Money Movement</b> measures early/informed money — insider Form-4, smart-money 13F filings, and quality finance analysts (the insider-tracking layer). <b>Market Confirmation</b> measures the broad market + economic data (the broad-market layer). The <b>flow</b> (IN/OUT) is a fact read straight from the filings, and an objective <b>leverage</b> read states balance-sheet facts. It is a measurement of movement and a leverage-facts read — never a buy/sell recommendation, a price prediction, or investment advice.</p>
           </div>
         </section>
 

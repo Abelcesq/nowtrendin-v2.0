@@ -223,10 +223,10 @@ export const CATEGORY_DEFS: Array<{
     key: 'nowtrendin',
     label: 'Now TrendIn',
     short: 'NOW TRENDIN',
-    range: 'Ranked by N (Now Trending) 100 → 0',
+    range: 'Ranked by Platform Indicator (N) 100 → 0',
     color: '#B11226', altColor: '#B11226',
     definition:
-      'Every accessible trend, ranked by the proprietary N (Now Trending) score — the ' +
+      'Every accessible trend, ranked by the proprietary Platform Indicator (N) — the ' +
       'platform-tracking indicator of how often a topic is triggered and surfaced as a ' +
       'tracked topic. N never enters the Gradient Score itself; it is the platform\'s own ' +
       'ranking lens, distinct from the Detection ranking in All Signals.',
@@ -261,9 +261,9 @@ export const CATEGORY_DEFS: Array<{
       'These are trends already breaking out across multiple platforms with the engine ' +
       'showing high confidence in the diffusion.',
     howReached:
-      'A topic reaches Breakout when its Detection Score (G·0.40 + D·0.25 + I·0.20 + M·0.10 + C·0.05) ' +
-      'lands at 85 or higher. This typically requires sustained cross-platform mentions, strong ' +
-      'first-timer ratio (Dark Matter), and accelerating engagement.',
+      'A topic reaches Breakout when its Detection Score ' +
+      'lands at 85 or higher. This typically requires sustained cross-platform mentions, a strong ' +
+      'share of first-time participants (under-the-radar signals), and accelerating engagement.',
     showTile: true,
     filter: (s) => s.score >= 85,
   },
@@ -278,8 +278,8 @@ export const CATEGORY_DEFS: Array<{
       'is established and momentum is steady — a candidate to watch for promotion to Breakout.',
     howReached:
       'Detection Score lands in the 70–84 band. Usually means broad platform coverage is in ' +
-      'place, Inertia is positive, but one or more components (often Dark Matter or Gradient ' +
-      'Strength) has not yet maxed out.',
+      'place, Inertia is positive, but one or more components (often Under-the-Radar Signals or ' +
+      'Niche Concentration) has not yet maxed out.',
     showTile: true,
     filter: (s) => s.score >= 70 && s.score < 85,
   },
@@ -293,8 +293,8 @@ export const CATEGORY_DEFS: Array<{
       'Building signals — early momentum is forming but the engine has not yet confirmed ' +
       'sustained acceleration across multiple cycles. The earliest end of the actionable band.',
     howReached:
-      'Detection Score 55–69. Typically Gradient Strength is high (niche concentration) but ' +
-      'Inertia and Medium Sequence are still ramping. Many will fade; some will graduate to Strong.',
+      'Detection Score 55–69. Typically Niche Concentration is high but Inertia and ' +
+      'cross-stage diffusion are still ramping. Many will fade; some will graduate to Strong.',
     showTile: true,
     filter: (s) => s.score >= 55 && s.score < 70,
   },
@@ -398,7 +398,7 @@ export const GAP_BANDS = [
   { max: 15, range: '0–15 pts', label: 'Both scores agree — aligned, not in conflict', color: '#2E7D5B' },
   { max: 35, range: '16–35 pts', label: 'Early stage — confirmation building', color: '#A8456A' },
   { max: 60, range: '36–60 pts', label: 'Very early — detected, not confirmed', color: '#B11226' },
-  { max: Infinity, range: '60+ pts', label: 'Speculative — dark matter signal only', color: '#6B4FA0' },
+  { max: Infinity, range: '60+ pts', label: 'Speculative — under-the-radar signal only', color: '#6B4FA0' },
 ] as const;
 
 export function gapBandIndex(gap: number): number {

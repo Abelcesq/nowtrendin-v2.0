@@ -48,7 +48,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
     ['Niche Concentration', _qc.gradient_strength],
     ['Platform Diversity', _qc.platform_diversity],
     ['Momentum', _qc.inertia_score ?? _qc.inertia],
-    ['Dark Matter', _qc.dark_matter_score ?? _qc.dark_matter],
+    ['Under-the-Radar Signals', _qc.dark_matter_score ?? _qc.dark_matter],
     ['Persistence', _qc.persistence_score ?? _qc.persistence],
   ]
   const measured = result.source === 'measured'
@@ -80,7 +80,7 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
         <div style={{ paddingLeft: 2 }}>
           <div>• <b style={{ color: MC.detection }}>Attention (Gradient Score)</b> — how much human attention is moving toward this, and how early. <i>The headline read.</i></div>
           <div>• <b style={{ color: MC.amber }}>Market Signal</b> (companies only) — whether market positioning is unusual vs this stock’s <i>own</i> baseline. Not attention.</div>
-          <div>• <b style={{ color: MC.orange }}>N · Now Trending</b> — how often this topic is triggered + surfaced as a tracked topic across the platform. A separate signal, never folded into the Gradient.</div>
+          <div>• <b style={{ color: MC.orange }}>Platform Indicator (N)</b> — how often this topic is triggered + surfaced as a tracked topic across the platform. A separate signal, never folded into the Gradient.</div>
         </div>
       </div>
       {/* Legal disclaimer — top, above the Market Signal score */}
@@ -166,10 +166,10 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
           )
         })}
 
-        {/* (3) N score — Now Trending (platform tracking, NOT user demand) */}
-        <h4 className="g-h" style={{ color: MC.orange }}>N Score · Now Trending</h4>
-        <div className="kv"><span>N (platform tracking)</span><b style={{ color: MC.orange }}>{nScore != null && nScore > 0 ? nScore : 'not yet registered'}</b></div>
-        <div className="disc">N — how often a topic is triggered + surfaced as a tracked topic across the Now TrendIn platform (feeds, queries, grades) — is a SEPARATE signal, never folded into the Gradient (no feedback loop). {measured ? 'Measured live from the engine.' : 'Registers once platform tracking accrues; this grade query logs it.'}</div>
+        {/* (3) N score — Platform Indicator (platform tracking, NOT user demand) */}
+        <h4 className="g-h" style={{ color: MC.orange }}>Platform Indicator (N)</h4>
+        <div className="kv"><span>Platform Indicator (N)</span><b style={{ color: MC.orange }}>{nScore != null && nScore > 0 ? nScore : 'not yet registered'}</b></div>
+        <div className="disc">The Platform Indicator (N) — how often a topic is triggered + surfaced as a tracked topic across the Now TrendIn platform (feeds, queries, grades) — is a SEPARATE signal, never folded into the Gradient (no feedback loop). {measured ? 'Measured live from the engine.' : 'Registers once platform tracking accrues; this grade query logs it.'}</div>
 
         {Array.isArray(result.citations) && result.citations.length > 0 && (
           <>

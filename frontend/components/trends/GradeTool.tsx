@@ -303,7 +303,7 @@ function ProposedCard({ result }: { result: Proposed }) {
         <Bar label="Niche Concentration" value={result.gradient_strength} />
         <Bar label="Platform Diversity" value={result.platform_diversity} />
         <Bar label="Momentum" value={result.inertia} />
-        <Bar label="Dark Matter" value={result.dark_matter} />
+        <Bar label="Under-the-Radar Signals" value={result.dark_matter} />
         <Bar label="Persistence" value={result.persistence} />
       </View>
       {!!result.research && (
@@ -320,18 +320,19 @@ function ProposedCard({ result }: { result: Proposed }) {
           ))}
         </>
       )}
-      {/* N (on-platform demand) explanation — kept consistent with the trend
+      {/* N (Platform Indicator) explanation — kept consistent with the trend
           signal section. N is a separate, measured signal; the Gradient Score
-          itself stays demand-free (no internal-demand feedback loop). */}
+          itself stays N-free (no internal feedback loop). */}
       <View className="mt-3 pt-3 border-t border-border">
         <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-[12px] font-bold tracking-widest uppercase" style={{ color: '#B11226' }}>N Score · Now Trending</Text>
+          <Text className="text-[12px] font-bold tracking-widest uppercase" style={{ color: '#B11226' }}>Platform Indicator (N)</Text>
           <Text className="text-base font-black" style={{ color: '#B11226' }}>{nScore != null && nScore > 0 ? nScore : '—'}</Text>
         </View>
         <Text className="text-textMuted text-[12px] leading-4">
-          On-platform demand (N) — how often Now TrendIn users ask about a topic — is a
-          separate signal, never folded into the Gradient (no demand feedback loop).
-          {measured ? ' Measured live from the engine.' : ' Registers once demand accrues; this grade query logs it.'}
+          The Platform Indicator (N) — how often a topic is triggered and surfaced as a tracked
+          topic across the Now TrendIn platform — is a separate signal, never folded into the
+          Gradient (no feedback loop).
+          {measured ? ' Measured live from the engine.' : ' Registers once platform tracking accrues; this grade query logs it.'}
         </Text>
       </View>
       <Text className="text-textMuted text-[12px] leading-4 mt-3">Proposed score — an AI estimate from public web evidence, not a measured engine score.</Text>

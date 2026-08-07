@@ -118,7 +118,7 @@ export function ScoreChart({ points }: { points: ChartPoint[] }) {
             <div className="sc-tip-fac">
               {hp.mentions != null && <span>{hp.mentions.toLocaleString()} mentions{delta(hp.mentions, prev?.mentions)}</span>}
               {hp.platforms != null && <span>{hp.platforms} platform{hp.platforms === 1 ? '' : 's'}</span>}
-              {hp.dark_matter ? <span>dark-matter {hp.dark_matter}</span> : null}
+              {hp.dark_matter ? <span>under-the-radar {hp.dark_matter}</span> : null}
             </div>
           )}
         </div>

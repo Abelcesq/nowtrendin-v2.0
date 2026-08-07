@@ -20,12 +20,14 @@ const MODES: { key: Mode; label: string }[] = [
 // Verdict filter chips. PRE-BROKEN = the Google breakout happened >7d BEFORE our
 // first sighting (server-computed flag) — never a race we could win. It stays
 // COUNTED in the honest rate; the tracked-race rate reports only races run.
+// S8 plain-English relabel (2026-08-05): verdict KEYS/values stay untouched — display
+// labels only. LED renders as "Detected First"; PRE_BROKEN as "Pre-existing breakout".
 const A_FILTERS = [
   { key: '', label: 'ALL' },
-  { key: 'LED', label: 'LED' },
+  { key: 'LED', label: 'DETECTED FIRST' },
   { key: 'SAME_DAY', label: 'SAME DAY' },
   { key: 'LAGGED_NEAR', label: 'LAGGED · NEAR' },
-  { key: 'PRE_BROKEN', label: 'PRE-BROKEN' },
+  { key: 'PRE_BROKEN', label: 'PRE-EXISTING BREAKOUT' },
   { key: 'FALSE_POSITIVE', label: 'FALSE POSITIVE' },
 ];
 const P_FILTERS = [
@@ -71,10 +73,15 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
   );
 }
 
+// Display text for a RAW verdict value (color lookup + filters keep the raw keys).
+const VERDICT_LABEL: Record<string, string> = {
+  LED: 'DETECTED FIRST', SAME_DAY: 'SAME DAY', LAGGED: 'LAGGED', 'PRE-BROKEN': 'PRE-EXISTING',
+  FALSE_POSITIVE: 'FALSE POSITIVE', LATE_REDETECTION: 'LATE REDETECTION',
+};
 function VerdictPill({ v }: { v: string }) {
   return (
     <View className="rounded-full" style={{ backgroundColor: (VERDICT_COLOR[v] || '#8A8F9C') + '1A', paddingVertical: 3, paddingHorizontal: 9 }}>
-      <Text style={{ color: VERDICT_COLOR[v] || '#8A8F9C', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 }}>{v.replace(/_/g, ' ')}</Text>
+      <Text style={{ color: VERDICT_COLOR[v] || '#8A8F9C', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 }}>{VERDICT_LABEL[v] || v.replace(/_/g, ' ')}</Text>
     </View>
   );
 }
@@ -212,15 +219,15 @@ export default function AccuracyLedger() {
           </View>
           <View className="flex-row gap-2 mb-2">
             <Metric label="RESOLVED" value={report!.total ?? 0} />
-            <Metric label="LED" value={report!.led ?? 0} />
+            <Metric label="DETECTED FIRST" value={report!.led ?? 0} />
             <Metric label="MAX LEAD" value={report!.maxLead ?? 0} suffix="d" />
           </View>
-          {/* Honest breakdown — near + pre-broken = lagged; nothing hidden. */}
+          {/* Honest breakdown — near + pre-existing = lagged; nothing hidden. */}
           <Text className="text-textMuted text-[12px] text-center mb-1">
-            {report!.led ?? 0} led · {report!.sameDay ?? 0} same-day · {report!.laggedNear ?? report!.lagged ?? 0} near-miss · {report!.preBroken ?? 0} pre-broken · {report!.falsePositives ?? 0} false positives
+            {report!.led ?? 0} detected first · {report!.sameDay ?? 0} same-day · {report!.laggedNear ?? report!.lagged ?? 0} near-miss · {report!.preBroken ?? 0} pre-existing · {report!.falsePositives ?? 0} false positives
           </Text>
           <Text className="text-textMuted text-[12px] text-center mb-1">
-            LED referee: {report!.ledCorroborated ?? 0} ✓ · {report!.ledUncorroborated ?? 0} – · {report!.ledUnchecked ?? 0} unchecked
+            Detected First referee: {report!.ledCorroborated ?? 0} ✓ · {report!.ledUncorroborated ?? 0} – · {report!.ledUnchecked ?? 0} unchecked
           </Text>
           {report!.pending != null && (
             <Text className="text-textMuted text-[12px] text-center mb-3">
@@ -228,9 +235,9 @@ export default function AccuracyLedger() {
             </Text>
           )}
           <Text className="text-textMuted text-[12px] leading-4 mb-4">
-            Pre-broken = the Google breakout happened more than 7 days before our first sighting — the topic
-            entered tracking already post-breakout, so it was never a race. Pre-broken stays counted in the
-            hit rate; Tracked-race reports only the races actually run.
+            Pre-existing breakout = the Google breakout happened more than 7 days before our first sighting —
+            the topic entered tracking already post-breakout, so it was never a race. Pre-existing rows stay
+            counted in the hit rate; Tracked-race reports only the races actually run.
           </Text>
 
           {aLoading ? (

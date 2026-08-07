@@ -184,10 +184,10 @@ export default function SignalDetail() {
 
       {/* ── Everything deeper: collapsed by default ── */}
       <View className="mt-5">
-        <Section title={`Now TrendIn demand · N ${n}`} hint="On-platform query demand for this topic">
+        <Section title={`Platform Indicator (N) · ${n}`} hint="On-platform tracking signal for this topic">
           <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, fontWeight: '500' }}>
-            How often Now TrendIn users have asked the engine about this topic — real institutional
-            curiosity no public source can see. The headline scores above stay demand-free.
+            How often this topic is triggered and surfaced as a tracked topic across the Now TrendIn
+            platform — a platform-internal read no public source has. The headline scores above stay N-free.
           </Text>
           {n > 0 && signal.nowTrendingGradientDetection != null && signal.nowTrendingGradientConfidence != null && (
             <View className="flex-row gap-3 mt-4">
@@ -203,7 +203,7 @@ export default function SignalDetail() {
           )}
           {n === 0 && (
             <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
-              No on-platform demand has registered yet — N rises as users query about it.
+              No platform tracking registered yet — N rises as this topic is surfaced and queried across the platform.
             </Text>
           )}
           <View className="mt-3"><ConvergenceBadge topicKey={signal.id} /></View>

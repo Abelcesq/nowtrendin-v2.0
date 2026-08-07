@@ -26,7 +26,7 @@ export default function Methodology() {
       <Block title="Two scores from one engine" color="#16264A">
         The same measurements run once; two threshold rule-sets produce two scores.
         <Text style={{ color: '#2A5B9E', fontWeight: '600' }}> Detection</Text> weights early-edge
-        components (niche concentration, dark matter, acceleration) — speed.
+        components (niche concentration, under-the-radar signals, acceleration) — speed.
         <Text style={{ color: '#2E7D5B', fontWeight: '600' }}> Confidence</Text> weights cross-platform
         confirmation — precision. The gap between them tells you how early a signal is.
       </Block>
@@ -47,8 +47,9 @@ export default function Methodology() {
         high-conviction read.
       </Block>
 
-      <Block title="The N (Now Trending) signal" color="#B11226">
-        N is the on-platform demand signal — how often Now TrendIn users ask the engine about a topic.
+      <Block title="The Platform Indicator (N)" color="#B11226">
+        N is our platform-tracking signal — how often a topic is triggered and surfaced as a tracked
+        topic across the Now TrendIn platform (its feeds, queries, and grades).
         It is shown separately and <Text style={{ fontWeight: '600' }}>never feeds the Gradient Score</Text>,
         so the Detection/Confidence read stays an objective measurement of the external world.
       </Block>
