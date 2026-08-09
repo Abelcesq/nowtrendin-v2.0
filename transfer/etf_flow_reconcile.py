@@ -444,8 +444,13 @@ def _strikes_with_capture(ticker: str, db_path: str = DB_PATH):
         r.setdefault("src", None)
         if distinct:
             p = distinct[-1]
+            # SRC-AWARE dedupe (board/Challenger, 2026-08-09): identical values
+            # across a src seam are NOT the same strike seen again — swallowing
+            # the seam strike would shift the new era's start later and blame
+            # its uncovered days on the prior source (pro-readiness bias).
             if (abs((p["shares"] or 0) - (r["shares"] or 0)) < 1e-9 and
-                    abs((p.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9):
+                    abs((p.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9 and
+                    (p.get("src") or "fmp") == (r.get("src") or "fmp")):
                 continue
         distinct.append(r)
     return distinct
@@ -574,7 +579,18 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                     # STRICT inequality: the boundary day d == era_start is the new
                     # source's baseline (its first strike settles THROUGH d — no
                     # interval can ever span it), so it stays with the prior era.
-                    owner = eras[0][1] if eras else "fmp"
+                    # COLD-START CORNER (board/Outsider, 2026-08-09): days at/before
+                    # the FIRST era's start predate ALL coverage capability. For a
+                    # legacy fund that era is FMP (blame stands, harmless to the
+                    # gate); for a fund onboarded issuer-FIRST, blaming the issuer
+                    # for pre-onboarding days would wrongly count against re-arm —
+                    # they stamp the sentinel 'pre_coverage' instead (excluded from
+                    # the re-arm bad-set like FMP; still visible as NO_DERIVED).
+                    if not eras:
+                        return "fmp"
+                    if d <= eras[0][0]:
+                        return eras[0][1] if eras[0][1] == "fmp" else "pre_coverage"
+                    owner = eras[0][1]
                     for e_t, e_src in eras:
                         if e_t < d:
                             owner = e_src
@@ -657,7 +673,11 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
     gate = ("FAIL" if fails or bias or no_derived else
             "PASS" if material_total >= 1 else "NO_MATERIAL_DAYS_YET")
     # A2.4 re-arm: non-FMP src only (issuer-page source), Chairman standard = 5.
-    np_rows = [r for r in rows if (r.get("src") or "fmp") != "fmp"]
+    # 'pre_coverage' rows (days predating a fund's first-ever source era — the
+    # cold-start sentinel) are likewise excluded from the bad-set: no source that
+    # counts toward the gate was on duty for them. They can never be PASS rows.
+    np_rows = [r for r in rows
+               if (r.get("src") or "fmp") not in ("fmp", "pre_coverage")]
     np_pass = [r for r in np_rows if r.get("verdict") == "PASS" and r.get("material")]
     np_bad = [r for r in np_rows if r.get("verdict") in
               ("FAIL", "EMPTY_INTERVAL", "NO_DERIVED")]

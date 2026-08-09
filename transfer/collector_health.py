@@ -74,6 +74,19 @@ COLLECTOR_EXPECTATIONS = {
     # min_distinct guards the dead-parser mode (pages up but only 1-2 funds parsing).
     "issuer_shares": {"max_gap_minutes": 360, "mode": "risk", "critical": False,
                       "min_distinct": 5},
+    # PER-FAMILY rows (board Q5, unanimous, Chairman-approved 2026-08-09 — the S2
+    # one-row-per-independently-failing-endpoint rule): four issuers fail
+    # independently (Grayscale's bot-wall proves the class); under the aggregate
+    # alone, an entire family — including iShares/IBIT — could die while 5+ other
+    # funds kept the row green. min_distinct = family size.
+    "issuer_ishares":  {"max_gap_minutes": 360, "mode": "risk", "critical": False,
+                        "min_distinct": 2},
+    "issuer_bitwise":  {"max_gap_minutes": 360, "mode": "risk", "critical": False,
+                        "min_distinct": 3},
+    "issuer_21shares": {"max_gap_minutes": 360, "mode": "risk", "critical": False,
+                        "min_distinct": 3},
+    "issuer_canary":   {"max_gap_minutes": 360, "mode": "risk", "critical": False,
+                        "min_distinct": 1},
     # RETIRED 2026-07-29: Finnhub's congressional endpoint is premium-gated on our plan and
     # returned 403 on every call, contributing zero rows. The call site is removed; this row is
     # marked disabled rather than DELETED so the failure history stays readable and it reports

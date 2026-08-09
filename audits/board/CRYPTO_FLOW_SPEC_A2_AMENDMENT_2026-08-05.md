@@ -127,3 +127,127 @@ evidence count, not dates (realistic earliest ~08-14–17).
 - Farside remains REFEREE ONLY. Post-swap PASSes are pipeline-fidelity evidence, not
   independent confirmation, and shall be described as such (Guardian/Economist/Outsider
   disclosure condition — adopted as a wording rule).
+
+---
+
+# ANNEX A2-N1 (2026-08-09) — post-swap rules, pre-declared and board-reviewed
+
+Basis: `BOARD_a2-fix_2026-08-08.md` (six memos, unanimous approve/ratify) +
+Chairman approval to implement ("go ahead and implement fixes", 2026-08-09). This
+annex records rules that previously lived only in code comments, and pre-declares
+the decisions with future effective dates. Nothing here alters F7 floor/band, any
+verdict semantics, or the A2.4 evidence standard.
+
+## N1.1 — NO_DERIVED era attribution (formalizing the 2026-08-08 fix; Guardian C-2)
+
+A material published trading day with no derived coverage is blamed on **the source
+whose strike ERA covered that day** — never on the latest source. Era boundaries
+fall at `t_of(first strike of each src run)`, in strike order; ownership transfers
+STRICTLY AFTER the boundary day (the era-start day is the new source's baseline,
+unspannable by any interval of that source, so it stays with the prior era).
+Days at or before the FIRST era's start predate all coverage capability: they stamp
+`'fmp'` when the first era is FMP (legacy semantics), else the sentinel
+**`'pre_coverage'`** (cold-start corner, Outsider). `'fmp'` and `'pre_coverage'`
+rows never count toward the A2.4 re-arm bad-set; both remain visible as NO_DERIVED
+in the report and the ALARM gate's record. Regressions: t4/t6.
+
+## N1.2 — Sub-versioning standing rule (Guardian C-3 / Challenger)
+
+Any future change to attribution or stamping SEMANTICS on rows that already exist
+under a rule_version MUST either (a) write new rows under a bumped sub-version
+(A2.x), or (b) archive the pre-change rows/report verbatim in `audits/` BEFORE the
+change deploys — as was done for the A1.5 first pass and the 2026-08-08 era fix
+(`A2_FIX_EVIDENCE_PACK_2026-08-08.md`, the 0→12→0 record). Narrative-only
+preservation is not sufficient.
+
+## N1.3 — Value-distinct dedupe is src-aware (Challenger)
+
+Two consecutive snapshot rows with identical (shares, nav) but different `src` are
+NEVER the same strike seen again: the seam strike survives dedupe in both the
+harness (`_strikes_with_capture`) and `latest_delta`. Prevents the seam-swallowing
+pro-readiness bias. Regression: t5.
+
+## N1.4 — Adapter fail-closed extensions (Challenger / Executioner)
+
+Issuer adapters additionally read as DECLARED ABSENCE when:
+- **Identity check:** the page's own AUM is present and shares × NAV deviates from
+  it by more than `ISSUER_IDENTITY_TOL` (default 15%) — the mis-parse guard; or
+- **Staleness:** the page's own as-of stamp parses to a date older than
+  `ISSUER_ASOF_MAX_TDAYS` (default 3) trading days — the frozen-page guard (the
+  XRPC 2026-07-31 case). An unparseable stamp logs a notice but does not reject.
+Both are verifier-side data-quality gates; neither touches any score.
+
+## N1.5 — SCHEDULED SERIES BREAKS + the ETHA reverse split (pre-declared NOW)
+
+A known corporate action is handled by a pre-declared, fund-scoped src EPOCH —
+never ad hoc on the day. The registry is `etf_issuer_pages.SCHEDULED_BREAKS`.
+**Entry 1 — ETHA reverse split, effective 2026-10-06:**
+- Captures whose effective ET date (pre-dawn = prior day, mirroring t_of) is on or
+  after 2026-10-06 stamp `src='issuer_ishares_r1'` — ETHA only; IBIT's series is
+  untouched (fund-scoped epoch, Expansionist).
+- The existing splice rule voids Δshares across the seam; era attribution assigns
+  the boundary day to the prior epoch (N1.1). The boundary interval is a seam —
+  VOID/PENDING semantics, never FAIL, never EMPTY_INTERVAL, never flow.
+- ETHA's Δ-clock and §8 per-fund preconditions restart on r1; the SOURCE's earned
+  standing does NOT reset (the instrument re-denominated; the source did not fail)
+  (Economist).
+- The official ratio is recorded from the issuer's announcement at the event for a
+  one-time RATIO CONTINUITY review (post-split shares × ratio ≈ pre-split within
+  the 20%-guard's spirit); the ratio is NEVER used to synthesize a ratio-adjusted
+  continuous series, and historical rows are NEVER rewritten (Guardian/Challenger).
+- The 20%/day discontinuity guard is satisfied via the epoch seam only; its
+  threshold is not widened (Guardian).
+- Re-arm planning note: ETHA's clocks restart at the break — evidence near that
+  date should lean on IBIT + Bitwise/21Shares (Executioner). The epoch stamp and
+  its regression (test_etf_issuer_pages t3) shipped 2026-08-09, satisfying the
+  Executioner's 2026-09-29 deadman in advance.
+
+## N1.6 — FMP 30-day silent comparison: the pre-declared 2026-09-05 rule (Challenger)
+
+Declared before the comparison data exists. FMP is DROPPED as a data source unless,
+over 2026-08-09 → 2026-09-05, on issuer-covered funds, read-only from
+`etf_share_observations` by src:
+1. on ≥80% of fund-days where BOTH sources report, FMP's shares agree with the
+   issuer strike within 0.5%; AND
+2. FMP shows NO frozen streak longer than 3 trading days while the issuer strike
+   moved (the Gate-4 failure mode).
+Either criterion failing → drop (subject to the Outsider's rider: if the Fidelity
+adapter is not yet live on 2026-09-05, FMP is retained for FBTC/FETH ONLY —
+observations-only, never strikes for covered funds — until wave 3 lands, because it
+is currently the only watcher on those funds).
+
+## N1.7 — Access doctrine + the iShares endpoint finding (Q1, recorded)
+
+Doctrine (Guardian/Executioner, board-convergent): a declared browser-grade UA
+carrying the `NowTrendIn/2.0` token against a PUBLIC issuer page is honest
+identification and the CEILING of acceptable posture; headless-browser or
+session-forging escalation past an ACTIVE wall (the Grayscale 429 class) is
+circumvention and requires its own board ruling before anyone builds it.
+Endpoint migration attempt (2026-08-09): BlackRock serves the product page itself
+as `application/json` from the documented `.ajax` resource — the page IS the data
+document; the product-screener API rejects without an internal config name. No
+separate public machine endpoint was found. The current parser therefore already
+reads BlackRock's own data payload. Standing source-preference ORDER adopted
+(Expansionist): official data endpoint → server-rendered JSON → rendered-HTML regex
+(last resort, migration ticket open). Counsel eyeball of site terms remains open
+per the Outsider (flip-adjacent, not code).
+
+## N1.8 — Locale boundary on the join rule (Expansionist, §16a-style statement)
+
+The A2.1 `t_of` settled-through mapping is US-only BY CONSTRUCTION (US Eastern
+clock, US trading days). No non-US-listed fund may enter this universe until the
+join rule's timezone + trading-calendar is parameterized per listing venue. Any
+universe expansion violating this is a cold-start-posture violation (§16a).
+
+## N1.9 — Recorded open items (not implemented this round, on the ledger)
+
+- Wave-3 adapters: Fidelity FBTC/FETH derived-precise (HIGH; a flip precondition
+  per the board's either/or), Grayscale (blocked on doctrine N1.7), VanEck.
+- Observation-key hardening: add `src` to the `etf_share_observations` uniqueness
+  key before a third writer per fund exists (Expansionist/Challenger/Outsider).
+- Raw-payload archiving per capture (Challenger A-4).
+- Economist prescriptions 1–4, 6, 8 (null-baseline comparator, tail-weighted
+  report, coverage-% metric, persisted source ledger, latest-wins sweep, lead/lag
+  study) — awaiting Chairman prioritization.
+- NO_DERIVED materiality floor uses latest AUM for historical days (known
+  approximation, Challenger #3 — biases toward FEWER material flags on old days).

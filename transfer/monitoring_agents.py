@@ -1944,7 +1944,9 @@ def etf_reconcile_watch(db_path=None) -> dict:
                                   f"${(f.get('published_usd') or 0)/1e6:.1f}M — derived "
                                   f"flow diverges from issuer-published truth"})
         for f in (rep.get("no_derived") or []):
-            if (f.get("src") or "fmp") != "fmp":
+            # 'pre_coverage' = days predating a fund's first source era (cold-start
+            # sentinel, 2026-08-09) — visible in the report, never a live-source page.
+            if (f.get("src") or "fmp") not in ("fmp", "pre_coverage"):
                 alerts.append({"level": "critical", "block": "B7",
                                "msg": f"etf-flow reconcile NO_DERIVED (live source): "
                                       f"{f['ticker']} {f['interval_end_date']} — material "

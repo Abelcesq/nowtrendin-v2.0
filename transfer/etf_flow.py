@@ -154,12 +154,19 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
     # for their covered tickers — FMP demotes to observations-only there (its silent
     # 30-day comparison, re-eval 2026-09-05). Uncovered tickers keep the FMP strike
     # path so a fund with no adapter never goes dark silently.
+    # FLAG COUPLING (board/Executioner A-1, 2026-08-09): demotion binds ONLY when
+    # the issuer writer is BOTH enabled and importable — otherwise the two-flag
+    # dark corner (PRIMARY=1, PAGES=0) or a broken import would leave NO writer
+    # owning covered-ticker strikes. An import failure is LOUD, never silent.
     issuer_covered = frozenset()
-    if os.getenv("ETF_ISSUER_PRIMARY", "1") == "1":
+    if os.getenv("ETF_ISSUER_PRIMARY", "1") == "1" and \
+            os.getenv("ETF_ISSUER_PAGES", "1") == "1":
         try:
             from etf_issuer_pages import COVERED as issuer_covered
-        except Exception:
+        except Exception as _ie:
             issuer_covered = frozenset()
+            print(f"[etf-flow][ALERT] etf_issuer_pages import FAILED — FMP "
+                  f"re-promoted to strike writer for ALL funds this run: {_ie}")
     init_etf_db(db_path)
     c = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
@@ -355,12 +362,16 @@ def latest_delta(ticker: str, db_path: str = DB_PATH) -> dict:
             seen.add(r["snapshot_date"])
             by_date.append(r)
     # Collapse value-identical consecutive days: one strike = one observation.
+    # SRC-AWARE (board/Challenger C-1, 2026-08-09): a src change is NEVER a
+    # pre-strike copy — collapsing across a seam would hide the seam and bias
+    # era attribution pro-readiness (the asymmetric defect class).
     distinct = []
     for r in by_date:                        # newest → oldest
         if distinct:
             prev = distinct[-1]
             same = (abs((prev["shares"] or 0) - (r["shares"] or 0)) < 1e-9 and
-                    abs((prev.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9)
+                    abs((prev.get("nav") or 0) - (r.get("nav") or 0)) < 1e-9 and
+                    (prev.get("src") or "fmp") == (r.get("src") or "fmp"))
             if same:
                 # keep the OLDER date for the strike (it happened then; the newer row
                 # is the pre-strike copy) — replace so from/to dates stay truthful.

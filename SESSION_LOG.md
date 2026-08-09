@@ -3291,3 +3291,29 @@ correct), 13 open fails ALL src=fmp (silent comparison). Re-arm clock genuinely
 running; flip stays BLOCKED pending A2.4 evidence + Chairman go. Workup for the board:
 audits/board/A2_FIX_WORKUP_2026-08-08.md. NEXT: /advisory-board convening on the
 workup (founder-ordered).
+
+## 2026-08-09 (PT) — Board-approved A2 fixes IMPLEMENTED (Chairman go)
+
+All cheap/safe board conditions shipped (annex A2-N1 in the amendment doc records
+every rule): (1) per-family collector-health rows (issuer_ishares/bitwise/21shares/
+canary, min_distinct = family size) + per-family run logging; (2) shares×NAV≈AUM
+IDENTITY check (15% tol, fail-closed — the mis-parse guard); (3) page_asof STALENESS
+guard (>3 trading days → declared absence; unparseable → keep+log) — XRPC expected
+to go absent until Canary refreshes; (4) src-aware value-distinct dedupe in BOTH
+_strikes_with_capture and latest_delta (Challenger's seam-swallowing pro-readiness
+bias); (5) cold-start 'pre_coverage' sentinel (Outsider's corner: issuer-native
+funds can't inherit pre-onboarding blame; excluded from re-arm bad-set + monitor
+paging); (6) two-flag coupling in etf_flow.snapshot (demotion only when issuer
+writer enabled AND importable; import failure is LOUD); (7) ETHA reverse-split
+epoch PRE-DECLARED + implemented (SCHEDULED_BREAKS, issuer_ishares_r1 effective
+2026-10-06, fund-scoped, pre-dawn rule mirrors t_of; Executioner's 09-29 deadman
+satisfied in advance); (8) FMP 2026-09-05 drop/keep rule pre-declared (≥80%
+fund-days within 0.5% AND no >3-tday frozen streak; Outsider rider: FBTC/FETH-only
+retention if wave 3 not live); (9) access doctrine + iShares endpoint finding
+recorded (no separate public machine endpoint exists — the .ajax page IS BlackRock's
+data document served as application/json; declared-UA ceiling doctrine adopted).
+Monitor keying verified ALREADY correct (critical only on live-source failures;
+FMP = info). Tests: A2 suite 26/26 (+t5 seam dedupe, +t6 pre_coverage), new
+test_etf_issuer_pages 10/10, A1/F-fix regressions green. NOT implemented (annex
+N1.9 ledger): wave-3 adapters (Fidelity = flip precondition), observation-key src
+hardening, payload archiving, Economist prescriptions — awaiting prioritization.

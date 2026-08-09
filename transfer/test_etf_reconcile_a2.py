@@ -194,10 +194,58 @@ def t4_no_derived_era_attribution():
        rep["re_arm"]["open_bad"] == 0, rep["re_arm"])
 
 
+def t5_src_aware_dedupe():
+    """Board/Challenger 2026-08-09: identical values across a src seam must NOT
+    collapse — swallowing the seam strike shifts the new era's start later and
+    blames its uncovered days on the prior source (pro-readiness bias)."""
+    _wipe()
+    _strike("IBIT", TD[3], 1_000_000_000, 18e9, 40.0, src="fmp")
+    _strike("IBIT", TD[2], 1_000_000_000, 18e9, 40.0, src="issuer_ishares")
+    strikes = REC._strikes_with_capture("IBIT")
+    ok("seam strike survives dedupe", len(strikes) == 2,
+       [(s["snapshot_date"], s.get("src")) for s in strikes])
+    d = EF.latest_delta("IBIT")
+    ok("latest_delta sees the seam (splice, not collapse)",
+       d.get("available") is False and d.get("splice") is True, d)
+
+
+def t6_pre_coverage_cold_start():
+    """Board/Outsider 2026-08-09: a fund onboarded issuer-FIRST must not have
+    pre-onboarding published days blamed on the issuer (structurally uncoverable
+    → 'pre_coverage' sentinel, excluded from the re-arm bad-set)."""
+    _wipe()
+    # Issuer-native fund: first-ever strikes are issuer-sourced at TD[2]/TD[1].
+    _strike("IBIT", TD[2], 60_000_000, 1e9, 18.0, src="issuer_ishares")
+    _strike("IBIT", TD[1], 60_010_000, 1e9, 18.1, src="issuer_ishares")
+    by = {d.isoformat(): {"IBIT": 0.0} for d in TD[:11]}
+    by[TD[6].isoformat()]["IBIT"] = 80e6      # material day long before onboarding
+    stub = {"available": True, "source": "farside", "url": "stub",
+            "by_date": by, "days": len(by)}
+    real_fetch = REC.fetch_published
+    REC.fetch_published = lambda coin, source="farside": (
+        stub if coin == "BTC" else {"available": False, "reason": "no_comparator"})
+    try:
+        REC.reconcile_a2(coins={"BTC"})
+    finally:
+        REC.fetch_published = real_fetch
+    c = _conn()
+    nd = {r[0]: r[1] for r in c.execute(
+        "SELECT interval_end_date, src FROM etf_reconcile_log2 "
+        "WHERE ticker='IBIT' AND verdict='NO_DERIVED'").fetchall()}
+    c.close()
+    ok("pre-onboarding day -> pre_coverage", nd.get(TD[6].isoformat()) == "pre_coverage",
+       nd)
+    rep = REC.report_a2(days=30)
+    ok("pre_coverage excluded from re-arm bad-set",
+       rep["re_arm"]["open_bad"] == 0, rep["re_arm"])
+
+
 if __name__ == "__main__":
     print("=== A2 reconciliation regression harness ===")
     t1_t_of_mapping()
     t2_full_pass()
     t3_splice_rule()
     t4_no_derived_era_attribution()
+    t5_src_aware_dedupe()
+    t6_pre_coverage_cold_start()
     print(f"\nALL {len(PASSED)} CHECKS PASSED")

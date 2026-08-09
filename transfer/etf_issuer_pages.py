@@ -41,11 +41,43 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import db_compat
 
+try:
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+except Exception:                                   # tzdata-less fallback (dev boxes)
+    _ET = timezone(timedelta(hours=-4))
+
 DB_PATH = os.getenv("GAD_DB_PATH", "anomaly_detector.db")
+
+# Board conditions (BOARD_a2-fix_2026-08-08, Chairman-approved 2026-08-09):
+#  IDENTITY CHECK — the pages themselves publish shares, NAV, AND AUM; shares×NAV
+#  must reconcile to AUM within tolerance or the parse is rejected (fail-closed).
+#  Converts most MIS-parse modes (regex repointed at a plausible wrong number) into
+#  declared absence. Tolerance is loose (15%) because NAV/AUM as-of stamps can lag
+#  each other by a day (Bitwise) and crypto moves — mis-parses miss by magnitudes.
+_IDENTITY_TOL = float(os.getenv("ISSUER_IDENTITY_TOL", "0.15"))
+#  STALENESS GUARD — a page that keeps PARSING a frozen value is invisible to
+#  fail-closed (the XRPC 9-day-stale as-of in the first live capture). If the
+#  page's own as-of stamp parses and is older than N trading days, the fund reads
+#  declared absence. An unparseable stamp logs a notice but does not reject (the
+#  identity check still guards values; date-format drift must not dark a family).
+_ASOF_MAX_TDAYS = int(os.getenv("ISSUER_ASOF_MAX_TDAYS", "3"))
+
+#: SCHEDULED SERIES BREAKS (pre-declared per A2 annex 2026-08-09 — never ad hoc).
+#: A known corporate action gets a fund-scoped src EPOCH effective on its date: the
+#: splice rule then voids Δshares across the seam and era attribution assigns the
+#: boundary day to the prior epoch — zero new comparison logic, one stamp. The
+#: epoch names the SOURCE LINEAGE (same issuer, re-denominated instrument): the
+#: fund's Δ-clock restarts; the source's earned standing does NOT reset.
+SCHEDULED_BREAKS = {
+    "ETHA": {"effective": "2026-10-06", "epoch_src": "issuer_ishares_r1",
+             "reason": "iShares ETHA reverse split (survey hazard 1; pre-declared "
+                       "2026-08-09, board-unanimous)"},
+}
 
 # Browser-grade UA (iShares 403s bare fetches) carrying our declared token — honest
 # identification without tripping the CDN's bare-client wall. Env-overridable.
@@ -218,8 +250,39 @@ ADAPTERS = {
 COVERED = frozenset(ADAPTERS.keys())
 
 
+def _tdays_ago(iso_date: str) -> int | None:
+    """Trading days (Mon–Fri, holidays not excluded — same declared basis as the
+    harness) between iso_date and today UTC. None if unparseable."""
+    try:
+        d = datetime.strptime(iso_date, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+    today = datetime.now(timezone.utc).date()
+    n, cur = 0, d
+    while cur < today:
+        cur += timedelta(days=1)
+        if cur.weekday() < 5:
+            n += 1
+    return n
+
+
+def _epoch_src(ticker: str, src: str, now_utc: datetime) -> str:
+    """Apply a pre-declared scheduled series break: captures whose effective ET
+    date (pre-dawn belongs to the prior day, mirroring t_of) is on/after the
+    break's effective date carry the epoch src. Deterministic, fund-scoped."""
+    b = SCHEDULED_BREAKS.get(ticker.upper())
+    if not b:
+        return src
+    et = now_utc.astimezone(_ET)
+    eff = et.date()
+    if et.hour < 6:
+        eff -= timedelta(days=1)
+    return b["epoch_src"] if eff.isoformat() >= b["effective"] else src
+
+
 def fetch_one(ticker: str) -> dict | None:
-    """Live fetch+parse for one fund. None = declared absence (fail-closed)."""
+    """Live fetch+parse for one fund. None = declared absence (fail-closed):
+    no page, no parse, stale as-of, or shares×NAV≉AUM all read as absence."""
     ent = ADAPTERS.get(ticker.upper())
     if not ent:
         return None
@@ -232,9 +295,39 @@ def fetch_one(ticker: str) -> dict | None:
     except Exception as e:
         print(f"[issuer-pages] {ticker} parse error: {e}")
         return None
-    if out:
-        out["src"] = src
-        out["url"] = url
+    if not out:
+        return None
+    # STALENESS GUARD (board A-2/Executioner-2): canonicalize the page's own as-of.
+    asof_iso = None
+    if out.get("asof"):
+        try:
+            from date_utils import to_iso_date
+            asof_iso = to_iso_date(out["asof"])
+        except Exception:
+            asof_iso = None
+        if asof_iso:
+            age = _tdays_ago(asof_iso)
+            if age is not None and age > _ASOF_MAX_TDAYS:
+                print(f"[issuer-pages] {ticker} STALE page as-of {asof_iso} "
+                      f"({age} trading days old > {_ASOF_MAX_TDAYS}) — declared absence")
+                return None
+        else:
+            print(f"[issuer-pages] {ticker} as-of stamp unparseable "
+                  f"({out['asof']!r}) — value kept; identity check still guards")
+    # IDENTITY CHECK (board/Challenger A-1): shares × NAV ≈ AUM or reject.
+    aum = out.get("aum")
+    if aum:
+        implied = out["shares"] * out["nav"]
+        dev = abs(implied - aum) / aum
+        if dev > _IDENTITY_TOL:
+            print(f"[issuer-pages] {ticker} IDENTITY FAIL: shares×NAV "
+                  f"${implied/1e6:.1f}M vs AUM ${aum/1e6:.1f}M ({dev:.1%} > "
+                  f"{_IDENTITY_TOL:.0%}) — probable mis-parse, declared absence")
+            return None
+    out["src"] = src
+    out["url"] = url
+    if asof_iso:
+        out["asof_iso"] = asof_iso
     return out
 
 
@@ -272,7 +365,8 @@ def snapshot_issuer(db_path: str = DB_PATH, tickers=None) -> dict:
             if not info:
                 out["missing"].append(t)
                 continue
-            src = info["src"]
+            # Pre-declared scheduled break (ETHA 2026-10-06): fund-scoped epoch src.
+            src = _epoch_src(t, info["src"], datetime.now(timezone.utc))
             try:
                 c.execute(
                     f"INSERT INTO etf_share_observations "
@@ -325,10 +419,23 @@ def snapshot_issuer(db_path: str = DB_PATH, tickers=None) -> dict:
         c.close()
     try:
         import collector_health as _ch
+        # Aggregate row + one row PER FAMILY (board Q5, unanimous — the S2 rule:
+        # families fail independently; aggregation hid the finnhub sub-source
+        # failure). Family = the adapter's base src id, never the epoch variant.
         _ch.log_collector_run("issuer_shares", len(out["tickers"]),
                               "success" if out["tickers"] else "failure",
                               db_path=db_path,
                               distinct_keys=len(out["tickers"]))
+        fam_total, fam_ok = {}, {}
+        for t in roster:
+            fam = ADAPTERS[t][0]
+            fam_total[fam] = fam_total.get(fam, 0) + 1
+            if t in out["tickers"]:
+                fam_ok[fam] = fam_ok.get(fam, 0) + 1
+        for fam, total in fam_total.items():
+            n = fam_ok.get(fam, 0)
+            _ch.log_collector_run(fam, n, "success" if n else "failure",
+                                  db_path=db_path, distinct_keys=n)
     except Exception:
         pass
     print(f"[issuer-pages] {today}: parsed={len(out['tickers'])} new={out['written']} "
