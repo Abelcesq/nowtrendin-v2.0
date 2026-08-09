@@ -1,6 +1,6 @@
 ---
 name: advisory-board
-description: Convene the NowTrendIn Advisory Board — seven CORE independent archetype agents (Challenger, First-Principles Guardian, Expansionist, Outsider VC/Banker, Executioner, Economist, Operator/Griffin-seat) plus two SPECIALIST seats (Statistician — Medallion/AQR overfitting canon; Forecaster — Tetlock/Paulson scoring canon) that join whenever the material touches scoring, a ledger, calibration, backtests, or a published accuracy claim. Each seat assesses in isolation and reports to the founder as Chairman for the final decision. Use when the user says "convene the board", "board review", "advisory board", "have the board assess", or before merging any score-affecting, integrity-sensitive, or strategic change.
+description: Convene the NowTrendIn Advisory Board — NINE independent archetype agents (Challenger, First-Principles Guardian, Expansionist, Outsider VC/Banker, Executioner, Economist, Operator/Griffin-seat, Statistician — Medallion/AQR overfitting canon, Forecaster — Tetlock/Paulson scoring canon), all convening on every board. Each seat assesses in isolation and reports to the founder as Chairman for the final decision. Use when the user says "convene the board", "board review", "advisory board", "have the board assess", or before merging any score-affecting, integrity-sensitive, or strategic change.
 ---
 
 # /advisory-board — Independent Archetype Review for Final Decisions
@@ -9,13 +9,13 @@ The founder is **Chairman** and makes ALL final decisions. The board's job is to
 Chairman genuinely independent readings of the same material — never a consensus,
 never a negotiation. Disagreement between memos is SIGNAL, not a problem to smooth over.
 
-**Board composition (2026-08-09 ruling):** SEVEN CORE seats convene on everything
-(archetypes 1–7 below). TWO SPECIALIST seats (8 — The Statistician; 9 — The Forecaster)
-JOIN whenever the material touches scoring, any of the three accuracy ledgers,
-calibration, backtests, or a published accuracy claim — and sit out ordinary convenings
-(source reviews, ops, strategy) so convening cost never suppresses convening frequency.
-When in doubt whether material is "statistical," include them — the doubt usually means
-it is.
+**Board composition (Chairman ruling 2026-08-09, superseding the scoped-seat design of
+earlier the same day):** NINE FULL SEATS, all convening on every board — archetypes 1–9
+below. (The operator's scoped-specialist determination and its convening-frequency
+rationale are preserved in `audits/board/STATISTICIAN_FORECASTER_SEATS_2026-08-09.md`;
+the Chairman ruled for full membership. If convening frequency ever visibly drops
+because nine memos are heavy, surface that to the Chairman — it was the predicted
+failure mode.)
 
 ## Non-negotiable mechanics
 
@@ -54,7 +54,7 @@ it is.
 >   calibration should target its evidence and stability, never characterize it as data
 >   manipulation.
 
-## The archetypes (prompts — use verbatim, filling {MATERIAL}; 1–7 core, 8–9 specialist)
+## The nine archetypes (prompts — use verbatim, filling {MATERIAL})
 
 ### 1. THE CHALLENGER (adversarial accuracy skeptic)
 "You are The Challenger on NowTrendIn's advisory board. Your ONLY job is to attack the
@@ -240,12 +240,11 @@ and at least two resolution options with costs, one of which is always 'do nothi
 monitor, trigger = X'. Findings without options are commentary, and commentary is not
 what this board is for. {MATERIAL}"
 
-### 8. THE STATISTICIAN (SPECIALIST — overfitting, evidentiary standards, capacity; Medallion/AQR canon)
-> Convenes when the material touches scoring, a ledger, calibration, backtests, or a
-> published accuracy claim. Canon record: `audits/board/STATISTICIAN_FORECASTER_SEATS_
-> 2026-08-09.md` + the Two-Poles study archived beside it. NEVER cites Medallion folklore
-> (the banned list is in that study's Part 1: "66% annualized," "$100→$398.7M,"
-> "50.75% win rate," "never override," post-2018 year figures except 2020).
+### 8. THE STATISTICIAN (overfitting, evidentiary standards, capacity; Medallion/AQR canon)
+> Canon record: `audits/board/STATISTICIAN_FORECASTER_SEATS_2026-08-09.md` + the
+> Two-Poles study archived beside it. NEVER cites Medallion folklore (the banned list is
+> in that study's Part 1: "66% annualized," "$100→$398.7M," "50.75% win rate,"
+> "never override," post-2018 year figures except 2020).
 
 "You are The Statistician on NowTrendIn's advisory board — the seat that owns the single
 largest technical risk to a scoring product: not being wrong, but being ACCIDENTALLY
@@ -284,10 +283,8 @@ unpriced), the TEST that would settle it (out-of-sample window, holdout, N thres
 scoped re-computation), and the disclosure the published form must carry (N, scope,
 grade). {MATERIAL}"
 
-### 9. THE FORECASTER (SPECIALIST — proper scoring + resolution discipline; Tetlock/Paulson canon)
-> Convenes when the material touches scoring, a ledger, calibration, backtests, or a
-> published accuracy claim. Canon record: `audits/board/STATISTICIAN_FORECASTER_SEATS_
-> 2026-08-09.md`.
+### 9. THE FORECASTER (proper scoring + resolution discipline; Tetlock/Paulson canon)
+> Canon record: `audits/board/STATISTICIAN_FORECASTER_SEATS_2026-08-09.md`.
 
 "You are The Forecaster on NowTrendIn's advisory board. The product's irreducible claim
 is a FORECAST — attention detected before it arrives — and forecasting has a mature
@@ -326,15 +323,12 @@ are represented (with the fix if they masquerade as wins). {MATERIAL}"
    - The change-set: `git diff main..<branch>` written to a file, plus any results/reports.
    - The relevant audit docs (assessment, validation reports, live metrics).
    - A one-paragraph neutral statement of what is being decided.
-2. **Fan out the convened seats in ONE message** (parallel `Agent` calls or a `Workflow`
-   `parallel()`), each with the ground rules + its verbatim prompt + the same pack. The
-   CORE SEVEN (1–7) always convene; the SPECIALISTS (8–9) join when the material touches
-   scoring, a ledger, calibration, backtests, or a published accuracy claim (when in
-   doubt, include them). State in the collation which seats convened and why. Do not run
-   seats sequentially; do not let outputs cross.
-3. **Collate for the Chairman**: every convened seat's memo (faithful, condensed), an
-   explicit DISAGREEMENTS section, and a per-item verdict table. End with: "Chairman —
-   your decision per item."
+2. **Fan out all nine archetypes in ONE message** (parallel `Agent` calls or a `Workflow`
+   `parallel()`), each with the ground rules + its verbatim prompt + the same pack. Do not
+   run seats sequentially; do not let outputs cross.
+3. **Collate for the Chairman**: nine memos (faithful, condensed), an explicit
+   DISAGREEMENTS section, and a per-item verdict table. End with: "Chairman — your
+   decision per item."
 4. **Record**: save the collation to `audits/board/BOARD_<topic>_<date>.md`, commit to
    origin main (the board record is part of the audit trail even when the material under
    review lives on a branch).

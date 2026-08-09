@@ -3394,3 +3394,18 @@ The 8 Two-Poles mechanics (capacity register · scoped claims · N-always · pro
 grades · we-don't-score-this-well list · scoreability pre-filter · unresolved≠win UI ·
 cleaning-layer-as-product) recorded as ranked adoptables PENDING CHAIRMAN, joined with
 the Griffin adoptables as one prioritization list. Skill backup refreshed.
+
+## 2026-08-09 (PT, cont.-4) — Chairman ruling: NINE FULL always-convening seats
+
+Chairman superseded the scoped-specialist design same-day: seats 8 (Statistician) + 9
+(Forecaster) are now FULL members convening on every board. Skill + repo backup updated;
+the scoped determination + its convening-frequency rationale preserved in
+STATISTICIAN_FORECASTER_SEATS_2026-08-09.md with a standing instruction to surface it if
+convening frequency visibly drops. PENDING: the founder's hedge-fund buyer-roadmap
+analysis (HEDGE_FUND_BUYER_ROADMAP_20260809.md.docx) could NOT be read — file absent
+from the Desktop path and not found anywhere on the machine (OneDrive sync suspected;
+the two earlier parallel-session files also vanished from Desktop after reading).
+Determination-in-principle on a 3rd specialist (hedge-fund customer voice) delivered in
+chat: SYNTHESIZE into the Outsider seat rather than seat a customer-desire archetype
+(integrity hazard: a buyer-voice seat structurally pushes toward actionable-signal/advice
+drift, against measurement-not-advice); full document-specific review awaits re-share.
