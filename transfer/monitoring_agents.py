@@ -752,6 +752,8 @@ DATA_SUBSCRIPTIONS = [
      "congressional trades — Dark Matter; ~$30/mo"),
     ("FMP",                  "FMP_API_KEY",          "COST_FMP_USD",          "paid",
      "prices/fundamentals + crypto coin prices; ~$20/mo Starter (300/min, crypto+forex)"),
+    ("Socialcrawl",          "SOCIALCRAWL_API_KEY",  "COST_SOCIALCRAWL_USD",  "paid",
+     "google-trends rising-query discovery (dark lane, §16 2026-08-07); £15/2,500 credits"),
     # free / free-tier data APIs (configured, $0 expected)
     ("FRED",                 "FRED_API_KEY",         None, "free", "Federal Reserve econ data (free)"),
     ("FINRA",                "FINRA_API_KEY",        None, "free", "FINRA short/market data (free)"),

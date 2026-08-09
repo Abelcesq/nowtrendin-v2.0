@@ -3210,3 +3210,44 @@ the log — the 08-06 session left no SESSION_LOG entry).
 key rotations (Socialcrawl, Scrape Creators, + standing QUIVER/FMP); S8 deploy go;
 re-test Scrape Creators videos/popular when Creative Center returns; A2 re-arm watch
 (5 in-band comparisons) unchanged.
+
+## 2026-08-08 (PT) — S8 deployed · Socialcrawl Lane A wired+armed (dark) · Scrape Creators HOLD re-affirmed · A2 re-arm: 0/5
+
+**S8 plain-English relabel DEPLOYED (founder go):** gh-pages was already live from the
+08-08 morning push (350b93c — verified serving "Detected First" in the live bundle);
+mobile preview re-exported (enterprise gate + v2 DB targets verified in-bundle) and
+pushed to nowtrendin-v2-preview (8d25b4b) — PIN gate intact, live entry bundle now
+carries the S8 labels. Both surfaces verified live.
+
+**Socialcrawl Lane A WIRED + ARMED (founder go = the Chairman go the review awaited):**
+`discovery_collectors.collect_socialcrawl_rising` — google_trends/rising, TRUST-THE-
+SOURCE-ENTITY, **niche tier → Dark-Matter routing** (deliberately not expert: no
+corroboration-floor exemption earned). Flag `SOCIALCRAWL_RISING=1` + key on engine;
+2 slots/day (00/12 UTC families), 3 rotating seeds/slot over 6 seeds ≈ 900 credits/mo
+(£15/2,500 tier). collector_health row `socialcrawl` (900m, disabled-pattern when flag
+off); COST_SOCIALCRAWL_USD + Data Subscriptions entry. Gate-5 live test: 43 clean topic
+signals from 2 seeds (10 credits; "mitch mcconnell health" +2300%, "spacex stock",
+"hybe stocks"). MONITORED TRIAL: watch topic-quality + catch-all auditors (GHOST_FEEDS
+template). ⚠ Key rotation still owed (transcript-exposed) — rotate at socialcrawl.dev
+then `heroku config:set SOCIALCRAWL_API_KEY=... -a nowtrendin-v2-engine`.
+
+**Scrape Creators: HOLD RE-AFFIRMED.** Founder ordered wiring, but the §16 gate-5
+re-test (2026-08-08) found BOTH Creative-Center endpoints (`videos/popular`,
+`songs/popular`) still upstream-503 (TikTok's own page down; vendor honest, 0 credits).
+The only working trending endpoint failed the 08-07 format eyeball (dupes/stale/
+descriptor-tags). NOT LINKED — a source that cannot serve cannot pass CURRENCY+ACCESS.
+Re-test when Creative Center returns (98 credits intact).
+
+**A2 re-arm verify (founder ask "are the comparisons in?"): NO — 0 of 5.**
+`/diag/etf-reconcile` live: re_arm.pass_comparisons=0, funds=0, trading_days=0,
+ready=false. Root cause verified in code+data: **no issuer-page adapter exists yet** —
+every etf_reconcile_log2 row is src='fmp' (silent-comparison, disqualified from re-arm
+by A2.4). The issuer adapters (iShares/Fidelity daily shares outstanding, per the 08-05
+survey) were "NEXT" in the 08-05 log and remain unbuilt — the re-arm clock cannot even
+start until they ship. FMP rows meanwhile: gate FAIL, 11 open out-of-band failures
+(consistent with the Chairman's FMP-dead ruling). CRYPTO_ETF_FLOW flip stays BLOCKED.
+
+**Open/next:** build issuer-page shares adapters (the A2 re-arm blocker); rotate
+Socialcrawl + Scrape Creators + standing QUIVER/FMP keys; Chairman rulings on board
+I1–I6 + remaining source-review items (Lane B Apify-vs-explore comparison, Lane C IG
+reels); re-test Scrape Creators when Creative Center is back.

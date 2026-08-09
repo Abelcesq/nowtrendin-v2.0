@@ -76,6 +76,12 @@ COLLECTOR_EXPECTATIONS = {
     # QUIVER (positioning_intel._build_congress), verified live at retirement.
     "finnhub_congress": {"max_gap_minutes": 420, "mode": "risk", "critical": False,
                          "disabled": True},
+    # Socialcrawl rising-query discovery (§16 2026-08-07, armed 2026-08-08): runs on
+    # 2 of the 4 daily 6h slots (00/12 UTC families) → 12h cadence + margin = 900m.
+    # DISABLED-pattern while the flag is off so an intentional off-switch never
+    # reads as a fault (the reddit lesson below).
+    "socialcrawl":   {"max_gap_minutes": 900, "mode": "attention", "critical": False,
+                      "disabled": os.getenv("SOCIALCRAWL_RISING", "0") != "1"},
     # Intentionally OFF (licensing) — DISABLED, not DEGRADED. It was reporting
     # "ran Nm ago but 0 signals" forever: a standing false amber on a source we chose to
     # switch off. A deliberate off-switch is not a fault.

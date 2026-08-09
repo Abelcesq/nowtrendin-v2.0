@@ -371,6 +371,104 @@ def collect_google_search_discovery(conn) -> int:
     return written
 
 
+# ── 5. Socialcrawl — Google Trends RISING queries (paid; key + flag gated) ──
+#
+# §16-onboarded 2026-08-07 (SOCIALCRAWL_SCRAPECREATORS_REVIEW_2026-08-07.md, Lane A;
+# founder go 2026-08-08). Entity-grade pre-resolved rising queries WITH growth
+# magnitude ("nano banana" +11500%) — the same TRUST-THE-SOURCE-ENTITY shape as the
+# free daily-trending RSS, extended with rising-query expansion per seed keyword.
+#
+# DARK-MATTER LANE: tier is "niche" so the D-vs-M router (platform_tier) sends these
+# to the Dark-Matter pathway, never the mainstream denominator. Deliberately NOT
+# "expert" — that tier carries the corroboration-floor exemption, which a scraped
+# trending feed has not earned.
+#
+# Growth % is Google Trends' own figure relayed by the vendor; vendor-COMPUTED
+# fields (engagement_rate, estimated_reach) are never ingested.
+#
+# Credit budget: rising = 5 credits/call. SOCIALCRAWL_SEEDS_PER_SLOT (default 3)
+# seeds rotate per eligible slot × 2 slots/day (00/12 UTC families) × 5 credits
+# ≈ 900 credits/mo — inside the £15/2,500 tier registered on COST_SOCIALCRAWL_USD.
+# Clock-slot compliant: runs only inside the 6h collect cycles, 2 of 4 slots.
+
+_SCRAWL_ENDPOINT = "https://www.socialcrawl.dev/v1/google_trends/rising"
+_SCRAWL_SEEDS = ["ai", "crypto", "stocks", "health", "sports", "entertainment"]
+_SCRAWL_SLOTS = (0, 2)   # hour//6 ∈ {0,2} → the 00:00 and 12:00 UTC cycle families
+
+
+def collect_socialcrawl_rising(conn, force: bool = False) -> int:
+    """Rising Google-Trends queries per rotating seed. Skips silently unless
+    SOCIALCRAWL_RISING=1 and SOCIALCRAWL_API_KEY are both set."""
+    if not _HAS_REQUESTS:
+        return 0
+    api_key = os.getenv("SOCIALCRAWL_API_KEY", "")
+    if os.getenv("SOCIALCRAWL_RISING", "0") != "1" or not api_key:
+        print("  [discovery] socialcrawl_rising skipped "
+              "(set SOCIALCRAWL_RISING=1 + SOCIALCRAWL_API_KEY to enable)")
+        return 0
+    now = datetime.now(timezone.utc)
+    slot = now.hour // 6
+    if not force and slot not in _SCRAWL_SLOTS:
+        print(f"  [discovery] socialcrawl_rising skipped (slot {slot} not armed)")
+        return 0
+    per_slot = max(1, int(os.getenv("SOCIALCRAWL_SEEDS_PER_SLOT", "3") or 3))
+    # Rotate the seed window so every seed is covered on a fixed cadence.
+    offset = ((now.timetuple().tm_yday * 2) + (0 if slot == 0 else 1)) * per_slot
+    seeds = [_SCRAWL_SEEDS[(offset + i) % len(_SCRAWL_SEEDS)]
+             for i in range(min(per_slot, len(_SCRAWL_SEEDS)))]
+    written, credits_used, credits_left, failed = 0, 0, None, False
+    for seed in seeds:
+        try:
+            r = requests.get(_SCRAWL_ENDPOINT,
+                             params={"keyword": seed, "geo": "US"},
+                             headers={"x-api-key": api_key,
+                                      "User-Agent": "NowTrendIn/2.0 (+discovery)"},
+                             timeout=30)
+            body = r.json() if r.content else {}
+            credits_used += int(body.get("credits_used") or 0)
+            if body.get("credits_remaining") is not None:
+                credits_left = body.get("credits_remaining")
+            if r.status_code != 200 or not body.get("success"):
+                print(f"  [discovery] socialcrawl_rising[{seed}] HTTP "
+                      f"{r.status_code}: {str(body.get('error'))[:160]}")
+                failed = True
+                continue
+            rising = ((body.get("data") or {}).get("rising")) or []
+            platform, tier = "socialcrawl_rising", "niche"
+            source = f"rising_{seed}"
+            for item in rising:
+                query = (item.get("query") or "").strip()
+                if len(query) < 3:
+                    continue
+                growth = int(item.get("growth") or 0)
+                engagement = math.log1p(max(growth, 1))
+                sig_id = hashlib.md5(f"scrawl-{seed}-{query}".encode()).hexdigest()[:16]
+                url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+                _write_signal(conn, sig_id=sig_id, platform=platform, tier=tier,
+                              source=source, title=query, url=url,
+                              engagement=engagement, upvotes=growth)
+                # TRUST THE SOURCE ENTITY — store the rising query verbatim.
+                written += _write_topic(conn, sig_id=sig_id, topic=query,
+                                        platform=platform, tier=tier, source=source,
+                                        engagement=engagement, upvotes=growth)
+        except Exception as e:
+            print(f"  [discovery] socialcrawl_rising[{seed}] error: {e}")
+            failed = True
+    try:
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        import collector_health as _ch
+        _ch.log_collector_run("socialcrawl", written,
+                              "failure" if (failed and not written) else "success")
+    except Exception:
+        pass
+    print(f"  [discovery] socialcrawl_rising: {written} topic signals "
+          f"(seeds={seeds}, credits_used={credits_used}, remaining={credits_left})")
+    return written
+
+
 # ── Orchestrator ───────────────────────────────────────────────────
 
 def collect_all_discovery(conn, geos=("US",)) -> dict:
@@ -381,6 +479,7 @@ def collect_all_discovery(conn, geos=("US",)) -> dict:
     out["wikipedia_hot"] = collect_wikipedia_hot(conn)
     out["firecrawl_web"] = collect_firecrawl_discovery(conn)
     out["google_web"] = collect_google_search_discovery(conn)
+    out["socialcrawl_rising"] = collect_socialcrawl_rising(conn)
     out["_total"] = sum(v for v in out.values() if isinstance(v, int))
     print(f"  [discovery] TOTAL: {out['_total']} topic signals")
     return out

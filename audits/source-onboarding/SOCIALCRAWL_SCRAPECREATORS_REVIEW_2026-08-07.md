@@ -56,7 +56,7 @@ Verdict: **CONDITIONAL PASS — lane-by-lane, founder picks which to arm.**
 
 | Lane | Read | Status |
 |---|---|---|
-| A. `google_trends/rising` seeded discovery | Entity-grade, growth-weighted; extends the free daily-RSS discovery with rising-query expansion | **NOT wired — ready to wire dark** (`SOCIALCRAWL_RISING=0`, key-gated) on Chairman go; the 2026-08-07 DDN board (I2) counsels no linking before the source-economics ruling |
+| A. `google_trends/rising` seeded discovery | Entity-grade, growth-weighted; extends the free daily-RSS discovery with rising-query expansion | **✅ WIRED + ARMED 2026-08-08 (founder go)** — `discovery_collectors.collect_socialcrawl_rising` at **niche** tier (Dark-Matter routing; deliberately not `expert` — no corroboration-floor exemption earned), flag `SOCIALCRAWL_RISING=1` + `SOCIALCRAWL_API_KEY` on the engine; 2 slots/day (00/12 UTC families), `SOCIALCRAWL_SEEDS_PER_SLOT`=3 rotating over 6 seeds ≈ 900 credits/mo; `collector_health` row `socialcrawl` (900m window, disabled-pattern when flag off); `COST_SOCIALCRAWL_USD` + Data Subscriptions entry registered. Gate-5 live test 2026-08-08: 43 topic signals from 2 seeds, clean entities ("mitch mcconnell health" +2300%, "spacex stock", "hybe stocks"), 10 credits. Monitored trial: watch topic-quality + catch-all auditors per the GHOST_FEEDS template |
 | B. `google_trends/explore` as ledger-sweep curve alternative to Apify | High potential cost/latency win (~$0.04/curve vs compute-expensive actor runs) | **NOT wired.** Touches the moat's measurement path — requires a held-out side-by-side vs the Apify actor on identical keywords before any swap (separate §16 + board gate) |
 | C. `instagram/reels/trending` | Only IG-trending source available to us; moderate entity quality | NOT wired — founder call on value at ~$0.04/pull |
 | D. Social trending feeds (TikTok) | Caption-grade, stale-mix | Do not wire |
@@ -83,6 +83,10 @@ API is up and fast, but the RIGHT endpoint for measured trend discovery —
 honestly reported by the vendor, 0 credits charged). Cannot pass CURRENCY on an
 endpoint that cannot currently serve.
 ### Gate 5: **HOLD — do not link.**
+**Re-tested 2026-08-08 (founder-ordered wiring attempt): BOTH `/v1/tiktok/videos/popular`
+AND `/v1/tiktok/songs/popular` still 503 (upstream TikTok Creative Center down; vendor
+honest, 0 credits charged, 98 remaining). HOLD stands — §16 forbids linking a source
+that cannot currently serve.**
 Re-test `/v1/tiktok/videos/popular` (+ `/v1/tiktok/songs/popular`) when TikTok Creative
 Center is back up. If it passes the eyeball then, Scrape Creators becomes the preferred
 TikTok lane on cost (~10–20× cheaper per pull than Socialcrawl's 5-credit trending calls).
