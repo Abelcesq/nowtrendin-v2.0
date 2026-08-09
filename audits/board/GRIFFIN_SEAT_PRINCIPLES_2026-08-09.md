@@ -1,6 +1,63 @@
 # THE GRIFFIN SEAT — study, principles, and the NowTrendIn implementation map
 ### (2026-08-09, founder-ordered: "study and research Ken Griffin and add him on the advisory board")
 
+> **⚠ PART 0 — FACT-CHECK RECONCILIATION (2026-08-09, later the same day; READ FIRST).**
+> A PARALLEL Claude Code session independently built this same seat and — critically —
+> fact-checked the founder-supplied transcript against ~25 primary sources
+> (`GRIFFIN_SEAT_SPEC_parallel-session_2026-08-09.pdf`, archived beside this file; its
+> sources include Citadel's own history, Risk.net, Institutional Investor, SEC EDGAR,
+> the SEC 2021 staff report, and the Eleventh Circuit opinion). Its corrections
+> SUPERSEDE the corresponding rows in the Part-1 table below, which was written from
+> the transcript before verification:
+> 1. **Timeline:** first trade AND first fund both **1987** (not 1986) — the fund
+>    launched days after his 19th birthday, essentially CONCURRENT with Black Monday,
+>    not a year of trading before it.
+> 2. **1994:** −4.3% per Institutional Investor, but Risk.net says trading was ~flat
+>    and the real damage was losing ~⅓ of the capital base to WITHDRAWALS. The terms
+>    redesign came in **1998**, not immediately.
+> 3. **1998 vs 2008 instruments:** 1998 = two-year LOCKUPS / quarterly liquidity with
+>    redemption fees. **GATES were 2008.** The Part-1 row conflating them is wrong.
+> 4. **E-Trade:** of the "$2.5B rescue," **$800M was Citadel BUYING the ~$3B distressed
+>    ABS book** (E-Trade took a $2.2B charge) — a distressed-asset purchase more than a
+>    capital injection.
+> 5. **The omitted fact that matters most: +62% in 2009 recovered NOTHING** — the
+>    flagship funds did not clear their high-water mark until **January 2012**. Three
+>    years to get back to zero. (−55% needs **+122%**.)
+> 6. **2025 was a below-benchmark year for the all-time #1**: net gains $7.4B (5th),
+>    Wellington +10.2% vs the HFRI composite's 12.6% (TCI led at a record $18.9B).
+>    Any seat built on "never wrong for long" is built on sand; this one is built on
+>    mechanisms.
+> 7. **GameStop:** the SEC's Oct-2021 staff report attributes the broker restrictions
+>    to NSCC clearing margin (~$6.9B intraday calls on Jan 27) and found no evidence
+>    Citadel directed Robinhood — but the Eleventh Circuit's 2024 affirmance was on
+>    antitrust market definition, expressly ASSUMING a conspiracy had been plausibly
+>    alleged. It is not a merits exoneration; citing it as one is overclaiming.
+> 8. **Unsourced lore ban:** the circulating pod-model specifics ("cut at 5% drawdown,"
+>    named position limits, a "central risk book") appear only in blogs/forums. What IS
+>    documented from Citadel directly: five core strategies + a Portfolio Construction
+>    and Risk Group independent of the investment team, reporting to the CEO. The seat
+>    is prohibited from citing the lore; the Part-1 "pod model" row inherits this caveat.
+> 9. **Disputed founding details:** "Nov 1990, $4.6M" is contested (Institutional
+>    Investor: September, $18M). Treat as disputed; never print as settled.
+> The seat's PROMPT (archetype 7 in `/advisory-board`) was upgraded the same day to the
+> parallel session's fact-checked version (two axes EDGE/SURVIVAL; verdicts
+> DURABLE/DECAYING/NOT-AN-EDGE; mandatory resolution options; seat self-monitoring:
+> edge-decay register, common-mode dependency ledger, streak trigger, lore audit).
+> Additional principle adopted from the parallel study: **E-7 the history trap**
+> (Citadel's CRO deliberately builds forward-looking rather than historical risk
+> models) — for us: a backtest is evidence a mechanism EXISTED, never that it
+> persists; every backtested weight states its mechanism or it is curve-fitting.
+> **Pending Chairman ruling (recommended by the parallel study, NOT installed):**
+> two additional seats — THE STATISTICIAN (Renaissance/AQR: overfitting,
+> multiple-hypothesis testing, out-of-sample discipline, capacity decay — nothing on
+> the current board owns overfitting) and THE FORECASTER (Tetlock: Brier scores,
+> calibration curves, sealed resolution criteria — upgrades the ledger from hit rate
+> to proper forecast scoring). Study bench (read, don't seat): Thorp (bet sizing;
+> caught Madoff on return SMOOTHNESS — turn that lens on our own ledger), Marks,
+> Dalio, Tudor Jones, Markopolos (the correct-early-signal-nobody-believes archetype —
+> our product's own failure mode), the Black Edge boundary case, Burry (right-too-early
+> ≈ wrong unless capital is locked — our LEDGER_TIMEOUT_DAYS=365 rationale).
+
 Sources: founder-submitted biography + documentary transcript (2026-08-09) + the public
 record (Citadel LLC / Citadel Securities history, 2008 crisis coverage, LCH Investments
 rankings, congressional testimony 2008 + 2021). This document is the research basis for

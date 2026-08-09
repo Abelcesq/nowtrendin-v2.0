@@ -3343,3 +3343,29 @@ checks passed on all 8; per-family health rows live — ishares/bitwise/21shares
 issuer_canary honestly DOWN (the stale family is now visible instead of hidden in a
 green aggregate — S2 working day one); A2 pass clean: re_arm open_bad=0, zero
 live-source failures, 13 open fails all FMP silent-comparison. Re-arm clock accumulating.
+
+## 2026-08-09 (PT, cont.-2) — Griffin seat RECONCILED with the parallel session's fact-checked build
+
+Founder submitted a PARALLEL Claude Code session's independent build of the same seat
+(grifin.pdf, archived to audits/board/GRIFFIN_SEAT_SPEC_parallel-session_2026-08-09.pdf,
+~25 sources). Its fact-check SUPERSEDES the transcript-derived rows in our Part-1 table
+(reconciliation prepended as Part 0 of GRIFFIN_SEAT_PRINCIPLES_2026-08-09.md): first
+trade+fund both 1987 (concurrent with Black Monday); 1994 = withdrawals wound, redesign
+1998; 1998 LOCKUPS vs 2008 GATES (different instruments — our table had conflated them);
+E-Trade $800M of the $2.5B was a distressed-ABS purchase; +62% in 2009 recovered nothing
+(high-water mark Jan 2012; −55% needs +122%); 2025 below-benchmark year for the all-time
+#1; GameStop 11th-Circuit = not a merits exoneration; pod-model lore UNSOURCED (banned
+from seat citations); founding date/capital disputed. The installed archetype-7 prompt
+was UPGRADED to the merged fact-checked version: two axes (EDGE/SURVIVAL), verdicts
+DURABLE/DECAYING/NOT-AN-EDGE + the single measurement that would flip them + mandatory
+resolution options (one always monitor-with-trigger), history-trap principle (CRO:
+forward-looking vs historical risk models — backtests prove a mechanism EXISTED, never
+that it persists), no-Challenger-duplication boundary, and seat SELF-monitoring
+(edge-decay register · common-mode dependency ledger · STREAK TRIGGER: 3 convenings
+with no DECAYING verdict → audit the seat itself · lore audit). Provenance note: BOTH
+sessions were real — v321 + the installed seat happened in THIS lineage; the parallel
+session (fresh context) correctly disclaimed what it could not see. PENDING CHAIRMAN
+(recommended, NOT installed): seats 8–9 — THE STATISTICIAN (Renaissance/AQR:
+overfitting/out-of-sample/capacity decay) + THE FORECASTER (Tetlock: Brier/calibration/
+sealed resolution criteria); study bench Thorp/Marks/Dalio/PTJ/Markopolos/Burry recorded.
+Skill backup refreshed (docs/skills/advisory-board.md).
