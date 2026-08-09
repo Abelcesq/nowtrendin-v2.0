@@ -3317,3 +3317,22 @@ FMP = info). Tests: A2 suite 26/26 (+t5 seam dedupe, +t6 pre_coverage), new
 test_etf_issuer_pages 10/10, A1/F-fix regressions green. NOT implemented (annex
 N1.9 ledger): wave-3 adapters (Fidelity = flip precondition), observation-key src
 hardening, payload archiving, Economist prescriptions — awaiting prioritization.
+
+## 2026-08-09 (PT, cont.) — THE OPERATOR (Ken Griffin seat) added to the advisory board
+
+Founder-ordered: studied Griffin/Citadel (founder-submitted bio + documentary transcript
++ public record) and seated archetype 7 in /advisory-board — THE OPERATOR: edge economics
+(structural mispricing named or it's a story; data plumbing IS the edge; edges expire —
+measure your own decay; panics misprice assets/talent/data — be the 3:30am buyer; become
+the toll road; repeatability is the product) + hubris control (never a forced
+seller/shipper; the winning streak is the poison — scrutiny INCREASES with the streak;
+hunt the hidden common factor; leverage of claims hands control to challengers; drawdown
+math is asymmetric; transparency in a run; skin in the same cell; cut what needs the
+muscle you don't have; no single point of failure incl. the founder). Every board convening
+is now SEVEN memos. Research + NowTrendIn implementation map (edge-decay lead-time read,
+common-mode dependency ledger, streak-triggered review, panic-season §16 onboarding,
+rails-as-toll-road, bus-factor/succession docs) recorded in
+audits/board/GRIFFIN_SEAT_PRINCIPLES_2026-08-09.md — implementation items awaiting
+Chairman prioritization; governance note: where the Griffin canon conflicts with the
+foundational principles (access ethics), the principles WIN. Skill backed up to
+docs/skills/advisory-board.md.
