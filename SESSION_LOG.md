@@ -3336,3 +3336,10 @@ audits/board/GRIFFIN_SEAT_PRINCIPLES_2026-08-09.md — implementation items awai
 Chairman prioritization; governance note: where the Griffin canon conflicts with the
 foundational principles (access ethics), the principles WIN. Skill backed up to
 docs/skills/advisory-board.md.
+
+**Board fixes LIVE-VERIFIED (engine v321):** issuer snapshot parsed 8/9 with XRPC
+correctly DECLARED ABSENT by the new staleness guard (page frozen at 07-31); identity
+checks passed on all 8; per-family health rows live — ishares/bitwise/21shares HEALTHY,
+issuer_canary honestly DOWN (the stale family is now visible instead of hidden in a
+green aggregate — S2 working day one); A2 pass clean: re_arm open_bad=0, zero
+live-source failures, 13 open fails all FMP silent-comparison. Re-arm clock accumulating.
