@@ -155,9 +155,49 @@ def t3_splice_rule():
     ok("splice refused", d.get("available") is False and d.get("splice") is True, d)
 
 
+def t4_no_derived_era_attribution():
+    """2026-08-08 source-swap defect: NO_DERIVED days must be blamed on the source
+    whose ERA covered them, never on the latest src — otherwise the new issuer
+    source inherits every FMP-era uncovered day at takeover (open_bad pollution
+    that permanently blocks re-arm, violating A2.4's 'no FMP-era row counts')."""
+    _wipe()
+    # FMP era: two early strikes, then frozen (leaves TD[5] uncovered).
+    _strike("IBIT", TD[9], 58_000_000, 1e9, 17.8, src="fmp")
+    _strike("IBIT", TD[8], 58_001_000, 1e9, 17.9, src="fmp")
+    # Issuer era: takeover with strikes at TD[2]/TD[1]; era starts at
+    # T(first issuer strike) = TD[3] — days ≤ TD[3] stay FMP-era.
+    _strike("IBIT", TD[2], 60_000_000, 1e9, 18.0, src="issuer_ishares")
+    _strike("IBIT", TD[1], 60_010_000, 1e9, 18.1, src="issuer_ishares")
+
+    by = {d.isoformat(): {"IBIT": 0.0} for d in TD[:11]}
+    by[TD[5].isoformat()]["IBIT"] = 80e6      # FMP-era uncovered material day
+    by[TD[3].isoformat()]["IBIT"] = 70e6      # boundary day = issuer baseline
+    stub = {"available": True, "source": "farside", "url": "stub",
+            "by_date": by, "days": len(by)}
+    real_fetch = REC.fetch_published
+    REC.fetch_published = lambda coin, source="farside": (
+        stub if coin == "BTC" else {"available": False, "reason": "no_comparator"})
+    try:
+        REC.reconcile_a2(coins={"BTC"})
+    finally:
+        REC.fetch_published = real_fetch
+
+    c = _conn()
+    nd = {r[0]: r[1] for r in c.execute(
+        "SELECT interval_end_date, src FROM etf_reconcile_log2 "
+        "WHERE ticker='IBIT' AND verdict='NO_DERIVED'").fetchall()}
+    c.close()
+    ok("fmp-era day blamed on fmp", nd.get(TD[5].isoformat()) == "fmp", nd)
+    ok("boundary day stays prior era", nd.get(TD[3].isoformat()) == "fmp", nd)
+    rep = REC.report_a2(days=30)
+    ok("re-arm open_bad clean of fmp-era days",
+       rep["re_arm"]["open_bad"] == 0, rep["re_arm"])
+
+
 if __name__ == "__main__":
     print("=== A2 reconciliation regression harness ===")
     t1_t_of_mapping()
     t2_full_pass()
     t3_splice_rule()
+    t4_no_derived_era_attribution()
     print(f"\nALL {len(PASSED)} CHECKS PASSED")

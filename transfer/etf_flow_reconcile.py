@@ -554,8 +554,34 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                             b.get("src"))
                     summary["pass" if verdict == "PASS" else "fail"] += 1
                 # A2.1.4 — NO_DERIVED sweep: material published days we never covered.
+                # ERA ATTRIBUTION (2026-08-08, the source-swap defect): a day is blamed
+                # on the source whose strike ERA covered it — never on the latest src.
+                # Blaming src_latest made the new issuer source inherit every FMP-era
+                # uncovered day at takeover (open_bad=12 on rows the issuer series is
+                # STRUCTURALLY unable to cover — its first strike postdates them),
+                # violating A2.4's "no FMP-era row counts toward any gate" and
+                # permanently blocking re-arm. Era = t_of(first strike of each src run);
+                # days before the first era belong to the first source ever seen.
                 floor_nd = max(FLOOR_ABS_USD, FLOOR_AUM_FRAC * aum_latest)
-                src_latest = (strikes[-1].get("src") if strikes else None) or "fmp"
+                eras = []                            # [(era_start_T, src)] in order
+                for s in strikes:
+                    s_src = s.get("src") or "fmp"
+                    s_t = t_of(s.get("captured_at"))
+                    if s_t and (not eras or eras[-1][1] != s_src):
+                        eras.append((s_t, s_src))
+
+                def _src_for_day(d):
+                    # STRICT inequality: the boundary day d == era_start is the new
+                    # source's baseline (its first strike settles THROUGH d — no
+                    # interval can ever span it), so it stays with the prior era.
+                    owner = eras[0][1] if eras else "fmp"
+                    for e_t, e_src in eras:
+                        if e_t < d:
+                            owner = e_src
+                        else:
+                            break
+                    return owner
+
                 for d in pub_dates:
                     if max_pub and d >= max_pub:
                         continue                     # comparator's edge not final
@@ -567,7 +593,7 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                     if v is None or abs(v) <= floor_nd:
                         continue
                     _upsert(d.isoformat(), tkr, None, None, float(v), 1, None, None,
-                            "NO_DERIVED", src_latest)
+                            "NO_DERIVED", _src_for_day(d))
                     summary["no_derived"] += 1
         conn.commit()
     finally:
