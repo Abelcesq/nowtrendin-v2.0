@@ -3274,3 +3274,20 @@ first issuer strikes; standard unchanged (A2.4: 5 material in-band, ≥2 funds, 
 zero fails; realistic earliest per amendment ~4-7 trading days). Flip stays BLOCKED
 until re_arm.ready=true + Chairman go. NEXT: board review of the A2-fix workup
 (founder-ordered), wave-3 adapters when unblocked.
+
+## 2026-08-08 (PT, late-2) — A2 era-attribution fix (2nd caught defect) + live verification
+
+First live A2 pass after the issuer takeover exposed a harness defect: the NO_DERIVED
+sweep blamed uncovered material days on the LATEST strike's src → the new issuer source
+inherited all 12 FMP-era uncovered July days (open_bad 0→12; would permanently block
+re-arm; violates A2.4 "no FMP-era row counts"). Fixed mechanism-derived: era
+attribution — each published day blamed on the src whose strike era covered it
+(era = t_of(first strike of each src run), STRICT boundary: the era-start day is the
+new source's unspannable baseline, stays with the prior era). Only the src stamp on
+NO_DERIVED rows changes; no verdict/band/floor/PASS-FAIL outcome touched. +t4
+regression (22/22 green). Deployed (1d7924a) + live-verified: re_arm.open_bad=0,
+open_failures_live_source=null, 5 issuer intervals PENDING_FINAL (still-moving edge,
+correct), 13 open fails ALL src=fmp (silent comparison). Re-arm clock genuinely
+running; flip stays BLOCKED pending A2.4 evidence + Chairman go. Workup for the board:
+audits/board/A2_FIX_WORKUP_2026-08-08.md. NEXT: /advisory-board convening on the
+workup (founder-ordered).
