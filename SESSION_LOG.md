@@ -3369,3 +3369,28 @@ session (fresh context) correctly disclaimed what it could not see. PENDING CHAI
 overfitting/out-of-sample/capacity decay) + THE FORECASTER (Tetlock: Brier/calibration/
 sealed resolution criteria); study bench Thorp/Marks/Dalio/PTJ/Markopolos/Burry recorded.
 Skill backup refreshed (docs/skills/advisory-board.md).
+
+## 2026-08-09 (PT, cont.-3) — Two-Poles study incorporated; seats 8+9 installed as SPECIALIST seats
+
+Founder submitted the parallel session's TWO-POLES study (TCI vs Medallion; archived
+.docx+.txt in audits/board/) and ordered incorporation into the Statistician/Forecaster
+additions + Paulson's practical knowledge; then asked mid-turn to "review and determine
+whether new board members make better sense or whether it can be synthesized."
+DETERMINATION (recorded in STATISTICIAN_FORECASTER_SEATS_2026-08-09.md, Chairman may
+overrule): SCOPED SPECIALIST SEATS — pure synthesis loses coverage (nobody owns
+overfitting; a canon folded into the Economist becomes a paragraph, and paragraphs don't
+file findings); pure 9-on-everything pays the convening-cost the study itself warned of;
+and the seats' mandates only BIND on statistical material. So: core seven convene on
+everything; THE STATISTICIAN (8: Medallion/AQR/Thorp canon — overfitting, N-reporting,
+capacity/reflexivity, never-average-the-ledgers, folklore mirror/provenance grades A-B-C,
+publish bad years, smoothness red flag) and THE FORECASTER (9: Tetlock/Paulson canon —
+sealed resolution criteria, Brier/calibration over ALL forecasts, Paulson 2007 asymmetric
+construction = patience365 vindicated + post-2007 "a track record is not a process",
+unresolved ≠ pending win) JOIN whenever material touches scoring/ledgers/calibration/
+backtests/accuracy claims. Routing implemented regardless: OPERATOR gained the CAPACITY
+CONDITION in its EDGE FINDINGS format + the trust-damage-lands-after-recovery lesson
+(TCI 2008→2012); GUARDIAN gained the UNIVERSE QUESTION (exclusion list as strategy).
+The 8 Two-Poles mechanics (capacity register · scoped claims · N-always · provenance
+grades · we-don't-score-this-well list · scoreability pre-filter · unresolved≠win UI ·
+cleaning-layer-as-product) recorded as ranked adoptables PENDING CHAIRMAN, joined with
+the Griffin adoptables as one prioritization list. Skill backup refreshed.
