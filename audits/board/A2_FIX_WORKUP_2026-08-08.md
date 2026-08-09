@@ -90,8 +90,10 @@ frozen, nothing zigzagging.
 
 Behavior test matrix (throwaway DB): FMP demotion (covered ticker skipped, uncovered
 written) · first-sight insert · same-value no-op · genuine strike update · FMP→issuer
-takeover seam. All passed. Regression suites: `test_etf_reconcile_a2.py` **19/19**,
-`test_crypto_flow_a1.py` **all green**.
+takeover seam. All passed. Regression suites: `test_etf_reconcile_a2.py` **19/19**
+*(correction 2026-08-08 late, flagged by the Challenger: 19/19 was the count at the
+adapter commit d8c23d9, before t4 landed with the era fix — the final suite is
+22/22 as stated in §4 item 3)*, `test_crypto_flow_a1.py` **all green**.
 
 ## 5. What this does NOT do
 
