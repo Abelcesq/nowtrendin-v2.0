@@ -3251,3 +3251,26 @@ start until they ship. FMP rows meanwhile: gate FAIL, 11 open out-of-band failur
 Socialcrawl + Scrape Creators + standing QUIVER/FMP keys; Chairman rulings on board
 I1–I6 + remaining source-review items (Lane B Apify-vs-explore comparison, Lane C IG
 reels); re-test Scrape Creators when Creative Center is back.
+
+## 2026-08-08 (PT, late) — A2 FIX: issuer-page shares adapters BUILT + WIRED (the re-arm blocker)
+
+Founder-ordered ("proceed with the fix for A2"). The re-arm was 0/5 because NO
+issuer-source rows existed — the A2.3 primary source was never built. Now it is:
+`transfer/etf_issuer_pages.py`, 9 of 15 roster funds live-verified (waves 1+2 of the
+survey build order): iShares IBIT/ETHA (entity-encoded JSON blob + browser-grade UA;
+IBIT 1,318.0M sh confirms the creation FMP's frozen count missed), Bitwise
+BITB/ETHW/BSOL (server-rendered fundDetails), 21Shares ARKB/TSOL/TOXR (ki4/ki3
+data-elements), Canary XRPC (wpDataTables history). Grayscale (429 bot-wall), VanEck
+(redirect loop), Fidelity (JS-hydrated, derived-precise) = wave 3, fail-closed
+declared absence. Integration per A2.3: src='issuer_<family>' provenance; FMP demoted
+to observations-only on covered tickers (ETF_ISSUER_PRIMARY=1) = the silent 30-day
+comparison; one-time takeover seam (splice rule); capture-instant dating (survey
+hazard 2); scheduler hook on the 4h loop + POST /etf/issuer-snapshot (internal);
+collector_health row issuer_shares (360m, min_distinct 5). Behavior-tested end-to-end
+incl. a CAUGHT same-second (ticker,captured_at) PK collision (issuer obs silently
+dropped when FMP pass ran the same second) → issuer captured_at now microseconds.
+19/19 A2 harness checks + all A1/F-fix regressions green. Re-arm clocks START at
+first issuer strikes; standard unchanged (A2.4: 5 material in-band, ≥2 funds, ≥3 days,
+zero fails; realistic earliest per amendment ~4-7 trading days). Flip stays BLOCKED
+until re_arm.ready=true + Chairman go. NEXT: board review of the A2-fix workup
+(founder-ordered), wave-3 adapters when unblocked.

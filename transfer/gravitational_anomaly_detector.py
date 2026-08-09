@@ -6154,6 +6154,18 @@ def _etf_snapshot_loop():
                   f"strikes={r.get('strikes_updated', 0)} missing={len(r.get('missing') or [])}")
         except Exception as _e:
             print(f"[etf-snapshot] loop error: {_e}")
+        # A2.3 (Chairman 2026-08-05): issuer-page shares are the PRIMARY strike
+        # source — same cadence, right after the FMP observation pass. Fail-closed;
+        # a missing issuer page surfaces as NO_DERIVED in the A2 harness.
+        try:
+            import etf_issuer_pages
+            ri = etf_issuer_pages.snapshot_issuer(DB_PATH)
+            if not ri.get("disabled"):
+                print(f"[etf-issuer] {ri.get('date')}: parsed={len(ri.get('tickers') or {})} "
+                      f"new={ri.get('written', 0)} strikes={ri.get('strikes_updated', 0)} "
+                      f"takeovers={ri.get('takeovers', 0)} missing={ri.get('missing')}")
+        except Exception as _ie:
+            print(f"[etf-issuer] loop error: {_ie}")
 
 
 def _etf_reconcile_loop():
@@ -7465,6 +7477,18 @@ def diag_etf_reconcile(run: int = 0, firstpass: int = 0):
             out["run"] = rec.reconcile_a2(DB_PATH)
         out.update(rec.report_a2(DB_PATH))
         return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.post("/etf/issuer-snapshot", dependencies=[Depends(_require_internal)])
+def etf_issuer_snapshot():
+    """A2.3: manual trigger of the issuer-page shares snapshot (the scheduler runs it
+    every ETF_SNAPSHOT_INTERVAL_MIN with the FMP pass). Record-only, fail-closed —
+    used post-deploy to start the re-arm clocks and verify adapters live."""
+    try:
+        import etf_issuer_pages
+        return etf_issuer_pages.snapshot_issuer(DB_PATH)
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
 

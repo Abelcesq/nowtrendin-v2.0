@@ -150,6 +150,16 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     out = {"date": today, "written": 0, "strikes_updated": 0, "missing": [], "tickers": {}}
+    # A2.3 (Chairman 2026-08-05): the issuer-page adapters own the daily STRIKE row
+    # for their covered tickers — FMP demotes to observations-only there (its silent
+    # 30-day comparison, re-eval 2026-09-05). Uncovered tickers keep the FMP strike
+    # path so a fund with no adapter never goes dark silently.
+    issuer_covered = frozenset()
+    if os.getenv("ETF_ISSUER_PRIMARY", "1") == "1":
+        try:
+            from etf_issuer_pages import COVERED as issuer_covered
+        except Exception:
+            issuer_covered = frozenset()
     init_etf_db(db_path)
     c = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
@@ -170,6 +180,9 @@ def snapshot(db_path: str = DB_PATH, tickers=None) -> dict:
                     f"INSERT INTO etf_share_observations (ticker,captured_at,shares,aum,nav,src) "
                     f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) ON CONFLICT DO NOTHING",
                     (t, now_iso, info["shares"], info["aum"], info["nav"], "fmp"))
+                if t in issuer_covered:
+                    out["tickers"][t] = round(info["shares"])
+                    continue                    # observation recorded; strike row is issuer-owned
                 # Daily row: insert on first sight; UPDATE only when the NAV itself moved
                 # (a genuine later strike) — never on AUM alone (that is price noise).
                 row = c.execute(
