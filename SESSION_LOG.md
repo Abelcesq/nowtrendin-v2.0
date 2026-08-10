@@ -3573,3 +3573,9 @@ old token (solved); if it PERSISTS, the caller holds current credentials (JoinMy
 backend or a connected tool) and must be found there. Timeline note: the new app
 cannot explain the PAST month's spend (it didn't exist); the historical dupe was an
 older holder of the joinmynet credentials.
+
+**Display batch LIVE-VERIFIED all three surfaces (2026-08-10):** gh-pages 44327c4
+(bundle carries the epoch-split + PROVISIONAL rendering); mobile preview b5d9f93
+(gate + epoch verified in-bundle); engine deployed (GET /accuracy note field live,
+health ok). Board defect #1-#5 CLOSED. Remaining board item: the 5 pre-guard risk
+rows (bounded, deferred with note). STANDING: X 48h checkpoint ~2026-08-12.
