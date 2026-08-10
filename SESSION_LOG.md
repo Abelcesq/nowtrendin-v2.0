@@ -3523,3 +3523,14 @@ X_COST_PER_POST_USD=0.005 + COST_X_API_USD=100. QUEUED (next): the accuracy-disp
 batch (web+mobile provisional caveat + epoch split + KM parity + methodology count +
 signal_analysis prose + /accuracy note) and the 5 pre-guard risk rows
 (verify-or-age-out) — both bounded.
+
+## 2026-08-10 (PT, cont.) — Key rotation landed; verification + Chairman acceptance
+
+Founder regenerated keys. Verified live: X bearer SET + authenticating (HTTP 200);
+Quiver 200. FMP: Heroku still holds the DEAD key (403) — founder updating via
+dashboard (prices/crypto-M/ledger cross-check dark until then, all fail-closed).
+Socialcrawl: key valid but account OUT OF CREDITS (402) — fund-or-pause decision
+pending; lane paused safely. NEW X tokens were pasted into the chat during rotation
+(transcript-exposed); operator advised re-regeneration; **CHAIRMAN EXPLICITLY
+ACCEPTED the exposure on the record ("secure computer and chat") — accepted risk,
+not an oversight.** OAuth1/OAuth2 tokens from the paste are unused by the engine.
