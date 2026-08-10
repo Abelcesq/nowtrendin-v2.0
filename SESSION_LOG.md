@@ -3534,3 +3534,13 @@ pending; lane paused safely. NEW X tokens were pasted into the chat during rotat
 (transcript-exposed); operator advised re-regeneration; **CHAIRMAN EXPLICITLY
 ACCEPTED the exposure on the record ("secure computer and chat") — accepted risk,
 not an oversight.** OAuth1/OAuth2 tokens from the paste are unused by the engine.
+
+**Rotation verification CLOSED (2026-08-10):** FMP ✓ WORKING — the earlier "dead
+key 403" was the operator's own false alarm (tested FMP's deprecated /api/v3 legacy
+path; the engine has always used the /stable base — verify-before-fix applies to
+one's own tests too); live /crypto serves BTC+price. X ✓ new token authenticating.
+Quiver ✓. Socialcrawl: valid key, ZERO credits (402) — lane paused fail-closed,
+fund-or-pause pending Chairman. Trends-caller hunt: guidance delivered (Usage
+breakdown → Agent/Connections/Webhooks tabs → watch 24-48h post-rotation: if Trends
+stops, old-token caller is dead; if it continues, the caller holds NEW credentials =
+this machine / JoinMyNet's own backend; permanent fix = dedicated NowTrendIn app).
