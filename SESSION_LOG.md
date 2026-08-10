@@ -3544,3 +3544,12 @@ fund-or-pause pending Chairman. Trends-caller hunt: guidance delivered (Usage
 breakdown → Agent/Connections/Webhooks tabs → watch 24-48h post-rotation: if Trends
 stops, old-token caller is dead; if it continues, the caller holds NEW credentials =
 this machine / JoinMyNet's own backend; permanent fix = dedicated NowTrendIn app).
+
+**X dedicated-app migration COMPLETE (2026-08-10):** founder created app
+"NowTrendin2.0" (33295718), attached to the Pay-Per-Use project (first attach was
+Ads-only → 403 "must be attached to a Project"; fixed by also connecting Default
+Pay-Per-Use); X_BEARER_TOKEN swapped to the dedicated app and live-verified (counts
+200 with data). CONSEQUENCES: per-app Usage now separates NowTrendIn's X spend from
+JOINMYNET's (attribution + diligence answer); the JOINMYNET app's usage graph now
+shows ONLY the mystery ~985/day Trends caller — the founder's 24-48h watch isolates
+it cleanly. Engine X spend from here: dedicated, metered (requests+posts), capped.
