@@ -3579,3 +3579,17 @@ older holder of the joinmynet credentials.
 (gate + epoch verified in-bundle); engine deployed (GET /accuracy note field live,
 health ok). Board defect #1-#5 CLOSED. Remaining board item: the 5 pre-guard risk
 rows (bounded, deferred with note). STANDING: X 48h checkpoint ~2026-08-12.
+
+## 2026-08-10 (PT, day) — Pre-guard age-out LIVE + Socialcrawl RECOVERED (last board fixes)
+
+Pre-guard fix deployed (6caf56a): risk serve path suppresses topics whose newest row
+predates RISK_SERVE_MIN_SCORED_AT (default 2026-07-20 = guard-ship date) — display-
+only, rows retained; S6 census now warns only on floor regression. VERIFIED: oldest
+SERVED risk row is 2026-07-22 (nothing pre-guard serves); 300-row cap unaffected.
+SOCIALCRAWL RECOVERED: founder purchased credits (2,484 remaining); the catch-up
+gate fired on the first scheduled cycle in the unserved 12:00Z window — 73 signals,
+HEALTHY; the manual re-trigger correctly SKIPPED (window already served) — the new
+gate's both branches proven live. ALL nine-seat board converged fixes now CLOSED
+(display batch, scheduler, X metering/caps, null reconciliation, pre-guard,
+rotations, dedicated X app). Open: Chairman items only (Guardian ruling, gdelt cut-
+vs-fix, on-chain fund-vs-shelf, interim crypto line, FMP 09-05, X 48h checkpoint).
