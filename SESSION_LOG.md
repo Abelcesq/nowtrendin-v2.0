@@ -3474,3 +3474,27 @@ problem selection; self-education-from-primary-texts; two-sided-narrative lesson
 (genuine prize + unaccepted legend = the folklore mirror). Study bench, not a seat.
 **Session-limit note:** one research subagent (data dictionary) was killed by the
 session cap — dictionary written directly at verified-class level instead.
+
+## 2026-08-09/10 (PT, late) — FULL HEALTH CHECK + first NINE-seat board convening
+
+Live battery (04:30-05:00Z): engine/prewarm/catmaps healthy; 21 collectors HEALTHY;
+gdelt DEGRADED (0 signals); issuer_canary DOWN (correct fail-closed); socialcrawl
+STALE 24h (boot-phase-vs-clock-slot mismatch, slot-skips unlogged — operator
+finding); monitors 7 ok + COST SENTINEL CRITICAL (X pacing $437 vs $200 line);
+pipeline_integrity warn (5 pre-guard risk rows); FMP silent-comparison 10 divergent
+intervals accruing; A2 re-arm 0/5 clean. Nine-seat board convened on the pack
+(archived HEALTH_EVIDENCE_PACK + BOARD_full-health_2026-08-09.md). CONVERGENCES
+(6-9 seats): accuracy-display gap = #1 liability (ship the 6 defects before any
+demo); socialcrawl scheduler fix (clock-anchor + log skips); key rotations TODAY;
+Guardian-feeds contradiction resolves THIS WEEK; wave-3 Fidelity adapters dark =
+highest-leverage build; referee run on the 13 LED wins; crypto n/a = honest state,
+fix via the sequenced A2 chain + coverage disclosure (unanimous, no shortcuts).
+UNIQUE: Statistician — served 27.1% sits BELOW the served random-order 50% null
+unreconciled (write the reconciliation note before citing; CI ±13 at N=48);
+Forecaster — seal resolution queries at ENROLLMENT (10 ambiguous wins trace to
+sweep-time query choice) + calibration/Brier layer; Executioner — verify the X
+4,800-post cap actually enforces BEFORE fixing (verify-before-fix); Economist —
+tail-capture metric; Expansionist — gdelt is our most global source strangled
+(DISAGREEMENT w/ Executioner's CUT); on-chain-as-named-workstream (DISAGREEMENT);
+interim crypto progress line (DISAGREEMENT w/ Executioner's cut-cosmetics).
+ALL RULINGS PENDING THE CHAIRMAN (decision list in the board doc).
