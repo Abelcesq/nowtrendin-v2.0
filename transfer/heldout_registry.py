@@ -113,6 +113,15 @@ ACKNOWLEDGED_EXCEPTIONS = {
     ("gravitational_anomaly_detector", "flow_enrollment"):
         "scheduler driver + serve endpoints (/flow/*): write + read-only reports; "
         "never a verdict into a score",
+    # CoinAPI derivatives accumulation (Chairman-ordered 2026-08-10). The detector
+    # DRIVES the daily pull (scheduler loop) and SERVES the read-only /diag/coinapi
+    # report. Direction: detector -> coinapi_derivs, trigger + report only.
+    # ⚠ THE REVIEW MUST RE-CHECK: no funding-rate, open-interest, or derived value
+    # may ever be read back into a score without the backtest + board + Chairman
+    # flip. The day one is read pre-flip, this exception is revoked, not widened.
+    ("gravitational_anomaly_detector", "coinapi_derivs"):
+        "daily-pull scheduler + read-only /diag/coinapi report; accumulation only — "
+        "no value into any score pre-backtest/board/flip",
 }
 
 #: Identifiers that signal a REALIZED-RETURN computation. Their presence inside a module

@@ -3649,3 +3649,19 @@ pack; $0.38 used day one (incl. all test overhead) → steady-state single daily
 now track it). Founder's $1/day CoinAPI-side hard limit caps worst case ~$30/mo —
 the vendor-side guard mirroring our own budget pattern. Credit pack ≈ 5 months
 runway at steady state.
+
+## 2026-08-10 (PT, day-4) — Outstanding-issues sweep: two fixes + housekeeping
+
+Live sweep findings + fixes: (1) GDELT RECOVERED (GAL rewire worked first cycle —
+out of the non-healthy list). (2) NEW DEFECT, same deploy-phase class the Operator
+flagged: the ETF snapshot loop is sleep-FIRST, so every deploy reset its 4h timer —
+deploy-heavy day starved issuer strikes (families STALE 389m vs 360m window). FIXED:
+catch-up-at-boot (runs immediately if newest observation older than cadence).
+(3) heldout_firewall CRITICAL — the firewall correctly caught the detector importing
+coinapi_derivs (scheduler+diag). RESOLVED the sanctioned way: ACKNOWLEDGED_EXCEPTIONS
+entry with direction (trigger+report only) + revocation warning. The firewall
+catching same-day new wiring = the mechanism working. (4) Cost sentinel: X metering
+rates SET (X_COST_PER_REQUEST_USD=0.010, X_COST_PER_POST_USD=0.005, COST_X_API_USD=
+100 per the approved reduction plan — unmetered-requests warn clears; request meter
+already counting: 40 req MTD). (5) Minor: fragment auditor flags 1 geo topic
+('geopolitical'→economy) — routine lexicon item for the next Agent-6 worklist.

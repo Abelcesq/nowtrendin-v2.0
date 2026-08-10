@@ -6206,8 +6206,33 @@ def _etf_snapshot_loop():
     remains as the safety net; writes are idempotent/strike-guarded either way."""
     import time as _t
     interval = max(60, int(os.getenv("ETF_SNAPSHOT_INTERVAL_MIN", "240")))
+    # CATCH-UP AT BOOT (board defect class, 2026-08-10): sleep-FIRST meant every
+    # deploy reset the 4h timer — a deploy-heavy day starved the strike series
+    # (issuer families read STALE at 389m vs the 360m window). Same fix family as
+    # socialcrawl/coinapi: on boot, run immediately if the newest observation is
+    # older than the cadence; else sleep the remainder. Fetches are cheap
+    # (FMP paid-plan + free issuer pages; no Apify/clock-slot money involved).
+    def _stale_by(mins: int) -> bool:
+        try:
+            conn0 = get_db(DB_PATH)
+            row = conn0.execute(
+                "SELECT MAX(captured_at) AS m FROM etf_share_observations"
+            ).fetchone()
+            conn0.close()
+            m = row["m"] if hasattr(row, "keys") else (row[0] if row else None)
+            if not m:
+                return True
+            age = (datetime.now(timezone.utc)
+                   - datetime.fromisoformat(str(m).replace("Z", "+00:00"))
+                   ).total_seconds() / 60.0
+            return age >= mins
+        except Exception:
+            return False                      # unknown age → keep old behavior
+    first = True
     while True:
-        _t.sleep(interval * 60)
+        if not (first and _stale_by(interval)):
+            _t.sleep(interval * 60)
+        first = False
         if os.getenv("ETF_FLOW_SNAPSHOT", "1") != "1":
             continue
         try:
