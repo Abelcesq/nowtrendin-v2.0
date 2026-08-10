@@ -7510,15 +7510,22 @@ def diag_coverage():
            "attention leg's unit is topics, reported separately, never blended."}
     conn = get_db(DB_PATH)
     ph = "%s" if db_compat.USE_PG else "?"
+
+    def _v(row, key, idx):
+        # PG rows are dict-like, sqlite rows are tuples (the codebase idiom).
+        return row[key] if hasattr(row, "keys") else row[idx]
+
     try:
         try:
             rows = conn.execute(
-                "SELECT substr(signal_date,1,7) AS ym, COUNT(DISTINCT item_key) "
+                "SELECT substr(signal_date,1,7) AS ym, "
+                "COUNT(DISTINCT item_key) AS n "
                 "FROM market_signal_history GROUP BY ym ORDER BY ym").fetchall()
-            months = [{"month": r[0], "distinct_instruments": r[1]} for r in rows]
-            distinct_total = conn.execute(
-                "SELECT COUNT(DISTINCT item_key) FROM market_signal_history"
-            ).fetchone()[0]
+            months = [{"month": _v(r, "ym", 0), "distinct_instruments": _v(r, "n", 1)}
+                      for r in rows]
+            distinct_total = _v(conn.execute(
+                "SELECT COUNT(DISTINCT item_key) AS n FROM market_signal_history"
+            ).fetchone(), "n", 0)
             out["market_leg"] = {
                 "distinct_instruments_all_time": distinct_total,
                 "by_month": months,
@@ -7543,16 +7550,18 @@ def diag_coverage():
             pass
         try:
             t30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-            topics_30d = conn.execute(
-                f"SELECT COUNT(DISTINCT topic_key) FROM velocity_scores "
-                f"WHERE scored_at >= {ph}", (t30,)).fetchone()[0]
+            topics_30d = _v(conn.execute(
+                f"SELECT COUNT(DISTINCT topic_key) AS n FROM velocity_scores "
+                f"WHERE scored_at >= {ph}", (t30,)).fetchone(), "n", 0)
             tmonths = conn.execute(
-                "SELECT substr(scored_at,1,7) AS ym, COUNT(DISTINCT topic_key) "
+                "SELECT substr(scored_at,1,7) AS ym, "
+                "COUNT(DISTINCT topic_key) AS n "
                 "FROM velocity_scores GROUP BY ym ORDER BY ym").fetchall()
             out["attention_leg"] = {
                 "unit": "topics (no instrument identifier by design)",
                 "distinct_topics_30d": topics_30d,
-                "by_month": [{"month": r[0], "distinct_topics": r[1]} for r in tmonths],
+                "by_month": [{"month": _v(r, "ym", 0), "distinct_topics": _v(r, "n", 1)}
+                             for r in tmonths],
             }
         except Exception as e:
             out["attention_leg"] = {"available": False, "reason": str(e)[:120]}

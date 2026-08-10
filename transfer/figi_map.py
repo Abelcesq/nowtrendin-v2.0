@@ -152,10 +152,12 @@ def figi_report(db_path: str = DB_PATH) -> dict:
     init_figi_db(db_path)
     c = _connect(db_path)
     try:
-        rows = [dict(zip(("ticker", "figi", "name", "status", "mapped_at"), r))
-                for r in c.execute(
-                    "SELECT ticker, figi, name, status, mapped_at FROM figi_map "
-                    "ORDER BY ticker").fetchall()]
+        # PG rows are dict-like, sqlite rows are tuples (the codebase idiom).
+        cols = ("ticker", "figi", "name", "status", "mapped_at")
+        raw = c.execute(
+            "SELECT ticker, figi, name, status, mapped_at FROM figi_map "
+            "ORDER BY ticker").fetchall()
+        rows = [dict(r) if hasattr(r, "keys") else dict(zip(cols, r)) for r in raw]
     except Exception as e:
         return {"available": False, "reason": str(e)[:120]}
     finally:
