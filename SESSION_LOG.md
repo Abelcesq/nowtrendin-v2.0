@@ -3434,3 +3434,43 @@ register uncompiled; N-with-every-figure not universal; null-model baseline unpu
 coverage-by-month uncounted; single-founder permanency). Phase-0/1/2 adoptables ranked
 and joined with the Griffin + Two-Poles lists as ONE prioritization queue PENDING
 CHAIRMAN. Skill backup refreshed.
+
+## 2026-08-09/10 (PT) — Buyer roadmap Phases 0-2 EXECUTED + Emeagwali lessons integrated
+
+**Phase 0 (docs/buyer-diligence/, all committed):** PII_POLICY + MNPI_POLICY (written,
+DDQ-answer form, App Annie discipline); RIGHTS_REGISTER (one row per source across 9
+classes; banned/removed table; 9 OPEN rights questions incl. the Guardian
+ban-vs-RSS-ingestion conflict, direct-RSS redistribution gap, scraper-acceptability
+ruling never recorded — Chairman queue); DATA_LINEAGE_FISD (four FISD questions
+answered from a full code inventory: backfill NO except 2 labeled classes;
+interpolation NONE in production; schema alteration format-only + quarantine;
+outliers refused-not-deleted; audit-trail model incl. honest limitations);
+ACCURACY_FIGURES_SCOPED (ONE answer per ledger as of 2026-08-09: attention
+tracked-race 27.1% N=48 / blended 11.7% N=111, PROVISIONAL (0 referee-corroborated)
++ epoch split mandatory (v2 engine 5.0% n=20); market/crypto/flow rates withheld BY
+DESIGN with thresholds; 6 display defects listed for founder go — provisional caveat
+not rendered on web/mobile, Methodology says two ledgers, etc.); FISD_DDQ_RESPONSES
+(cold, all 9 gates).
+**Phase 1 (engine 051b7f8→b0/…):** figi_map.py — 33/33 roster mapped via OpenFIGI
+(live-verified: AAPL BBG000B9XRY4…, unmapped=[]), instrument legs only (topics carry
+no instrument id BY DESIGN); /diag/figi + /diag/coverage (live: market 672 distinct
+instruments all-time ≥75 threshold, 9 months; attention 48,968 topics/30d — per-leg,
+never blended); NULL MODEL block live in /accuracy/ledger (Malkiel-null labeled,
+held-out: breakout_base_rate 100% + random-order 50% comparators beside tracked-race);
+DATA_DICTIONARY v0.9 (classes/vintages/cadences verified; exhaustive per-field pass =
+remaining item). One caught-in-verification defect: PG dict-rows vs sqlite tuples
+broke figi_report + coverage (KeyError-0 class) — fixed with the codebase idiom,
+redeployed, re-verified.
+**Phase 2:** TRIAL_LICENSE_TEMPLATE (SBAI-shaped, ⚠ counsel-review draft);
+LISTING_PACK (Neudata materials with category positioned AWAY from "sentiment";
+BattleFin scorecard mapping; Fintech Sandbox; marketplace DEFERRED; right-tier-first
+sequencing doctrine). ALL external submissions = founder actions.
+**Emeagwali (founder-ordered):** study guide reviewed with the standing provenance
+discipline (verified Gordon Bell 1989 core vs contested legend; guide internally
+inconsistent on birthplace); 7 life lessons integrated
+(audits/board/EMEAGWALI_LESSONS_2026-08-09.md): parallelism + communication-topology
+(bees/honeycomb) adopted as a named agent-architecture principle; Grand-Challenge
+problem selection; self-education-from-primary-texts; two-sided-narrative lesson
+(genuine prize + unaccepted legend = the folklore mirror). Study bench, not a seat.
+**Session-limit note:** one research subagent (data dictionary) was killed by the
+session cap — dictionary written directly at verified-class level instead.
