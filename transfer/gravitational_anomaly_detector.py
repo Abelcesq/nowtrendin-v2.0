@@ -3547,40 +3547,82 @@ def collect_mastodon(conn) -> int:
 
 
 def collect_gdelt_trends(conn) -> int:
-    """GDELT Doc API (free, no key) as independent MAINSTREAM corroboration of
-    the engine's newest emerging topics. The attention-mode 'gdelt' health entry
-    previously had no producer at all ('never recorded a successful run').
-    Bounded: ≤15 topic queries per cycle, paced 1s."""
-    try:
-        topics = _x_candidate_topics(int(os.getenv("GDELT_TOPIC_LIMIT", "15")))
-    except Exception:
-        topics = []
+    """GDELT global news signal — REWIRED (Chairman fix 2026-08-10) from the
+    per-topic Doc API (which rate-limits Heroku's shared egress IPs → weeks of
+    'runs, 0 signals' DEGRADED) to the **GDELT v3 GAL RSS feeds** on
+    data.gdeltproject.org: static bulk files, no per-query rate limit, verified
+    live (feed.rss ~6.3k items, feed-social ~2.5k). Our single most GLOBAL,
+    multilingual source (the Expansionist's point) restored via founder-supplied
+    endpoints. Bounded by GDELT_GAL_MAX newest items per feed per cycle; the old
+    Doc API remains as an automatic fallback if the GAL feeds ever go dark."""
+    feeds = [u.strip() for u in os.getenv(
+        "GDELT_GAL_FEEDS",
+        "http://data.gdeltproject.org/gdeltv3/gal/feed.rss,"
+        "http://data.gdeltproject.org/gdeltv3/gal/feed-social.rss").split(",")
+        if u.strip()]
+    cap = int(os.getenv("GDELT_GAL_MAX", "300"))
     total = 0
-    for i, t in enumerate(topics):
-        if i:
-            time.sleep(1.0)
+    for fi, feed_url in enumerate(feeds):
+        if fi:
+            time.sleep(2.0)                      # batch pacing (§13)
         try:
-            r = requests.get(
-                "https://api.gdeltproject.org/api/v2/doc/doc",
-                params={"query": t, "mode": "ArtList", "format": "json",
-                        "timespan": "24h", "maxrecords": 10, "sort": "hybridrel"},
-                headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+            r = requests.get(feed_url, timeout=25,
+                             headers={"User-Agent": "NowTrendIn/2.0 (+discovery)"})
             r.raise_for_status()
-            arts = (r.json() or {}).get("articles", []) or []
+            root = ET.fromstring(r.content)
         except Exception as e:
-            print(f"  GDELT '{t}': error: {e}")
+            print(f"  GDELT GAL {feed_url}: error: {e}")
             continue
-        for a in arts:
-            title = (a.get("title") or "").strip()
-            url = a.get("url") or ""
-            domain = (a.get("domain") or "").strip() or "gdelt"
+        n = 0
+        for item in root.iter("item"):
+            if n >= cap:
+                break
+            title = (item.findtext("title") or "").strip()
+            url = (item.findtext("link") or "").strip()
             if len(title) < 12 or not url:
                 continue
+            try:
+                domain = url.split("/")[2] if "://" in url else "gdelt"
+            except Exception:
+                domain = "gdelt"
             sig_id = hashlib.md5(f"gdelt-{url}".encode()).hexdigest()[:16]
-            total += _social_write_signal(
+            wrote = _social_write_signal(
                 conn, sig_id=sig_id, platform="gdelt", tier="mainstream",
                 community=domain, title=title, url=url, author=domain,
                 ups=0, comments=0, is_first_timer=False, is_organic=True)
+            total += wrote
+            n += 1
+    if total == 0:
+        # Fallback: the old per-topic Doc API pass (may rate-limit on Heroku).
+        try:
+            topics = _x_candidate_topics(int(os.getenv("GDELT_TOPIC_LIMIT", "15")))
+        except Exception:
+            topics = []
+        for i, t in enumerate(topics):
+            if i:
+                time.sleep(1.0)
+            try:
+                r = requests.get(
+                    "https://api.gdeltproject.org/api/v2/doc/doc",
+                    params={"query": t, "mode": "ArtList", "format": "json",
+                            "timespan": "24h", "maxrecords": 10, "sort": "hybridrel"},
+                    headers={"User-Agent": REDDIT_USER_AGENT}, timeout=20)
+                r.raise_for_status()
+                arts = (r.json() or {}).get("articles", []) or []
+            except Exception as e:
+                print(f"  GDELT '{t}': error: {e}")
+                continue
+            for a in arts:
+                title = (a.get("title") or "").strip()
+                url = a.get("url") or ""
+                domain = (a.get("domain") or "").strip() or "gdelt"
+                if len(title) < 12 or not url:
+                    continue
+                sig_id = hashlib.md5(f"gdelt-{url}".encode()).hexdigest()[:16]
+                total += _social_write_signal(
+                    conn, sig_id=sig_id, platform="gdelt", tier="mainstream",
+                    community=domain, title=title, url=url, author=domain,
+                    ups=0, comments=0, is_first_timer=False, is_organic=True)
     conn.commit()
     print(f"  GDELT trends: {total} topic signals")
     return total

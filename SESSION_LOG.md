@@ -3593,3 +3593,32 @@ gate's both branches proven live. ALL nine-seat board converged fixes now CLOSED
 (display batch, scheduler, X metering/caps, null reconciliation, pre-guard,
 rotations, dedicated X app). Open: Chairman items only (Guardian ruling, gdelt cut-
 vs-fix, on-chain fund-vs-shelf, interim crypto line, FMP 09-05, X 48h checkpoint).
+
+## 2026-08-10 (PT, day-2) — SEVEN CHAIRMAN RULINGS EXECUTED
+
+(1) GUARDIAN RESOLVED: ruling recorded — "public RSS headlines are different from
+API access"; ban governs the API product (key stays unset), public RSS feeds are a
+distinct documented class → the 7 feeds are policy-consistent. Rights register §H.1
+closed. (2) COPYRIGHT POSITION adopted (docs/buyer-diligence/COPYRIGHT_POSITION.md):
+headlines/public names/common words = facts, not protected expression (Copyright
+Act protects fixed expression, NOT facts/data/ideas — per the reviewed Oberheiden
+fair-use authority); our scores = our own authorship; honest boundaries kept
+(no court blessing claimed, ToS ≠ copyright, counsel memo still the completion,
+§H.3 stays open with this doc as its brief). (3) GDELT FIXED (Chairman-supplied
+endpoints): collect_gdelt_trends rewired from the per-topic Doc API (Heroku-IP
+rate-limited → weeks of 0 signals) to the GDELT v3 GAL RSS bulk feeds (verified
+live: feed.rss ~6.3k items, feed-social ~2.5k; keyless static files, no rate
+limit), capped GDELT_GAL_MAX=300/feed, Doc-API automatic fallback retained — the
+most global multilingual source restored. (4) ON-CHAIN: Glassnode ruled too
+expensive; COINMETRICS COMMUNITY API v4 tested and PASSES access (free, keyless:
+BTC AdrActCnt daily 2009→yesterday verified live) → a genuine $0 on-chain path;
+requires full §16 five gates + backtest-before-ship + board before ANY wiring
+(score-affecting; not wired tonight). (5) Crypto n/a interim line: LEAVE AS-IS
+(ruled). (6) FMP UPGRADED to paid Starter Annual ($228/yr = $19/mo, receipt
+Jun 26 2026-Jun 26 2027): new key set on engine; viability battery PASSED on the
+/stable base (equity quote, crypto quote, profile all 200; legacy /api/v3 401 —
+irrelevant, engine uses /stable); COST_FMP_USD=19 set (Cost Sentinel per founder
+order); known limitation stands documented (etf/info shares failed CURRENCY —
+permanently demoted; issuer pages primary). (7) X CHECKPOINT RESOLVED: founder
+confirms request count SIGNIFICANTLY DECREASED post-rotation/app-split (console
+PDF) — the duplication is dead; NowTrendIn's X spend now isolated on its own app.

@@ -79,10 +79,14 @@ validation curve (the ledger itself is held-out).
 | Socialcrawl lanes B/C/D | not wired (B gated on held-out comparison; D "do not wire") |
 
 ## H. OPEN RIGHTS QUESTIONS (the honest section — Chairman's queue)
-1. **Guardian conflict (A1):** Guardian sits on the written ban list ("until written
-   commercial approval") while 7 Guardian RSS feeds actively ingest under the
-   direct-RSS doctrine. Resolve: obtain Guardian Open Platform approval, or remove
-   the feeds, or rule the RSS/API distinction explicitly.
+1. **Guardian conflict (A1): ✅ RESOLVED — Chairman ruling 2026-08-10.** "Public RSS
+   headlines are different from API access" — the ban list's "until written
+   commercial approval" governs the Guardian **API product** (key remains unset);
+   the outlet's PUBLIC RSS syndication feeds are a distinct access class under the
+   direct-RSS doctrine (titles/metadata only, no content reproduction, derived
+   scores as the product). Position paper: `COPYRIGHT_POSITION.md` (adopted same
+   date, incorporating the reviewed fair-use/facts-doctrine authority). The 7
+   Guardian RSS feeds are therefore CONSISTENT with policy as ruled.
 2. **Scraper-backed social acceptability:** the general ruling requested in the
    2026-08-07 review was never recorded — only the Socialcrawl Lane-A arm. Record
    the general ruling.
