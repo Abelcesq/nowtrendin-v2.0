@@ -6549,6 +6549,12 @@ def get_accuracy():
         "count":       len(predictions),
         "predictions": predictions,
         "timestamp":   datetime.now(timezone.utc).isoformat(),
+        # Name-collision note (nine-seat board defect #5, 2026-08-10): despite the
+        # path, this endpoint serves a DETECTION LIST, not accuracy rates — rates
+        # (with N, provisional flags, epoch splits) live at /accuracy/ledger.
+        "note": "This endpoint lists logged detections only. Accuracy RATES are "
+                "served exclusively by /accuracy/ledger (with N, provisional "
+                "status, and the engine-epoch split).",
     }
 
 

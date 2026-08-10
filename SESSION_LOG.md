@@ -3553,3 +3553,23 @@ Pay-Per-Use); X_BEARER_TOKEN swapped to the dedicated app and live-verified (cou
 JOINMYNET's (attribution + diligence answer); the JOINMYNET app's usage graph now
 shows ONLY the mystery ~985/day Trends caller — the founder's 24-48h watch isolates
 it cleanly. Engine X spend from here: dedicated, metered (requests+posts), capped.
+
+## 2026-08-10 (PT, cont.-2) — Accuracy-display batch (board defect #1-#5) + X 48h checkpoint
+
+Display batch (board's #1 convergence): web Ledger.tsx now renders PROVISIONAL on
+both rate cards + the hitRateCaveat note + the ENGINE-EPOCH SPLIT note (current
+engine tracked-race beside the blended headline); Methodology.tsx corrected two→
+THREE ledgers + the pre-registered flow ledger + withheld-by-design language;
+mobile accuracy.tsx gained the caveat, epoch split, and KM survival line (§12
+parity); signal_analysis._track_trend no longer frames all-resolved rows as the
+"emerging cohort" unless the cohort is a genuine strict subset (matches the API's
+own withholding); legacy GET /accuracy now carries the name-collision note (rates
+live at /accuracy/ledger only). Web build green.
+**X 48h CHECKPOINT (founder hypothesis on the record):** founder believes the old
+app + a second consumer were duplicating pulls; NowTrendin2.0 (created tonight)
+now isolates our spend. DECISIVE TEST ~2026-08-12: console → per-app Usage — if
+JOINMYNET's ~985/day Trends line DIED after the Aug-9 rotation, the dupe ran on the
+old token (solved); if it PERSISTS, the caller holds current credentials (JoinMyNet
+backend or a connected tool) and must be found there. Timeline note: the new app
+cannot explain the PAST month's spend (it didn't exist); the historical dupe was an
+older holder of the joinmynet credentials.

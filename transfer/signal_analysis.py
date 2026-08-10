@@ -282,14 +282,21 @@ def _trend(item: dict, ledger: dict) -> dict:
 def _track_trend(ledger: dict) -> str:
     ledger = ledger or {}
     pending = _i(_first(ledger.get("still_pending"), ledger.get("pending")))
-    # Prefer the EMERGING cohort — the product's actual claim. Established/already-mainstream
-    # topics are reported separately (they can only lag) and excluded from the headline.
+    # ALIGNMENT FIX (nine-seat board defect #3, 2026-08-10): the API itself WITHHOLDS
+    # earlyDetectionHitRate because maturity coverage is 0 ("a segmentation label
+    # without a segmentation") — this prose used to frame the same rows as the
+    # "emerging cohort" anyway. The cohort framing is used ONLY when the cohort is a
+    # genuine strict subset of resolved; otherwise the honest scope is "resolved
+    # detections", matching the API's own withholding.
     em = (ledger.get("by_maturity") or ledger.get("byMaturity") or {}).get("emerging") or {}
     e_res = _i(em.get("resolved"))
-    using_cohort = e_res is not None
-    resolved = _i(_first(em.get("resolved"), ledger.get("sample_size"), ledger.get("resolved")))
-    led = _i(_first(em.get("led"), ledger.get("hits_led")))
-    lead = _first(em.get("median_lead_days"), ledger.get("median_lead_days"), ledger.get("medianLead"))
+    all_res = _i(_first(ledger.get("sample_size"), ledger.get("resolved")))
+    using_cohort = (e_res is not None and all_res is not None and e_res < all_res)
+    resolved = _i(_first(em.get("resolved") if using_cohort else None,
+                         ledger.get("sample_size"), ledger.get("resolved")))
+    led = _i(_first(em.get("led") if using_cohort else None, ledger.get("hits_led")))
+    lead = _first(em.get("median_lead_days") if using_cohort else None,
+                  ledger.get("median_lead_days"), ledger.get("medianLead"))
     if not resolved:
         return ("Each early detection is written into a falsifiable accuracy ledger and later tested against "
                 "an external benchmark — the date the topic broke out on Google Trends — counting every miss. "

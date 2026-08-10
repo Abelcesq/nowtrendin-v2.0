@@ -212,8 +212,8 @@ export function Ledger() {
             Wikipedia-pageviews referee</b> check (wins resolved before 2026-07-07 predate it and read "unchecked").
           </div>
           <div className="statstrip">
-            <div className="statcard"><div className="sl">Honest hit rate</div><div className="sv good">{hit.toFixed(1)}%</div><div className="sf">Detected First ÷ all resolved (misses counted)</div></div>
-            <div className="statcard"><div className="sl">Tracked-race hit rate</div><div className="sv early">{summary?.trackedRaceHitRate != null ? summary.trackedRaceHitRate.toFixed(1) + '%' : '—'}</div><div className="sf">Detected First ÷ races actually run ({summary?.trackedRaceSample ?? '—'}; pre-existing breakouts excluded)</div></div>
+            <div className="statcard"><div className="sl">Honest hit rate{(summary as any)?.hitRateProvisional ? ' · PROVISIONAL' : ''}</div><div className="sv good">{hit.toFixed(1)}%</div><div className="sf">Detected First ÷ all resolved (misses counted){(summary as any)?.hitRateProvisional ? ' — provisional, see note below' : ''}</div></div>
+            <div className="statcard"><div className="sl">Tracked-race hit rate{(summary as any)?.hitRateProvisional ? ' · PROVISIONAL' : ''}</div><div className="sv early">{summary?.trackedRaceHitRate != null ? summary.trackedRaceHitRate.toFixed(1) + '%' : '—'}</div><div className="sf">Detected First ÷ races actually run ({summary?.trackedRaceSample ?? '—'}; pre-existing breakouts excluded)</div></div>
             <div className="statcard"><div className="sl">Median lead time</div><div className="sv early">{med}d</div><div className="sf">days ahead of Google Trends breakout</div></div>
             <div className="statcard"><div className="sl">First / Same / Near / Pre-existing / FP</div><div className="sv">{summary?.led ?? 0}/{summary?.sameDay ?? 0}/{summary?.laggedNear ?? summary?.lagged ?? 0}/{summary?.preBroken ?? 0}/{summary?.falsePositives ?? 0}</div><div className="sf">outcome breakdown (near + pre-existing = lagged)</div></div>
             <div className="statcard"><div className="sl">Detected First referee check</div><div className="sv">✓{summary?.ledCorroborated ?? 0} · ✗{summary?.ledUncorroborated ?? 0} · —{summary?.ledUnchecked ?? 0}</div><div className="sf">Wikipedia-corroborated · not corroborated · unchecked</div></div>
@@ -222,6 +222,19 @@ export function Ledger() {
               <div className="statcard"><div className="sl">KM eventual confirmation</div><div className="sv early">{summary.survival.estimated_confirmation_pct.eventual.toFixed(1)}%</div><div className="sf">survival estimate over {summary.survival.censored ?? 0} censored pending (denominator-honest companion)</div></div>
             )}
           </div>
+          {(summary as any)?.hitRateCaveat && (
+            <div className="note" style={{ marginTop: 8 }}>
+              <strong>Provisional:</strong> {(summary as any).hitRateCaveat}
+            </div>
+          )}
+          {(summary as any)?.byEpoch?.v2_engine && (
+            <div className="note" style={{ marginTop: 8 }}>
+              <strong>Engine-epoch split</strong> (the headline blends engine versions; quote it with this split):
+              current engine {((summary as any).byEpoch.v2_engine.tracked_race_hit_rate_pct ?? (summary as any).byEpoch.v2_engine.hit_rate_pct)?.toFixed?.(1) ?? '—'}% tracked-race
+              (n={(summary as any).byEpoch.v2_engine.tracked_race_sample ?? (summary as any).byEpoch.v2_engine.resolved ?? '—'}, young races still resolving)
+              {(summary as any).byEpoch.v1_engine ? ` · retired v1 engine ${((summary as any).byEpoch.v1_engine.tracked_race_hit_rate_pct ?? (summary as any).byEpoch.v1_engine.hit_rate_pct)?.toFixed?.(1) ?? '—'}% (n=${(summary as any).byEpoch.v1_engine.tracked_race_sample ?? (summary as any).byEpoch.v1_engine.resolved ?? '—'})` : ''}.
+            </div>
+          )}
         </>
       )}
 

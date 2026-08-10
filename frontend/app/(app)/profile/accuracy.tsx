@@ -229,6 +229,22 @@ export default function AccuracyLedger() {
           <Text className="text-textMuted text-[12px] text-center mb-1">
             Detected First referee: {report!.ledCorroborated ?? 0} ✓ · {report!.ledUncorroborated ?? 0} – · {report!.ledUnchecked ?? 0} unchecked
           </Text>
+          {(report as any)?.hitRateCaveat ? (
+            <Text className="text-textMuted text-[12px] leading-4 text-center mb-1">
+              Provisional: {(report as any).hitRateCaveat}
+            </Text>
+          ) : null}
+          {(report as any)?.byEpoch?.v2_engine ? (
+            <Text className="text-textMuted text-[12px] leading-4 text-center mb-1">
+              Engine-epoch split: current engine {((report as any).byEpoch.v2_engine.tracked_race_hit_rate_pct ?? (report as any).byEpoch.v2_engine.hit_rate_pct) ?? '—'}% tracked-race (young races still resolving)
+              {(report as any).byEpoch?.v1_engine != null ? ` · retired v1 ${((report as any).byEpoch.v1_engine.tracked_race_hit_rate_pct ?? (report as any).byEpoch.v1_engine.hit_rate_pct) ?? '—'}%` : ''}. Headline rates blend both.
+            </Text>
+          ) : null}
+          {(report as any)?.survival?.available && (report as any).survival?.estimated_confirmation_pct?.eventual != null ? (
+            <Text className="text-textMuted text-[12px] text-center mb-1">
+              KM eventual confirmation {(report as any).survival.estimated_confirmation_pct.eventual}% over {(report as any).survival.censored ?? 0} censored pending (companion estimate)
+            </Text>
+          ) : null}
           {report!.pending != null && (
             <Text className="text-textMuted text-[12px] text-center mb-3">
               {Number(report!.pending).toLocaleString()} pending detections still in flight — 365-day patience window
