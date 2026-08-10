@@ -3498,3 +3498,28 @@ tail-capture metric; Expansionist — gdelt is our most global source strangled
 (DISAGREEMENT w/ Executioner's CUT); on-chain-as-named-workstream (DISAGREEMENT);
 interim crypto progress line (DISAGREEMENT w/ Executioner's cut-cosmetics).
 ALL RULINGS PENDING THE CHAIRMAN (decision list in the board doc).
+
+## 2026-08-10 (PT) — Board fixes batch 2 + the X spend investigation
+
+X DEEP-DIVE (founder console + Gemini read + code audit): the ~$350/30d console
+reality decomposes as ~985 Trends-req/day (~$295/mo) + counts (~$30-60) + post reads
+(~$20). VERIFIED: our engine makes ZERO trends calls (x_signal_module is the only X
+caller) — the Trends line is an EXTERNAL consumer of the shared joinmynet app (June
+dual-process class; candidates incl. any MCP/agent tool holding the app keys).
+Deep-pull intent (2/day) VERIFIED enforced; the 4,800-post cap VERIFIED enforcing on
+both paths (the $437 sentinel CRITICAL was uncapped pacing math). Counts calls were
+assumed FREE (old plan) — under pay-per-use every request bills = the meter gap.
+SHIPPED: X_SCAN_MAX_CANDIDATES=40 cap; x_request_usage metering (+/x/budget field);
+sentinel recalibrated (cap-clamped projection, coverage-gap alarm, unmetered-req
+warn); socialcrawl CATCH-UP gate (fires first cycle after each 12h boundary, skips
+logged — kills the phase-shift staleness class); null-model degenerate-100% label +
+served null RECONCILIATION (Statistician condition: record does not yet beat the
+naive null — stated, not implied away). 26/26 regressions green. Step-by-step
+reduction plan + value analysis (X = <1% topic coverage, no proven ledger lift,
+X-attribution audit recommended): audits/X_SPEND_ANALYSIS_2026-08-10.md — founder
+console steps: find/kill the Trends caller, dedicated NowTrendIn X app, cycle cap
+$300→$100, auto-recharge $200→$100, set X_COST_PER_REQUEST_USD=0.010 +
+X_COST_PER_POST_USD=0.005 + COST_X_API_USD=100. QUEUED (next): the accuracy-display
+batch (web+mobile provisional caveat + epoch split + KM parity + methodology count +
+signal_analysis prose + /accuracy note) and the 5 pre-guard risk rows
+(verify-or-age-out) — both bounded.
