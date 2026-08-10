@@ -13,9 +13,11 @@ parallel computation — an oil-reservoir simulation across 65,536 Connection Ma
 processors. That achievement is real and documented. The CONTESTED record: broader
 claims circulated around him (e.g., "father of the Internet"-class framings) are
 widely disputed and not accepted by the scientific community; this study guide is
-self-published motivational material, not a factual authority. Per the same rule
-applied to the Griffin transcript and the Medallion folklore: we take the LESSONS,
-we do not cite the legend as fact, and no contested claim enters our materials.
+self-published motivational material, not a factual authority (the guide is even
+internally inconsistent — Ch. 1 places his childhood in Agbor while its own lesson
+plan says born in Akure). Per the same rule applied to the Griffin transcript and
+the Medallion folklore: we take the LESSONS, we do not cite the legend as fact, and
+no contested claim enters our materials.
 
 ## The life lessons, integrated where they genuinely apply to NowTrendIn
 
@@ -37,12 +39,21 @@ we do not cite the legend as fact, and no contested claim enters our materials.
    runs: the reward is the trace to the actual mechanism (verify-before-fix), not
    the appearance of a fix.
 5. **Parallelism: many modest processors beat one heroic one** (Ch. 5–6, the
-   Gordon-Bell-verified core) — the deepest match to our architecture: nine
-   independent board seats instead of one oracle; fleets of monitoring agents;
-   parallel research agents; pipeline stages that breathe. The lesson formalized:
-   decompose the problem so INDEPENDENT units work simultaneously and no single
-   unit's failure stalls the whole — and (his actual technical insight) the
-   TOPOLOGY of communication between units matters as much as the units.
+   Gordon-Bell-verified core: 65,536 processors, ~3.1B calculations/second, the
+   oil-reservoir fluid-dynamics simulation) — the deepest match to our
+   architecture: nine independent board seats instead of one oracle; fleets of
+   monitoring agents; parallel research agents; pipeline stages that breathe. The
+   lesson formalized: decompose the problem so INDEPENDENT units work
+   simultaneously and no single unit's failure stalls the whole — and (his actual
+   technical insight) the TOPOLOGY of communication between units matters as much
+   as the units themselves. The guide adds his stated inspiration: **nature — the
+   bees' honeycomb** (efficient structure + collective work). Design translation
+   we adopt with it: when architecting agent fleets, copy proven natural/market
+   structures for the COMMUNICATION pattern, don't just add more agents.
+5b. **Pick Grand Challenge problems** (Ch. 4) — he aimed at a problem "even the
+   most powerful computers could not solve." Ours is stated in one sentence:
+   measure attention BEFORE it arrives, provably. The lesson: the problem
+   selection IS the strategy (TCI's universe filter, restated by a mathematician).
 6. **A result can carry a narrative bigger than itself** (Ch. 7–8, the Nigerian
    pride chapters) — read with both eyes open: inspiration is real leverage (the
    product's honest wins should be told plainly), AND a narrative that outruns its
