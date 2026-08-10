@@ -289,13 +289,24 @@ def _load_category_snapshot() -> None:
         print(f"[cat-snapshot] load skipped: {e}")
 
 
+#: DEFINITIONAL PINS (display-only; fragment-auditor fix 2026-08-10): words that are
+#: BY DEFINITION one category regardless of headline context — the context map had
+#: learned 'geopolitical'→economy from market-risk headlines, overriding the lexicon.
+#: Keep this list tiny and definitional; ambiguous terms belong to the layered maps.
+_LEX_PIN = {"geopolitical": "current_events"}
+
+
 def _category_for(topic_key: str, display: str) -> str:
     """Serve-time category with three context layers, strongest first, all DISPLAY-ONLY
     (no scoring impact, no circularity):
+      0. DEFINITIONAL PIN — tiny list of words that are one category by definition
       1. SITUATION category — the topic's co-occurring EVENT context (canada+hockey→sports)
       2. CONTEXT category — the topic's own signal HEADLINES (hokit raises $40M→business)
       3. bare-word lexicon — and finally the honest 'general' bucket if nothing matches."""
     if topic_key:
+        p = _LEX_PIN.get(topic_key)
+        if p:
+            return p
         if SITUATION_CATEGORY_ENABLED:
             c = _SITUATION_CAT.get(topic_key)
             if c and c not in _CATCHALL_CATS:

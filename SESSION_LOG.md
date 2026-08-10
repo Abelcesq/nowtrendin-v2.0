@@ -3665,3 +3665,24 @@ rates SET (X_COST_PER_REQUEST_USD=0.010, X_COST_PER_POST_USD=0.005, COST_X_API_U
 100 per the approved reduction plan — unmetered-requests warn clears; request meter
 already counting: 40 req MTD). (5) Minor: fragment auditor flags 1 geo topic
 ('geopolitical'→economy) — routine lexicon item for the next Agent-6 worklist.
+
+## 2026-08-10 (PT, day-5) — Lexicon pin + Fidelity wave-3 verdict + Coinbase review
+
+LEXICON: 'geopolitical' was ALREADY in the current_events lexicon — the mis-sort came
+from the CONTEXT layer (headlines like "geopolitical risk weighs on markets" taught
+the map economy), which outranks the bare lexicon. FIX: new layer-0 DEFINITIONAL PIN
+(_LEX_PIN, display-only, tiny by charter) — 'geopolitical'→current_events wins over
+all learned maps. FIDELITY WAVE-3 VERDICT (honest): SIX §15-compliant plain-fetch
+probes exhausted (product page, fundresearch, institutional SPA 937KB, webxpress,
+quote dashboard, CBOE listing) — FBTC/FETH numbers are JS-hydrated everywhere; NO
+compliant data path exists today. The adapter CANNOT be built without either
+headless rendering (new infra + a board doctrine ruling per annex N1.7) or a data
+channel not yet found. Per the board's flip either/or, the standing path is:
+flip on re_arm.ready with FBTC/FETH EXPLICITLY EXCLUDED + covered-AUM disclosure;
+revisit Fidelity if a channel appears. COINBASE CDP KEY (founder-created,
+transcript-exposed, accepted class): reviewed — largely account/trade-API class; no
+§16 case to wire (prices covered ×3; volume prohibited); the ONE distinctive signal
+(Coinbase premium = US-institutional demand gap) needs only the PUBLIC keyless spot
+endpoint (verified 200, BTC $64,039) — recorded as a future held-out candidate; key
+HELD unwired. Coinbase public spot noted in the rights register class B (official
+public API).
