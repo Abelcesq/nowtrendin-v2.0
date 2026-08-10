@@ -6204,6 +6204,14 @@ def _coinapi_derivs_loop():
                     r = coinapi_derivs.snapshot_derivs(DB_PATH)
                     print(f"[coinapi-loop] daily pull: {r.get('written')} coins "
                           f"(missing {r.get('missing')})")
+            # Coinbase RETAIL-SPOT premium accumulation (Chairman 2026-08-10; 5-day
+            # value review 2026-08-15). Held-out; separate price_class by order —
+            # never blended with market prices. Keyless public endpoint.
+            if os.getenv("COINBASE_PREMIUM", "1") == "1":
+                import coinbase_premium
+                if not coinbase_premium.has_row_for_today(DB_PATH):
+                    rp = coinbase_premium.snapshot_premium(DB_PATH)
+                    print(f"[cb-premium-loop] daily pull: {rp.get('written')} coins")
         except Exception as _e:
             print(f"[coinapi-loop] error: {_e}")
         _t.sleep(1800)

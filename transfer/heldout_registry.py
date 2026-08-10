@@ -54,6 +54,9 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "insider_flow":        "the append-only Form-4 panel + universe promotion",
     "coinapi_derivs":      "crypto derivatives positioning accumulation (funding/OI) — "
                            "held-out baseline; wiring requires backtest + board",
+    "coinbase_premium":    "Coinbase retail-spot premium accumulation (demand proxy; "
+                           "separate price_class, never a market price) — 5-day review "
+                           "2026-08-15",
 }
 
 #: Modules that PRODUCE OR CALIBRATE A SCORE. These must never import the held-out set.
@@ -122,6 +125,12 @@ ACKNOWLEDGED_EXCEPTIONS = {
     ("gravitational_anomaly_detector", "coinapi_derivs"):
         "daily-pull scheduler + read-only /diag/coinapi report; accumulation only — "
         "no value into any score pre-backtest/board/flip",
+    # Same shape for the Coinbase premium accumulation (Chairman 2026-08-10).
+    # ⚠ RE-CHECK: coinbase_retail_spot rows must NEVER enter a price/market leg or
+    # any score pre-review; the day one does, revoke this exception.
+    ("gravitational_anomaly_detector", "coinbase_premium"):
+        "daily-pull scheduler + read-only report; separate price_class accumulation "
+        "only — never a market price, no value into any score pre-review",
 }
 
 #: Identifiers that signal a REALIZED-RETURN computation. Their presence inside a module

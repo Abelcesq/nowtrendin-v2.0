@@ -93,6 +93,10 @@ COLLECTOR_EXPECTATIONS = {
     "coinapi_derivs":  {"max_gap_minutes": 1740, "mode": "risk", "critical": False,
                         "min_distinct": 8,
                         "disabled": not os.getenv("COINAPI_KEY")},
+    # Coinbase retail-spot premium (held-out, keyless public; daily; BNB absent by
+    # design → floor at 8 of 11 listable coins).
+    "coinbase_premium": {"max_gap_minutes": 1740, "mode": "risk", "critical": False,
+                         "min_distinct": 8},
     # RETIRED 2026-07-29: Finnhub's congressional endpoint is premium-gated on our plan and
     # returned 403 on every call, contributing zero rows. The call site is removed; this row is
     # marked disabled rather than DELETED so the failure history stays readable and it reports

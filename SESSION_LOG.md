@@ -3686,3 +3686,27 @@ transcript-exposed, accepted class): reviewed — largely account/trade-API clas
 endpoint (verified 200, BTC $64,039) — recorded as a future held-out candidate; key
 HELD unwired. Coinbase public spot noted in the rights register class B (official
 public API).
+
+## 2026-08-10 (PT, day-6) — Coinbase premium monitor LIVE (5-day review 2026-08-15) + FMP/A2/Fidelity assessment
+
+COINBASE (Chairman-ordered 5-day trial): built coinbase_premium.py — held-out daily
+accumulation of the CROSS-VENUE premium (Coinbase spot vs FMP global reference) for
+all 12 coins, each row hard-labeled price_class='coinbase_retail_spot' in its OWN
+table (the Chairman's separate-category order: NEVER blended with market prices;
+firewall + acknowledged exception + health row coinbase_premium min_distinct 8).
+Live test 12/12 (BTC +0.006%, XRP -0.044%; BNB serves an index rate). Keyless public
+endpoint — $0; the founder's CDP key stays UNWIRED. NOTE: /spot is mid-market — the
+retail SPREAD signal would use /v2/prices/{pair}/buy (addable at review). REVIEW DUE
+2026-08-15: variance/directionality worth a §16 workup as a US-demand proxy?
+FMP VALUE ASSESSMENT (founder ask): (a) A2 — FMP's shares field remains DISQUALIFIED
+by evidence (the frozen-IBIT/FBTC-zigzag Gate-4 record; the paid-plan upgrade does
+not change the field's vendor-computed lineage); its value to A2 is exactly its
+CURRENT role: the independent silent-comparison stream (10 divergent intervals
+already banked for the 2026-09-05 drop/keep rule). A2.4's "FMP rows never count"
+stays Chairman-ruled. (b) FIDELITY — FMP /stable serves FBTC quotes+metadata (live-
+verified) and is TODAY THE ONLY WATCHER on FBTC/FETH. The defensible conditional
+path: IF the ongoing silent comparison shows FMP's FBTC series turning in-band by
+09-05, the board could approve a NARROW disclosed FMP-as-FBTC-fallback src (serving
+coverage post-flip, NEVER counting toward re-arm) — the rehabilitation test is
+ALREADY RUNNING by design; no new build needed. Otherwise flip proceeds on the
+declared-exclusion path (board either/or (b)).
