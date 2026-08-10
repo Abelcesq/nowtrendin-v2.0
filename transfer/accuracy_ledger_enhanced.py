@@ -787,11 +787,26 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
             "breakout_base_rate_meaning": "share of resolved enrollments where a Google "
                     "breakout occurred at ALL within the window — the skill-free "
                     "'attention arrives anyway' ceiling; LED must be judged on ORDER "
-                    "of arrival, not arrival itself",
+                    "of arrival, not arrival itself. NOTE (Statistician, 2026-08-10): "
+                    "at zero FALSE_POSITIVEs this reads a DEGENERATE 100% — it then "
+                    "carries no information beyond 'enrollment conditions on eventual "
+                    "attention' and must not be cited as a comparator",
             "random_order_race_expectation_pct": 50.0,
             "random_order_meaning": "among races actually run, a timing-skill-free "
                     "detector would precede the breakout ~half the time under random "
                     "ordering; compare tracked_race_hit_rate_pct against this",
+            # NULL RECONCILIATION (Statistician condition, 2026-08-10, served so the
+            # comparison is never silent): the tracked-race rate currently sits BELOW
+            # the naive random-order comparator. Stated honestly rather than implied
+            # away: the resolved-race record does not yet demonstrate ordering skill
+            # over the naive null (CI at these N spans tens of points; the current-
+            # engine epoch is young). This is WHY every rate is PROVISIONAL and not
+            # externally citable as skill. The naive 50% is a stated 2-outcome
+            # comparator; the race set has ties (same-day) — the strict order test is
+            # led vs lagged_near, also served in the outcome counts.
+            "reconciliation": "tracked_race vs random_order: record does not yet beat "
+                    "the naive null; rates are PROVISIONAL by design — see "
+                    "hitRateCaveat and the epoch split before any citation",
         },
         "median_lead_days": round(statistics.median(lead_times), 1) if lead_times else 0,
         "mean_lead_days": round(statistics.mean(lead_times), 1) if lead_times else 0,

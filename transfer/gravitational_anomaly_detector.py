@@ -8492,6 +8492,44 @@ def _x_record_pull() -> None:
         print(f"[x-budget] daily write error: {e}")
 
 
+def _x_requests_this_month() -> int:
+    """Pay-per-use REQUEST meter (2026-08-10): counts/recent polls were assumed FREE
+    (true on the old subscription's post cap; FALSE under Pay-Per-Use where every
+    request bills). This is why console spend ($250.42/cycle) ran ~$100 above the
+    posts-only meter. Count every counts-class request so the sentinel can meter
+    dollars against X_COST_PER_REQUEST_USD once calibrated from the console."""
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_request_usage "
+                     "(month TEXT PRIMARY KEY, requests INTEGER)")
+        row = conn.execute("SELECT requests FROM x_request_usage WHERE month = ?",
+                           (month,)).fetchone()
+        conn.commit()
+        conn.close()
+        return int(row["requests"]) if row and row["requests"] is not None else 0
+    except Exception as e:
+        print(f"[x-budget] request read error: {e}")
+        return 0
+
+
+def _x_record_requests(n: int) -> None:
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    try:
+        conn = get_db(DB_PATH)
+        conn.execute("CREATE TABLE IF NOT EXISTS x_request_usage "
+                     "(month TEXT PRIMARY KEY, requests INTEGER)")
+        conn.execute(
+            "INSERT INTO x_request_usage (month, requests) VALUES (?, ?) "
+            "ON CONFLICT(month) DO UPDATE SET requests = x_request_usage.requests + ?",
+            (month, n, n),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[x-budget] request write error: {e}")
+
+
 def _x_posts_spent_this_month() -> int:
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     try:
@@ -8531,6 +8569,7 @@ def x_budget():
     return {"month": datetime.now(timezone.utc).strftime("%Y-%m"),
             "posts_spent": spent, "budget": _X_MONTHLY_POST_BUDGET,
             "remaining": max(0, _X_MONTHLY_POST_BUDGET - spent),
+            "requests_this_month": _x_requests_this_month(),
             "posts_per_pull": _X_POSTS_PER_PULL}
 
 
@@ -8607,17 +8646,25 @@ def _x_velocity_scan(topics=None, threshold=None, limit=10) -> dict:
     # back-to-back rate-limits after ~5 and silently shrinks the scan.
     pace_s = float(os.getenv("X_SCAN_PACE_S", "2.5"))
 
-    # ── Phase 1: FREE volume/velocity poll for every candidate (counts/recent
-    # does NOT draw down the 15k post cap) ──
-    scanned = []
+    # ── Phase 1: volume/velocity poll per candidate. ⚠ NOT FREE (corrected
+    # 2026-08-10): counts/recent didn't draw the OLD plan's post cap, but under
+    # Pay-Per-Use EVERY REQUEST BILLS — the unmetered polls are the console-vs-
+    # meter gap ($250 cycle vs ~$144 posts-only). Universe is hard-capped
+    # (X_SCAN_MAX_CANDIDATES) and every request is metered. ──
+    _max_cand = int(os.getenv("X_SCAN_MAX_CANDIDATES", "40"))
+    if _max_cand > 0:
+        topics = topics[:_max_cand]
+    scanned, _req_n = [], 0
     for i, t in enumerate(topics):
         if i and pace_s > 0:
             time.sleep(pace_s)
+        _req_n += 1
         vol = xsig.collect_x_volume(t)
         if not vol:
             continue
         scanned.append({"topic": t, "velocity": vol.get("velocity", 0) or 0,
                         "total": vol.get("total", 0)})
+    _x_record_requests(_req_n)
 
     # ── Phase 2: spend the limited deep pulls (~100 posts each) on the TOP
     # trending movers — ranked by velocity desc so the per-scan/day/month budget

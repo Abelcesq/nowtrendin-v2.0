@@ -407,13 +407,33 @@ def collect_socialcrawl_rising(conn, force: bool = False) -> int:
               "(set SOCIALCRAWL_RISING=1 + SOCIALCRAWL_API_KEY to enable)")
         return 0
     now = datetime.now(timezone.utc)
-    slot = now.hour // 6
-    if not force and slot not in _SCRAWL_SLOTS:
-        print(f"  [discovery] socialcrawl_rising skipped (slot {slot} not armed)")
-        return 0
+    # CATCH-UP GATE (nine-seat board fix, 2026-08-10): the old gate fired only when
+    # the CURRENT hour fell in an armed clock-slot family — but the 6h collect cycle
+    # is boot-phase-anchored, so deploys could phase-shift it past BOTH daily slots
+    # forever, and skips were unlogged (indistinguishable from a dead collector).
+    # New rule: fire on the FIRST cycle after each armed 12h boundary (00/12 UTC)
+    # that hasn't been served yet, judged by the collector's own last-success record;
+    # every skip is a logged decision. Same 2-runs/day budget.
+    slot = 0 if now.hour < 12 else 1
+    boundary = now.replace(hour=(0 if slot == 0 else 12), minute=0, second=0,
+                           microsecond=0)
+    if not force:
+        try:
+            row = conn.execute(
+                "SELECT last_success_at FROM collector_health "
+                "WHERE collector = 'socialcrawl'").fetchone()
+            last = None
+            if row is not None:
+                last = row["last_success_at"] if hasattr(row, "keys") else row[0]
+            if last and str(last) >= boundary.isoformat():
+                print(f"  [discovery] socialcrawl_rising SKIP (already served the "
+                      f"{boundary.strftime('%H:%M')}Z window; last success {last})")
+                return 0
+        except Exception as e:
+            print(f"  [discovery] socialcrawl_rising window check error ({e}) — running")
     per_slot = max(1, int(os.getenv("SOCIALCRAWL_SEEDS_PER_SLOT", "3") or 3))
     # Rotate the seed window so every seed is covered on a fixed cadence.
-    offset = ((now.timetuple().tm_yday * 2) + (0 if slot == 0 else 1)) * per_slot
+    offset = ((now.timetuple().tm_yday * 2) + slot) * per_slot
     seeds = [_SCRAWL_SEEDS[(offset + i) % len(_SCRAWL_SEEDS)]
              for i in range(min(per_slot, len(_SCRAWL_SEEDS)))]
     written, credits_used, credits_left, failed = 0, 0, None, False

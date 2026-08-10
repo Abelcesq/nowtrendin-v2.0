@@ -495,13 +495,51 @@ def cost_sentinel() -> dict:
             alerts.append({"level": "critical", "block": "B7", "msg": f"X post budget EXHAUSTED {xs}/{xb}"})
         elif xb and xs / xb >= 0.8:
             alerts.append({"level": "warn", "block": "B7", "msg": f"X posts at {xs / xb * 100:.0f}% of {xb}/mo"})
-        if x_projected > x_declared * 1.1:
-            alerts.append({"level": "critical" if x_projected > x_declared * 1.5 else "warn",
+        # RECALIBRATED (board 2026-08-10, verify-before-fix): the 4,800-post hard cap
+        # was VERIFIED to enforce on both spend paths, so a raw linear projection above
+        # the line is early-month pacing math, not a leak — the projection is CLAMPED
+        # to what the cap permits, and the honest alarm is the COVERAGE GAP (budget
+        # exhausting mid-month = the back half of the month goes dark on X).
+        x_cap_usd = round(xb * x_rate, 2) if xb else None
+        x_projected_capped = min(x_projected, x_cap_usd) if x_cap_usd else x_projected
+        x_line["projected_usd_capped"] = x_projected_capped
+        # Requests are billed under Pay-Per-Use but were unmetered (the console-vs-
+        # meter gap). Count them always; meter dollars only when a calibrated rate
+        # is configured — never assert a rate we haven't verified.
+        try:
+            xreq = g._x_requests_this_month()
+            xreq_rate = float(os.getenv("X_COST_PER_REQUEST_USD", "0") or 0)
+            x_line["requests_mtd"] = xreq
+            if xreq_rate > 0:
+                x_line["requests_usd_mtd"] = round(xreq * xreq_rate, 2)
+                total += x_line["requests_usd_mtd"]
+                lines.append({"item": "X counts-requests (metered)",
+                              "usd": x_line["requests_usd_mtd"], "source": "metered"})
+            elif xreq:
+                alerts.append({"level": "warn", "block": "B7",
+                               "msg": f"X counts-requests UNMETERED in dollars ({xreq} "
+                                      f"req MTD) — set X_COST_PER_REQUEST_USD from the "
+                                      f"console (cycle spend $250.42 ran ~$100 above the "
+                                      f"posts-only meter, 2026-08-10 finding)"})
+        except Exception:
+            pass
+        if xb:
+            spent_days = max(1, datetime.now(timezone.utc).day)
+            _burn = xs / spent_days
+            if _burn > 0 and xs < xb:
+                _exhaust_day = int(xs and (xb - xs) / _burn) + spent_days
+                if _exhaust_day <= 28:
+                    alerts.append({"level": "warn", "block": "B7",
+                                   "msg": f"X post budget will exhaust ~day {_exhaust_day} "
+                                          f"of the month at current burn ({xs}/{xb}) — "
+                                          f"back-of-month X coverage gap (time-varying "
+                                          f"bias a buyer's coverage check will see)"})
+        if x_projected_capped > x_declared * 1.1:
+            alerts.append({"level": "critical" if x_projected_capped > x_declared * 1.5 else "warn",
                            "block": "B7",
-                           "msg": f"X pay-per-use pacing ${x_projected:.0f}/mo vs the "
-                                  f"${x_declared:.0f} configured line ({xs} posts MTD × "
-                                  f"${x_rate}/post) — metered actuals diverging from the "
-                                  f"declared cost"})
+                           "msg": f"X metered spend ${x_projected_capped:.0f}/mo (cap-"
+                                  f"clamped) vs the ${x_declared:.0f} configured line "
+                                  f"({xs} posts MTD × ${x_rate}/post)"})
     except Exception:
         pass
 
