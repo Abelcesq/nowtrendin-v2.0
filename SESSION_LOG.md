@@ -3642,3 +3642,10 @@ INTO THE CRYPTO MONEY LEG REMAINS GATED: baseline accrues ~2 weeks → backtest-
 before-ship → board → Chairman flip. CoinMetrics community (free on-chain) remains
 the complementary §16 candidate. Earlier CoinAPI 403s were pay-per-use provisioning
 lag, not a dead key.
+
+**CoinAPI cost registered (founder billing screenshot 2026-08-10):** $25 credit
+pack; $0.38 used day one (incl. all test overhead) → steady-state single daily pull
+≈ $0.15/day ≈ $4.6/mo → COST_COINAPI_USD=5 set (Cost Sentinel + Data Subscriptions
+now track it). Founder's $1/day CoinAPI-side hard limit caps worst case ~$30/mo —
+the vendor-side guard mirroring our own budget pattern. Credit pack ≈ 5 months
+runway at steady state.
