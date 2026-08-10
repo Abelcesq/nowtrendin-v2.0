@@ -3409,3 +3409,28 @@ Determination-in-principle on a 3rd specialist (hedge-fund customer voice) deliv
 chat: SYNTHESIZE into the Outsider seat rather than seat a customer-desire archetype
 (integrity hazard: a buyer-voice seat structurally pushes toward actionable-signal/advice
 drift, against measurement-not-advice); full document-specific review awaits re-share.
+
+## 2026-08-09 (PT, cont.-5) — Buyer roadmap studied; OUTSIDER → OUTSIDER/BUYER'S DESK (Chairman-ruled synthesis)
+
+Founder re-shared the parallel session's hedge-fund buyer roadmap (moved into repo root;
+archived to audits/board/, root copies gitignored). Chairman agreed with the
+recommendation: NO tenth customer seat — buyer view SYNTHESIZED into seat 4, now THE
+OUTSIDER / BUYER'S DESK: first-look diligence + the FISD DDQ gate order (point-in-time ·
+lineage · rights · PII instant-kill · MNPI · row-level identifiers · coverage stability ·
+economics · vendor permanency) + the APP ANNIE RULE (SEC's first alt-data enforcement was
+for MISDESCRIBING methodology to buyers — every DDQ/methodology claim is securities
+exposure; honest absence + reproducible numbers are LEGAL DEFENSES) + the
+components-and-score-both-reproducible shape + right-tier-first sequencing + the adopted
+one-line strategy: "the attention dataset a compliance team can actually approve and a
+quant can actually reproduce." Verdicts now name which buyer-desk gate each item
+strengthens/endangers. Critical analysis + incorporation record:
+audits/board/BUYER_ROADMAP_INCORPORATION_2026-08-09.md — incl. push-backs (category
+framing: we are a measurement-rails/ledger product, not "sentiment data"; 75-ticker/FIGI
+scope = instrument legs only, attention unit is topics) and VERIFY-BEFORE-FIX triage of
+the roadmap's "fails-today" list: parallel-lineage items (plaintext credential — OUR
+md scan is CLEAN; crypto-no-money-input — not this engine; hist_store/prereg/A4-A5)
+separated from the items that DO apply here (PII/MNPI policy docs absent; rights
+register uncompiled; N-with-every-figure not universal; null-model baseline unpublished;
+coverage-by-month uncounted; single-founder permanency). Phase-0/1/2 adoptables ranked
+and joined with the Griffin + Two-Poles lists as ONE prioritization queue PENDING
+CHAIRMAN. Skill backup refreshed.

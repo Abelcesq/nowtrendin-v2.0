@@ -1,0 +1,249 @@
+What Hedge Funds Actually Buy — and a Realistic Path for NowTrendIn
+Prepared: 2026-08-09 · Companion to the Griffin seat and the Two Poles study
+Part 0 — What the Rich List does and does not tell us
+The article is Institutional Investor's 25th annual Rich List: a ranking of manager compensation for 2025. Top 25 earned $36.65B; the entry bar was a record $470M.
+#
+Manager
+Firm
+2025 earnings
+1
+Chris Hohn
+TCI
+$4.9B
+2
+Steven Cohen
+Point72
+$4.0B
+3
+Izzy Englander
+Millennium
+$3.5B
+4
+David Tepper
+Appaloosa
+$3.3B
+5
+Ken Griffin
+Citadel
+$2.4B
+6
+David Shaw
+D.E. Shaw
+$2.0B
+7
+Philippe Laffont
+Coatue
+$1.8B
+8=
+Chris Rokos
+Rokos
+$1.4B
+8=
+Dan Sundheim
+D1 Capital
+$1.4B
+10
+Bill Ackman
+Pershing Square
+$1.1B
+It is a pay ranking, not a statement of data needs — it cannot answer &quot;what do hedge funds seek in data.&quot; Note also that nine of the top earners underperformed the S&amp;P 500 in 2025, which is worth remembering before treating this list as a list of oracles.
+Its real use is as a buyer map, and read that way it delivers an uncomfortable result.
+Part 1 — Only four of the ten are addressable. The #1 name is the least addressable.
+Firm
+Positions (13F Q1 2026)
+Alt-data function
+Verdict
+Citadel
+6,733, $619B
+Data Strategies Group — central quant research team serving both quant and fundamental sides
+Addressable
+Millennium
+4,153, $257B
+2,000+ datasets from ~400 providers, ~10 trillion records (Feb 2020 figure)
+Addressable
+D.E. Shaw
+4,470, $166B
+Standing Alternative Data Analyst role; Firmwide Market Data Lead owns vendor contracts, onboarding, audit
+Addressable
+Point72
+3,704, $78B
+Market Intelligence division with a named Data Sourcing and Strategy function
+Addressable
+Coatue
+62 holdings
+Systematic quant fund; 30+ data scientists/engineers, target 100
+Possible — narrow universe
+Rokos
+n/a (macro)
+No data function named on careers page
+Poor fit — rates/FX book
+TCI
+10 positions, top five 85%
+None found. Forbes: &quot;old-fashioned stock picking… rather than quantitative models&quot;
+Not addressable
+Appaloosa
+31 holdings
+None found; family office since 2019
+Not addressable
+D1 Capital
+44 holdings; majority in privates
+Nothing verifiable
+Not addressable
+Pershing Square
+11 positions
+S-1 lists 9 investment professionals, two-person diligence teams, no data vendors named
+Not addressable
+Two findings worth sitting with. First, the #1 earner — Chris Hohn, whom we studied at length this week — holds ten names and is the single worst economic case for a broad attention dataset. Second, Ken Griffin himself has publicly downplayed the category: &quot;It was all the rage that alternative data was going to transform the industry. And it's had a modest impact, which was, frankly, our prior back then.&quot; (June 2023, via a secondary source — I could not reach the original video.) The man whose seat we just built on this board is a public skeptic of the product category we would be selling him.
+Part 2 — What buyers actually check, in order
+This is the real answer to &quot;what do they seek.&quot; It is largely specified for free by the FISD Alternative Data Council (a buy-side-led body inside SIIA, active and publishing; its DDQ, tear sheets and five Learning Points are public, some on GitHub).
+⚠️ Do not cite IDSO. It was a real standards body in 2018–19 but appears dormant — idso.org now redirects to an unrelated organisation. Cite FISD.
+1 · Point-in-time integrity. FISD's definition: data must &quot;reflect, at each Point-In-Time, what was known and when it was known.&quot; Look-ahead bias is &quot;using data that was not yet known on the date being analyzed.&quot; Survivorship bias is a universe that &quot;only represents the present.&quot; There is no published minimum number of years. The closest thing to a threshold is J.P. Morgan's guidance that under ~50 observations is &quot;typically less useful,&quot; and the contractual default in the SBAI Standardised Trial Data License Agreement, which is &quot;full available history&quot; less a commercially sensitive window. A vendor drip-feeding a two-year sample is already off-standard.
+2 · Data lineage. This is the hardest gate — 90% of FISD webinar attendees named it the most difficult requirement to satisfy. Vendors must document whether data &quot;was backfilled,&quot; whether &quot;missing values were interpolated,&quot; whether &quot;values were altered for schema alignment,&quot; whether &quot;outliers were removed,&quot; with audit trails logging when and by whom.
+3 · Rights to redistribute. The FISD DDQ requires contracts evidencing the legal right to resell or license the data and any derived products. It probes web-scraping method, proxy use, IP anonymisation, and compliance with robots.txt and terms of service specifically. Its organising principle is excluding data from &quot;breach of fiduciary duty, breach of contract or deceptive behavior.&quot; &quot;We scraped it and nobody complained&quot; is not a right.
+4 · PII — an instant kill, not a negotiation. Nasdaq's data team: &quot;We do not even want to see data that contains PII and nor do our clients. It is not worth the compliance risk.&quot;
+5 · MNPI. Vendors must diligence origin to ensure no material non-public information.
+6 · Identifier mapping, at ROW level. FISD's Identifiers Learning Point names the accepted set — ticker, ISIN, FIGI, SEDOL, CUSIP, PermID, RIC — and states the requirement plainly: &quot;a security identifier is essential to be included, for example, for each row of data provided.&quot; Unmapped data isn't rejected on principle; the buyer prices in the mapping labour and the dataset stops clearing its hurdle. Nasdaq rejected a geolocation dataset on exactly that basis.
+7 · Coverage breadth and stability. Eagle Alpha's stated quant threshold is a universe of 75+ tickers. Coverage that drifts over the history invalidates the backtest even when the signal is real.
+8 · Economics, which is a separate gate from statistics. One manager told AIMA it requires alpha net of acquisition, cleaning, structuring and analysis costs. 1798 Alternatives targets at least 10x return relative to all-in cost. A real signal that doesn't clear the economics is rejected while being perfectly valid.
+9 · Vendor permanency. Neudata's process explicitly includes &quot;company background and permanency risk checks.&quot; A one-person vendor is a documented risk item, and buyers hedge it by spreading payments across the term rather than paying upfront.
+The App Annie rule — the most important compliance fact for us
+SEC v. App Annie (Sept 2021) was the first SEC enforcement action against an alternative data provider: $10M from the company, $300,000 plus a three-year officer-and-director bar for the co-founder. The violation was not collecting bad data. It was misdescribing its own methodology and controls to buyers. Every answer we put in a DDQ becomes a securities-law exposure. This is the strongest possible argument for the honest-absence discipline we already run — and against ever publishing an accuracy number we cannot reproduce.
+Part 3 — The hard truth about selling a score
+The weight of evidence says sophisticated quant funds do not buy opaque scores as a primary input. Deloitte: leading firms favour &quot;raw, minimally-processed data, allowing internal transformation for specific economic problems rather than vendor-curated signals.&quot; Jane Street staffs feature engineering in-house and tests whether a dataset is &quot;additive to our modeling.&quot;
+Four mechanical reasons, all downstream of Part 2 rather than snobbery:
+A score cannot be orthogonalised against the buyer's existing factor book unless they can decompose it. &quot;Additive to our modeling&quot; is the test, and a black box can't be tested.
+A score cannot be reconstructed point-in-time if the model was retrained — the historical score series then isn't what would have been observable. That is look-ahead bias smuggled in through the model.
+A score's revisions are model revisions, colliding head-on with the lineage requirement to document whether &quot;values were altered.&quot;
+A score gives the buyer no way to answer &quot;why is it predictive,&quot; which is a first-order test.
+But this is not a dead end, and the nuance is where our opportunity lives. Only about 38% of buy-side firms want truly raw data; the majority want cleaned, normalised data with embedded tags to securities, industries and timestamps, and only ~17% need no supporting services. So the commercially survivable structure is clear:
+Ship the components AND the score, both with full point-in-time vintages, publish the transformation logic to FISD lineage standard, and let the buyer reproduce the score.
+And the honest strategic reframe: the Rich List firms buy raw data because they employ 750 engineers. Our score is most valuable precisely to buyers who don't — smaller funds, family offices, RIAs, corporate strategy and IR teams, and sell-side research. Positioning against Citadel's Data Strategies Group is positioning against our own strength.
+One more finding we should not flinch from
+Industry data indicates card-transaction and web-scraped data are the most used and most highly rated, while social/sentiment data has the most providers and ranks lower for analytical value. That is our category. It means the differentiation cannot be &quot;we have sentiment data.&quot; It has to be the point-in-time rigour and the provenance — which is, conveniently, exactly what we have been building.
+Part 4 — What we already have that most vendors don't
+This is the good news, and it is substantial. The hardest requirements to retrofit are the ones we happen to have already built.
+Requirement
+What we have
+Status
+Point-in-time / no look-ahead
+hist_store.py bitemporal event_date + knowable_at, all reads via as_of(t)
+Built. This is the single hardest thing to retrofit and it exists
+No silent restatement
+Append-only SQLite BEFORE UPDATE/DELETE … RAISE(ABORT) triggers; ReadOnlyHistStore opened mode=ro
+Built
+Lineage / transformation audit
+ingestion_gate.py, gate_date(), quarantine to format_review_queue
+Mostly built — needs writing up
+Rights to redistribute
+Engine CLAUDE.md line 74 banned-source list; the OpenBB Chairman ruling; the AP/scraping analysis; the licensing survey of 12 news APIs
+Genuine differentiator. Most vendors cannot answer this. We have written rulings
+Reproducibility / pre-registration
+Sealed prereg, PREREG LOCK 261716973f6968b4, Merkle/manifest sealing, param_version
+Built — stronger than most vendors
+Held-out track record
+Three separate accuracy ledgers, never-deleted, 365-day retention
+Built
+Data-quality discipline
+CATCHALL_MIN_SOURCES = 2, honest n/a, flow_integrity: not_started
+Built
+Identifier mapping
+OpenFIGI researched — free, MIT-licensed, api.openfigi.com/v3, FIGIs never change or get reused
+Ready to implement
+The moat is not the score. The moat is the point-in-time archive, because it accrues value every single day and cannot be back-filled by a competitor. Someone starting in 2028 cannot manufacture 2026 knowable_at stamps. Combined with a documented rights position, that is a defensible asset — and Renaissance's own history says the same thing: their moat was Sandor Straus's cleaned archive, not the math.
+Part 5 — What would fail a DDQ today
+Blunt, because the App Annie rule means overstating readiness is worse than admitting gaps.
+The accuracy numbers. Seven published figures spanning 0%–54.5% (audit finding A4). A buyer asking &quot;what is your hit rate&quot; gets seven answers. This must be resolved into scoped, reproducible, per-ledger figures before any external conversation.
+Crypto grades a signal with zero money input. crypto_accuracy_ledger has been scoring against a money leg that does not exist. Fix or withdraw the ledger.
+A live credential sits in plaintext in engine CLAUDE.md line 100. Any DDQ security question fails on this. Rotate it — this is a today item, independent of any sales plan.
+No PII or MNPI policy document exists. Both are required DDQ answers.
+No row-level security identifier.
+Coverage count is unknown against the 75-ticker quant threshold. We have never counted.
+No null model for the 365-day lead window (audit finding A5) — a buyer will ask what the random-chance baseline is, and &quot;we haven't computed it&quot; is a stopping answer.
+Single-founder permanency risk is a literal Neudata check item.
+AGENT_CHARTER.md and DATA_BUILDING_BLOCKS.md have never been uploaded, so we cannot yet describe our own agent inventory completely.
+Part 6 — The concrete plan, staged to where we actually are
+Everything in Phases 0–2 is free and can be completed before a single buyer conversation. That matters, because the evaluation gate is front-loaded into documentation while the post-gate business is durable — Neudata reports &gt;90% retention once a dataset is adopted.
+Phase 0 — Fix what would fail, and write what we already do (≈4–6 weeks, £0)
+#
+Step
+Why
+0.1
+Rotate INTERNAL_API_KEY. Move to Heroku config vars only
+Live credential in source. Today item
+0.2
+Resolve the seven accuracy numbers into scoped, reproducible, per-ledger figures with N reported
+A4; App Annie rule
+0.3
+Fix or withdraw the crypto ledger
+It grades a signal with no money input
+0.4
+Write the PII policy — state plainly that we collect and ship none
+Instant-kill item
+0.5
+Write the MNPI policy — all sources public, licensed, no expert networks, no panels
+Required DDQ answer
+0.6
+Write the rights register — one row per source: licence, ToS reviewed, redistribution permitted Y/N, date
+We have the material; nobody has written it down
+0.7
+Write the lineage document to FISD standard — every transformation, gate, quarantine, and who/when
+The 90%-hardest gate, and we can pass it
+0.8
+Complete the FISD DDQ cold, before anyone asks
+Free spec; forces every other gap into view
+Phase 1 — Make the data buyer-shaped (≈6–8 weeks)
+#
+Step
+Why
+1.1
+Add row-level OpenFIGI to every scored record
+FISD: identifier required per row. Free, MIT
+1.2
+Count coverage — distinct mapped tickers, and coverage by month over the whole history
+75+ threshold; drift invalidates backtests
+1.3
+Ship components, not just the score — G, I, M, D, C, P as separate columns with vintages
+Solves orthogonality + &quot;why is it predictive&quot;
+1.4
+Vintaged delivery — revisions as new rows with new knowable_at, never overwrites
+Already the DB behaviour; expose it in the product
+1.5
+Build the A5 null model on direct FRED/BLS/IMF calls
+&quot;What's the random baseline&quot; is a certain question
+1.6
+Write the data dictionary — every field, type, units, update cadence, revision policy
+Neudata asks for it at listing
+Phase 2 — Get listed and get evaluated (free)
+#
+Step
+Why
+2.1
+Free Neudata listing. No cost, no revenue share, ~1–4 weeks from first contact
+Highest-leverage free action available
+2.2
+Apply to Fintech Sandbox (already identified for the AP feed)
+Under $1M ARR, fintech-adjacent — we qualify
+2.3
+Build documentation to the BattleFin Data Quality Scorecard — metadata summary, univariate, bivariate, time-series, completeness
+A free published spec of a first-pass quant screen
+2.4
+Adopt the SBAI Standardised Trial Data License Agreement as our template
+90-day evaluation, full history less a sensitive window, delete-on-termination. Buyers already know it
+2.5
+Consider a cloud-marketplace listing (Snowflake's Capacity Drawdown lets buyers pay from existing commitments — turns a new-vendor decision into budgeted spend)
+Removes procurement friction
+Phase 3 — Sell to the right tier first
+Do not open with Citadel, Millennium, D.E. Shaw or Point72. They are addressable, but they buy raw data, run 700-dataset funnels, and will find every Phase 0 gap. Approach them after Phases 0–2, and even then expect a long cycle — Deloitte puts discovery-to-institutionalisation at two to three years.
+Open instead with the segment that buys processed signals because it lacks in-house quant capacity: smaller funds, family offices, RIAs, corporate strategy and IR teams, and sell-side research. That is where a score is the product rather than a liability.
+When we do approach the large funds, the sales motion is three-sided: central data sourcing = the contracting counterparty and negotiator (Point72's own posting: &quot;negotiating terms, and securing approvals from investment teams&quot;); quant research or the sector data-science group = the technical approver; a named PM or pod = the economic sponsor. At a pod shop you need all three, and the sponsor is what makes it happen.
+One asymmetry to exploit: a large quant manager told AIMA that ~80% of new dataset discoveries came from investment research testing a specific thesis, and only 20% from prospecting. We are far more likely to be found because a fund is already asking our question than because they are browsing. So publish the methodology and the question we answer, publicly and precisely.
+Phase 4 — Pricing, when we get there
+Published bands: overall under $25k to $500k+/year, with most datasets in the $25k–$150k range; sentiment specifically skews low (~30% under $25k). Average dataset revenue is ~$1.1M/year; elite ones exceed $20M. Buyers average ~$1.6M annual spend across ~20 subscriptions.
+Price against the 10x all-in-cost hurdle, not against our own costs. And note the trap: 62% of buyers cite high prices as the primary adoption obstacle, while the retention above 90% means the whole commercial problem is winning the first evaluation, not holding the account.
+Part 7 — The one-line strategy
+We are not competing on having sentiment data — that category is crowded and rated low. We are competing on being the sentiment dataset that a compliance team can actually approve and a quant can actually reproduce. Point-in-time from the start, lineage documented, rights written down, identifiers on every row, methodology published, absences shown honestly.
+Everything in Phase 0 and Phase 1 serves that sentence, and none of it requires a customer, a fundraise, or a single new data source.
+Sources
+II 25th Rich List — https://www.institutionalinvestor.com/article/hedge-funds/rich-list-institutional-investors-25th-annual-ranking-highest-earning-hedge · FISD Alternative Data Council — https://fisd.net/alternative-data-council/ · FISD Point-in-Time — https://fisd.net/wp-content/uploads/2021/06/Learning-Point-Point-in-Time.pdf · FISD Data Lineage — https://fisd.net/wp-content/uploads/2021/06/Data-Lineage-Learning-Point.pdf · FISD Identifiers — https://fisd.net/wp-content/uploads/2021/06/FISD-Learning-Point-Identifiers-2.pdf · FISD MNPI — https://fisd.net/wp-content/uploads/2021/06/Learning-Point-MNPI-June-18-20-Alt-Data-Council.pdf · FISD council GitHub — https://github.com/siia-fisd/altdata-council · SBAI trial agreement — https://www.sbai.org/static/ed728b0e-beca-45af-bc40f2dff1a4d6df/Standard-Data-Trial-Agreement-6-February-2019.pdf · SEC v. App Annie — https://www.sec.gov/news/press-release/2021-176 · SEC Exams Risk Alert (Apr 2022), via Akin — https://www.akingump.com/en/insights/alerts/sec-division-of-examinations-finally-speaks-on-alternative-data · AIMA, Casting the Net — https://www.aima.org/static/8778b1e4-75c3-44e4-b35dc38e1495001e/Casting-The-Net-v10.pdf · JPM Big Data &amp; AI Strategies — https://cpb-us-e2.wpmucdn.com/faculty.sites.uci.edu/dist/2/51/files/2018/05/JPM-2017-MachineLearningInvestments.pdf · Deloitte on alternative data — https://www.deloitte.com/us/en/insights/industry/financial-services/alternative-data-for-investors-from-discovery-to-institutionalization.html · Eagle Alpha vendor guide — https://www.eaglealpha.com/alternative-data-provider-complete-guide/ · Neudata provider FAQs (free listing) — https://www.neudata.co/education/data-provider-faqs · Neudata market sizing — https://www.neudata.co/press-release/alternative-data-spending-by-investment-management-firms-could-top-15-4bn-in-2025-according-to-neudata-s-latest-report · Neudata: how to sell to investment managers — https://www.neudata.co/education/how-to-sell-alternative-data-to-investment-managers · II on dataset pricing — https://www.institutionalinvestor.com/article/2bsx5x6m2pew8jzgavmyo/corner-office/how-much-are-managers-paying-for-data · BattleFin Ensemble scorecard — https://www.battlefin.com/ensemble · Lowenstein Sandler, alt-data contracts — https://www.lowenstein.com/media/11088/how-to-ensure-better-contracts-with-alternative-data-providers-1.pdf · Citadel Data Strategies Group — https://www.citadel.com/careers/career-perspectives/real-people-real-impact-how-alternative-data-powers-investment-decisions-at-citadel/ · Point72 Market Intelligence — https://point72.com/market-intelligence/ · Point72 Data Sourcing &amp; Strategy role — https://job-boards.greenhouse.io/point72/jobs/8475068002 · D.E. Shaw Firmwide Market Data Lead — https://www.deshaw.com/careers/firmwide-market-data-lead-5571 · Millennium data scientist role — https://jobs.alooba.com/gb/job/millennium-management-data-scientist-equities-850653/ · Pershing Square S-1 — https://www.sec.gov/Archives/edgar/data/2026053/000114036126008560/ny20040230x14_s1.htm · Snowflake provider onboarding — https://docs.snowflake.com/en/collaboration/provider-becoming
+Could not verify
+Any published minimum years of history (does not appear to exist); numeric IC / decay / capacity thresholds (proprietary); evaluation-to-onboarding conversion rates; market-standard exclusivity terms; whether a vendor redistributing CUSIP/ISIN needs its own identifier licence — ask counsel, it is a known trap; IDSO's current status; current heads of data sourcing at Millennium, Citadel and Coatue; the Griffin alt-data quote (second-hand, original video not reached); headcount for TCI, Appaloosa, D1 and Coatue.
