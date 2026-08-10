@@ -2746,6 +2746,15 @@ def get_risk_scores(db_path: str = DB_PATH, limit: int = 50) -> dict:
     # Business ≥12h). Prefer the unpruned positioning_history first cycle so the
     # age stays truthful even if risk_scores is ever pruned; fall back to the
     # earliest score row.
+    # PRE-GUARD AGE-OUT (nine-seat board fix, Chairman-approved 2026-08-10): display
+    # guards are forward-only, so a DEAD topic's newest row — scored before a guard
+    # shipped — would serve its pre-guard payload forever (the S6 census class: a
+    # drawdown row served a fabricated 30.0 for 23 days). Topics whose NEWEST row
+    # predates the newest display-guard ship date are SUPPRESSED FROM SERVING —
+    # display-only; every row is retained per the 365-day rule; a topic that
+    # re-scores serves again automatically.
+    _serve_floor = os.getenv("RISK_SERVE_MIN_SCORED_AT", "2026-07-20")
+    _ph = "%s" if getattr(db_compat, "USE_PG", False) else "?"
     rows = conn.execute(f"""
         SELECT v.*,
                CASE WHEN ph.first_cycle IS NOT NULL AND ph.first_cycle < fs.first_at
@@ -2757,7 +2766,8 @@ def get_risk_scores(db_path: str = DB_PATH, limit: int = 50) -> dict:
           ON v.risk_topic = fs.risk_topic
         LEFT JOIN (SELECT item_key, MIN(cycle_at) first_cycle FROM positioning_history GROUP BY item_key) ph
           ON v.risk_topic = ph.item_key
-    """).fetchall()
+        WHERE l.m >= {_ph}
+    """, (_serve_floor,)).fetchall()
     conn.close()
     results = [_format_risk_row(r) for r in rows]
     # Minimum signal count guard: topics with fewer than 3 total signals have

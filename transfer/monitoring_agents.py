@@ -181,11 +181,22 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
         _stale = int((_row["n"] if hasattr(_row, "keys") else _row[0]) or 0)
         summary["stale_preguard_topics"] = _stale
         summary["stale_basis"] = "latest row per topic (served exposure), not all history"
-        if _stale:
+        # AGE-OUT SHIPPED (board fix 2026-08-10): the risk serve path now suppresses
+        # topics whose newest row predates RISK_SERVE_MIN_SCORED_AT (default = the
+        # guard date), so pre-guard rows are RETAINED but no longer SERVED. The
+        # census stays (retention visibility); it WARNS only if the serve floor has
+        # been moved behind the guard date (which would re-expose the class).
+        _serve_floor = os.getenv("RISK_SERVE_MIN_SCORED_AT", "2026-07-20")
+        summary["preguard_serve_floor"] = _serve_floor
+        if _stale and _serve_floor < _GUARD_SHIP_DATE:
             alerts.append({"level": "warn", "block": "B3",
-                           "msg": f"{_stale} risk topic(s) whose NEWEST row predates the "
-                                  f"newest display guard ({_GUARD_SHIP_DATE}) — these still "
-                                  f"serve a pre-guard payload; verify honest or aged out"})
+                           "msg": f"{_stale} pre-guard risk topic(s) RE-EXPOSED: the serve "
+                                  f"floor ({_serve_floor}) is behind the guard date "
+                                  f"({_GUARD_SHIP_DATE}) — raise RISK_SERVE_MIN_SCORED_AT"})
+        elif _stale:
+            summary["preguard_note"] = (f"{_stale} pre-guard topic(s) retained in history "
+                                        f"but suppressed from serving (age-out floor "
+                                        f"{_serve_floor})")
     except Exception:
         try:
             conn.rollback()
