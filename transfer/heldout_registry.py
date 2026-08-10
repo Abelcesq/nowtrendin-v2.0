@@ -52,6 +52,8 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "signal_analysis":     "per-item narrative; measurement-only, never an input",
     "flow_enrollment":     "the enrollment driver — the detector's ONLY doorway into the flow program",
     "insider_flow":        "the append-only Form-4 panel + universe promotion",
+    "coinapi_derivs":      "crypto derivatives positioning accumulation (funding/OI) — "
+                           "held-out baseline; wiring requires backtest + board",
 }
 
 #: Modules that PRODUCE OR CALIBRATE A SCORE. These must never import the held-out set.

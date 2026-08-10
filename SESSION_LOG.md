@@ -3622,3 +3622,23 @@ order); known limitation stands documented (etf/info shares failed CURRENCY —
 permanently demoted; issuer pages primary). (7) X CHECKPOINT RESOLVED: founder
 confirms request count SIGNIFICANTLY DECREASED post-rotation/app-split (console
 PDF) — the duplication is dead; NowTrendIn's X spend now isolated on its own app.
+
+## 2026-08-10 (PT, day-3) — COINAPI derivatives positioning ONBOARDED (held-out, Chairman-ordered)
+
+Founder challenged the initial not-viable read — CORRECTLY: CoinAPI's Tier-1
+pay-per-use account serves DERIVATIVES POSITIONING metrics (funding rates, open
+interest, liquidations) — genuine money-class data (leverage price + committed
+capital), NOT volume (C5/C6 intact), covering ALL 12 roster coins via Binance USDT
+perps — the first full-roster money source. Live-verified: BTC funding 6.182e-05,
+OI ~105k BTC; gate-5 pull wrote 11/12 coins (BCH 429 → pacing 1.0→2.5s + one 6s
+retry fix). BUILT: transfer/coinapi_derivs.py — HELD-OUT accumulation (own table
+coinapi_derivs, PK coin+date, §14 canon columns, fail-closed declared absence,
+forward-only), daily catch-up loop (first check after 00:00 UTC = the founder's
+12:01 AM pull; ~24-48 req/day, cents), /diag/coinapi (internal, ?pull=1),
+collector-health row (1740m, min_distinct 8, disabled-pattern w/o key), Data
+Subscriptions entry (COST_COINAPI_USD owed once billed), heldout_registry entry
+(scoring can never import it — AST-enforced). COINAPI_KEY set on engine. WIRING
+INTO THE CRYPTO MONEY LEG REMAINS GATED: baseline accrues ~2 weeks → backtest-
+before-ship → board → Chairman flip. CoinMetrics community (free on-chain) remains
+the complementary §16 candidate. Earlier CoinAPI 403s were pay-per-use provisioning
+lag, not a dead key.

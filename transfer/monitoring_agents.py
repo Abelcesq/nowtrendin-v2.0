@@ -803,6 +803,9 @@ DATA_SUBSCRIPTIONS = [
      "prices/fundamentals + crypto coin prices; ~$20/mo Starter (300/min, crypto+forex)"),
     ("Socialcrawl",          "SOCIALCRAWL_API_KEY",  "COST_SOCIALCRAWL_USD",  "paid",
      "google-trends rising-query discovery (dark lane, §16 2026-08-07); £15/2,500 credits"),
+    ("CoinAPI",              "COINAPI_KEY",          "COST_COINAPI_USD",      "paid",
+     "crypto derivatives positioning (funding/OI, held-out accumulation, §16 "
+     "2026-08-10); Tier-1 pay-per-use ~24 req/day — set the real monthly $ once billed"),
     # free / free-tier data APIs (configured, $0 expected)
     ("FRED",                 "FRED_API_KEY",         None, "free", "Federal Reserve econ data (free)"),
     ("FINRA",                "FINRA_API_KEY",        None, "free", "FINRA short/market data (free)"),

@@ -6177,6 +6177,27 @@ def _prewarm_loop():
 INSIDER_INGEST_INTERVAL_MIN = int(os.getenv("INSIDER_INGEST_INTERVAL_MIN", "60"))
 
 
+def _coinapi_derivs_loop():
+    """Daily crypto derivatives-positioning accumulation (CoinAPI, held-out —
+    Chairman-ordered 2026-08-10). CATCH-UP semantics: checks every 30 min and runs
+    the pull on the FIRST check of each new UTC day (the founder's "12:01 AM"
+    daily pull), so deploy phase can never silently skip a day. ~24 pay-per-use
+    requests/day. Record-only; feeds no score."""
+    import time as _t
+    _t.sleep(120)                                   # let boot settle
+    while True:
+        try:
+            if os.getenv("COINAPI_DERIVS", "1") == "1" and os.getenv("COINAPI_KEY"):
+                import coinapi_derivs
+                if not coinapi_derivs.has_row_for_today(DB_PATH):
+                    r = coinapi_derivs.snapshot_derivs(DB_PATH)
+                    print(f"[coinapi-loop] daily pull: {r.get('written')} coins "
+                          f"(missing {r.get('missing')})")
+        except Exception as _e:
+            print(f"[coinapi-loop] error: {_e}")
+        _t.sleep(1800)
+
+
 def _etf_snapshot_loop():
     """A1 (Chairman 2026-08-05): ETF share snapshots every ETF_SNAPSHOT_INTERVAL_MIN
     (default 240 = 4h → up to 6 looks/day), so the day's NAV strike is captured within
@@ -6295,6 +6316,9 @@ async def startup_auto_collect():
 
     # A1: 4h ETF share-snapshot loop (record-only; ETF_FLOW_SNAPSHOT=0 disables).
     try:
+        threading.Thread(target=_coinapi_derivs_loop, daemon=True,
+                         name="coinapi-derivs").start()
+        print("[startup] coinapi-derivs started (daily 00:xx UTC; held-out).")
         threading.Thread(target=_etf_snapshot_loop, daemon=True,
                          name="etf-snapshot").start()
         print(f"[startup] etf-snapshot started "
@@ -7616,6 +7640,21 @@ def diag_coverage():
     finally:
         conn.close()
     return out
+
+
+@app.get("/diag/coinapi", dependencies=[Depends(_require_internal)])
+def diag_coinapi(pull: int = 0):
+    """Held-out CoinAPI derivatives accumulation status (§16 2026-08-10).
+    `?pull=1` triggers a manual daily pull (idempotent per coin+date)."""
+    try:
+        import coinapi_derivs
+        out = {}
+        if pull:
+            out["pull"] = coinapi_derivs.snapshot_derivs(DB_PATH)
+        out.update(coinapi_derivs.derivs_report(DB_PATH))
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
 
 
 @app.post("/etf/issuer-snapshot", dependencies=[Depends(_require_internal)])

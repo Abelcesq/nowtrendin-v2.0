@@ -87,6 +87,12 @@ COLLECTOR_EXPECTATIONS = {
                         "min_distinct": 3},
     "issuer_canary":   {"max_gap_minutes": 360, "mode": "risk", "critical": False,
                         "min_distinct": 1},
+    # CoinAPI derivatives positioning (held-out accumulation, §16 2026-08-10):
+    # once daily (first check after 00:00 UTC) → 24h cadence + generous margin.
+    # min_distinct 8: fewer than 8 of 12 coins parsing = dead-symbol drift.
+    "coinapi_derivs":  {"max_gap_minutes": 1740, "mode": "risk", "critical": False,
+                        "min_distinct": 8,
+                        "disabled": not os.getenv("COINAPI_KEY")},
     # RETIRED 2026-07-29: Finnhub's congressional endpoint is premium-gated on our plan and
     # returned 403 on every call, contributing zero rows. The call site is removed; this row is
     # marked disabled rather than DELETED so the failure history stays readable and it reports
