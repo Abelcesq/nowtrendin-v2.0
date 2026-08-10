@@ -7481,6 +7481,86 @@ def diag_etf_reconcile(run: int = 0, firstpass: int = 0):
         return {"available": False, "reason": str(e)[:160]}
 
 
+@app.get("/diag/figi", dependencies=[Depends(_require_internal)])
+def diag_figi(build: int = 0):
+    """Buyer roadmap Phase 1 (2026-08-09): row-level FIGI mapping for the
+    INSTRUMENT-KEYED legs (watchlist + ETF proxies + crypto proxy equities).
+    `?build=1` (re)maps the roster via keyless OpenFIGI (paced, fail-closed —
+    unmapped is recorded, never guessed). Display/export metadata only."""
+    try:
+        import figi_map
+        out = {}
+        if build:
+            out["build"] = figi_map.build_figi_map(DB_PATH)
+        out.update(figi_map.figi_report(DB_PATH))
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.get("/diag/coverage", dependencies=[Depends(_require_internal)])
+def diag_coverage():
+    """Buyer roadmap Phase 1 (2026-08-09): coverage breadth + stability, scoped per
+    leg (never blended — Two-Poles M-4). Instrument legs vs the 75-ticker quant
+    threshold; coverage-by-month over the retained history; attention leg reported
+    in ITS unit (topics). Read-only."""
+    out = {"as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "quant_threshold_note": "75+ distinct instruments is the published quant "
+           "screen threshold (Eagle Alpha); applies to instrument legs only — the "
+           "attention leg's unit is topics, reported separately, never blended."}
+    conn = get_db(DB_PATH)
+    ph = "%s" if db_compat.USE_PG else "?"
+    try:
+        try:
+            rows = conn.execute(
+                "SELECT substr(signal_date,1,7) AS ym, COUNT(DISTINCT item_key) "
+                "FROM market_signal_history GROUP BY ym ORDER BY ym").fetchall()
+            months = [{"month": r[0], "distinct_instruments": r[1]} for r in rows]
+            distinct_total = conn.execute(
+                "SELECT COUNT(DISTINCT item_key) FROM market_signal_history"
+            ).fetchone()[0]
+            out["market_leg"] = {
+                "distinct_instruments_all_time": distinct_total,
+                "by_month": months,
+                "meets_75_threshold": bool(distinct_total and distinct_total >= 75),
+            }
+        except Exception as e:
+            out["market_leg"] = {"available": False, "reason": str(e)[:120]}
+        try:
+            from financial_risk_gradient import WATCHLIST_TICKERS
+            out["watchlist_size"] = len(WATCHLIST_TICKERS)
+        except Exception:
+            pass
+        try:
+            import crypto_signals as _cs
+            out["crypto_coins"] = len(_cs.COIN_UNIVERSE)
+        except Exception:
+            pass
+        try:
+            from etf_flow import ETF_PROXIES
+            out["etf_proxies"] = len(ETF_PROXIES)
+        except Exception:
+            pass
+        try:
+            t30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            topics_30d = conn.execute(
+                f"SELECT COUNT(DISTINCT topic_key) FROM velocity_scores "
+                f"WHERE scored_at >= {ph}", (t30,)).fetchone()[0]
+            tmonths = conn.execute(
+                "SELECT substr(scored_at,1,7) AS ym, COUNT(DISTINCT topic_key) "
+                "FROM velocity_scores GROUP BY ym ORDER BY ym").fetchall()
+            out["attention_leg"] = {
+                "unit": "topics (no instrument identifier by design)",
+                "distinct_topics_30d": topics_30d,
+                "by_month": [{"month": r[0], "distinct_topics": r[1]} for r in tmonths],
+            }
+        except Exception as e:
+            out["attention_leg"] = {"available": False, "reason": str(e)[:120]}
+    finally:
+        conn.close()
+    return out
+
+
 @app.post("/etf/issuer-snapshot", dependencies=[Depends(_require_internal)])
 def etf_issuer_snapshot():
     """A2.3: manual trigger of the issuer-page shares snapshot (the scheduler runs it
@@ -7560,6 +7640,9 @@ def accuracy_ledger_report():
                     "enrollmentCompleteness": _enrollment_completeness(),
                     "hitRate": h["honest_hit_rate_pct"],
                     "naiveHitRate": h["naive_hit_rate_pct"],
+                    # NULL MODEL (Phase 1, 2026-08-09): stated naive comparators
+                    # (Malkiel null) — held-out display fields; nothing reads them.
+                    "nullModel": h.get("null_model"),
                     "avgLead": h["mean_lead_days"],
                     "medianLead": h["median_lead_days"],
                     "maxLead": h["max_lead_days"],

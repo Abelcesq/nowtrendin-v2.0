@@ -774,6 +774,25 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
         "tracked_race_sample": _race_denom,
         "honest_hit_rate_pct": round(len(led) / resolved * 100, 1),
         "naive_hit_rate_pct": round(len(led) / naive_denom * 100, 1) if naive_denom else 0.0,
+        # NULL MODEL (buyer roadmap Phase 1 / Economist prescription #1, Chairman-run
+        # 2026-08-09): naive comparators a skeptical buyer will ask for. Read-only,
+        # held-out DISPLAY fields — no gate, score, or verdict reads them. These are
+        # STATED naive comparators, not fitted nulls (the Statistician's labeling rule).
+        "null_model": {
+            "note": "Malkiel-null comparators: the signal must beat these before it "
+                    "is believed. Stated naive baselines, not fitted models; nothing "
+                    "in scoring or gating reads them.",
+            "breakout_base_rate_pct": (round((len(led) + len(same) + len(lag))
+                                             / resolved * 100, 1) if resolved else None),
+            "breakout_base_rate_meaning": "share of resolved enrollments where a Google "
+                    "breakout occurred at ALL within the window — the skill-free "
+                    "'attention arrives anyway' ceiling; LED must be judged on ORDER "
+                    "of arrival, not arrival itself",
+            "random_order_race_expectation_pct": 50.0,
+            "random_order_meaning": "among races actually run, a timing-skill-free "
+                    "detector would precede the breakout ~half the time under random "
+                    "ordering; compare tracked_race_hit_rate_pct against this",
+        },
         "median_lead_days": round(statistics.median(lead_times), 1) if lead_times else 0,
         "mean_lead_days": round(statistics.mean(lead_times), 1) if lead_times else 0,
         "max_lead_days": max(lead_times) if lead_times else 0,
