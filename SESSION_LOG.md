@@ -3710,3 +3710,10 @@ path: IF the ongoing silent comparison shows FMP's FBTC series turning in-band b
 coverage post-flip, NEVER counting toward re-arm) — the rehabilitation test is
 ALREADY RUNNING by design; no new build needed. Otherwise flip proceeds on the
 declared-exclusion path (board either/or (b)).
+
+## 2026-08-10 (late) — Apify bot audit + timeout cut (Chairman-ordered)
+- Audit: 986 runs / 31d attributed via API — ALL ours (2 actors); 0 schedules/tasks/webhooks; no external consumer (no X-pattern double-pay). Plan already STARTER.
+- Finding: sweep actor 83% TIMED-OUT ($57.93/31d waste, 0 results); realtime 125/125 clean.
+- Applied: APIFY_RUN_TIMEOUT 600->120 (config v338) — projected ~$45/mo saved, no data loss. Watch success rate 1 week; alternatives queued if still ~17%.
+- Delete candidate: empty custom actor nowtrendin-v2-0 (0 runs ever). Open: AWS $104 sentinel line ownership.
+- Full record: audits/APIFY_BOT_AUDIT_2026-08-10.md
