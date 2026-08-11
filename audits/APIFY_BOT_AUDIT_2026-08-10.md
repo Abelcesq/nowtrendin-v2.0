@@ -59,3 +59,37 @@ Cost Sentinel's Apify line ($18.99) matches the console ($19) — it reads the r
 **Open line for the Chairman:** the Cost Sentinel's **AWS $104/mo** entry — nothing in the
 NowTrendIn stack runs on AWS (Heroku end-to-end). Confirm whether it belongs to another
 venture; if so it should leave this product's $700-cap ledger.
+
+---
+
+## ADDENDUM 2026-08-11 — Full failure-data identification + fix-or-eliminate verdicts (Chairman-ordered)
+
+### Failure inventory (complete sweep: engine 28 collectors + both actors + all paid meters)
+
+| # | Failing item | Cost of failure | Fixable by us? | Verdict |
+|---|---|---|---|---|
+| 1 | **Apify sweep actor** (`apify/google-trends-scraper`): 83% of runs blocked by Google | was $58/mo → **~$20/mo** after the 2-min cap (verified live: failed-run cost $0.086→$0.028) | **NO** — all fix paths tested and exhausted (below) | **KEEP** (it resolves the attention ledger — the moat; elimination = ledger stops resolving). Replacement vendor path identified for Chairman if desired. |
+| 2 | Canary issuer page (XRPC): DOWN, never succeeded | **$0** (free scrape) | **NO** — our adapter is correct; Canary's own page is stale (as-of 2026-07-31, 7 tdays > 3-tday guard → declared absence, by design) | **KEEP WATCHING** — self-heals when Canary updates their page. If stale ≥30d, drop XRPC from the A2 roster. Nothing saved by eliminating (free). |
+| 3 | X posts budget exhausted (4,800/4,800 by Aug 10) | $0 extra (the cap BLOCKS spend — working as designed) | n/a | Most of the budget burned pre-fix (shared-app era). NOTE for Chairman: under the new dedicated-app pricing, 4,800 post-reads ≈ **$24/mo**, not the ~$200 the cap was sized for — raising it is now cheap, founder's call, no urgency. |
+| 4 | Cost Sentinel "Firecrawl: $None" display | $0 (cosmetic) | Yes — trivial | Fix batched into next engine deploy. |
+| — | Everything else | — | — | Healthy: 21/28 collectors green (2 disabled intentionally), realtime actor 125/125, CoinAPI 12/12, Coinbase premium accumulating, FMP paid plan serving. |
+
+### Sweep fix attempts (all live-tested 2026-08-11, total test spend ~$0.11)
+1. **Residential proxy** on the official actor: TIMED-OUT 2/2 (incl. a 300s leash) — **not the fix**.
+2. **Query dependence**: ruled out — same query fails then succeeds; failures span mainstream + niche.
+3. **Store alternatives**: `vnx0/google-trends-scraper` (5.0★) and `data_xplorer/google-trends-fast-scraper`
+   (4.9★) both return trending-keyword LISTS, not interest-over-time curves — **fail §16 TYPE gate**
+   (the fast-scraper silently ignored our input and returned trending searches; recorded as a
+   would-be onboarding failure). No drop-in actor replacement exists on the Store today.
+
+### The one genuine replacement path (Chairman decision, not urgent)
+A dedicated Google-Trends API vendor (e.g. DataForSEO, ~$0.01/query ≈ **$10/mo** at our ~960
+queries/mo) would likely take resolution reliability from 17% → ~95%+ and REPLACE the sweep actor
+outright (net save ~$40/mo AND ~6× resolution throughput). It is a NEW source feeding the held-out
+ledger → full §16 five-gate workup + a curve-equivalence check (run both vendors on the same
+queries, compare) before any switch. On the shelf until ordered.
+
+### Current steady state (post-cut)
+Apify ≈ $90/mo total (realtime $69 legitimate + sweep ~$20 incl. residual waste), ledger resolving
+~5/day at 17% actor success under the 365-day patience window. Acceptable; not silent — this line
+is watched weekly by improve-system.
