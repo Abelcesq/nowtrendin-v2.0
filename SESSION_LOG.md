@@ -3717,3 +3717,9 @@ declared-exclusion path (board either/or (b)).
 - Applied: APIFY_RUN_TIMEOUT 600->120 (config v338) — projected ~$45/mo saved, no data loss. Watch success rate 1 week; alternatives queued if still ~17%.
 - Delete candidate: empty custom actor nowtrendin-v2-0 (0 runs ever). Open: AWS $104 sentinel line ownership.
 - Full record: audits/APIFY_BOT_AUDIT_2026-08-10.md
+
+## 2026-08-11 (late) — XRPC removed + StockTitan nine-seat board convened
+- Canary XRPC issuer adapter REMOVED (Chairman order; frozen page, 0 successes); regressions 10/10+26/26+A1 pass; deployed. XRP proxy map (Finviz ticker) unaffected. TOXR note updated.
+- StockTitan RSS live-tested (100 items, 100% date-parse, ~200-400/day, 46/13/41 mix, per-ticker /rss/news/{T} works, micro-cap tilt) -> evidence pack -> NINE seats convened in parallel, independent.
+- VERDICTS: Item 1 (mainstream M) REJECTED 9/9 (purchasable inflation vector, definitional). Items 2+3 conditionally approved 9/9 (money movement = unanimous strongest use). Item 4: per-ticker pulls; firehose never for measurement; push-hub disputed.
+- Collation: audits/board/BOARD_stocktitan_2026-08-11.md — rulings pending Chairman.
