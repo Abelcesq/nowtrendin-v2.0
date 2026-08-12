@@ -85,8 +85,10 @@ COLLECTOR_EXPECTATIONS = {
                         "min_distinct": 3},
     "issuer_21shares": {"max_gap_minutes": 360, "mode": "risk", "critical": False,
                         "min_distinct": 3},
-    "issuer_canary":   {"max_gap_minutes": 360, "mode": "risk", "critical": False,
-                        "min_distinct": 1},
+    # issuer_canary (XRPC) REMOVED from the roster by Chairman order 2026-08-11 —
+    # the page sat frozen >3 tdays with 0 production successes (permanent declared
+    # absence). Re-add the row together with the ADAPTERS entry if Canary ever
+    # publishes a live page again.
     # CoinAPI derivatives positioning (held-out accumulation, §16 2026-08-10):
     # once daily (first check after 00:00 UTC) → 24h cadence + generous margin.
     # min_distinct 8: fewer than 8 of 12 coins parsing = dead-symbol drift.

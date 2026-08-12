@@ -29,7 +29,14 @@ COVERAGE, stated honestly (wave 1+2 of the survey's build order):
   ishares   IBIT ETHA        — product page JSON blob (browser-grade UA; 403 bare)
   bitwise   BITB ETHW BSOL   — server-rendered fundDetails JSON (T-1 stamps)
   21shares  ARKB TSOL TOXR   — server-rendered ki4/nav data elements (same-day)
-  canary    XRPC             — wpDataTables daily history table (T-1)
+REMOVED (Chairman order 2026-08-11):
+  canary    XRPC             — wpDataTables adapter worked, but the page itself sat
+                               frozen at as-of 2026-07-31 (>3 tdays; 0 production
+                               successes) — the staleness guard held it in declared
+                               absence permanently. Roster row deleted; XRP proxy
+                               exposure via ticker XRPC in crypto_signals is a
+                               DIFFERENT usage (Finviz data, not the issuer page)
+                               and is unaffected.
 NOT covered this wave (fail-closed absence; wave 3 per the survey):
   grayscale GBTC ETHE GSOL   — 429 bot-wall to plain fetch (needs UA/session work)
   vaneck    HODL             — redirect loop headless; direct field unconfirmed
@@ -188,42 +195,6 @@ def _parse_21shares(html: str) -> dict | None:
     return {"shares": shares, "nav": nav, "aum": aum, "asof": asof}
 
 
-def _parse_canary(html: str) -> dict | None:
-    """Canary XRPC: wpDataTables daily history rendered server-side. Rows carry
-    [Fund Name, Ticker, CUSIP, Net Assets, Shares Outstanding, NAV, ..., Rate Date].
-    Take the newest dated row; T-1 stamps are fine (capture-instant rule)."""
-    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S)
-    best = None            # (date_iso, shares, nav, aum)
-    for r in rows:
-        cells = [re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").strip()
-                 for c in re.findall(r"<td[^>]*>(.*?)</td>", r, re.S)]
-        if len(cells) < 7 or "XRPC" not in cells[:3]:
-            continue
-        nums = {}
-        try:
-            aum = _f(cells[3])
-            shares = _f(cells[4])
-            nav = _f(cells[5])
-        except Exception:
-            continue
-        date_iso = None
-        for c in reversed(cells):
-            try:
-                from date_utils import to_iso_date
-                date_iso = to_iso_date(c)
-            except Exception:
-                date_iso = None
-            if date_iso:
-                break
-        if not (shares and nav and date_iso):
-            continue
-        if best is None or date_iso > best[0]:
-            best = (date_iso, shares, nav, aum)
-    if not best:
-        return None
-    return {"shares": best[1], "nav": best[2], "aum": best[3], "asof": best[0]}
-
-
 #: ticker → (src id, url, parser). One entry per fund; a new issuer is one row +
 #: (at most) one parser. Order = fetch order (family-grouped, batch-paced).
 ADAPTERS = {
@@ -242,7 +213,6 @@ ADAPTERS = {
              "https://www.21shares.com/en-us/products-us/tsol", _parse_21shares),
     "TOXR": ("issuer_21shares",
              "https://www.21shares.com/en-us/products-us/toxr", _parse_21shares),
-    "XRPC": ("issuer_canary", "https://canaryetfs.com/xrpc", _parse_canary),
 }
 
 #: Tickers whose daily STRIKE row is issuer-sourced — etf_flow.snapshot() (FMP)

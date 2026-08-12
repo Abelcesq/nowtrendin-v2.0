@@ -318,8 +318,9 @@ def report(db_path: str = DB_PATH, days: int = 21) -> dict:
         "available": True, "window_days": days, "funds": by,
         "material_comparisons": material_total,
         "open_failures": fails or None, "bias_flags": bias or None,
-        "no_comparator": ["XRP funds (XRPC/TOXR) — no published-flow page exists; "
-                          "honest absence, never implied covered"],
+        "no_comparator": ["XRP fund (TOXR) — no published-flow page exists; honest "
+                          "absence, never implied covered. (XRPC removed from the "
+                          "roster 2026-08-11, Chairman order — frozen issuer page)"],
         "band": {"floor": "max($10M, 0.05% AUM)", "direction": "mandatory on material "
                  "days", "magnitude": "±25% or ±$20M (more forgiving)",
                  "bias_rule": f"≥{BIAS_RUN} consecutive same-sign errors fail"},
@@ -703,8 +704,9 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
         "open_failures_live_source": live_fails or None,
         "no_derived": no_derived or None, "bias_flags": bias or None,
         "re_arm": re_arm,
-        "no_comparator": ["XRP funds (XRPC/TOXR) — no published-flow page exists; "
-                          "honest absence, never implied covered"],
+        "no_comparator": ["XRP fund (TOXR) — no published-flow page exists; honest "
+                          "absence, never implied covered. (XRPC removed from the "
+                          "roster 2026-08-11, Chairman order — frozen issuer page)"],
         "band": {"floor": "max($10M, 0.05% AUM)", "direction": "mandatory on material "
                  "intervals", "magnitude": "±25% or ±$20M (more forgiving)",
                  "bias_rule": f">={BIAS_RUN} consecutive same-sign errors fail",
