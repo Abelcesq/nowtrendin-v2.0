@@ -7491,7 +7491,7 @@ def _enrollment_completeness() -> dict:
         c = get_db(DB_PATH)
         try:
             rows = [dict(r) for r in c.execute(
-                "SELECT cycle_at, status, enrolled FROM ledger_intake_log "
+                "SELECT cycle_at, status, enrolled, error_class FROM ledger_intake_log "
                 "ORDER BY id DESC LIMIT 200").fetchall()]
         finally:
             c.close()
@@ -7522,6 +7522,12 @@ def _enrollment_completeness() -> dict:
                      f"and first-crossing candidates age out after "
                      f"{os.getenv('LEDGER_ENROLL_RECENT_DAYS', '14')} days. Rates below are "
                      f"computed over the rows that were enrolled." if failed else None),
+        # Board #2 batch (2026-08-17): name the failure MECHANISM, not just the count —
+        # a completeness % without the error classes is a symptom with no diagnosis.
+        "failed_by_class": [{"error_class": k or "(unclassified)", "cycles": v}
+                            for k, v in Counter((r.get("error_class") or "")
+                                                for r in failed).most_common()],
+        "last_failed_at": (max((r.get("cycle_at") or "") for r in failed) if failed else None),
     })
     return out
 
@@ -7713,6 +7719,37 @@ def diag_coinapi(pull: int = 0):
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
+
+
+#: Referee-backfill status (board-ordered run, 2026-08-17): kicked in the background —
+#: ~25 wins x 2-4 Wikipedia calls each exceeds the 30s router limit synchronously.
+_REFEREE_BACKFILL: dict = {"state": "idle"}
+
+
+def _referee_backfill_bg(limit):
+    global _REFEREE_BACKFILL
+    _REFEREE_BACKFILL = {"state": "running",
+                         "started_at": datetime.now(timezone.utc).isoformat()}
+    try:
+        import accuracy_ledger_enhanced as _al
+        r = _al.referee_backfill(DB_PATH, limit=limit)
+        _REFEREE_BACKFILL = {"state": "done",
+                             "finished_at": datetime.now(timezone.utc).isoformat(), **r}
+    except Exception as e:
+        _REFEREE_BACKFILL = {"state": "error", "reason": str(e)[:200]}
+
+
+@app.get("/accuracy/ledger/referee-backfill", dependencies=[Depends(_require_internal)])
+def accuracy_referee_backfill(run: int = 0, limit: int = 0):
+    """Board-ordered referee run (7 seats, 2026-08-09): backfill the independent
+    Wikipedia referee over already-resolved LED/SAME_DAY wins whose check is NULL.
+    Fills ONLY referee_corroborated; verdicts/dates untouched; idempotent.
+    `?run=1` kicks it in the background; poll without params for status."""
+    if run and _REFEREE_BACKFILL.get("state") != "running":
+        _threading.Thread(target=_referee_backfill_bg, args=(limit or None,),
+                          daemon=True, name="referee-backfill").start()
+        return {"kicked": True, **_REFEREE_BACKFILL}
+    return _REFEREE_BACKFILL
 
 
 @app.get("/diag/coinmetrics", dependencies=[Depends(_require_internal)])

@@ -103,7 +103,11 @@ def init_pending_db(db_path: str = DB_PATH):
                 conn.rollback()
             except Exception:
                 pass
-    for _col, _typ in (("enroll_arm", "TEXT"), ("breadth_at_enroll", "INTEGER")):
+    # sealed_* (Forecaster fix, board 2026-08-09, built 2026-08-17): the resolution
+    # query + referee article are chosen ONCE, at ENROLLMENT, and frozen — a query
+    # chosen at sweep time is chosen with hindsight (the ambiguous-query wins).
+    for _col, _typ in (("enroll_arm", "TEXT"), ("breadth_at_enroll", "INTEGER"),
+                       ("sealed_query", "TEXT"), ("sealed_wiki_article", "TEXT")):
         try:
             conn.execute(f"ALTER TABLE pending_detections ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -137,7 +141,7 @@ def _query_ambiguity(display: str) -> int:
     return 1 if len(d.split()) == 1 else 0
 
 
-def _referee_corroborate(topic_display, detection_date, breakout_date):
+def _referee_corroborate(topic_display, detection_date, breakout_date, article=None):
     """Independent second referee (held-out): does Wikipedia corroborate OUR LEAD?
 
     Board fix 2026-07-08 (Review #2, Challenger B2): the original check compared the
@@ -149,10 +153,14 @@ def _referee_corroborate(topic_display, detection_date, breakout_date):
           independent confirmation that attention arrived AFTER our call.
       0 = referee readable but contradicts or does not match (including an arrival
           BEFORE detection — the referee disputes the lead).
-      None = referee unavailable/unresolvable. Never blocks or changes a verdict."""
+      None = referee unavailable/unresolvable. Never blocks or changes a verdict.
+
+    `article`: a pre-resolved Wikipedia title (the SEALED referee query, Forecaster fix
+    2026-08-17) — when present it is used verbatim; live opensearch is only the fallback
+    for legacy rows sealed before the column existed."""
     try:
         import referee_wikipedia as _rw
-        art = _rw.resolve_article(topic_display)
+        art = article or _rw.resolve_article(topic_display)
         if not art:
             return None
         det = _parse(detection_date)
@@ -169,6 +177,66 @@ def _referee_corroborate(topic_display, detection_date, breakout_date):
         return 1 if abs((adt - brk).days) <= 14 else 0
     except Exception:
         return None
+
+
+def referee_backfill(db_path=DB_PATH, limit=None, pause_s=1.0) -> dict:
+    """BOARD-ORDERED RUN (7 seats, 2026-08-09; Guardian: "the highest-leverage moat work
+    in the company"): run the independent Wikipedia referee over the ALREADY-RESOLVED
+    LED / SAME_DAY wins whose referee_corroborated is still NULL ("unchecked" — resolved
+    before the referee shipped 2026-07-07). The corroborated count gates whether ANY
+    attention rate is citable.
+
+    HARD BOUNDARIES:
+      • Fills ONLY the referee_corroborated column, ONLY where it is NULL, ONLY on
+        LED/SAME_DAY rows. Verdicts, dates, leads, and every other column untouched.
+      • Same frozen _referee_corroborate (wiki-v2 params) the live sweep uses — the
+        backfilled checks are comparable with sweep-time checks by construction.
+      • Free keyless Wikipedia APIs; batch-paced; fail-open (an unreadable topic stays
+        NULL = honestly unchecked, never guessed).
+      • Held-out: nothing in scoring reads this column; re-running is idempotent
+        (checked rows are no longer NULL, so they are never re-fetched)."""
+    import time as _t
+    conn = db_compat.connect(db_path)
+    q = ("SELECT id, topic_key, topic_display, sweep_query, detection_date, breakout_date "
+         "FROM accuracy_ledger WHERE verdict IN ('LED','SAME_DAY') "
+         "AND referee_corroborated IS NULL ORDER BY detection_date")
+    if limit:
+        q += f" LIMIT {int(limit)}"
+    try:
+        rows = [dict(r) for r in conn.execute(q).fetchall()]
+    except Exception as e:
+        conn.close()
+        return {"available": False, "reason": str(e)[:160]}
+    out = {"available": True, "checked": 0, "corroborated": 0, "contradicted_or_unmatched": 0,
+           "unresolvable": 0, "rows": []}
+    ph = "%s" if db_compat.USE_PG else "?"
+    for i, r in enumerate(rows):
+        if i:
+            _t.sleep(max(0.0, pause_s))          # batch pacing (§13)
+        q_used = r.get("sweep_query") or r.get("topic_display") or ""
+        corr = _referee_corroborate(q_used, r["detection_date"], r["breakout_date"])
+        out["rows"].append({"topic": r.get("topic_display"), "detection": r.get("detection_date"),
+                            "breakout": r.get("breakout_date"), "referee": corr})
+        if corr is None:
+            out["unresolvable"] += 1
+            continue                             # stays NULL — honestly unchecked
+        try:
+            conn.execute(f"UPDATE accuracy_ledger SET referee_corroborated = {ph} "
+                         f"WHERE id = {ph} AND referee_corroborated IS NULL", (corr, r["id"]))
+            conn.commit()
+        except Exception as e:
+            print(f"[ledger] referee_backfill write error ({r.get('topic_display')}): {e}")
+            continue
+        out["checked"] += 1
+        if corr == 1:
+            out["corroborated"] += 1
+        else:
+            out["contradicted_or_unmatched"] += 1
+    conn.close()
+    print(f"[ledger] referee_backfill: {out['checked']} checked, "
+          f"{out['corroborated']} corroborated, {out['contradicted_or_unmatched']} contradicted, "
+          f"{out['unresolvable']} unresolvable of {len(rows)} candidates")
+    return out
 
 
 def _parse(date_str: str) -> datetime:
@@ -224,6 +292,18 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
     except Exception:
         timeout_dt = None
     rec_id = hashlib.md5(f"{topic_key}-{detection_date}".encode()).hexdigest()[:16]
+    # SEAL AT ENROLLMENT (Forecaster fix, 2026-08-17): freeze the resolution query and
+    # the referee's Wikipedia article NOW, before any outcome is knowable, so neither
+    # can be (even unconsciously) chosen with hindsight at sweep time. Written once at
+    # INSERT and never updated. Fail-open: an unresolvable article seals as NULL — the
+    # sweep-time opensearch fallback then applies, exactly the legacy behavior.
+    sealed_query = (topic_display or (topic_key or "").replace("_", " ")).strip()
+    sealed_article = None
+    try:
+        import referee_wikipedia as _rw
+        sealed_article = _rw.resolve_article(sealed_query)
+    except Exception:
+        sealed_article = None
     try:
         # Don't reopen something already resolved.
         ex = conn.execute("SELECT status FROM pending_detections WHERE id=%s" if db_compat.USE_PG
@@ -232,10 +312,12 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
             conn.execute("""
                 INSERT OR IGNORE INTO pending_detections
                     (id, topic_key, topic_display, detection_date, detection_score,
-                     timeout_date, last_checked, status, enroll_arm, breadth_at_enroll)
-                VALUES (?,?,?,?,?,?,?,'pending',?,?)
+                     timeout_date, last_checked, status, enroll_arm, breadth_at_enroll,
+                     sealed_query, sealed_wiki_article)
+                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?)
             """, (rec_id, topic_key, topic_display, detection_date,
-                  detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll))
+                  detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll,
+                  sealed_query, sealed_article))
             conn.commit()
     except Exception as e:
         print(f"[ledger] record_detection error: {e}")
@@ -390,10 +472,14 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                                  (now - _parse(p["detection_date"])).days + 35))
         except Exception:
             _cdays = 90
+        # SEALED QUERY (Forecaster fix, 2026-08-17): the Trends curve is fetched with the
+        # query frozen at enrollment; legacy rows (sealed_query NULL) keep topic_display —
+        # byte-identical to their historical behavior.
+        _fetch_q = (p.get("sealed_query") if hasattr(p, "get") else None) or p["topic_display"]
         try:
-            curve = fetch(p["topic_display"], days=_cdays)
+            curve = fetch(_fetch_q, days=_cdays)
         except TypeError:
-            curve = fetch(p["topic_display"])   # an injected fetch_fn may not accept days=
+            curve = fetch(_fetch_q)             # an injected fetch_fn may not accept days=
         except Exception:
             curve = None
         # SAME-SURGE FLOOR: match only a breakout on/after (detection − MATCH_WINDOW).
@@ -414,7 +500,10 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                 # genuine LED win, not a re-detection. This is the patience principle in code — we do
                 # NOT disqualify our own early read just because human attention took months to arrive.
                 _lt = lead["lead_time_days"]
-                _q = p["topic_display"]
+                # SEALED QUERY (Forecaster fix): rows enrolled after 2026-08-17 carry
+                # their resolution query frozen at enrollment; legacy rows fall back to
+                # topic_display (which is what sweep-time selection always used).
+                _q = (p.get("sealed_query") if hasattr(p, "get") else None) or p["topic_display"]
                 _amb = _query_ambiguity(_q)
                 if _lt < -MATCH_WINDOW_DAYS or _lt > LEAD_MAX_DAYS:
                     rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
@@ -429,7 +518,9 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                 # free Wikipedia pageviews, fail-open, never changes the verdict.
                 _corr = None
                 if lead["verdict"] in ("LED", "SAME_DAY"):
-                    _corr = _referee_corroborate(_q, p["detection_date"], lead["breakout_date"])
+                    _corr = _referee_corroborate(
+                        _q, p["detection_date"], lead["breakout_date"],
+                        article=(p.get("sealed_wiki_article") if hasattr(p, "get") else None))
                 rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                 _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
                                lead["lead_time_days"], lead["verdict"], "sweep",
@@ -835,4 +926,85 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                          "referee_corroborated": r.get("referee_corroborated"),
                          "query_ambiguous": r.get("query_ambiguous")}
                         for r in led], key=lambda x: x["lead_days"] or 0, reverse=True)[:5],
+        # ── TAIL CAPTURE (Economist prescription, board 2026-08-09; built 2026-08-17) ──
+        # Magnitude-weighted capture: of the TOP-DECILE realized surges (by Google
+        # breakout multiple, among resolved rows where a breakout occurred), what share
+        # did we genuinely race (led / same-day / near-miss) vs enter pre-broken — and
+        # at what lead. "A 5% average that catches the giants is a business; a 27%
+        # average that misses them is not." Read-only report field; held-out.
+        "tail_capture": _tail_capture(led, same, lag_near, lag_pre),
+        # ── CALIBRATION CURVE + BRIER (Forecaster, board 2026-08-09; built 2026-08-17) ──
+        # Detection score (0–100) is a graded forecast being judged binary. Buckets the
+        # RESOLVED RACE rows (pre-broken excluded: not a race) by detection_score and
+        # reports the confirmed rate per bucket + the Brier score of p = score/100
+        # against confirmed∈{0,1}. Read-only; held-out; small-N buckets carry their n.
+        "calibration_curve": _calibration_curve(led, same, lag_near, fp),
+    }
+
+
+def _tail_capture(led, same, lag_near, lag_pre) -> dict:
+    """Top-decile-by-magnitude capture over resolved rows WITH a breakout multiple."""
+    pool = ([dict(r, _cls="led") for r in led] + [dict(r, _cls="same_day") for r in same]
+            + [dict(r, _cls="near_miss") for r in lag_near]
+            + [dict(r, _cls="pre_broken") for r in lag_pre])
+    sized = [r for r in pool if r.get("breakout_multiple") is not None]
+    if len(sized) < 10:
+        return {"available": False,
+                "reason": f"only {len(sized)} resolved breakouts carry a magnitude — "
+                          "top-decile capture needs >=10", "sized_rows": len(sized)}
+    sized.sort(key=lambda r: r["breakout_multiple"], reverse=True)
+    top = sized[: max(1, len(sized) // 10)]
+    raced = [r for r in top if r["_cls"] in ("led", "same_day", "near_miss")]
+    led_top = [r for r in top if r["_cls"] == "led"]
+    leads = [r["lead_time_days"] for r in led_top if r.get("lead_time_days") is not None]
+    return {
+        "available": True,
+        "note": "of the top-decile realized surges (by breakout multiple), how many did "
+                "we race and how many did we lead — magnitude-weighted capture, the "
+                "giants-vs-average question. Held-out report field; never a score input.",
+        "sized_rows": len(sized), "top_decile_n": len(top),
+        "top_decile_min_multiple": round(float(top[-1]["breakout_multiple"]), 2),
+        "raced": len(raced), "raced_pct": round(len(raced) / len(top) * 100, 1),
+        "led": len(led_top), "led_pct": round(len(led_top) / len(top) * 100, 1),
+        "pre_broken": sum(1 for r in top if r["_cls"] == "pre_broken"),
+        "led_median_lead_days": (round(statistics.median(leads), 1) if leads else None),
+        "top_topics": [{"topic": r.get("topic_display"), "multiple": round(float(r["breakout_multiple"]), 2),
+                        "outcome": r["_cls"], "lead_days": r.get("lead_time_days")}
+                       for r in top[:10]],
+    }
+
+
+def _calibration_curve(led, same, lag_near, fp) -> dict:
+    """Reliability buckets + Brier score for detection_score as P(confirmed)."""
+    rows = ([dict(r, _y=1) for r in led] + [dict(r, _y=1) for r in same]
+            + [dict(r, _y=1) for r in lag_near] + [dict(r, _y=0) for r in fp])
+    scored = [r for r in rows if r.get("detection_score") is not None]
+    if len(scored) < 10:
+        return {"available": False, "reason": f"only {len(scored)} race rows carry a "
+                                              "detection score — need >=10"}
+    brier = sum((min(max(float(r["detection_score"]) / 100.0, 0.0), 1.0) - r["_y"]) ** 2
+                for r in scored) / len(scored)
+    base = sum(r["_y"] for r in scored) / len(scored)
+    brier_base = sum((base - r["_y"]) ** 2 for r in scored) / len(scored)
+    buckets = []
+    for lo in range(0, 100, 20):
+        hi = lo + 20
+        b = [r for r in scored if lo <= float(r["detection_score"]) < (hi if hi < 100 else 101)]
+        if not b:
+            continue
+        buckets.append({"score_range": f"{lo}-{hi}", "n": len(b),
+                        "confirmed_rate_pct": round(sum(r["_y"] for r in b) / len(b) * 100, 1),
+                        "mean_score": round(statistics.mean(float(r["detection_score"]) for r in b), 1)})
+    return {
+        "available": True,
+        "note": "detection_score read as a graded forecast of confirmation (p=score/100) "
+                "over resolved RACE rows (confirmed = led/same-day/near-miss; miss = "
+                "timeout false-positive; pre-broken excluded — not a race). Brier vs the "
+                "base-rate Brier says whether the score's GRADATION carries information "
+                "beyond the base rate. Held-out; small buckets carry their n.",
+        "n": len(scored), "brier_score": round(brier, 4),
+        "base_rate_confirmed_pct": round(base * 100, 1),
+        "brier_base_rate": round(brier_base, 4),
+        "skill_vs_base_rate": round(brier_base - brier, 4),
+        "buckets": buckets,
     }

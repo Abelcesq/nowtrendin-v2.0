@@ -841,10 +841,18 @@ def init_risk_db(db_path: str = DB_PATH):
 
 # Market-tenure classification — distinguishes a NEW/emerging risk from an
 # established name where the activity (e.g. insider Form 4) is routine.
+# 2026-08-17 (founder-reported "rate hike" defect): the macro set now includes the WHOLE
+# FINANCIAL_RISK_VOCABULARY — every entry there is a theme/phenomenon ("rate hike",
+# "cre", "bankruptcy", "default"), never a company, so none can carry a ticker. Before
+# this, only 7 hand-picked themes were macro and the rest fell through to the
+# halted_microcap lane, rendering the warning-toned "insufficient positioning data" note
+# for data that is STRUCTURALLY N/A (a category error masquerading as a coverage gap —
+# exactly what the lane system exists to prevent). Live mis-laned set at fix time:
+# rate hike, cre, bankruptcy, default.
 _MACRO_THEMES = {
     "recession", "inflation", "credit risk", "volatility spike",
     "financial stress", "mortgage delinquency", "yield curve inversion",
-}
+} | FINANCIAL_RISK_VOCABULARY
 
 
 def _risk_maturity(display: str):
