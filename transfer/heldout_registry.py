@@ -57,6 +57,9 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "coinbase_premium":    "Coinbase retail-spot premium accumulation (demand proxy; "
                            "separate price_class, never a market price) — 5-day review "
                            "2026-08-15",
+    "coinmetrics_onchain": "on-chain activity accumulation (AdrActCnt/TxCnt, CoinMetrics "
+                           "community, $0) — held-out baseline; wiring requires backtest "
+                           "+ board + Chairman flip; SOL/BNB/DOT permanent declared absence",
 }
 
 #: Modules that PRODUCE OR CALIBRATE A SCORE. These must never import the held-out set.
@@ -131,6 +134,14 @@ ACKNOWLEDGED_EXCEPTIONS = {
     ("gravitational_anomaly_detector", "coinbase_premium"):
         "daily-pull scheduler + read-only report; separate price_class accumulation "
         "only — never a market price, no value into any score pre-review",
+    # Same shape for the CoinMetrics on-chain accumulation (Chairman 2026-08-16).
+    # ⚠ RE-CHECK: no AdrActCnt/TxCnt or derived value may ever be read back into a
+    # score pre-backtest/board/flip. The day one is, revoke this exception. Also:
+    # activity counts must NEVER be dressed up as C5/NVT or C6/realized-cap — the
+    # free tier does not serve those fields (403), and the shelf triggers stay unfired.
+    ("gravitational_anomaly_detector", "coinmetrics_onchain"):
+        "daily-pull scheduler + read-only /diag/coinmetrics report; accumulation "
+        "only — no value into any score pre-backtest/board/flip",
 }
 
 #: Identifiers that signal a REALIZED-RETURN computation. Their presence inside a module

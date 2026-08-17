@@ -99,6 +99,13 @@ COLLECTOR_EXPECTATIONS = {
     # design → floor at 8 of 11 listable coins).
     "coinbase_premium": {"max_gap_minutes": 1740, "mode": "risk", "critical": False,
                          "min_distinct": 8},
+    # CoinMetrics community on-chain activity (held-out, keyless, §16 2026-08-16):
+    # once daily, yesterday's completed UTC day. 9 covered coins (SOL/BNB/DOT are
+    # permanent declared absence — no free current series); min_distinct 7 = fewer
+    # than 7 of 9 parsing signals asset-id drift or a community-tier change.
+    "coinmetrics_onchain": {"max_gap_minutes": 1740, "mode": "risk",
+                            "critical": False, "min_distinct": 7,
+                            "disabled": os.getenv("COINMETRICS_ONCHAIN", "1") != "1"},
     # RETIRED 2026-07-29: Finnhub's congressional endpoint is premium-gated on our plan and
     # returned 403 on every call, contributing zero rows. The call site is removed; this row is
     # marked disabled rather than DELETED so the failure history stays readable and it reports

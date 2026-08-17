@@ -62,6 +62,11 @@ import db_compat
 import hashlib
 import argparse
 import statistics
+import xml.etree.ElementTree as ET   # GAL RSS parsing (the 2026-08-10 gdelt rewire
+                                     # shipped WITHOUT this import — every GAL fetch
+                                     # died on NameError, silently swallowed, and fell
+                                     # through to the 429-limited Doc API fallback;
+                                     # found 2026-08-17, verify-before-fix §10a)
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict, Counter
 from typing import Optional
@@ -6212,6 +6217,15 @@ def _coinapi_derivs_loop():
                 if not coinbase_premium.has_row_for_today(DB_PATH):
                     rp = coinbase_premium.snapshot_premium(DB_PATH)
                     print(f"[cb-premium-loop] daily pull: {rp.get('written')} coins")
+            # CoinMetrics community on-chain activity (Chairman-ordered onboarding
+            # 2026-08-16; held-out, keyless, $0). Pulls YESTERDAY's completed UTC
+            # day once per day, catch-up semantics like the two above.
+            if os.getenv("COINMETRICS_ONCHAIN", "1") == "1":
+                import coinmetrics_onchain
+                if not coinmetrics_onchain.has_row_for_day(DB_PATH):
+                    rc = coinmetrics_onchain.snapshot_onchain(DB_PATH)
+                    print(f"[coinmetrics-loop] daily pull: {rc.get('written')} coins "
+                          f"(missing {rc.get('missing')})")
         except Exception as _e:
             print(f"[coinapi-loop] error: {_e}")
         _t.sleep(1800)
@@ -7696,6 +7710,21 @@ def diag_coinapi(pull: int = 0):
         if pull:
             out["pull"] = coinapi_derivs.snapshot_derivs(DB_PATH)
         out.update(coinapi_derivs.derivs_report(DB_PATH))
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.get("/diag/coinmetrics", dependencies=[Depends(_require_internal)])
+def diag_coinmetrics(pull: int = 0):
+    """Held-out CoinMetrics community on-chain accumulation status (§16 2026-08-16).
+    `?pull=1` triggers a manual daily pull (idempotent per coin+metric-day)."""
+    try:
+        import coinmetrics_onchain
+        out = {}
+        if pull:
+            out["pull"] = coinmetrics_onchain.snapshot_onchain(DB_PATH)
+        out.update(coinmetrics_onchain.onchain_report(DB_PATH))
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}

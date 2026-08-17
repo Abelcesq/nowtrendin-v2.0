@@ -3723,3 +3723,48 @@ declared-exclusion path (board either/or (b)).
 - StockTitan RSS live-tested (100 items, 100% date-parse, ~200-400/day, 46/13/41 mix, per-ticker /rss/news/{T} works, micro-cap tilt) -> evidence pack -> NINE seats convened in parallel, independent.
 - VERDICTS: Item 1 (mainstream M) REJECTED 9/9 (purchasable inflation vector, definitional). Items 2+3 conditionally approved 9/9 (money movement = unanimous strongest use). Item 4: per-ticker pulls; firehose never for measurement; push-hub disputed.
 - Collation: audits/board/BOARD_stocktitan_2026-08-11.md — rulings pending Chairman.
+
+## 2026-08-16 (PT) — Chairman rulings executed: gdelt root-cause fix + CoinMetrics on-chain onboarded
+
+**CHAIRMAN RULINGS (this session, recorded):** (1) StockTitan Items 2+3 APPROVED
+per the board's conditions (Item 3 first: per-ticker priced capital events, sealed
+taxonomy before first row, announced/priced/closed, EDGAR comparator, 90-day floor;
+Item 2 behind it). (2) StockTitan Item 4: the Operator/Outsider MIDDLE path ruled —
+per-ticker pulls are the production mode with a MEASURED MISS-COUNTER; the push-hub
+is deferred behind measured miss_count > 0, never built on theory. Firehose never
+for measurement (board-unanimous, stands). (3) "N" naming: plain-English relabel
+APPROVED — S8 item 2's naming gate is now RESOLVED; relabel proceeds display-only
+with 3-platform parity pass. (4) gdelt: initial ruling was CUT, but verify-before-fix
+(§10a) found the real cause first and the Chairman accepted the FIX instead (below).
+(5) CoinMetrics community onboarding ORDERED — executed this session.
+
+**GDELT ROOT CAUSE (verify-before-fix win):** the 2026-08-10 GAL rewire NEVER RAN —
+`collect_gdelt_trends` used `ET.fromstring` but `xml.etree.ElementTree` was never
+imported in gravitational_anomaly_detector.py. Every GAL fetch died on NameError
+("name 'ET' is not defined", visible in dyno logs), was swallowed by the broad
+except, and fell through to the 429-limited Doc API fallback → weeks of "runs, 0
+signals" DEGRADED. The feeds themselves are ALIVE (probed live: feed.rss 2,961
+items rebuilt minutes earlier; feed-social 862). The "0 signals" was OUR defect,
+not the source's. FIX: one import + a dated comment. The 08-10 "verified live"
+claim tested the FEEDS but never the deployed code path — lesson: gate-5 means
+testing the wired collector, not the endpoint.
+
+**COINMETRICS ON-CHAIN ONBOARDED (§16 five gates, held-out):** new
+`transfer/coinmetrics_onchain.py` — daily accumulation of AdrActCnt + TxCnt
+(genuine on-chain activity facts) for YESTERDAY's completed UTC day, keyless
+community API, $0. Gate probes (archived here): free tier serves AdrActCnt, TxCnt,
+CapMrktCurUSD, SplyCur, HashRate; **TxTfrValAdjUSD / FeeTotUSD / CapRealUSD /
+NVTAdj all 403 (paid)** → the C5/NVT + C6/realized-cap shelf triggers DO NOT fire
+(the required fields are not free; activity counts are never a substitute).
+Coverage 9/12 current (btc eth xrp doge ada link ltc bch + avax via 'avaxc'
+C-Chain); SOL (no free on-chain metrics — only ref rates + prohibited spot
+volume), BNB (community series = dead BEP2 chain frozen 2019), DOT (frozen
+2022-06) = PERMANENT DECLARED ABSENCE, no rows ever. STALENESS GUARD
+(CM_MAX_AGE_DAYS=7) added for the BNB gotcha — a 200 response carrying a
+years-old row is absence, not data. Wiring: own table coinmetrics_onchain
+(PK coin+signal_date, §14 canon), daily catch-up in the coinapi/coinbase loop,
+health row (1740m, min_distinct 7), heldout_registry entry + acknowledged
+exception, /diag/coinmetrics (internal, ?pull=1). Gate-5 live test: 9/9 written,
+idempotent re-run proven, values eyeballed sane (BTC 541,863 / 825,829). NO subs
+entry (keyless $0 — Coinbase-premium precedent). Score wiring stays GATED:
+baseline accrues -> backtest-before-ship -> board -> Chairman flip.
