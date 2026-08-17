@@ -7897,6 +7897,11 @@ def accuracy_ledger_report():
                               "refereeCorroborated": b.get("referee_corroborated"),
                               "queryAmbiguous": b.get("query_ambiguous")}
                              for b in h.get("best", [])],
+                    # Board #2 batch (2026-08-17): magnitude-weighted capture (Economist)
+                    # + score-as-forecast reliability/Brier (Forecaster). Held-out report
+                    # fields; internal denominator-honesty companions, not external KPIs.
+                    "tailCapture": h.get("tail_capture"),
+                    "calibrationCurve": h.get("calibration_curve"),
                     # Maturity-segmented — early detection of EMERGING topics is the claim;
                     # established topics can only resolve LAGGED (coverage latency, not the thesis).
                     "byMaturity": h.get("by_maturity"),
