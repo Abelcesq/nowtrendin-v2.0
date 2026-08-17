@@ -31,14 +31,6 @@ const PIPELINE = [
   { key: 'Retail Amplify', label: 'Retail Amplify', desc: 'Finance YouTube / crowd', detect: false },
 ] as const;
 
-const COMPONENT_LABELS: Record<string, string> = {
-  gradient_strength: 'Niche Concentration',
-  dark_matter: 'Insider Tracking (positioning)',
-  inertia: 'Inertia (acceleration)',
-  medium_sequence: 'Diffusion (cross-stage)',
-  confidence_decay: 'Freshness',
-};
-
 // Market Gradient — neutral intensity tiers + colors (describe how unusual the
 // positioning is, never what to do). Mirrors the Trends gradient's tier legend.
 const MARKET_TIER_COLOR: Record<string, string> = {
@@ -521,25 +513,12 @@ export default function RiskDetail() {
         })}
       </View>
 
-      {/* Components */}
-      {Object.keys(risk.components).length > 0 && (
-        <>
-          <Text className="text-textSecondary text-xs uppercase tracking-wider mb-3">Score components</Text>
-          <View className="bg-card rounded-2xl p-4 mb-5 gap-3">
-            {Object.entries(risk.components).map(([k, val]) => (
-              <View key={k}>
-                <View className="flex-row justify-between mb-1">
-                  <Text className="text-textSecondary text-sm flex-1 pr-2">{COMPONENT_LABELS[k] ?? k}</Text>
-                  <Text className="text-textPrimary text-sm font-semibold">{Math.round(Number(val))}</Text>
-                </View>
-                <View className="h-1.5 rounded-full bg-border overflow-hidden">
-                  <View style={{ width: `${Math.max(0, Math.min(100, Number(val)))}%`, backgroundColor: color }} className="h-full rounded-full" />
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+      {/* "Score components" panel REMOVED (2026-08-16) — §17 canonical fix, web
+          parity: the web's copy was removed 2026-06-25 for the same defect. It
+          duplicated MARKET FACTORS above and rendered NaN once the engine began
+          serving components as objects ({score, feeds, ...}) — Number(object) is
+          NaN. Market Factors reads .score and renders honest n/a; one panel, no
+          NaN, all three platforms consistent. */}
 
       {/* Source provenance */}
       {risk.sources.length > 0 && (
