@@ -6,7 +6,7 @@ import { useExplainer } from '../../hooks/useSignals';
 // "Research" section for the Signal Intel detail — the AI (Perplexity) plain-
 // English explanation of what the trend means. Evergreen + cached, so it's
 // shown to every tier at ~zero cost.
-export function TopicResearch({ topicKey, topicName }: { topicKey: string; topicName?: string }) {
+export function TopicResearch({ topicKey, topicName, title }: { topicKey: string; topicName?: string; title?: string }) {
   const { explainer, isLoading } = useExplainer(topicKey, topicName);
 
   if (!isLoading && !explainer?.full && !explainer?.short) return null;
@@ -22,7 +22,7 @@ export function TopicResearch({ topicKey, topicName }: { topicKey: string; topic
     <View className="mb-5">
       <View className="flex-row items-center gap-2 mb-2">
         <BookOpen size={15} color="#2A5B9E" />
-        <Text className="text-textSecondary text-xs uppercase tracking-wider">Research — what this means</Text>
+        <Text className="text-textSecondary text-xs uppercase tracking-wider">{title || 'Research — what this means'}</Text>
       </View>
       <View className="bg-card rounded-2xl p-4">
         {isLoading && !blocks.length ? (

@@ -5,6 +5,7 @@ import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-na
 import { Screen } from '../../../components/ui/Screen';
 import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
+import { TopicResearch } from '../../../components/trends/TopicResearch';
 import { useRisk } from '../../../hooks/useSignals';
 
 const CLASS_COLOR: Record<string, string> = {
@@ -168,14 +169,43 @@ export default function RiskDetail() {
               how early the move is. Measurement only — not financial advice.
             </Text>
 
-            {/* D7/§17 coverage parity (2026-07-19): the web shows LTD DATA when most
-                inputs are absent; mobile now does too — a flat read on missing data
-                must never present as a measured quiet market. */}
-            {(mg as any)?.dataCoverage === 'insufficient' && (
-              <View className="rounded-lg px-3 py-2.5 mb-3" style={{ backgroundColor: '#B112261A' }}>
-                <Text className="text-[12px] font-bold" style={{ color: '#7A0D1A' }}>
-                  LIMITED DATA — most market inputs are absent for this instrument. Scores reflect
+            {/* AI Context — the same source-aware /explainer definition the web's Market
+                rail shows (§12 parity), placed under the score like the web. Renders
+                only when a definition exists or is generating (§17). */}
+            <TopicResearch topicKey={risk.key} topicName={risk.display} title="AI Context" />
+
+            {/* Coverage notes — §12 parity with the web rail (2026-08-17, founder-
+                reported): informative, names WHAT is absent and the counts, styled as a
+                notice (rose), never error-red — coverage is a fact, not a failure. */}
+            {mg?.lane === 'macro_theme' && (mg.naComponents?.length ?? 0) > 0 ? (
+              <View className="rounded-xl px-3 py-2.5 mb-3 bg-card">
+                <Text className="text-textSecondary text-[12px] leading-4">
+                  <Text className="font-bold">Macro theme. </Text>
+                  A market-wide theme has no single ticker, so smart-money positioning (FINRA short
+                  interest · 13F) and company fundamentals are not applicable — the score reflects only
+                  the macro / cross-market inputs that can be measured
+                  {mg.totalInputs != null ? ` (${mg.totalInputs} applicable factor${mg.totalInputs === 1 ? '' : 's'})` : ''}.
+                </Text>
+              </View>
+            ) : (mg as any)?.dataCoverage === 'insufficient' && !(mg as any)?.moneyDataAbsent && (
+              <View className="rounded-xl px-3 py-2.5 mb-3" style={{ backgroundColor: '#A8456A14' }}>
+                <Text className="text-[12px] leading-4" style={{ color: '#7C3352' }}>
+                  <Text className="font-bold">Insufficient positioning data. </Text>
+                  Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren't
+                  populated for this instrument yet
+                  {(mg as any)?.absentInputs != null ? ` (${(mg as any).absentInputs}/${(mg as any).totalInputs} inputs absent)` : ''},
+                  so it sits near baseline by default — not a confirmed quiet market. Scores reflect
                   data coverage, not a measured quiet market.
+                </Text>
+              </View>
+            )}
+            {!!(mg as any)?.moneyDataAbsent && (
+              <View className="rounded-xl px-3 py-2.5 mb-3 bg-card">
+                <Text className="text-textSecondary text-[12px] leading-4">
+                  <Text className="font-bold">Market-Confirmation only. </Text>
+                  No informed-money data exists for this instrument yet (every money-movement input is
+                  absent), so the Money Movement read is absent — not zero. Only the broad Market
+                  Confirmation (M) is shown.
                 </Text>
               </View>
             )}

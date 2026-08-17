@@ -312,6 +312,10 @@ export interface RiskScore {
     laneLabel?: string;
     dataCoverage?: string;           // full | partial | insufficient (over APPLICABLE inputs)
     naComponents?: string[];
+    // Coverage counts (§12 parity with the web's insufficient-data note): how many of
+    // the applicable inputs are absent — lets the note say "4/7 inputs absent".
+    absentInputs?: number | null;
+    totalInputs?: number | null;
     // Market Signal v2.0 (the Money Gradient) — present ONLY when MARKET_SIGNAL_V2 is on.
     // When present: Detection→Money Movement, Confidence→Market Confirmation, and the
     // factual flow (IN/OUT) surfaces. Absent → v1 labels (flag off).
@@ -510,6 +514,8 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       lane: r.market_gradient.lane || undefined,
       laneLabel: r.market_gradient.lane_label || undefined,
       dataCoverage: r.market_gradient.data_coverage || undefined,
+      absentInputs: r.market_gradient.absent_inputs ?? null,
+      totalInputs: r.market_gradient.total_inputs ?? null,
       // E1 composite disclosure (board D8 session, 2026-07-19)
       compositeNote: r.market_gradient.composite_note || undefined,
       // D8 (2026-07-20): money read absent → render Market-Confirmation-only, never a number.
