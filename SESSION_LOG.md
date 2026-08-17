@@ -3768,3 +3768,20 @@ exception, /diag/coinmetrics (internal, ?pull=1). Gate-5 live test: 9/9 written,
 idempotent re-run proven, values eyeballed sane (BTC 541,863 / 825,829). NO subs
 entry (keyless $0 — Coinbase-premium precedent). Score wiring stays GATED:
 baseline accrues -> backtest-before-ship -> board -> Chairman flip.
+
+**GDELT FIX VERIFIED LIVE:** first post-deploy cycle (04:00Z) wrote 1,754 topic
+signals via the GAL feeds (weeks of 0 before); collector HEALTHY. The most global
+multilingual source is genuinely restored — the Expansionist seat's position, now
+with the code actually executing.
+
+**MOBILE MARKET-SIGNAL NaN PANEL REMOVED (founder-reported, §17 canonical fix):**
+founder flagged desktop-vs-mobile disconnect on /risk/rate_hike. Verified: the
+top-half rings/factors MATCH desktop and the n/a factor rows are HONEST (engine
+serves score:null absent:true on 6/7 components — rate_hike is a macro topic with
+only Signal Freshness measured). The REAL defect was below the fold: the legacy
+mobile "Score components" panel rendered Number(componentObject) = NaN x7 — the
+EXACT §17 canonical violation whose web copy was removed 2026-06-25; mobile kept
+its copy until the engine began serving object components. FIX: panel removed
+(duplicates Market Factors, which reads .score and renders honest n/a), unused
+COMPONENT_LABELS dropped. Deployed preview 2ec9f51, live-verified zero NaN on the
+page; source pushed 52ecd37.
