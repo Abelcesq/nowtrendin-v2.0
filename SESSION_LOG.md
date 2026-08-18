@@ -3916,3 +3916,24 @@ alternating sign daily (only regime where +/-1-day flips direction). RECOMMENDED
 FIX (pending Chairman): A2.2 — key T on the page's own as-of stamp with per-family
 basis, persist page_asof, forward-only re-verdict, restart re-arm clocks; also fix
 the silently-inert 21Shares AUM parse. NOT implemented (verify-before-fix honored).
+
+## 2026-08-18 (PT, cont.-3) — A2.2 DEPLOYED + LIVE-VERIFIED (engine v345)
+
+A2.2 (Chairman-approved, commit b4281ee) pushed to origin + deployed to
+nowtrendin-v2-engine (Released v345). Live verify via /diag/etf-reconcile?run=1:
+rule_version A2.2 active; run clean (checked=42, 0 errors). Forward-only honored —
+A2/A1.5 rows untouched, report reads A2.2 rows only, so the A2.4 re-arm clocks
+RESTARTED at deploy (ready=false, all counters 0; gate_status FAIL is the correct
+posture until >=5 material in-band ISSUER-source comparisons re-arm it). All 42
+window rows are NO_DERIVED FMP rows (silent-comparison only, open_bad=0, never
+count toward re-arm) — expected cold-start: as-of-keyed derived intervals accrue
+as new issuer snapshots arrive with the page_asof stamp. XRP no-comparator honest
+absence intact. WATCH ITEM: after the next daily issuer snapshot + reconcile
+cycle, confirm issuer-source A2.2 rows begin deriving (page_asof stamps landing).
+
+### Open / Next (carried)
+- Build (b) the bitemporal PIT store (Chairman-approved; next engineering item)
+- Design + freeze (c) the unmarketed daily index calculation rules (register-appended)
+- Board convening on the World Cup case study
+- Forecaster to seal the structure-(f) first-licensee forecast
+- CoinAPI gate ~08-24; FMP ETF-flow re-eval 2026-09-05
