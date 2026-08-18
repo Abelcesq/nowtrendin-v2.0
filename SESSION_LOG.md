@@ -3850,3 +3850,22 @@ disputed (Google-derived input vs Google-validated ledger — firewall demanded)
 d_at_enroll stamping = prerequisite #0; referee is en-only (0/15 partly a language
 ceiling); A2 sign-flip named the one active credibility fire; converged honest
 language for buyers recorded in the collation.
+
+## 2026-08-18 (PT) — Nine-seat board: the $1M/Month Question (index-administrator path)
+
+Chairman submitted the INDEX_ADMIN_1M_MONTH paper (archived audits/buyer-diligence/);
+nine seats convened independently (survived a mid-run session-limit outage; 4 seats +
+the WC researcher resumed via transcript). Collation:
+**audits/board/BOARD_1M-month_2026-08-18.md — rulings pending Chairman.**
+Headlines: meter change approved 9/9 (internal minute, zero publication);
+LOAD-BEARING DEFECT found by 3 seats independently — the paper's bitemporal
+knowable_at/Merkle archive EXISTS ONLY IN DOCUMENTS, not in this engine's code
+(build-first-then-claim, or one buyer's grep kills the story); 1.8 (one number) is
+the gate; start index CALCULATION now unmarketed with frozen registered rules, no
+back-history ever; index path RESOLVES Q5 (same-day floor sufficient for a
+benchmark; before-arrival = pricing upgrade if validated); reflexivity
+pre-commitments written at AUM=0; Forecaster sealed staged probabilities (Stage 4
+~1-2%, acquisition ~5-10%, plan-of-record = Stages 1-2 only); vendor-permanency =
+escrow + named backup calc agent before Stage 3. Disagreements for Chairman:
+first-contract label/date; Art-13 publication vs formula-confidential standard;
+oversight representation. World Cup case study still in flight (researcher resumed).
