@@ -3831,3 +3831,22 @@ bankruptcy/default fell to halted_microcap (category error as coverage gap). Fix
 _MACRO_THEMES now includes the whole FINANCIAL_RISK_VOCABULARY. Verified live:
 10 macro themes (was 4); rate hike now macro_theme/partial, real interpretation,
 scores re-read under intended macro computation (35/33 ROUTINE).
+
+## 2026-08-17 (PT, cont.) — Nine-seat credibility board convened + D-early design pre-registered
+
+Chairman-ordered board on the latest findings (referee 0/15 FINAL, tail capture 1/12,
+D structural root cause + M0 inversion). Pack: EVIDENCE_PACK_credibility_2026-08-17.md
++ DARK_EARLY_DESIGN_PREREG_2026-08-17.md; M0 baseline endpoint /diag/dark-early deployed
+first (LED first-sighting D median 0.0 / pre-broken 14.3 — the inversion, live).
+NINE seats convened in parallel, independent; collation:
+**audits/board/BOARD_credibility_2026-08-17.md — rulings pending Chairman.**
+Headlines: no attention rate citable (9/9; tracked-race is BELOW the null at p~0.001);
+v1 wins quarantined as non-evidence ("post-hoc referee, query unsealed" permanent
+marking); "0 false positives" ruled a censoring artifact to strip/caveat; C diagnosis
+unanimous ("finding of the quarter"); D-early approved DARK-phase-first with separate
+flips (bundle rejected 6/9); Lever B design defect caught (must be PRE-enrollment;
+rebuild D10 trigger; drop Wikipedia from rescore set — referee common-mode); Lever C
+disputed (Google-derived input vs Google-validated ledger — firewall demanded);
+d_at_enroll stamping = prerequisite #0; referee is en-only (0/15 partly a language
+ceiling); A2 sign-flip named the one active credibility fire; converged honest
+language for buyers recorded in the collation.
