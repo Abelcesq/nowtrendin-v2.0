@@ -7756,6 +7756,31 @@ def diag_index(run: int = 0, days: int = 14):
         return {"available": False, "reason": str(e)[:160]}
 
 
+@app.post("/diag/pit/forecast", dependencies=[Depends(_require_internal)])
+def diag_pit_forecast(payload: dict = Body(...)):
+    """Seal a FORECAST REGISTER entry into the PIT store (Chairman minute
+    2026-08-18 standing consequence 3; register file audits/forecasts/
+    FORECAST_REGISTER.md is the second anchor). Body: {item_key, text}.
+    Appends kind='forecast' with the verbatim text + its sha256 — append-only,
+    server-stamped knowable_at, hash-chain sealed daily. Never resolves or
+    edits anything; a resolution is a separate later row."""
+    try:
+        import hashlib as _hl
+        import pit_store as pit
+        item_key = (payload.get("item_key") or "").strip()
+        text = payload.get("text") or ""
+        if not item_key or not text:
+            return {"ok": False, "reason": "item_key and text required"}
+        sha = pit.record("forecast", item_key,
+                         datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                         {"text": text,
+                          "text_sha256": _hl.sha256(text.encode("utf-8")).hexdigest(),
+                          "chars": len(text)})
+        return {"ok": bool(sha), "row_sha256": sha, "item_key": item_key}
+    except Exception as e:
+        return {"ok": False, "reason": str(e)[:160]}
+
+
 @app.get("/diag/figi", dependencies=[Depends(_require_internal)])
 def diag_figi(build: int = 0):
     """Buyer roadmap Phase 1 (2026-08-09): row-level FIGI mapping for the
