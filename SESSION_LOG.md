@@ -3896,3 +3896,23 @@ gates all accuracy claims under (f). NEXT SESSION QUEUE: build (b) the PIT store
 design + freeze (c) the calculation rules (register-appended); board convening on
 the World Cup case study; A2 sign-flip trace (held); Forecaster to seal the
 structure-(f) first-licensee forecast.
+
+## 2026-08-18 (PT, cont.-2) — Time-triggered items + A2 ROOT CAUSE FOUND
+
+APIFY WATCH CLOSED: $41.93 MTD day-18 (~$70/mo run-rate vs ~$220 pre-fix); keep
+APIFY_RUN_TIMEOUT=120. COINBASE 5-DAY REVIEW (overdue, run): verdict SHELVE w/
+trigger — /spot mid-market never measured the retail spread; 98% of rows in a
++/-0.10% noise band; BNB rows are SYNTHETIC rates (integrity flag). Trigger = add
+/buy+/sell legs on Chairman approval. audits/source-onboarding/COINBASE_PREMIUM_
+5DAY_REVIEW_2026-08-18.md. CoinAPI gate ~08-24 + FMP 09-05 not yet due.
+A2 SIGN-FLIP TRACED (audits/board/A2_SIGNFLIP_TRACE_2026-08-18.md): t_of
+(etf_flow_reconcile.py:386-398) assumes a fixed one-day capture->trade-date model;
+iShares publishes SETTLED-basis with VARIABLE rollover latency, 21Shares TRADE-DATE
+basis -> IBIT intervals labeled one tday late, ARKB one early. Derived values match
+published flows EXACTLY one day shifted (IBIT "08-12" $50,199,120 = published 08-11
+$50.2M). All 6 bad rows recompute PASS/IMMATERIAL under corrected labels — the
+derivations were RIGHT; the labels were wrong. Burst on 08-10 = BTC flows began
+alternating sign daily (only regime where +/-1-day flips direction). RECOMMENDED
+FIX (pending Chairman): A2.2 — key T on the page's own as-of stamp with per-family
+basis, persist page_asof, forward-only re-verdict, restart re-arm clocks; also fix
+the silently-inert 21Shares AUM parse. NOT implemented (verify-before-fix honored).
