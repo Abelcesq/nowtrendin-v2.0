@@ -3785,3 +3785,49 @@ its copy until the engine began serving object components. FIX: panel removed
 (duplicates Market Factors, which reads .score and renders honest n/a), unused
 COMPONENT_LABELS dropped. Deployed preview 2ec9f51, live-verified zero NaN on the
 page; source pushed 52ecd37.
+
+## 2026-08-17 (PT) — Board #2 batch executed + founder-reported mobile/lane defects fixed
+
+**REFEREE BACKFILL RUN (board-ordered, the gating number — now FINAL):** built
+referee_backfill() + /accuracy/ledger/referee-backfill (background, internal); ran
+live. Result across ALL 15 LED wins: **0 corroborated / 14 uncorroborated / 1
+unresolvable; 11 of 15 on ambiguous queries** (mexico, webhook, nestjs, karoline...).
+The independent Wikipedia referee disputes or fails to match every checked win.
+hitRateProvisional stays TRUE — correctly. No attention rate is citable; the
+display caveats shipped 08-10 are carrying exactly the load they were built for.
+
+**SEAL-AT-ENROLLMENT LIVE (Forecaster fix):** pending_detections + sealed_query +
+sealed_wiki_article, frozen at record_detection (fail-open); sweep Trends fetch,
+sweep_query metadata, and the referee all use sealed values; legacy rows
+byte-identical. New wins can no longer rest on hindsight-chosen queries.
+
+**TAIL CAPTURE (Economist) LIVE:** top-decile surges (12 of 123 sized): raced 12/12
+(0 pre-broken — the giants are NOT cold-start artifacts), but LED only 1/12 (8.3%);
+5 same-day, 4 near-miss by 1-2 days. On the biggest surges we are AT the moment,
+not ahead of it — the strongest empirical case yet for the fast-lane recheck +
+GHOST early-D work.
+
+**CALIBRATION/BRIER (Forecaster) LIVE but DEGENERATE at zero FALSE_POSITIVEs:**
+base rate = 100% confirmed among race rows, so Brier skill reads trivially negative
+and every bucket is 100%. Honest and labeled; becomes informative when the first
+timeout FPs resolve (mid-2027 under 365d patience). Do not cite until then.
+
+**ENROLLMENT COMPLETENESS DIAGNOSED:** all 17 failed cycles are error_class
+"operational" and the LAST failure was 2026-08-01 — zero failures in 16 days. The
+80.7% completeness is a trailing-window artifact of the early-August deploy/pool
+era, not an ongoing leak. failed_by_class + last_failed_at now served.
+
+**MULTIPLE-COMPARISONS REGISTER (Statistician):** audits/ledger-research/
+MULTIPLE_COMPARISONS_REGISTER_2026-08-17.md — 15 hypothesis families enumerated +
+pre-committed Bonferroni-across-citable-families policy; replication-over-correction
+preferred path; append-on-introduction rule.
+
+**FOUNDER-REPORTED FIXES (same session):** (1) mobile risk detail: legacy "Score
+components" NaN panel removed (§17 canonical, web parity 2026-06-25). (2) AI Context
+added to mobile market detail (same /explainer as web) + informative coverage notes
+replacing the error-styled LIMITED DATA banner. (3) ROOT CAUSE of the "insufficient"
+note on rate hike: _MACRO_THEMES only had 7 hand-picked entries — rate hike/cre/
+bankruptcy/default fell to halted_microcap (category error as coverage gap). Fix:
+_MACRO_THEMES now includes the whole FINANCIAL_RISK_VOCABULARY. Verified live:
+10 macro themes (was 4); rate hike now macro_theme/partial, real interpretation,
+scores re-read under intended macro computation (35/33 ROUTINE).
