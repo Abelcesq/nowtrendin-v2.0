@@ -7752,6 +7752,67 @@ def accuracy_referee_backfill(run: int = 0, limit: int = 0):
     return _REFEREE_BACKFILL
 
 
+@app.get("/diag/dark-early", dependencies=[Depends(_require_internal)])
+def diag_dark_early(limit: int = 300):
+    """DARK-MATTER EARLINESS baseline (read-only; the M0 metric of the D-early design,
+    2026-08-17). For every resolved attention-ledger row: the topic's dark_matter score
+    at its EARLIEST retained velocity_scores row (first sighting) vs its LATEST row —
+    per verdict cohort. Quantifies the 2026-07-07 mining finding ("D=0 at first
+    sighting; current Dark Matter is late-confirmation") reproducibly, so the D-early
+    trial has a frozen baseline to beat. Touches nothing; held-out ledger read-only."""
+    conn = get_db(DB_PATH)
+    try:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT topic_key, detection_date, verdict, pre_broken, lead_time_days "
+            "FROM accuracy_ledger ORDER BY detection_date DESC").fetchall()][: max(1, int(limit))]
+        cohorts: dict = {}
+        for r in rows:
+            v = r.get("verdict")
+            if v == "LAGGED":
+                v = "pre_broken" if r.get("pre_broken") else "near_miss"
+            elif v not in ("LED", "SAME_DAY", "FALSE_POSITIVE"):
+                continue
+            tk = r.get("topic_key")
+            try:
+                first = conn.execute(
+                    "SELECT dark_matter_score AS d FROM velocity_scores "
+                    "WHERE topic_key = ? ORDER BY scored_at ASC LIMIT 1", (tk,)).fetchone()
+                last = conn.execute(
+                    "SELECT dark_matter_score AS d FROM velocity_scores "
+                    "WHERE topic_key = ? ORDER BY scored_at DESC LIMIT 1", (tk,)).fetchone()
+            except Exception:
+                continue
+            fd = (dict(first).get("d") if first else None)
+            ld = (dict(last).get("d") if last else None)
+            if fd is None:
+                continue
+            c = cohorts.setdefault(v, {"n": 0, "first_d": [], "last_d": []})
+            c["n"] += 1
+            c["first_d"].append(float(fd))
+            if ld is not None:
+                c["last_d"].append(float(ld))
+        import statistics as _st
+        def _agg(xs):
+            if not xs:
+                return None
+            return {"mean": round(_st.mean(xs), 1), "median": round(_st.median(xs), 1),
+                    "pct_zero": round(100 * sum(1 for x in xs if x <= 0.5) / len(xs), 1),
+                    "p90": round(sorted(xs)[max(0, int(len(xs) * 0.9) - 1)], 1)}
+        out = {c: {"n": v["n"], "first_sighting_d": _agg(v["first_d"]),
+                   "latest_d": _agg(v["last_d"])} for c, v in cohorts.items()}
+        return {"available": True, "read_only": True,
+                "note": "M0 baseline for the D-early design: dark_matter at each ledger "
+                        "topic's FIRST retained scored row vs its LATEST, per cohort. "
+                        "CAVEAT: 'first retained row' erodes toward detection as the "
+                        "365d retention prunes; the trial's live metric stamps "
+                        "D-at-enrollment on new rows instead.",
+                "rows_scanned": len(rows), "cohorts": out}
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+    finally:
+        conn.close()
+
+
 @app.get("/diag/coinmetrics", dependencies=[Depends(_require_internal)])
 def diag_coinmetrics(pull: int = 0):
     """Held-out CoinMetrics community on-chain accumulation status (§16 2026-08-16).
