@@ -3869,3 +3869,14 @@ pre-commitments written at AUM=0; Forecaster sealed staged probabilities (Stage 
 escrow + named backup calc agent before Stage 3. Disagreements for Chairman:
 first-contract label/date; Art-13 publication vs formula-confidential standard;
 oversight representation. World Cup case study still in flight (researcher resumed).
+
+**WORLD CUP CASE STUDY DELIVERED (Chairman-commissioned):**
+audits/board/WORLDCUP_CASE_STUDY_2026-08-17.md — full lifecycle reconstructed from
+our own data. Both doctrine clauses CONFIRMED: family entered via the news pipeline
+(mainstream by construction; D<=9/100 across all 532 retrievable cycles — never dark
+matter); all 7 ledger rows LAGGED/pre_broken (Google broke out 8-22 days before our
+first sighting); post-final collapse to MONITORING in 2 days = "no longer a trend"
+visible in data. Refinements earned: quorum matters (mexico world cup at 4-5 stories
+correctly demoted to trigger vs world cup at 134 outlets); and the pre-fix engine
+under-scored the mainstream giant to 41 — "already mainstream" must never read
+"measured as nothing." Board review of the case study = next convening.
