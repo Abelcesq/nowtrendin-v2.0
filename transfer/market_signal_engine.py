@@ -740,8 +740,30 @@ def apply_market_signal(item_key: str, item_name: str, components_current: dict,
     if record_this_cycle:
         record_market_cycle(item_key, components_current, db_path=db_path, conn=conn)
     baselines = get_market_baselines(item_key, db_path=db_path, conn=conn)
-    return compute_market_signal(item_key, item_name, components_current, baselines,
-                                 lane=lane, na_components=na_components)
+    out = compute_market_signal(item_key, item_name, components_current, baselines,
+                                lane=lane, na_components=na_components)
+    # Bitemporal PIT record (Chairman ruling (b), 2026-08-18): append the served
+    # composite with a knowable_at stamp — recording cycles only (record_this_cycle
+    # is the moment new data became knowable; recompute-only calls add no facts).
+    # Fail-open, own connection; HELD-OUT (never read back into scoring).
+    if record_this_cycle:
+        try:
+            import pit_store as _pit
+            _pit.record(
+                "crypto_score" if item_key.startswith("crypto:") else "market_score",
+                item_key,
+                datetime.now(timezone.utc).strftime("%Y-%m-%d"), {
+                    "detection": out.get("detection"),
+                    "confidence": out.get("confidence"),
+                    "money_movement": out.get("money_movement"),
+                    "market_confirmation": out.get("market_confirmation"),
+                    "tier": out.get("tier"),
+                    "money_data_absent": out.get("money_data_absent"),
+                    "lane": lane,
+                }, db_path=db_path)
+        except Exception as _pite:
+            print(f"  [pit] market record skipped ({item_key}): {_pite}")
+    return out
 
 
 # ── Historical backfill (seed baselines from real history) ──────────

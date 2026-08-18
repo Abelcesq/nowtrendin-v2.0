@@ -5395,6 +5395,26 @@ class GravitationalAnomalyDetector:
                 1 if result.get("tier_migration") else 0,
             ))
 
+            # Bitemporal PIT record (Chairman ruling (b), 2026-08-18): append the
+            # served numbers with a knowable_at stamp. Fail-open, own connection —
+            # a PIT failure can never abort this scoring transaction. HELD-OUT:
+            # nothing ever reads this back into scoring.
+            try:
+                import pit_store as _pit
+                from date_utils import to_iso_date as _pit_date
+                _pit.record("trend_score", result["topic_key"],
+                            _pit_date(result["scored_at"]) or "", {
+                    "overall": result["overall_score"],
+                    "detection": result["detection_score"],
+                    "confidence": result["confidence_score"],
+                    "n": result["nowtrendin_score"],
+                    "dark_matter": result["dark_matter_score"],
+                    "stage": result["signal_stage"],
+                    "pathway": result.get("detection_pathway", "expert"),
+                })
+            except Exception as _pite:
+                print(f"  [pit] trend record skipped: {_pite}")
+
             # Log anomalies separately
             if result["is_gravitational_anomaly"]:
                 conn.execute("""
@@ -6447,6 +6467,18 @@ async def startup_auto_collect():
         print("[startup] etf-reconcile started (daily; held-out verifier).")
     except Exception as _ere:
         print(f"[startup] etf-reconcile failed to start: {_ere}")
+
+    # Bitemporal PIT store (Chairman ruling (b), 2026-08-18): hourly sealer —
+    # inits the append-only schema on boot and seals each complete UTC day into
+    # the hash chain. Held-out; write-side lives at the score sinks.
+    if os.getenv("PIT_STORE", "1").lower() in ("1", "true", "yes"):
+        try:
+            import pit_store as _pit
+            threading.Thread(target=_pit.seal_loop, daemon=True,
+                             name="pit-seal").start()
+            print("[startup] pit-seal started (hourly; append-only bitemporal store).")
+        except Exception as _pse:
+            print(f"[startup] pit-seal failed to start: {_pse}")
 
     # Category enrichment: build the topic_key→category override maps (situation
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
@@ -7668,6 +7700,26 @@ def diag_etf_reconcile(run: int = 0, firstpass: int = 0):
         if run:
             out["run"] = rec.reconcile_a2(DB_PATH)
         out.update(rec.report_a2(DB_PATH))
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.get("/diag/pit", dependencies=[Depends(_require_internal)])
+def diag_pit(verify: int = 0, seal: int = 0):
+    """Bitemporal PIT store (Chairman ruling (b), 2026-08-18): append-only,
+    trigger-enforced, daily hash-chain-sealed record of served scores/index
+    values (event_date/knowable_at). Held-out — never read by scoring.
+    `?seal=1` seals any pending complete UTC days now (idempotent);
+    `?verify=N` recomputes + checks the last N day-seals against the chain."""
+    try:
+        import pit_store as pit
+        out = {"status": pit.status(DB_PATH)}
+        if seal:
+            out["seal"] = pit.seal_pending(DB_PATH)
+            out["status"] = pit.status(DB_PATH)
+        if verify:
+            out["verify"] = pit.verify(days=min(int(verify), 400), db_path=DB_PATH)
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
