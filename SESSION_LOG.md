@@ -3880,3 +3880,19 @@ visible in data. Refinements earned: quorum matters (mexico world cup at 4-5 sto
 correctly demoted to trigger vs world cup at 134 outlets); and the pre-fix engine
 under-scored the mainstream giant to 41 — "already mainstream" must never read
 "measured as nothing." Board review of the case study = next convening.
+
+## 2026-08-18 (PT, cont.) — SIX CHAIRMAN RULINGS on the $1M/month collation
+
+Recorded in audits/buyer-diligence/METER_DECISION_MINUTE_2026-08-18.md:
+(a) meter ADOPTED (%-of-AUM in forward templates; never touches scoring);
+(b) bitemporal PIT store BUILD APPROVED (build-before-claim; next engineering item);
+(c) frozen-rule unmarketed daily index calculation APPROVED (no back-history ever);
+(d) benchmark first-contract label HELD; (e) METHOD STAYS CONFIDENTIAL — public-
+rulebook/BMR path REJECTED; we sell data + access to systems, never the method
+(kills Stage-1 items 1.3/1.9); (f) structure = API LICENSING with PROPRIETARY
+AGENTS AS THE TERMINAL (Bloomberg approach, agents in place of terminals; escrow/
+backup-agent path rejected; board caution preserved on record). Citation bar still
+gates all accuracy claims under (f). NEXT SESSION QUEUE: build (b) the PIT store;
+design + freeze (c) the calculation rules (register-appended); board convening on
+the World Cup case study; A2 sign-flip trace (held); Forecaster to seal the
+structure-(f) first-licensee forecast.
