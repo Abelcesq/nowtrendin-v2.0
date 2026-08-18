@@ -140,6 +140,167 @@ def run_once(get_db, db_path) -> dict:
             pass
 
 
+# ════════════════════════════════════════════════════════════════════════════════
+# LEVER B REBUILD — PRE-ENROLLMENT near-crosser lane (credibility board 2026-08-17,
+# Chairman-approved). The board's Executioner finding: a post-enrollment recheck can
+# move NOTHING the ledger judges (detection_date = first sighting, sealed at
+# enrollment). The honest value is PRE-enrollment: topics sitting just UNDER the
+# enrollment floor get an early FREE re-collect + rescore between the 6h cycles, so
+# a genuinely-crossing topic enrolls before it ages out (14-day window) and its race
+# starts sooner.
+#
+# INTEGRITY CONTRACT (board conditions, hard):
+#   * FREE, NON-ORACLE sources only: the re-collect is collect_for_term (HN Algolia +
+#     GitHub search — the engine's own free collectors). NO Wikipedia (it is the
+#     REFEREE — Operator's common-mode finding), NO Google trending (the VALIDATOR's
+#     family — Challenger's leakage finding), NO Apify (clock-slot rule untouched).
+#   * Attribution: every row enrolled via this lane carries
+#     enroll_arm='fastlane_nearcross' — the cadence epoch is separable in every rate
+#     (Challenger: never compare pre/post-cadence like-for-like).
+#   * The lane never writes accuracy_ledger, never computes a verdict, never touches
+#     detection_date semantics: detection_date remains the topic's canonical
+#     first-seen, exactly as the base enrollment path computes it.
+#   * Caps + pacing: NEARCROSS_MAX topics/run, 10s between topics (§13 batch-paced),
+#     per-topic cooldown; scoring runs through the engine's own normal pipeline.
+# ════════════════════════════════════════════════════════════════════════════════
+FASTLANE_NEARCROSS = os.getenv("FASTLANE_NEARCROSS", "1") == "1"
+NEARCROSS_BAND = float(os.getenv("FASTLANE_NEARCROSS_BAND", "10"))     # points below floor
+NEARCROSS_MAX = int(os.getenv("FASTLANE_NEARCROSS_MAX", "10"))         # topics per run
+NEARCROSS_COOLDOWN_H = int(os.getenv("FASTLANE_NEARCROSS_COOLDOWN_H", "12"))
+NEARCROSS_PAUSE_S = float(os.getenv("FASTLANE_NEARCROSS_PAUSE_S", "10"))
+
+_NC_TABLE = """CREATE TABLE IF NOT EXISTS fastlane_nearcross_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic_key TEXT, checked_at TEXT, score_before REAL, score_after REAL,
+    collected INTEGER, crossed INTEGER, enrolled INTEGER, note TEXT)"""
+
+
+def nearcross_once(get_db, db_path) -> dict:
+    """One pre-enrollment pass: re-collect + rescore up to NEARCROSS_MAX near-floor
+    topics via free sources; enroll any that cross, arm-stamped. Fail-open per topic."""
+    if not FASTLANE_NEARCROSS:
+        return {"enabled": False, "note": "FASTLANE_NEARCROSS=0 — lane inert"}
+    import time as _t
+    floor = float(os.getenv("LEDGER_DETECTION_FLOOR", "10"))
+    recent_days = int(os.getenv("LEDGER_ENROLL_RECENT_DAYS", "14"))
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=recent_days)).isoformat()
+    cool = (now - timedelta(hours=NEARCROSS_COOLDOWN_H)).isoformat()
+    conn = get_db(db_path)
+    out = {"enabled": True, "candidates": 0, "refreshed": 0, "crossed": 0, "enrolled": 0}
+    try:
+        conn.execute(_NC_TABLE)
+        conn.commit()
+        rows = conn.execute(
+            """SELECT v.topic_key, v.topic_display, v.detection_score,
+                      COALESCE(lc.first_detected_at, fs.first_at) AS det_date
+               FROM velocity_scores v
+               INNER JOIN (SELECT topic_key, MAX(scored_at) m FROM velocity_scores
+                           GROUP BY topic_key) l
+                 ON v.topic_key=l.topic_key AND v.scored_at=l.m
+               INNER JOIN (SELECT topic_key, MIN(scored_at) first_at FROM velocity_scores
+                           GROUP BY topic_key) fs ON v.topic_key=fs.topic_key
+               LEFT JOIN topic_lifecycle lc ON v.topic_key=lc.topic_key
+               LEFT JOIN topic_maturity tm ON v.topic_key=tm.topic_key
+               WHERE v.detection_score >= ? AND v.detection_score < ?
+                 AND COALESCE(lc.first_detected_at, fs.first_at) >= ?
+                 AND UPPER(COALESCE(tm.maturity_class, '')) NOT IN ('ESTABLISHED','MONITORING')
+                 AND NOT EXISTS (SELECT 1 FROM pending_detections p
+                                 WHERE p.topic_key = v.topic_key)
+                 AND NOT EXISTS (SELECT 1 FROM accuracy_ledger a
+                                 WHERE a.topic_key = v.topic_key)
+                 AND NOT EXISTS (SELECT 1 FROM fastlane_nearcross_log f
+                                 WHERE f.topic_key = v.topic_key AND f.checked_at >= ?)
+               ORDER BY COALESCE(lc.first_detected_at, fs.first_at) DESC
+               LIMIT ?""",
+            (max(0.0, floor - NEARCROSS_BAND), floor, cutoff, cool,
+             NEARCROSS_MAX)).fetchall()
+        cands = [dict(r) if hasattr(r, "keys") else
+                 dict(zip(("topic_key", "topic_display", "detection_score", "det_date"), r))
+                 for r in rows]
+    except Exception as e:
+        out["error"] = str(e)[:200]
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return out
+    finally:
+        pass
+    out["candidates"] = len(cands)
+    for i, c in enumerate(cands):
+        if i:
+            _t.sleep(max(0.0, NEARCROSS_PAUSE_S))       # §13 batch pacing
+        tk = c["topic_key"]
+        disp = c["topic_display"] or tk.replace("_", " ")
+        before = float(c["detection_score"] or 0)
+        after = None
+        collected = 0
+        crossed = enrolled = 0
+        note = ""
+        try:
+            import gravitational_anomaly_detector as _gad
+            collected, after = _gad.fastlane_refresh_topic(tk, disp)
+            out["refreshed"] += 1
+            if after is not None and after >= floor:
+                crossed = 1
+                out["crossed"] += 1
+                try:
+                    import date_utils
+                    dd = date_utils.to_iso_date(c["det_date"])
+                except Exception:
+                    dd = None
+                if dd:
+                    import accuracy_ledger_enhanced as _al
+                    _al.record_detection(tk, disp, dd, after, db_path=db_path,
+                                         enroll_arm="fastlane_nearcross")
+                    enrolled = 1
+                    out["enrolled"] += 1
+                else:
+                    note = "uncanonical_first_seen"
+        except Exception as e:
+            note = str(e)[:120]
+        try:
+            conn.execute(
+                "INSERT INTO fastlane_nearcross_log (topic_key, checked_at, score_before, "
+                "score_after, collected, crossed, enrolled, note) VALUES (?,?,?,?,?,?,?,?)",
+                (tk, datetime.now(timezone.utc).isoformat(timespec="seconds"), before,
+                 after, collected, crossed, enrolled, note or "ok"))
+            conn.commit()
+        except Exception:
+            pass
+    try:
+        conn.close()
+    except Exception:
+        pass
+    return out
+
+
+def nearcross_status(get_db, db_path) -> dict:
+    conn = get_db(db_path)
+    try:
+        conn.execute(_NC_TABLE)
+        n = conn.execute("SELECT COUNT(*) AS c, SUM(crossed) AS x, SUM(enrolled) AS e "
+                         "FROM fastlane_nearcross_log").fetchone()
+        last = conn.execute("SELECT MAX(checked_at) AS m FROM fastlane_nearcross_log").fetchone()
+        d = dict(n) if hasattr(n, "keys") else {"c": n[0], "x": n[1], "e": n[2]}
+        return {"enabled": FASTLANE_NEARCROSS,
+                "checked": d.get("c") or 0, "crossed": d.get("x") or 0,
+                "enrolled": d.get("e") or 0,
+                "last_run": (last["m"] if hasattr(last, "keys") else last[0]),
+                "caps": {"band": NEARCROSS_BAND, "max_per_run": NEARCROSS_MAX,
+                         "cooldown_h": NEARCROSS_COOLDOWN_H},
+                "sources": "collect_for_term (HN Algolia + GitHub) — no Wikipedia, "
+                           "no Google, no Apify"}
+    except Exception as e:
+        return {"enabled": FASTLANE_NEARCROSS, "error": str(e)[:120]}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def status(get_db, db_path) -> dict:
     conn = get_db(db_path)
     try:

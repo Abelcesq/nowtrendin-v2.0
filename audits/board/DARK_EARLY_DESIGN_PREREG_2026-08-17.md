@@ -87,3 +87,33 @@ deploy; §16a cold-start statement not required (no universe expansion). Every c
 this trial introduces is appended to the multiple-comparisons register on introduction.
 
 *Operator note: this document is an input to the 2026-08-17 nine-seat board, not a decision.*
+
+---
+
+## 5. CHAIRMAN RULINGS (2026-08-17, post-board — binding amendments)
+
+1. **Levers approved:** step-0 batch (stamps/caveats/register) — proceed; Lever B —
+   approved, REBUILT per the Executioner (pre-enrollment near-crosser lane, free
+   sources only, no Wikipedia, no Google, no Apify; live with `enroll_arm`
+   attribution); Lever A — dark phase approved (logging only, feeds nothing).
+2. **Lever C ruled (Q4): Challenger + Executioner combined.** The rising lane is
+   NOT a separate lever: if ever used, it is ONE logged, separately-attributed input
+   inside Lever A, AND rising-seeded enrollments are FIREWALLED — excluded from any
+   Google-validated rate (they may only count under a non-Google referee).
+3. **GOOGLE DOCTRINE (Chairman, verbatim intent — governs all future design):**
+   Google Trends is CONFIRMATION on the back end only, never a detection input.
+   **If it is trending on Google, it is not dark matter — it is more likely already
+   trending. If news sources confirm the topic IN ADDITION to Google Trends, it is
+   very likely already mainstream.** Any input derived from Google (rising queries,
+   trending RSS) is therefore evidence of ARRIVAL, not earliness — usable to close a
+   race, never to start one. OPEN CONSEQUENCE to examine: the socialcrawl rising-lane
+   DISCOVERY path seeds topics from Google's own rising queries — under this doctrine
+   those first sightings are Google-tainted for validation purposes and their
+   enrollments need the same firewall stamp (to be verified and, if confirmed,
+   implemented as a follow-up).
+4. **Case study commissioned:** the board is to study the FIFA World Cup arc in OUR
+   OWN data (unpopular → breakout → mainstream → no longer a trend) as the canonical
+   validation of this doctrine and of how the scoring tracked a full lifecycle.
+5. **A2 sign-flip trace:** HELD to next session (Chairman).
+6. **Positioning (Q5):** explained; decision deferred by the Chairman — no external
+   language changes until ruled.

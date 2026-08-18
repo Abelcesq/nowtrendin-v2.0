@@ -106,10 +106,27 @@ def init_pending_db(db_path: str = DB_PATH):
     # sealed_* (Forecaster fix, board 2026-08-09, built 2026-08-17): the resolution
     # query + referee article are chosen ONCE, at ENROLLMENT, and frozen — a query
     # chosen at sweep time is chosen with hindsight (the ambiguous-query wins).
+    # Step-0 batch (credibility board, Chairman-approved 2026-08-17): d_at_enroll +
+    # d_early_at_enroll (dark-phase logging, feeds NOTHING) + enrollment-time
+    # ambiguity stamp (Forecaster defect #2).
     for _col, _typ in (("enroll_arm", "TEXT"), ("breadth_at_enroll", "INTEGER"),
-                       ("sealed_query", "TEXT"), ("sealed_wiki_article", "TEXT")):
+                       ("sealed_query", "TEXT"), ("sealed_wiki_article", "TEXT"),
+                       ("d_at_enroll", "REAL"), ("d_early_at_enroll", "REAL"),
+                       ("sealed_query_ambiguous", "INTEGER")):
         try:
             conn.execute(f"ALTER TABLE pending_detections ADD COLUMN {_col} {_typ}")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    # accuracy_ledger carries the stamps through resolution (rollback-guarded ALTERs):
+    # referee_sealed = 1 the referee used the SEALED article, 0 = hindsight opensearch
+    # fallback (Forecaster defect #1 — such checks are second-class, marked forever).
+    for _col, _typ in (("d_at_enroll", "REAL"), ("referee_sealed", "INTEGER")):
+        try:
+            conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
             conn.commit()
         except Exception:
             try:
@@ -304,6 +321,36 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
         sealed_article = _rw.resolve_article(sealed_query)
     except Exception:
         sealed_article = None
+    # Enrollment-time ambiguity (Forecaster defect #2, step-0 batch): an ambiguous
+    # seal is known BEFORE any outcome, not discovered at sweep time.
+    sealed_ambiguous = _query_ambiguity(sealed_query)
+    # d_at_enroll (step-0 prerequisite #0) + d_early_at_enroll (Lever A DARK PHASE —
+    # logged, feeds NOTHING): the topic's dark_matter score and its expert-tier
+    # provenance evidence at the moment of enrollment. Fail-open NULL, never guessed.
+    d_at_enroll = None
+    d_early = None
+    try:
+        _vrow = conn.execute(
+            "SELECT dark_matter_score FROM velocity_scores WHERE topic_key = ? "
+            "ORDER BY scored_at DESC LIMIT 1", (topic_key,)).fetchone()
+        if _vrow is not None:
+            _v = dict(_vrow) if hasattr(_vrow, "keys") else {"dark_matter_score": _vrow[0]}
+            if _v.get("dark_matter_score") is not None:
+                d_at_enroll = round(float(_v["dark_matter_score"]), 2)
+    except Exception:
+        pass
+    try:
+        # Venue-class provenance at enrollment: share of the topic's signals carried
+        # on expert/niche-tier platforms. Recorded provenance, not inferred intent;
+        # rising-lane input EXCLUDED pending the Chairman's Lever-C ruling.
+        _t = conn.execute(
+            "SELECT SUM(CASE WHEN platform_tier IN ('expert','niche') THEN 1 ELSE 0 END) AS e, "
+            "COUNT(*) AS n FROM topic_signals WHERE topic_key = ?", (topic_key,)).fetchone()
+        _td = dict(_t) if hasattr(_t, "keys") else {"e": _t[0], "n": _t[1]}
+        if _td.get("n"):
+            d_early = round(100.0 * float(_td.get("e") or 0) / float(_td["n"]), 1)
+    except Exception:
+        pass
     try:
         # Don't reopen something already resolved.
         ex = conn.execute("SELECT status FROM pending_detections WHERE id=%s" if db_compat.USE_PG
@@ -313,11 +360,13 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
                 INSERT OR IGNORE INTO pending_detections
                     (id, topic_key, topic_display, detection_date, detection_score,
                      timeout_date, last_checked, status, enroll_arm, breadth_at_enroll,
-                     sealed_query, sealed_wiki_article)
-                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?)
+                     sealed_query, sealed_wiki_article, d_at_enroll, d_early_at_enroll,
+                     sealed_query_ambiguous)
+                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)
             """, (rec_id, topic_key, topic_display, detection_date,
                   detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll,
-                  sealed_query, sealed_article))
+                  sealed_query, sealed_article, d_at_enroll, d_early,
+                  sealed_ambiguous))
             conn.commit()
     except Exception as e:
         print(f"[ledger] record_detection error: {e}")
@@ -342,7 +391,8 @@ def _stamp_at_detection_days(conn, topic_key, detection_date):
 
 
 def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict, provider,
-                   sweep_query=None, query_ambiguous=None, referee_corroborated=None):
+                   sweep_query=None, query_ambiguous=None, referee_corroborated=None,
+                   referee_sealed=None):
     now = datetime.now(timezone.utc).isoformat()
     # Stamp the measurement basis AT RESOLUTION (board fix 2026-07-08):
     at_det_days = _stamp_at_detection_days(conn, p["topic_key"], p["detection_date"])
@@ -354,13 +404,14 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
     # D9 A/B carry-through (nullable; rows enrolled outside the test stay NULL).
     _arm = p.get("enroll_arm") if hasattr(p, "get") else None
     _brd = p.get("breadth_at_enroll") if hasattr(p, "get") else None
+    _dae = p.get("d_at_enroll") if hasattr(p, "get") else None
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
              breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
              sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken,
-             enroll_arm, breadth_at_enroll)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             enroll_arm, breadth_at_enroll, d_at_enroll, referee_sealed)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
@@ -368,11 +419,12 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
             sweep_query=EXCLUDED.sweep_query, query_ambiguous=EXCLUDED.query_ambiguous,
             referee_corroborated=EXCLUDED.referee_corroborated,
             at_detection_days=EXCLUDED.at_detection_days, pre_broken=EXCLUDED.pre_broken,
-            enroll_arm=EXCLUDED.enroll_arm, breadth_at_enroll=EXCLUDED.breadth_at_enroll
+            enroll_arm=EXCLUDED.enroll_arm, breadth_at_enroll=EXCLUDED.breadth_at_enroll,
+            d_at_enroll=EXCLUDED.d_at_enroll, referee_sealed=EXCLUDED.referee_sealed
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
           p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
           sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken,
-          _arm, _brd))
+          _arm, _brd, _dae, referee_sealed))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:
@@ -517,14 +569,20 @@ def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=
                 # Independent referee on WINS only (LED/SAME_DAY — the claims we publish):
                 # free Wikipedia pageviews, fail-open, never changes the verdict.
                 _corr = None
+                _rsealed = None
                 if lead["verdict"] in ("LED", "SAME_DAY"):
+                    _art = p.get("sealed_wiki_article") if hasattr(p, "get") else None
                     _corr = _referee_corroborate(
-                        _q, p["detection_date"], lead["breakout_date"],
-                        article=(p.get("sealed_wiki_article") if hasattr(p, "get") else None))
+                        _q, p["detection_date"], lead["breakout_date"], article=_art)
+                    # Forecaster defect #1 (step-0): a check via the SEALED article is
+                    # first-class (1); a fallback via hindsight opensearch is marked (0)
+                    # forever. NULL = no referee check ran.
+                    _rsealed = (1 if _art else 0) if _corr is not None else None
                 rec_id = hashlib.md5(f"{p['topic_key']}-{p['detection_date']}".encode()).hexdigest()[:16]
                 _upsert_ledger(conn, rec_id, p, lead["breakout_date"], breakout.get("multiple"),
                                lead["lead_time_days"], lead["verdict"], "sweep",
-                               sweep_query=_q, query_ambiguous=_amb, referee_corroborated=_corr)
+                               sweep_query=_q, query_ambiguous=_amb, referee_corroborated=_corr,
+                               referee_sealed=_rsealed)
                 conn.execute("UPDATE pending_detections SET status='resolved' WHERE id=?", (p["id"],))
                 conn.commit()
                 if lead["verdict"] == "LED": led += 1
@@ -926,6 +984,26 @@ def generate_honest_report(db_path=DB_PATH) -> dict:
                          "referee_corroborated": r.get("referee_corroborated"),
                          "query_ambiguous": r.get("query_ambiguous")}
                         for r in led], key=lambda x: x["lead_days"] or 0, reverse=True)[:5],
+        # ── FALSE-POSITIVE STRUCTURAL CAVEAT (credibility board 2026-08-17, 4 seats;
+        # Chairman-approved step-0). Under the 365-day patience window a FALSE_POSITIVE
+        # can only exist via timeout, and the first timeouts cannot resolve before
+        # ~mid-2027 — so "0 false positives" is a CENSORING ARTIFACT, not precision,
+        # and interim rates are structurally biased upward until the first timeout
+        # wave. The caveat travels WITH the number, machine-readable. ──
+        "false_positives_note": (
+            "structural: under the 365-day patience window, false positives can only "
+            "resolve via timeout — none can exist before ~mid-2027. A zero here is a "
+            "censoring artifact, not evidence of precision, and resolved-only rates "
+            "are biased upward until the first timeout wave."
+            if len(fp) == 0 else None),
+        # Sealed-epoch wall (Forecaster/Executioner): rows enrolled from 2026-08-17
+        # carry queries + referee articles frozen at enrollment; earlier rows are the
+        # hindsight-query legacy epoch and are never blended into a citable cohort.
+        "sealed_epoch": {
+            "start": "2026-08-17",
+            "note": "resolution queries + referee articles frozen at enrollment from "
+                    "this date; the citable cohort is sealed-epoch rows only",
+        },
         # ── TAIL CAPTURE (Economist prescription, board 2026-08-09; built 2026-08-17) ──
         # Magnitude-weighted capture: of the TOP-DECILE realized surges (by Google
         # breakout multiple, among resolved rows where a breakout occurred), what share
@@ -986,6 +1064,12 @@ def _calibration_curve(led, same, lag_near, fp) -> dict:
                 for r in scored) / len(scored)
     base = sum(r["_y"] for r in scored) / len(scored)
     brier_base = sum((base - r["_y"]) ** 2 for r in scored) / len(scored)
+    # Forecaster (board 2026-08-17): with a SINGLE-CLASS label set (all confirmed or
+    # all missed) the base-rate Brier is 0 and skill_vs_base_rate is ARITHMETICALLY
+    # FORCED negative — a number that looks like a finding but is pure degeneracy.
+    # Serve degenerate:true and suppress the skill field until both classes exist
+    # (first timeout FALSE_POSITIVEs resolve ~mid-2027 under the patience window).
+    single_class = base in (0.0, 1.0)
     buckets = []
     for lo in range(0, 100, 20):
         hi = lo + 20
@@ -1005,6 +1089,11 @@ def _calibration_curve(led, same, lag_near, fp) -> dict:
         "n": len(scored), "brier_score": round(brier, 4),
         "base_rate_confirmed_pct": round(base * 100, 1),
         "brier_base_rate": round(brier_base, 4),
-        "skill_vs_base_rate": round(brier_base - brier, 4),
+        "degenerate": single_class,
+        "skill_vs_base_rate": (None if single_class else round(brier_base - brier, 4)),
+        "degenerate_note": ("single-class outcome set (base rate 0% or 100%): skill vs "
+                            "base rate is arithmetically forced and therefore suppressed; "
+                            "informative once both outcome classes exist"
+                            if single_class else None),
         "buckets": buckets,
     }

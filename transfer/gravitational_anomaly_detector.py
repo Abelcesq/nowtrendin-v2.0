@@ -3644,6 +3644,40 @@ def collect_gdelt_trends(conn) -> int:
     return total
 
 
+def fastlane_refresh_topic(topic_key: str, display: str):
+    """Lever B (credibility board 2026-08-17): FREE re-collect + rescore of ONE
+    near-crosser topic through the engine's NORMAL pipeline — collect_for_term
+    (HN + GitHub only; no Wikipedia, no Google, no Apify) → score_topic →
+    apply_calibration → lifecycle → persist. Returns (signals_collected,
+    new_detection_score|None). Used by fastlane_recheck.nearcross_once; identical
+    flow to the Enterprise direct-query scorer so a fast-lane score is never a
+    special-cased score."""
+    conn = get_db(DB_PATH)
+    try:
+        collected = collect_for_term(conn, display)
+        signals = detector._get_topic_signals(topic_key, hours=72)
+        result = detector.score_topic(topic_key, signals)
+        if result is None:
+            return collected, None
+        if _CAL_AVAILABLE:
+            try:
+                result = apply_calibration(result, db_path=DB_PATH)
+            except Exception as _ce:
+                print(f"[fastlane-nearcross] apply_calibration failed {topic_key}: {_ce}")
+                result.setdefault("calibration_errors", []).append("apply_calibration")
+        try:
+            detector._update_topic_lifecycle(conn, result)
+        except Exception:
+            pass
+        persist_velocity_score(conn, result)
+        return collected, float(result.get("detection_score") or 0)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def collect_for_term(conn, term: str) -> int:
     """
     Targeted, on-demand collection for a single queried topic
@@ -5896,6 +5930,28 @@ def start_scheduler():
                           f"triggered={res.get('triggered')} err={res.get('error')}")
             except Exception as _fe:
                 print(f"[fastlane] skipped: {_fe}")
+        # LEVER B (credibility board 2026-08-17, Chairman-approved): pre-enrollment
+        # near-crosser lane — free re-collect + rescore of topics just under the
+        # enrollment floor, every 2h at :20 (off every paid clock slot; no Apify, no
+        # Wikipedia, no Google — collect_for_term only). Rows it enrolls carry
+        # enroll_arm='fastlane_nearcross' so the cadence epoch is separable in every
+        # rate. FASTLANE_NEARCROSS=0 disables.
+        def _scheduled_nearcross():
+            try:
+                import fastlane_recheck
+                res = fastlane_recheck.nearcross_once(get_db, DB_PATH)
+                if res.get("enabled"):
+                    print(f"[fastlane-nearcross] candidates={res.get('candidates')} "
+                          f"refreshed={res.get('refreshed')} crossed={res.get('crossed')} "
+                          f"enrolled={res.get('enrolled')}")
+            except Exception as _fe:
+                print(f"[fastlane-nearcross] skipped: {_fe}")
+        _sched.add_job(_scheduled_nearcross, "cron", hour="*/2", minute=20,
+                       id="fastlane_nearcross", max_instances=1, coalesce=True,
+                       misfire_grace_time=600)
+        print(f"[scheduler] FASTLANE nearcross job every 2h at :20 UTC "
+              f"(enabled={os.getenv('FASTLANE_NEARCROSS', '1') == '1'}; "
+              f"free sources only, pre-enrollment)")
         _sched.add_job(_scheduled_fastlane, "cron", hour="0,6,12,18", minute=10,
                        id="fastlane_recheck", max_instances=1, coalesce=True,
                        misfire_grace_time=600)
@@ -7928,6 +7984,10 @@ def accuracy_ledger_report():
                     # a denominator-honesty companion to the resolved-only rates above.
                     "survival": h.get("survival"),
                     "falsePositives": h["misses_false_positive"],
+                    # Step-0 (credibility board 2026-08-17): the zero is structural
+                    # (censoring), never precision — the caveat travels with the number.
+                    "falsePositivesNote": h.get("false_positives_note"),
+                    "sealedEpoch": h.get("sealed_epoch"),
                     "pending": h["still_pending"],
                     "smallSample": h["small_sample_warning"],
                     # Measurement-policy stamps (board convergence: no published rate
@@ -8099,10 +8159,12 @@ def backtest_estimator_report():
 
 @app.get("/fastlane")
 def fastlane_status():
-    """D10 fast-lane recheck status (held-out; FASTLANE_RECHECK=0 = inert)."""
+    """D10 fast-lane recheck status (held-out; FASTLANE_RECHECK=0 = inert) + the
+    Lever-B pre-enrollment near-crosser lane (credibility board 2026-08-17)."""
     try:
         import fastlane_recheck
-        return fastlane_recheck.status(get_db, DB_PATH)
+        return {"recheck": fastlane_recheck.status(get_db, DB_PATH),
+                "nearcross": fastlane_recheck.nearcross_status(get_db, DB_PATH)}
     except Exception as e:
         return {"error": str(e)[:200]}
 

@@ -62,7 +62,47 @@ search when any rate is cited.
    a forward replication on rows enrolled after the finding — out-of-sample by
    construction — rather than a corrected p-value on the searched pool.
 
-## 3. Standing rules this register inherits
+## 3. Frozen within-family parameters (board amendment, 2026-08-17 credibility review)
+
+> Statistician: "families without frozen parameters are still a garden of forking
+> paths." The parameters below are FROZEN as of this amendment; changing any one is a
+> DEFINITION CHANGE that must be appended here with a new param version, never a tune.
+
+- Patience window `LEDGER_TIMEOUT_DAYS` = 365 (H3) · backward match floor
+  `MATCH_WINDOW_DAYS` = 30 · forward lead cap `LEAD_MAX_DAYS` = 365.
+- Pre-broken grace `LEDGER_PRE_BROKEN_DAYS` = 7 (H5).
+- Tail-capture (H14): top decile = `len(sized) // 10` (min 1) over resolved rows
+  carrying a breakout multiple; computation requires ≥10 sized rows; LED baseline at
+  registration = 1/12 (frozen — the trial may not move its own goalpost).
+- Calibration curve (H15): 20-point score buckets over race rows (confirmed =
+  led/same-day/near-miss, miss = timeout FP; pre-broken excluded); `skill_vs_base_rate`
+  SUPPRESSED while the outcome set is single-class (degenerate flag).
+- Referee (H8): wiki-v2 frozen params (`SURGE_MULT` 3.0, `SURGE_MIN_ABS` 200,
+  `MATCH_WINDOW` 30, ±14d breakout match, 2d detection grace). `referee_sealed`
+  distinguishes sealed-article checks (first-class) from hindsight-opensearch
+  fallbacks (second-class, permanent marking).
+- Maturity split (H2): `LEDGER_ESTABLISHED_MIN_DAYS` = 14.
+- **Null models (written derivations, per the Statistician's amendment):**
+  - `random_order_race_expectation` = 50%: among races actually run (led + near-miss;
+    same-day ties excluded from the strict order test), a timing-skill-free detector
+    precedes the breakout half the time under exchangeability of (detection, breakout)
+    order. CAVEATS ON RECORD: the 6h sweep cadence vs Google's daily granularity
+    biases SAME_DAY assignment; exchangeability is assumed, not derived from an
+    attention model (Challenger). A naive-momentum comparator (yesterday's risers) is
+    the stronger Malkiel null and is REGISTERED AS FUTURE WORK (H-null-2), not yet
+    computed (Economist).
+  - `breakout_base_rate`: degenerate at zero FPs (labeled in-payload; not a comparator).
+- **Cadence epochs:** `enroll_arm='fastlane_nearcross'` marks rows enrolled via the
+  Lever-B pre-enrollment lane (live 2026-08-17). Pre/post-cadence rates are never
+  compared like-for-like (Challenger condition).
+- **H16 amendment (Statistician):** the D-early "inversion flips" criterion is a
+  MANIPULATION CHECK, never evidence of skill (Lever A raises race-cohort D by
+  construction); the citable tests are (ii) null-beating on sealed new-epoch races and
+  (iii) tail-capture improvement. The dark phase's flip gate is the pre-registered
+  discrimination test: does d_early-at-enrollment separate subsequently-confirmed from
+  pre-broken on NEW rows (threshold to be stated before the first readout).
+
+## 4. Standing rules this register inherits
 
 - Rates stay PROVISIONAL (payload-stamped) until the above is satisfied — the display
   caveat + epoch split shipped 2026-08-10 remain in force.

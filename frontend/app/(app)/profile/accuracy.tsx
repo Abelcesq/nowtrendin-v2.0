@@ -229,6 +229,12 @@ export default function AccuracyLedger() {
           <Text className="text-textMuted text-[12px] text-center mb-1">
             Detected First referee: {report!.ledCorroborated ?? 0} ✓ · {report!.ledUncorroborated ?? 0} – · {report!.ledUnchecked ?? 0} unchecked
           </Text>
+          {(report as any)?.falsePositivesNote ? (
+            <Text className="text-textMuted text-[12px] leading-4 text-center mb-1">
+              A false-positive count of 0 is structural (365-day patience window — first
+              timeouts resolve ~mid-2027), not evidence of precision.
+            </Text>
+          ) : null}
           {(report as any)?.hitRateCaveat ? (
             <Text className="text-textMuted text-[12px] leading-4 text-center mb-1">
               Provisional: {(report as any).hitRateCaveat}

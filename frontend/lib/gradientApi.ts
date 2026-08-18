@@ -623,6 +623,9 @@ export interface AccuracyReport {
   laggedNear?: number | null;
   preBroken?: number | null;
   falsePositives?: number;
+  // Structural-zero caveat (credibility board 2026-08-17): under the 365-day patience
+  // window no FP can resolve before ~mid-2027 — a 0 is censoring, not precision.
+  falsePositivesNote?: string | null;
   pending?: number;
   hitRate?: number;
   trackedRaceHitRate?: number | null;
@@ -658,6 +661,7 @@ export async function fetchAccuracy(): Promise<AccuracyReport> {
     laggedNear: d.laggedNear ?? null,
     preBroken: d.preBroken ?? null,
     falsePositives: d.falsePositives,
+    falsePositivesNote: d.falsePositivesNote,
     pending: d.pending,
     hitRate: d.hitRate ?? d.hit_rate_pct,
     trackedRaceHitRate: d.trackedRaceHitRate ?? null,
