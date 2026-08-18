@@ -6480,6 +6480,19 @@ async def startup_auto_collect():
         except Exception as _pse:
             print(f"[startup] pit-seal failed to start: {_pse}")
 
+    # NTI-SD50 (Chairman ruling (c), 2026-08-18): frozen-rule UNMARKETED daily
+    # index calculation — one sealed value per UTC day into the PIT store.
+    # Rules register: audits/index/INDEX_RULEBOOK_REGISTER.md (r1). Held-out.
+    if os.getenv("ATTENTION_INDEX", "1").lower() in ("1", "true", "yes"):
+        try:
+            import attention_index as _aidx
+            threading.Thread(target=_aidx.daily_loop, daemon=True,
+                             name="attention-index").start()
+            print(f"[startup] attention-index started (daily >=01:00 UTC; "
+                  f"{_aidx.RULES_VERSION}; unmarketed, PIT-sealed).")
+        except Exception as _aie:
+            print(f"[startup] attention-index failed to start: {_aie}")
+
     # Category enrichment: build the topic_key→category override maps (situation
     # EVENT-context + own-HEADLINE context), then refresh on an interval. Both drain the
     # news/general catch-all by context — display-only, never feed the score.
@@ -7720,6 +7733,24 @@ def diag_pit(verify: int = 0, seal: int = 0):
             out["status"] = pit.status(DB_PATH)
         if verify:
             out["verify"] = pit.verify(days=min(int(verify), 400), db_path=DB_PATH)
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.get("/diag/index", dependencies=[Depends(_require_internal)])
+def diag_index(run: int = 0, days: int = 14):
+    """NTI-SD50 (Chairman ruling (c), 2026-08-18): frozen-rule unmarketed daily
+    index. Register: audits/index/INDEX_RULEBOOK_REGISTER.md (r1). `?run=1`
+    computes today's value if not yet sealed (idempotent; never reaches back —
+    missed days stay ABSENT forever). Values live in the PIT store."""
+    try:
+        import attention_index as aidx
+        out = {"index_key": aidx.INDEX_KEY, "rules_version": aidx.RULES_VERSION,
+               "unmarketed": True}
+        if run:
+            out["run"] = aidx.compute_and_record(DB_PATH)
+        out["recent"] = aidx.recent(days=min(int(days), 60), db_path=DB_PATH)
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
