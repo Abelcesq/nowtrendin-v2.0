@@ -71,7 +71,9 @@ document hashes (sha256) are recorded with the resolution; the resolution is a N
 Early YES resolution is permitted the moment all criterion elements are evidenced.
 
 **PIT seal:** `kind='forecast'`, `item_key='FCAST-F5-first-paying-licensee-structure-f'`,
-`event_date='2026-08-18'`. `row_sha256`: *(recorded below upon sealing)*
+`event_date='2026-08-18'`, sealed via `POST /diag/pit/forecast` on 2026-08-18 (the sealed text =
+this entry's sections (1)–(5) verbatim, 3,386 chars). `row_sha256`:
+`9531d484d29840c26097104ee5f2ba9383696f38570a1bca41307934795f619c`
 
 **Board conditions attached (pending Chairman ruling, recorded for the resolution file):** the
 Operator's four rules (criterion firewall — sealed above; no commercial action may cite the

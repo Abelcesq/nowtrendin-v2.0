@@ -3937,3 +3937,50 @@ cycle, confirm issuer-source A2.2 rows begin deriving (page_asof stamps landing)
 - Board convening on the World Cup case study
 - Forecaster to seal the structure-(f) first-licensee forecast
 - CoinAPI gate ~08-24; FMP ETF-flow re-eval 2026-09-05
+
+## 2026-08-18 (PT, cont.-4) — Queue items 1-5 EXECUTED (PIT store + index LIVE; board convened; F5 sealed; gates checked)
+
+(1) PIT STORE BUILT + DEPLOYED (Chairman ruling (b)): transfer/pit_store.py —
+bitemporal pit_observations (event_date + server-stamped knowable_at) + daily
+hash-chain pit_seals, append-only TRIGGER-ENFORCED in the DB (UPDATE/DELETE both
+dialects, TRUNCATE on PG); held-out, write-only from score sinks (trend
+velocity_scores INSERT + market/crypto apply_market_signal recording cycles),
+fail-open own-connection; hourly pit-seal daemon; /diag/pit (+?seal ?verify).
+17/17 tests. Live-verified on PG: schema + triggers created; observations accrue
+from the next scoring cycle; first seal ~tomorrow 00:xx UTC. WATCH: confirm
+observations + first seal after the next collect cycle.
+(2) NTI-SD50 INDEX LIVE (Chairman ruling (c)): rules FROZEN pre-first-value in
+audits/index/INDEX_RULEBOOK_REGISTER.md r1 (top-50 eligible by stored detection,
+24h window, 48h embargo, honest ABSENT <10 eligible, one value/UTC day, missed
+days ABSENT forever, N banned, no ledger reads; RC1-RC4 reflexivity
+pre-commitments at AUM=0). transfer/attention_index.py + daily loop + /diag/index.
+13/13 tests. FIRST LIVE VALUE sealed to PIT: 2026-08-18 = 75.45 (50 constituents,
+universe 8409, eligible 5366). Unmarketed — no user surface.
+(3) NINE-SEAT BOARD CONVENED on the World Cup case study → collation
+audits/board/BOARD_worldcup-casestudy_2026-08-18.md — RULINGS PENDING CHAIRMAN.
+Headlines: method approved 9/9 (internal/diligence only; WC = illustration, the
+07-07 fleet mining = evidence); A2 ratify-then-sweep (Q=5 "set by construction,
+sweep pending"; Challenger: adopt the rule AS CODED — quorum OR magnitude); A3
+unanimous (+ soft-ceiling completion + aftermath-echo ticket); A4 gap real,
+GHOST_FEEDS stays gated — NEW FACTS: 3 niche football feeds live since 06-12
+produced ~zero niche mentions (Operator, verified — post-mortem demanded before
+any backtest), GHOST_RESEARCH_FEEDS trial readout OVERDUE (Executioner),
+geos=("US",) hard-code (Expansionist), Q5 38.5→70 vs peak 48.96 contradiction to
+label (Challenger), Google+Apify two-layer common-mode w/ Wikipedia referee at 0%
+on the family (Operator). 6 disagreements incl. F5 horizon (12mo vs sealed 24mo).
+(4) F5 SEALED (standing consequence 3): first paying structure-(f) licensee —
+P=0.30 by 2028-08-31, >=USD 5,000 arm's-length settled cash, exclusions +
+mechanics; register audits/forecasts/FORECAST_REGISTER.md founded (F1-F4
+migrated); dual-anchored via new POST /diag/pit/forecast → PIT row_sha256
+9531d484d29840c26097104ee5f2ba9383696f38570a1bca41307934795f619c.
+(5) TIME GATES: CoinAPI wiring gate NOT DUE (~08-24; baseline healthy 12/12
+coins, 9 days, latest today); FMP ETF-flow re-eval NOT DUE (09-05).
+
+### Open / Next
+- CHAIRMAN: rule on the board collation (A1 labeling conditions; A2 prose-vs-
+  OR-form + sweep; A3 tripwire/ceiling/echo; A4 sequencing — post-mortem, trial
+  readout, universe statement, scheduled-event registry, shadow-vs-retro,
+  geo fix; B horizon 12mo-vs-24mo + Operator rules + reflexivity log)
+- WATCH: PIT observations accruing + first day-seal; NTI-SD50 day 2 value;
+  A2.2 issuer-source rows deriving (page_asof stamps landing)
+- CoinAPI backtest-before-ship gate opens ~08-24; FMP re-eval 09-05
