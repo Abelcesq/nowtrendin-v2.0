@@ -64,9 +64,44 @@ def t3_etha_epoch():
        ip._epoch_src("IBIT", "issuer_ishares", post) == "issuer_ishares")
 
 
+def t4_21shares_aum_required():
+    """A2.2 hardening (trace A2_SIGNFLIP_TRACE_2026-08-18.md §7): the 21Shares AUM
+    regex went silently inert (split-div template) → identity check dead for the
+    family. The new template must parse; and on an AUM-publishing family
+    (_AUM_REQUIRED) a missing AUM = declared absence (fail-closed, never guessed).
+    Families outside _AUM_REQUIRED keep the N1.4 no-AUM contract (t1)."""
+    fixture = (
+        '<div data-element="ki4-shares-outstanding"><div class="text-all-caps '
+        'sans-body-copy-2a">Shares outstanding</div>'
+        '<div class="sans-body-copy-2b">100,775,000</div></div>'
+        '<div data-element="ki3-nav-per-unit"><div class="sans-body-copy-2a">NAV'
+        '</div><div class="sans-body-copy-2b">$21.32</div></div>'
+        '<div data-element="nav-aum"><div class="flex-horizontal margin-3xs">'
+        '<div class="text-emphasis">$</div>'
+        '<div class="text-emphasis">2,149,011,399.07</div></div>'
+        '<div class="text-annotations">AUM</div></div>'
+        'as of Aug 17, 2026')
+    p = ip._parse_21shares(fixture)
+    ok("21shares split-div AUM parses", p is not None and
+       p.get("aum") == 2149011399.07, p)
+    ok("21shares shares+nav+asof parse", p["shares"] == 100775000.0 and
+       p["nav"] == 21.32 and p["asof"] == "Aug 17, 2026", p)
+    ip._get = lambda url: "<html>stub</html>"
+    ip.ADAPTERS["ARKB"] = ("issuer_21shares", "stub://arkb",
+                           lambda html: {"shares": 100_775_000.0, "nav": 21.32,
+                                         "aum": None, "asof": None})
+    ok("AUM-required family fails closed on missing AUM",
+       ip.fetch_one("ARKB") is None)
+    ip.ADAPTERS["ARKB"] = ("issuer_21shares", "stub://arkb",
+                           lambda html: {"shares": 100_775_000.0, "nav": 21.32,
+                                         "aum": 2_149_011_399.07, "asof": None})
+    ok("AUM present passes identity check", ip.fetch_one("ARKB") is not None)
+
+
 if __name__ == "__main__":
     print("=== etf_issuer_pages guard regressions ===")
     t1_identity_check()
     t2_staleness_guard()
     t3_etha_epoch()
+    t4_21shares_aum_required()
     print(f"\nALL {len(PASSED)} CHECKS PASSED")

@@ -9,6 +9,8 @@ Proves, from the repo, with no network and no engine:
   4. PENDING_FINAL on the still-moving newest interval
   5. the A2.3 splice rule — latest_delta refuses a delta across a src seam
   6. the first-pass A1.5 log is FROZEN — reconcile_a2 never writes it (d#2)
+  7. A2.2 as-of-keyed labeling (Chairman-approved 2026-08-18): settled/trade basis
+     from the page's own stamp; stamp-less issuer strikes covered-not-scored
 
     python test_etf_reconcile_a2.py        (sqlite temp DB)
 """
@@ -48,14 +50,16 @@ def _wipe():
     c.close()
 
 
-def _strike(tkr, e_date, shares, aum, nav, src=None):
-    """One strike whose capture is 20:00 ET on trading day e_date → T = prev bday."""
+def _strike(tkr, e_date, shares, aum, nav, src=None, asof=None):
+    """One strike whose capture is 20:00 ET on trading day e_date → legacy
+    (capture-instant) T = prev bday. asof (A2.2): the issuer page's own stamp."""
     cap = f"{e_date.isoformat()}T20:00:00-04:00"
     c = _conn()
     c.execute("INSERT INTO etf_share_snapshots "
-              "(ticker,snapshot_date,shares,aum,nav,captured_at,src) "
-              "VALUES (?,?,?,?,?,?,?)",
-              (tkr, e_date.isoformat(), shares, aum, nav, cap, src))
+              "(ticker,snapshot_date,shares,aum,nav,captured_at,src,page_asof) "
+              "VALUES (?,?,?,?,?,?,?,?)",
+              (tkr, e_date.isoformat(), shares, aum, nav, cap, src,
+               asof.isoformat() if asof else None))
     c.commit()
     c.close()
 
@@ -240,6 +244,74 @@ def t6_pre_coverage_cold_start():
        rep["re_arm"]["open_bad"] == 0, rep["re_arm"])
 
 
+def t7_asof_keyed_labeling():
+    """A2.2 (Chairman-approved 2026-08-18; trace A2_SIGNFLIP_TRACE_2026-08-18.md):
+    issuer strike labels come from the page's OWN as-of stamp + per-family basis
+    (iShares settled → T = prev bday of as-of; 21Shares trade → T = as-of), and the
+    capture instant is IGNORED for those families. Stamp-less issuer strikes are
+    covered-not-scored: no A2.2 verdict row, no NO_DERIVED retro-blame."""
+    _wipe()
+    # iShares SETTLED basis. Captures placed on TD[4]/TD[3]/TD[0] evenings — the
+    # legacy mapping would label the first interval end TD[4] (a mislabel); the
+    # stamps say as-of TD[6]→TD[5], so T runs TD[7]→TD[6] and the +$48.1M derived
+    # flow must land on TD[6], where +$50M is published.
+    _strike("IBIT", TD[4], 1_000_000_000, 18e9, 40.0,
+            src="issuer_ishares", asof=TD[6])
+    _strike("IBIT", TD[3], 1_001_200_000, 18e9, 40.1,       # Δ +1.2M sh ≈ +$48.1M
+            src="issuer_ishares", asof=TD[5])
+    _strike("IBIT", TD[0], 1_001_225_000, 18e9, 40.2,       # newest → PENDING_FINAL
+            src="issuer_ishares", asof=TD[1])
+    # 21Shares TRADE basis: as-of names its own trade day; T = as-of, so the
+    # +$30.1M derived flow lands on TD[5], where +$30M is published.
+    _strike("ARKB", TD[4], 100_000_000, 4e9, 40.0,
+            src="issuer_21shares", asof=TD[6])
+    _strike("ARKB", TD[3], 100_750_000, 4e9, 40.1,          # Δ +0.75M sh ≈ +$30.1M
+            src="issuer_21shares", asof=TD[5])
+    _strike("ARKB", TD[0], 100_751_000, 4e9, 40.2,
+            src="issuer_21shares", asof=TD[1])
+    # Stamp-less issuer strikes (pre-A2.2 rows): the interval cannot be honestly
+    # labeled → NOT scored under A2.2, but its legacy-covered days must not turn
+    # into NO_DERIVED blamed on the issuer source.
+    _strike("HODL", TD[7], 58_000_000, 1e9, 17.8, src="issuer_ishares")
+    _strike("HODL", TD[5], 58_001_000, 1e9, 17.9, src="issuer_ishares")
+
+    by = {}
+    for d in TD[:11]:
+        by[d.isoformat()] = {"IBIT": 0.0, "FBTC": 0.0, "BITB": 0.0,
+                             "ARKB": 0.0, "HODL": 0.0}
+    by[TD[6].isoformat()]["IBIT"] = 50e6      # settled-basis target day
+    by[TD[5].isoformat()]["ARKB"] = 30e6      # trade-basis target day
+    by[TD[6].isoformat()]["HODL"] = 80e6      # inside HODL's legacy-covered window
+    stub = {"available": True, "source": "farside", "url": "stub",
+            "by_date": by, "days": len(by)}
+    real_fetch = REC.fetch_published
+    REC.fetch_published = lambda coin, source="farside": (
+        stub if coin == "BTC" else {"available": False, "reason": "no_comparator"})
+    try:
+        s = REC.reconcile_a2(coins={"BTC"})
+    finally:
+        REC.fetch_published = real_fetch
+
+    ok("stamp-less skip counted", s.get("asof_unlabelable", 0) >= 1, s)
+    c = _conn()
+    rows = {(r[0], r[1]): r[2] for r in c.execute(
+        "SELECT ticker, interval_end_date, verdict FROM etf_reconcile_log2").fetchall()}
+    c.close()
+    ok("settled basis labels by stamp (IBIT PASS on TD6)",
+       rows.get(("IBIT", TD[6].isoformat())) == "PASS", rows)
+    ok("capture instant ignored (no IBIT row on legacy TD4 label)",
+       ("IBIT", TD[4].isoformat()) not in rows, rows)
+    ok("trade basis labels by stamp (ARKB PASS on TD5)",
+       rows.get(("ARKB", TD[5].isoformat())) == "PASS", rows)
+    ok("stamp-less strike covered, not blamed (no HODL NO_DERIVED)",
+       ("HODL", TD[6].isoformat()) not in rows, rows)
+    rep = REC.report_a2(days=30)
+    ok("A2.2 re-arm counts the correctly-labeled passes",
+       rep["re_arm"]["pass_comparisons"] == 2 and rep["re_arm"]["open_bad"] == 0,
+       rep["re_arm"])
+    ok("rule_version is A2.2", rep["rule_version"] == "A2.2", rep["rule_version"])
+
+
 if __name__ == "__main__":
     print("=== A2 reconciliation regression harness ===")
     t1_t_of_mapping()
@@ -248,4 +320,5 @@ if __name__ == "__main__":
     t4_no_derived_era_attribution()
     t5_src_aware_dedupe()
     t6_pre_coverage_cold_start()
+    t7_asof_keyed_labeling()
     print(f"\nALL {len(PASSED)} CHECKS PASSED")

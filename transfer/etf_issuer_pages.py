@@ -16,10 +16,17 @@ FAIL-CLOSED (A2.3): an adapter that cannot parse BOTH shares AND nav from the li
 page returns nothing — declared absence, never a stale or guessed value. A frozen
 issuer page then surfaces as NO_DERIVED in the harness (failure, never silence).
 
-DATE RULE (survey hazard 2): issuers stamp mixed conventions (iShares/21Shares
-same-day; Bitwise/Canary T-1). We do NOT interpret their stamps — the A2
-t_of/settled-through mapping keys on OUR capture instant (captured_at), per the
-pre-declared spec. The page's own as-of date is logged for the eyeball only.
+DATE RULE (AMENDED under A2.2, Chairman-approved 2026-08-18 — root-cause trace
+audits/board/A2_SIGNFLIP_TRACE_2026-08-18.md): the page's OWN as-of stamp is now
+CAPTURED (canonicalized via date_utils.to_iso_date → `page_asof` on observations +
+snapshots) and is the A2.2 reconcile join key for families with a VERIFIED
+share-count basis (etf_flow_reconcile.ASOF_BASIS — iShares settled / 21Shares
+trade). The original rule ("we do NOT interpret their stamps"; capture-instant
+t_of) mislabeled issuer intervals by ±1 trading day, because page rollover latency
+varies by fund AND by day (IBIT posted as-of-D at T+1 ~16:30 ET on 08-11..15 but
+T+0 ~22:49 ET on 08-17) — only the stamp names its own day. The stamp was already
+trusted for the staleness guard; A2.2 extends that trust to labeling. Families
+without a stamp+value-verified basis (Bitwise) keep the capture-instant fallback.
 
 SPLICE (A2.3): the first issuer row after an FMP row is a source seam — the
 harness and latest_delta never compute Δshares across it; the issuer series
@@ -181,13 +188,28 @@ def _parse_21shares(html: str) -> dict | None:
             if nav:
                 break
     aum = None
-    am = re.search(r'data-element="nav-aum".{0,400}?\$([\d,\.]+)\s*([MB]?)', html, re.S)
-    if am:
-        aum = _f(am.group(1))
-        if aum and am.group(2) == "M":
-            aum *= 1e6
-        elif aum and am.group(2) == "B":
-            aum *= 1e9
+    # 2026-08-18 template (A2 sign-flip trace §7): the "$" and the value sit in
+    # SIBLING divs under data-element="nav-aum" — the old adjacent "$1.9B" pattern
+    # went silently inert, which left the shares×NAV≈AUM identity check dead for
+    # the whole family. New split-div patterns first; legacy suffixed form kept
+    # as fallback for the old template. Never guessed: no match → aum stays None
+    # and fetch_one fails CLOSED for this family (_AUM_REQUIRED).
+    for pat in (r'data-element="nav-aum".{0,300}?>\$</div><div[^>]*>([\d,\.]+)<',
+                r'data-element="ki3-aum".{0,400}?>\$</div><div[^>]*>([\d,\.]+)<'):
+        am = re.search(pat, html, re.S)
+        if am:
+            aum = _f(am.group(1))
+            if aum:
+                break
+    if not aum:
+        am = re.search(r'data-element="nav-aum".{0,400}?\$([\d,\.]+)\s*([MB]?)',
+                       html, re.S)
+        if am:
+            aum = _f(am.group(1))
+            if aum and am.group(2) == "M":
+                aum *= 1e6
+            elif aum and am.group(2) == "B":
+                aum *= 1e9
     dm = re.search(r'as of ([A-Z][a-z]+ \d{1,2}, \d{4})', html)
     asof = dm.group(1) if dm else None
     if not (shares and nav):
@@ -218,6 +240,15 @@ ADAPTERS = {
 #: Tickers whose daily STRIKE row is issuer-sourced — etf_flow.snapshot() (FMP)
 #: demotes to observations-only for these when ETF_ISSUER_PRIMARY=1.
 COVERED = frozenset(ADAPTERS.keys())
+
+#: Families whose pages ALWAYS publish AUM: a missing/unparseable AUM there means
+#: the PARSE broke, so the shares×NAV≈AUM identity check would run silently inert
+#: (the 2026-08-18 A2 sign-flip trace found exactly that on 21Shares — check dead,
+#: NO_DERIVED floor collapsed to flat $10M, shadow votes reading "AUM $0"). These
+#: families fail CLOSED to declared absence on missing AUM — never a value the
+#: identity check could not guard, never a guessed AUM. Families NOT listed keep
+#: the N1.4 contract (genuinely-no-AUM funds unaffected — regression t1).
+_AUM_REQUIRED = frozenset({"issuer_21shares"})
 
 
 def _tdays_ago(iso_date: str) -> int | None:
@@ -266,6 +297,13 @@ def fetch_one(ticker: str) -> dict | None:
         print(f"[issuer-pages] {ticker} parse error: {e}")
         return None
     if not out:
+        return None
+    # AUM-REQUIRED FAIL-CLOSED (A2.2 hardening, 2026-08-18 trace §7): on a family
+    # whose page always publishes AUM, a missing AUM means the parse broke and the
+    # identity check below would silently not run — declared absence instead.
+    if not out.get("aum") and src in _AUM_REQUIRED:
+        print(f"[issuer-pages] {ticker} AUM unparseable on an AUM-publishing family "
+              f"({src}) — identity check cannot run; declared absence (fail-closed)")
         return None
     # STALENESS GUARD (board A-2/Executioner-2): canonicalize the page's own as-of.
     asof_iso = None
@@ -337,23 +375,29 @@ def snapshot_issuer(db_path: str = DB_PATH, tickers=None) -> dict:
                 continue
             # Pre-declared scheduled break (ETHA 2026-10-06): fund-scoped epoch src.
             src = _epoch_src(t, info["src"], datetime.now(timezone.utc))
+            # A2.2: persist the page's own §14-canonical as-of stamp (asof_iso from
+            # fetch_one; None when the stamp did not parse — never guessed).
+            asof_iso = info.get("asof_iso")
             try:
                 c.execute(
                     f"INSERT INTO etf_share_observations "
-                    f"(ticker,captured_at,shares,aum,nav,src) "
-                    f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph}) ON CONFLICT DO NOTHING",
-                    (t, now_iso, info["shares"], info.get("aum"), info["nav"], src))
+                    f"(ticker,captured_at,shares,aum,nav,src,page_asof) "
+                    f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph}) "
+                    f"ON CONFLICT DO NOTHING",
+                    (t, now_iso, info["shares"], info.get("aum"), info["nav"], src,
+                     asof_iso))
                 row = c.execute(
                     f"SELECT shares, nav, src FROM etf_share_snapshots "
                     f"WHERE ticker={ph} AND snapshot_date={ph}", (t, today)).fetchone()
                 if row is None:
                     c.execute(
                         f"INSERT INTO etf_share_snapshots "
-                        f"(ticker,snapshot_date,shares,aum,nav,captured_at,src) "
-                        f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph}) "
+                        f"(ticker,snapshot_date,shares,aum,nav,captured_at,src,"
+                        f"page_asof) "
+                        f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph}) "
                         f"ON CONFLICT (ticker,snapshot_date) DO NOTHING",
                         (t, today, info["shares"], info.get("aum"), info["nav"],
-                         now_iso, src))
+                         now_iso, src, asof_iso))
                     out["written"] += 1
                 else:
                     r = dict(row) if hasattr(row, "keys") else \
@@ -366,18 +410,18 @@ def snapshot_issuer(db_path: str = DB_PATH, tickers=None) -> dict:
                         # the seam; splice rule voids deltas across it downstream.
                         c.execute(
                             f"UPDATE etf_share_snapshots SET shares={ph}, aum={ph}, "
-                            f"nav={ph}, captured_at={ph}, src={ph} "
+                            f"nav={ph}, captured_at={ph}, src={ph}, page_asof={ph} "
                             f"WHERE ticker={ph} AND snapshot_date={ph}",
                             (info["shares"], info.get("aum"), info["nav"], now_iso,
-                             src, t, today))
+                             src, asof_iso, t, today))
                         out["takeovers"] += 1
                     elif changed:
                         c.execute(
                             f"UPDATE etf_share_snapshots SET shares={ph}, aum={ph}, "
-                            f"nav={ph}, captured_at={ph} "
+                            f"nav={ph}, captured_at={ph}, page_asof={ph} "
                             f"WHERE ticker={ph} AND snapshot_date={ph}",
                             (info["shares"], info.get("aum"), info["nav"], now_iso,
-                             t, today))
+                             asof_iso, t, today))
                         out["strikes_updated"] += 1
                 out["tickers"][t] = {"shares": round(info["shares"]),
                                      "nav": info["nav"], "src": src,

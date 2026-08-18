@@ -352,8 +352,51 @@ def report(db_path: str = DB_PATH, days: int = 21) -> dict:
 #   2-trading-day grace — a frozen source reads as FAILURE, never silence).
 # ═══════════════════════════════════════════════════════════════════════════════
 
-RULE_VERSION = "A2"
+# ═══════════════════════════════════════════════════════════════════════════════
+# AMENDMENT A2.2 (Chairman-approved 2026-08-18; root-cause trace
+# audits/board/A2_SIGNFLIP_TRACE_2026-08-18.md; sub-versioned per annex N1.2).
+# The A2.1 capture-instant t_of mislabeled issuer-source intervals by ±1 trading
+# day: iShares counts are SETTLED-basis (as-of D = traded through D−1) with page
+# rollover latency that varies by fund AND by day (IBIT posted as-of-D at T+1
+# ~16:30 ET on 08-11..15 but T+0 ~22:49 ET on 08-17); 21Shares counts are
+# TRADE-basis (as-of D includes D's own trades). Every 08-10..08-13 sign-flip
+# FAIL was a CORRECT dollar value compared against the neighboring day's
+# published flow. A2.2 keys T on the page's OWN as-of stamp (persisted as
+# page_asof, §14-canonical) with a per-family mechanism-declared basis
+# (ASOF_BASIS below). FORWARD-ONLY RE-VERDICT: rule_version bumps to 'A2.2';
+# A2 rows are never rewritten or deleted; report_a2 + the A2.4 re-arm read
+# RULE_VERSION rows exclusively, so the re-arm clocks restart at zero on deploy
+# (pass_comparisons AND open_bad both reset; ≥5 material in-band issuer
+# comparisons re-earned from scratch on correctly-labeled rows). Issuer strikes
+# WITHOUT a stamp (pre-A2.2 rows, or a stamp that stops parsing) are NEVER
+# guessed (§14): their intervals are not scored under A2.2 — their verdicts
+# stand on the preserved A2 record — but their days still count as COVERED so
+# the NO_DERIVED sweep cannot retro-blame a source for days it watched (the
+# 953c31c era-attribution defect class); each skip is counted in the summary
+# (asof_unlabelable), never silent.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RULE_VERSION = "A2.2"
 NO_DERIVED_GRACE_TDAYS = int(os.getenv("RECONCILE_NO_DERIVED_GRACE", "2"))
+
+#: A2.2 — per-family share-count BASIS for the issuer page's as-of stamp. A basis
+#: is a DECLARED MECHANISM FACT verified from stamp+value pairs against the
+#: issuers' own published flows (trace §3-§4), never fitted per-row:
+#:   'settled' — count as-of D holds shares SETTLED through D = traded through the
+#:               PREVIOUS trading day (T+1 creation settlement). iShares: Δ(as-of
+#:               D − as-of D−1) reproduced the published flow of D−1 exactly on
+#:               four consecutive IBIT rows (−53.6 / +50.2 / −14.3 / −55.5 $M).
+#:   'trade'   — count as-of D already includes D's own creations. 21Shares:
+#:               Δ(as-of D − as-of D−1) reproduced the published flow of D exactly
+#:               (ARKB −11.5 / −58.8 $M).
+#:   (absent)  — basis not yet verified from stamps (Bitwise: empirically aligned
+#:               under the capture-instant mapping) → legacy t_of(captured_at)
+#:               fallback until a §16 stamp+value re-test promotes it.
+ASOF_BASIS = {
+    "issuer_ishares": "settled",
+    "issuer_ishares_r1": "settled",     # ETHA post-split epoch — same page mechanics
+    "issuer_21shares": "trade",
+}
 
 try:
     from zoneinfo import ZoneInfo
@@ -384,7 +427,11 @@ def _tdays_range(d_from_excl, d_to_incl):
 
 
 def t_of(captured_at: str):
-    """A2.1: the settled-through TRADE date a share-count capture reflects."""
+    """A2.1: the settled-through TRADE date a share-count capture reflects.
+    A2.2 note: retained as the FALLBACK mapping (FMP rows; families without a
+    verified ASOF_BASIS). For basis-verified issuer families the strike label
+    comes from t_of_strike (the page's own as-of stamp), because this
+    capture-instant model mislabels those intervals ±1 trading day (trace §4)."""
     try:
         dt = datetime.fromisoformat(str(captured_at).replace("Z", "+00:00"))
         if dt.tzinfo is None:
@@ -396,6 +443,42 @@ def t_of(captured_at: str):
         return _prev_bday(_last_bday(eff))
     except Exception:
         return None
+
+
+def t_of_strike(row: dict):
+    """A2.2 label for ONE strike row → (T, mode).
+
+    mode 'asof'         — src family has a verified basis and the row carries a
+                          parseable page_asof: T is derived from the stamp
+                          (settled: previous trading day of as-of; trade: the
+                          as-of trading day itself). Weekend-stamped as-ofs roll
+                          back to the last session first.
+    mode 'capture'      — no verified basis for this src (FMP, Bitwise): legacy
+                          capture-instant t_of.
+    mode 'missing_asof' — basis-verified family but NO parseable stamp on the row
+                          (pre-A2.2 capture, or stamp format drift): T is None —
+                          an honest label cannot be produced and is never guessed
+                          (§14). Caller skips scoring but keeps coverage.
+    Dates go through date_utils.to_iso_date (§14) — no raw slicing."""
+    src = (row.get("src") or "fmp")
+    basis = ASOF_BASIS.get(src)
+    if basis is None:
+        return t_of(row.get("captured_at")), "capture"
+    asof = row.get("page_asof")
+    iso = None
+    if asof:
+        try:
+            from date_utils import to_iso_date
+            iso = to_iso_date(str(asof))
+        except Exception:
+            iso = None
+    if not iso:
+        return None, "missing_asof"
+    try:
+        d = _last_bday(datetime.strptime(iso, "%Y-%m-%d").date())
+    except Exception:
+        return None, "missing_asof"
+    return (_prev_bday(d) if basis == "settled" else d), "asof"
 
 
 def init_reconcile_db2(db_path: str = DB_PATH):
@@ -426,14 +509,20 @@ def _strikes_with_capture(ticker: str, db_path: str = DB_PATH):
     try:
         try:
             rows = [dict(r) for r in c.execute(
-                "SELECT snapshot_date, shares, aum, nav, captured_at, src "
+                "SELECT snapshot_date, shares, aum, nav, captured_at, src, page_asof "
                 "FROM etf_share_snapshots WHERE ticker = ? ORDER BY snapshot_date ASC",
                 (ticker.upper(),)).fetchall()]
-        except Exception:                            # pre-src schema
-            rows = [dict(r) for r in c.execute(
-                "SELECT snapshot_date, shares, aum, nav, captured_at "
-                "FROM etf_share_snapshots WHERE ticker = ? ORDER BY snapshot_date ASC",
-                (ticker.upper(),)).fetchall()]
+        except Exception:                            # pre-A2.2 schema (no page_asof)
+            try:
+                rows = [dict(r) for r in c.execute(
+                    "SELECT snapshot_date, shares, aum, nav, captured_at, src "
+                    "FROM etf_share_snapshots WHERE ticker = ? "
+                    "ORDER BY snapshot_date ASC", (ticker.upper(),)).fetchall()]
+            except Exception:                        # pre-src schema
+                rows = [dict(r) for r in c.execute(
+                    "SELECT snapshot_date, shares, aum, nav, captured_at "
+                    "FROM etf_share_snapshots WHERE ticker = ? "
+                    "ORDER BY snapshot_date ASC", (ticker.upper(),)).fetchall()]
     except Exception:
         rows = []
     finally:
@@ -443,6 +532,7 @@ def _strikes_with_capture(ticker: str, db_path: str = DB_PATH):
         if not r.get("shares") or not r.get("captured_at"):
             continue
         r.setdefault("src", None)
+        r.setdefault("page_asof", None)
         if distinct:
             p = distinct[-1]
             # SRC-AWARE dedupe (board/Challenger, 2026-08-09): identical values
@@ -458,15 +548,19 @@ def _strikes_with_capture(ticker: str, db_path: str = DB_PATH):
 
 
 def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") -> dict:
-    """One A2 harness pass: interval comparisons + the NO_DERIVED sweep, upserted into
-    etf_reconcile_log2 under RULE_VERSION with a fresh verdict_at. Idempotent, daily."""
+    """One A2.2 harness pass: interval comparisons + the NO_DERIVED sweep, upserted
+    into etf_reconcile_log2 under RULE_VERSION with a fresh verdict_at. Idempotent,
+    daily. A2.2: interval labels come from t_of_strike (as-of-keyed for
+    basis-verified issuer families); stamp-less issuer strikes are covered-not-
+    scored (summary['asof_unlabelable'])."""
     import crypto_signals as cs
     init_reconcile_db2(db_path)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     today_t = _prev_bday(_last_bday(datetime.now(_ET).date()))
     summary = {"rule_version": RULE_VERSION, "checked": 0, "pass": 0, "fail": 0,
                "immaterial": 0, "pending_final": 0, "empty_interval": 0,
-               "no_derived": 0, "no_published": 0, "no_comparator_coins": [], "at": now}
+               "no_derived": 0, "no_published": 0, "asof_unlabelable": 0,
+               "no_comparator_coins": [], "at": now}
     conn = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
 
@@ -514,7 +608,25 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                 covered = set()
                 aum_latest = (strikes[-1].get("aum") if strikes else 0.0) or 0.0
                 for i, (a, b) in enumerate(zip(strikes, strikes[1:])):
-                    ta, tb = t_of(a["captured_at"]), t_of(b["captured_at"])
+                    # A2.2: strike labels come from the page's own as-of stamp
+                    # for basis-verified families; capture-instant fallback else.
+                    ta, ma = t_of_strike(a)
+                    tb, mb = t_of_strike(b)
+                    if "missing_asof" in (ma, mb):
+                        # Pre-A2.2 issuer strike (or a stamp that stopped
+                        # parsing): the interval cannot be honestly labeled and
+                        # is never guessed (§14). Its verdicts stand on the
+                        # preserved A2 record; its days still count as COVERED
+                        # (under the legacy labels) so the NO_DERIVED sweep does
+                        # not retro-blame the source for days it watched (the
+                        # 953c31c era class). Counted, never silent.
+                        if (a.get("src") or "fmp") == (b.get("src") or "fmp"):
+                            fa = t_of(a.get("captured_at"))
+                            fb = t_of(b.get("captured_at"))
+                            if fa and fb and fb > fa:
+                                covered.update(_tdays_range(fa, fb))
+                        summary["asof_unlabelable"] += 1
+                        continue
                     if not ta or not tb or tb <= ta:
                         continue
                     if (a.get("src") or "fmp") != (b.get("src") or "fmp"):
@@ -572,7 +684,13 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                 eras = []                            # [(era_start_T, src)] in order
                 for s in strikes:
                     s_src = s.get("src") or "fmp"
-                    s_t = t_of(s.get("captured_at"))
+                    # A2.2: era boundaries use the same per-strike label; a
+                    # missing-asof strike still needs a boundary date, so it
+                    # falls back to the capture-instant mapping (attribution
+                    # only — such strikes are never SCORED under A2.2).
+                    s_t, _sm = t_of_strike(s)
+                    if s_t is None:
+                        s_t = t_of(s.get("captured_at"))
                     if s_t and (not eras or eras[-1][1] != s_src):
                         eras.append((s_t, s_src))
 
@@ -710,12 +828,17 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
         "band": {"floor": "max($10M, 0.05% AUM)", "direction": "mandatory on material "
                  "intervals", "magnitude": "±25% or ±$20M (more forgiving)",
                  "bias_rule": f">={BIAS_RUN} consecutive same-sign errors fail",
-                 "join": "A2 interval-cumulative (T(strike) settled-through mapping)"},
+                 "join": "A2.2 interval-cumulative, as-of-keyed (T from the issuer "
+                         "page's own stamp + per-family basis; capture-instant t_of "
+                         "fallback for FMP / unverified families)"},
         "gate_status": gate,
-        "note": "Held-out verifier under amendment A2 (51adb9d). First-pass A1.5 log "
-                "frozen + archived. FMP rows are silent-comparison only (re-eval "
-                "2026-09-05); re-arm counts issuer-source rows exclusively. Post-swap "
-                "PASSes verify pipeline fidelity, not independent confirmation.",
+        "note": "Held-out verifier under amendment A2.2 (Chairman-approved 2026-08-18; "
+                "trace A2_SIGNFLIP_TRACE_2026-08-18.md). A2 + A1.5 records preserved, "
+                "never rewritten; this report reads A2.2 rows only, so the A2.4 re-arm "
+                "clocks restarted at deploy. FMP rows are silent-comparison only "
+                "(re-eval 2026-09-05); re-arm counts issuer-source rows exclusively. "
+                "Post-swap PASSes verify pipeline fidelity, not independent "
+                "confirmation.",
     }
 
 

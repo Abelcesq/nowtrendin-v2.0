@@ -192,3 +192,46 @@ and trusts for the staleness guard — but does not persist or use for the join.
 
 *Evidence: engine Postgres reads 2026-08-18; farside.co.uk/btc fetch 2026-08-18;
 live issuer-page fetches 2026-08-18; git 8efadda / d8c23d9 / 953c31c / b3eaf00.*
+
+---
+
+## 8. IMPLEMENTED — A2.2 (Chairman-approved, shipped 2026-08-18)
+
+Everything in §6 + §7 shipped as **rule_version 'A2.2'** (sub-versioned per annex
+N1.2). Not yet deployed to Heroku — deploy + live verification are the
+coordinator's next step.
+
+- **`transfer/etf_flow_reconcile.py`** — `RULE_VERSION = "A2.2"`; new `ASOF_BASIS`
+  map (iShares/`_r1` = settled, 21Shares = trade, Bitwise absent → capture-instant
+  fallback until a §16 stamp+value re-test); new `t_of_strike()` keys T on the
+  strike's persisted `page_asof` (via `date_utils.to_iso_date`, no raw slicing) with
+  the per-family basis; `reconcile_a2` labels intervals + era boundaries with it.
+  Stamp-less issuer strikes (pre-A2.2 rows, or stamp drift) are **covered-not-
+  scored**: no A2.2 verdict row is written (never guessed, §14), their legacy-labeled
+  days still count as covered so the NO_DERIVED sweep cannot retro-blame the source
+  (the 953c31c era class), and each skip is counted in `summary["asof_unlabelable"]`.
+  **Forward-only re-verdict:** A2/A1.5 rows are never rewritten or deleted;
+  `report_a2` + the A2.4 re-arm read RULE_VERSION rows exclusively, so the re-arm
+  clocks (pass_comparisons AND open_bad) restart at zero on deploy and the ≥5
+  material in-band issuer comparisons are re-earned on correctly-labeled rows.
+- **`transfer/etf_issuer_pages.py`** — DATE RULE amended honestly (stamp is now the
+  A2.2 join key; original capture-instant rule and why it failed); `snapshot_issuer`
+  persists `page_asof` (canonical ISO) on observations + snapshots (insert, takeover,
+  strike-update); 21Shares AUM parse fixed for the split-div template (old suffixed
+  pattern kept as fallback); new `_AUM_REQUIRED = {issuer_21shares}` — on an
+  AUM-publishing family a missing AUM is now declared absence (fail-closed), so the
+  identity check can never again run silently inert; other families keep the N1.4
+  no-AUM contract.
+- **`transfer/etf_flow.py`** — `init_etf_db` adds the additive, rollback-guarded
+  `page_asof TEXT` column to both tables (NULL = no stamp; FMP rows never carry one).
+- **Tests:** `test_etf_issuer_pages.py` +t4 (new AUM template parses; AUM-required
+  fail-closed) → **14/14**; `test_etf_reconcile_a2.py` `_strike` gains `asof`, +t7
+  (settled + trade basis label by stamp, capture instant ignored, stamp-less
+  covered-not-blamed, re-arm counts only correctly-labeled passes, rule_version
+  A2.2) → **33/33**; `test_crypto_flow_a1.py` → **all pass** (one pre-existing
+  cp1252 console artifact on Windows; green under PYTHONIOENCODING=utf-8).
+  `py_compile` clean on all edited files.
+- **Expected post-deploy behavior:** report/monitor read `not_started` until the
+  first A2.2 pass (~30 min after boot); issuer intervals begin scoring from the
+  SECOND stamped strike per fund (the first stamped strike pairs with a stamp-less
+  pre-A2.2 row → covered-not-scored). Re-arm realistically ≥5 trading days out.

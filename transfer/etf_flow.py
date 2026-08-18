@@ -120,15 +120,20 @@ def init_etf_db(db_path: str = DB_PATH, conn=None):
         # that produced it ('fmp' | an issuer-page adapter id). Δshares is NEVER
         # computed across a src seam (a provider cutover's step offset would read as
         # flow under the 20%/day guard — the splice rule). Additive, NULL≡'fmp'.
+        # A2.2 (Chairman-approved 2026-08-18; trace audits/board/A2_SIGNFLIP_TRACE_
+        # 2026-08-18.md): page_asof = the issuer page's OWN as-of stamp, §14-canonical
+        # ISO date — the A2.2 reconcile join key. Additive; NULL = no stamp captured
+        # (FMP rows, pre-A2.2 issuer rows) — such strikes are never asof-labeled.
         for tbl in ("etf_share_snapshots", "etf_share_observations"):
-            try:
-                c.execute(f"ALTER TABLE {tbl} ADD COLUMN src TEXT")
-                c.commit()
-            except Exception:
+            for col in ("src", "page_asof"):
                 try:
-                    c.rollback()
+                    c.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
+                    c.commit()
                 except Exception:
-                    pass
+                    try:
+                        c.rollback()
+                    except Exception:
+                        pass
         c.commit()
     finally:
         if conn is None:
