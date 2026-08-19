@@ -156,6 +156,12 @@ export interface RiskRow {
   baseline_cycles?: number; baseline_signals?: number; sufficient_baseline?: boolean
   baseline_status?: string; baseline_note?: string
   interpretation?: string; market_gradient?: MarketGradient
+  // N · Platform Indicator (held-out): how often this instrument is triggered +
+  // surfaced as a tracked item across the platform. Shown alongside the money
+  // numbers and NEVER inside them — the Money Gradient is computed with no
+  // knowledge of this value (engine-side AST firewall enforces it).
+  platform_indicator?: number; platform_indicator_band?: string
+  platform_indicator_held_out?: boolean
   positioning_score?: number; maturity?: string; maturity_note?: string
   source_provenance?: string
   components?: Record<string, number>
@@ -242,6 +248,10 @@ export const api = {
   analysis: (kind: 'trend' | 'market' | 'crypto' | 'ledger', item: any) =>
     post<SignalAnalysis>(`/analysis/${kind}`, { item }),
   risk: (limit = 200) => get<{ count: number; results: RiskRow[] }>(`/risk/scores?limit=${limit}`),
+  // Full instrument detail — carries the complete N · Platform Indicator block
+  // (n, band, counts, the SEPARATE n-inclusive what-if, convergence). Display
+  // data only; nothing here feeds a score.
+  riskDetail: (key: string) => get<any>(`/risk/${encodeURIComponent(key)}`),
   // The WHOLE Market universe, fetched 100 at a time (engine serves O(1) slices from
   // its prewarmed superset). onBatch fires after each page so the table paints
   // progressively despite the rich per-instrument payloads.

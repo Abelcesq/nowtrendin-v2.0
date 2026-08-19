@@ -60,6 +60,15 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "coinmetrics_onchain": "on-chain activity accumulation (AdrActCnt/TxCnt, CoinMetrics "
                            "community, $0) — held-out baseline; wiring requires backtest "
                            "+ board + Chairman flip; SOL/BNB/DOT permanent declared absence",
+    "market_platform_indicator":
+                           "N for Market Signal — PLATFORM-INTERNAL tracking frequency "
+                           "(founder instruction 2026-08-19: display value, zero score "
+                           "contact). Same anti-circularity rule as topic-N in the "
+                           "Gradient Score: a money read may never be validated by "
+                           "engagement with that money read. market_signal_engine and "
+                           "crypto_money_gradient are SCORING_MODULES, so this "
+                           "registration is what makes 'never touches the score' a "
+                           "build failure rather than a promise.",
 }
 
 #: Modules that PRODUCE OR CALIBRATE A SCORE. These must never import the held-out set.
@@ -92,6 +101,21 @@ SCORING_MODULES = {
 #: is a deliberate act that shows up in review — which is exactly the property the Guardian
 #: asked for when he said not to delete the entry once it goes red.
 ACKNOWLEDGED_EXCEPTIONS = {
+    # N · Platform Indicator for Market Signal (founder feature 2026-08-19). The detector
+    # hosts the API surface, so SERVING the indicator necessarily imports it — the same
+    # shape as the ledger-serving exceptions below. Direction: detector -> indicator,
+    # SERVE + LOG only. What makes this safe is that the two modules that actually
+    # PRODUCE the money numbers — market_signal_engine and crypto_money_gradient — do
+    # NOT import it, and the audit still fails the day either one does. The attach helper
+    # copies rows before adding N, so even the cached risk superset stays N-free.
+    # ⚠ THE REVIEW MUST RE-CHECK: N is display-only forever. The day any component,
+    # weight, tier, baseline, or ledger enrollment reads platform_indicator, that is the
+    # circularity the whole registry exists to prevent — revoke this exception, do not
+    # widen it. Proof-of-non-contact lives in test_market_platform_indicator.py t5
+    # (money numbers byte-identical with N maximal vs N absent).
+    ("gravitational_anomaly_detector", "market_platform_indicator"):
+        "serves the Market Signal N block (/risk/scores rows, /risk/{key} detail, "
+        "/diag/market-n) + logs surfacing events; display-only, never an input",
     ("gravitational_anomaly_detector", "accuracy_ledger_enhanced"):
         "serves GET /accuracy/ledger; ledger is DB-driven and read-only from the API path",
     ("gravitational_anomaly_detector", "market_accuracy_ledger"):

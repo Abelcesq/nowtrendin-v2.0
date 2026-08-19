@@ -21,9 +21,10 @@ interface MRow {
   lane: string; laneLabel: string   // coverage lane: covered / halted_microcap / macro_theme
   v2: boolean; flow: 'inflow' | 'outflow' | 'neutral' | null  // Money Gradient (v2): direction
   mda: boolean   // D8: money_data_absent — no informed-money component; render market-confirmation only
+  n: number      // N · Platform Indicator — platform-internal tracking; NEVER part of any score
   raw: RiskRow   // full payload for the comprehensive detail rail (mobile parity)
 }
-type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin'
+type SortKey = 'name' | 'det' | 'conf' | 'gap' | 'tier' | 'pct' | 'lev' | 'sigs' | 'ageMin' | 'n'
 
 // mobile MARKET_CATEGORY_DEFS parity — the tier axis.
 const TIERS = ['ELEVATED', 'ACTIVE', 'MODERATE', 'ROUTINE', 'DORMANT']
@@ -92,6 +93,9 @@ function toRow(r: RiskRow): MRow {
     v2: !!(mg.model_version || mg.money_movement != null || mg.flow),
     flow: (mg.flow as MRow['flow']) || null,
     mda: !!mg.money_data_absent,
+    // N · Platform Indicator (held-out). Served alongside the score, never inside
+    // it — the money numbers above are computed with no knowledge of this value.
+    n: Math.round((r as any).platform_indicator ?? 0),
     comps, raw: r,
   }
 }
@@ -148,9 +152,13 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
   const [exLoading, setExLoading] = useState(true)
   const [exStream, setExStream] = useState<string | null>(null)   // P2-A: live token stream
+  // Why there is no definition, straight from the engine ("no explainer provider
+  // available", a credit problem, …). Previously discarded, which forced the UI to
+  // claim a generation was pending even when none could ever happen.
+  const [exReason, setExReason] = useState<string | null>(null)
   const [showFull, setShowFull] = useState(false)
   useEffect(() => {
-    let alive = true; setExLoading(true); setShowFull(false); setEx(null); setExStream(null)
+    let alive = true; setExLoading(true); setShowFull(false); setEx(null); setExStream(null); setExReason(null)
     // P2-A: stream first (cached = one instant event; fresh = words appear <1s).
     // On any stream failure, fall back to the sync endpoint (OpenRouter lane included).
     const cancel = api.streamExplainer(
@@ -160,12 +168,31 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       () => {
         if (!alive) return
         api.explainer(row.key)
-          .then((x) => alive && setEx(x?.available ? x : null))
-          .catch(() => {}).finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
+          .then((x) => {
+            if (!alive) return
+            setEx(x?.available ? x : null)
+            if (!x?.available) setExReason(x?.error || x?.reason || null)
+          })
+          .catch((e) => { if (alive) setExReason(String(e?.message || e).slice(0, 120)) })
+          .finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
       },
     )
     return () => { alive = false; cancel() }
   }, [row.key])
+  // N · Platform Indicator detail block (held-out, display-only). The list row
+  // carries the bare number for the column; the full block — counts, the SEPARATE
+  // n-inclusive what-if, convergence — comes with the instrument detail. Failing
+  // to load it simply hides the extras; it can never affect a score.
+  const [pi, setPi] = useState<any>(null)
+  useEffect(() => {
+    let alive = true
+    setPi(null)
+    api.riskDetail(row.key)
+      .then((d) => { if (alive) setPi(d?.platform_indicator ?? null) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [row.key])
+
   const onWatch = async () => setAct(await addToWatchlist(row.key, row.name, 'market'))
   const onAlert = () => setAct('Alerts are arriving soon — noted your interest in this instrument.')
   const onExport = () => exportEntityCsv(`${row.key}_market.csv`, [
@@ -224,6 +251,43 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MC_LABEL : 'Confidence'}</div><div className="gf">{row.v2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
       </div>
 
+      {/* N · Platform Indicator — HELD-OUT. Same card, same words, same rules as the
+          Trends rail: shown alongside the money numbers, never inside them. The
+          N-inclusive pair is a clearly-fenced what-if; the headline Money Movement /
+          Market Confirmation above are computed with no knowledge of N. */}
+      <div className="sect">
+        <div className="n-card">
+          <div className="n-head">
+            <span className="n-flame">🔥</span>
+            <span className="n-brand"><b style={{ color: MC.orange }}>Now</b><b style={{ color: MC.maroon }}>TrendIn</b> · Platform Indicator (N)</span>
+            <span className="n-val">{row.n}</span>
+          </div>
+          <div className="n-desc">A platform-tracking signal — how often this instrument is triggered and surfaced as a tracked item across the Now TrendIn platform (feeds, lookups, grades). A platform-internal read no public source has.</div>
+          {row.n > 0 && pi?.n_inclusive?.available ? (
+            <div className="ntg">
+              <div className="ntg-head"><span style={{ color: MC.orange, fontWeight: 800, fontSize: 9, letterSpacing: '.1em' }}>N-INCLUSIVE MONEY GRADIENT</span><span className="ntg-tag">SEPARATE · N-INCLUSIVE</span></div>
+              <div className="ntg-sub">A what-if read — where the score lands if the platform-tracking signal (N) is folded in. The headline {MM_LABEL}/{MC_LABEL} stay N-free (external world only).</div>
+              <div className="ntg-pair">
+                <div className="ntg-cell" style={{ borderColor: MC.detection + '33', background: MC.detection + '0A' }}><div className="ntg-l">{MM_LABEL.toUpperCase()} + N</div><div className="ntg-n" style={{ color: MC.detection }}>{pi.n_inclusive.money_with_n == null ? 'n/a' : Math.round(pi.n_inclusive.money_with_n)}</div></div>
+                <div className="ntg-cell" style={{ borderColor: MC.confidence + '33', background: MC.confidence + '0A' }}><div className="ntg-l">{MC_LABEL.toUpperCase()} + N</div><div className="ntg-n" style={{ color: MC.confidence }}>{Math.round(pi.n_inclusive.confirmation_with_n)}</div></div>
+              </div>
+              {pi.n_inclusive.tracking_driven && <div className="ntg-warn">⚠ Substantially tracking-driven — external confirmation is limited, so N's weight is reduced and platform tracking alone can't lift the read.</div>}
+            </div>
+          ) : (
+            <div className="n-empty">No platform tracking registered yet — N rises as this instrument is surfaced and looked up across the platform.</div>
+          )}
+          {pi?.convergence?.available && (
+            <div className="conv" style={{ borderColor: (pi.convergence.agreement === 'CONFIRMED' ? MC.confidence : pi.convergence.agreement === 'CONFLICTING' ? MC.red : MC.gold) + '55' }}>
+              <b style={{ color: pi.convergence.agreement === 'CONFIRMED' ? MC.confidence : pi.convergence.agreement === 'CONFLICTING' ? MC.red : MC.gold }}>Signal Convergence: {pi.convergence.label}</b>
+              <div className="conv-t">Platform tracking is {pi.convergence.direction.toLowerCase()} against a {(pi.n_inclusive?.money_with_n ?? row.det) >= 50 ? 'active' : 'quiet'} money read. Independent of the score by construction — that is what makes the comparison informative.</div>
+            </div>
+          )}
+          {pi?.detail?.available && (
+            <div className="conv-t" style={{ marginTop: 8 }}>Surfaced {pi.detail.total_queries_30d} time(s) in 30 days · {pi.detail.queries_24h} in the last 24h · {pi.detail.daily_rate_7d}/day 7-day baseline.</div>
+          )}
+        </div>
+      </div>
+
       {/* AI Context — the same source-aware definition the Trends rail shows (§12 parity),
           placed under the score like the trend panel. */}
       <div className="sect">
@@ -241,7 +305,17 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
             )}
           </div>
         ) : (
-          <div className="narr muted">{exLoading ? 'Generating a source-aware definition…' : 'No AI definition yet — it generates on first view and is cached.'}</div>
+          // §17 honest absence: the engine tells us WHY it has no definition. Promising
+          // "it generates on first view" when no provider is configured is a promise the
+          // system cannot keep — say what is actually true instead.
+          <div className="narr muted">{
+            exLoading ? 'Generating a source-aware definition…'
+              : exReason && /provider|unavailable|credit|key/i.test(exReason)
+                ? 'AI definitions are not available in this environment — no AI provider is configured. This is an honest absence, not a pending result.'
+                : exReason
+                  ? `No AI definition available (${exReason}).`
+                  : 'No AI definition yet — it generates on first view and is cached.'
+          }</div>
         )}
         {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
       </div>
@@ -581,9 +655,9 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   }, [focus?.n, rows])
 
   const csv = () => {
-    const hdr = ['item', 'detection', 'confidence', 'gap', 'tier', 'classification', 'pct_vs_baseline', 'leverage_health', 'signals', 'updated_min']
+    const hdr = ['item', 'platform_indicator_n', 'detection', 'confidence', 'gap', 'tier', 'classification', 'pct_vs_baseline', 'leverage_health', 'signals', 'updated_min']
     const lines = [hdr.join(',')].concat(view.map((r) =>
-      [`"${r.name}"`, r.det, r.conf, r.gap, r.tier, r.cls, r.pct ?? '', r.lev ?? '', r.sigs, r.ageMin].join(',')))
+      [`"${r.name}"`, r.n, r.det, r.conf, r.gap, r.tier, r.cls, r.pct ?? '', r.lev ?? '', r.sigs, r.ageMin].join(',')))
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }))
     a.download = 'nowtrendin_market_signal.csv'; a.click()
@@ -654,6 +728,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
             <thead>
               <tr>
                 <th onClick={() => sort('name')} className={sortKey === 'name' ? 'sorted' : ''}>Instrument <span className="sort">{arrow('name')}</span></th>
+                <th onClick={() => sort('n')} className={'r ' + (sortKey === 'n' ? 'sorted' : '')} title="Platform Indicator (N) — how often this instrument is triggered + surfaced as a tracked item across the platform; platform-internal, never part of the Money Gradient" style={{ textAlign: 'center' }}>N <span className="sort">{arrow('n')}</span></th>
                 <th onClick={() => sort('det')} className={'r ' + (sortKey === 'det' ? 'sorted' : '')}>{isV2 ? MM_LABEL : 'Detection'} <span className="sort">{arrow('det')}</span></th>
                 <th onClick={() => sort('conf')} className={'r ' + (sortKey === 'conf' ? 'sorted' : '')}>{isV2 ? MC_LABEL : 'Confidence'} <span className="sort">{arrow('conf')}</span></th>
                 <th onClick={() => sort('gap')} className={'r ' + (sortKey === 'gap' ? 'sorted' : '')}>{isV2 ? 'Lead' : 'Gap (lead)'} <span className="sort">{arrow('gap')}</span></th>
@@ -670,6 +745,7 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
                 return (
                   <tr key={r.key} className={r.key === sel ? 'sel' : ''} onClick={() => select(r.key)}>
                     <td><div className="topic-name">{r.name}{r.calibrating && <span className="cal-chip">cal</span>}{r.v2 && flowChip(r.flow)}</div><div className="topic-cat">{r.lane ? (LANE_SHORT[r.lane] || 'market') : (r.cls ? r.cls.toLowerCase() : 'market')}</div></td>
+                    <td className="r" style={{ textAlign: 'center' }}><span className="score-cell" style={{ color: 'var(--early)' }} title={r.n ? `Platform Indicator (N) ${r.n} — platform-internal tracking, never part of the Money Gradient` : 'Not yet surfaced on the platform'}>{r.n || '—'}</span></td>
                     <td className="r"><span className="score-cell det" style={(r.mda || r.dc === 'insufficient') ? { opacity: 0.4 } : undefined}>{r.mda ? 'n/a' : r.det}</span></td>
                     <td className="r"><span className="score-cell conf" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{r.conf}</span></td>
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>

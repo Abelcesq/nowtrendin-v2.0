@@ -4114,3 +4114,52 @@ is in an externally-uploaded copy, outside this repo.
   conditions, A3 tripwire/echo diagnostic, A4 remaining sequencing
 - Watch: re-arm toward 5/2/3; day-2 seal ~17:00 PT; anchor each session
 - CoinAPI gate ~08-24; FMP re-eval 09-05; ACC-Q scoring 2026-11-30
+
+## 2026-08-19 (UTC) — Market Signal N built on a branch + PRODUCTION INCIDENT (my error, resolved)
+
+FEATURE (branch feature/market-platform-indicator, NOT merged, NOT deployed):
+N - Platform Indicator for Market Signal, mirroring Trends with the SAME system
+values. transfer/market_platform_indicator.py: own instrument_queries table,
+identical 0-100 formula (log-volume 0-70 + recency 0-30, same bands), dedup'd
+surfacing logger, SEPARATE n-inclusive what-if (thin-evidence guarded; a null
+money read STAYS null per D8), convergence line, fail-open throughout. Web
+terminal: sortable N column between Instrument and Money Movement + the same
+n-card in the detail rail + CSV column + riskDetail() helper. Build clean.
+
+INTEGRITY AS MECHANISM (the founder's condition): registered in
+heldout_registry.HELD_OUT_ARRIVAL_INPUTS, so the AST firewall FAILS the build if
+market_signal_engine or crypto_money_gradient ever imports it. The audit caught
+the detector's serve-path import immediately -> resolved the sanctioned way (an
+ACKNOWLEDGED_EXCEPTION documenting direction serve+log only, with an explicit
+revoke-not-widen note), never by weakening the audit. Test t5 proves
+money_movement / market_confirmation / detection / confidence / tier / gap are
+BYTE-IDENTICAL with N maximal vs N absent. 36/36 tests.
+
+INCIDENT (~06:21-06:27 UTC, engine down ~6 min): I deployed the feature BRANCH
+to the production engine to live-verify. The dyno failed to boot TWICE
+(SIGKILL/137 at the 60s R10 limit), never printing "Application startup
+complete"; both boots hung at the identical point, immediately after
+"[startup] market_signal_history table ensured" (the next step,
+ledger_plus.init_pending_db, never logged). Rolled back to v351 -> healthy in
+~6s. Verified after: /health operational, /risk/scores 200 in 0.29s serving 300
+instruments, payload correctly WITHOUT platform_indicator (branch not
+deployed), gh-pages 200.
+- PROVEN: my branch was the only delta; rollback fixed it.
+- NOT PROVEN: which call blocked. The market-n startup lines had already logged
+  successfully, so the naive suspect (init_db) had completed. Per
+  verify-before-fix I did NOT ship a fix for an unproven mechanism.
+- STRUCTURAL FIX INSTEAD: the module now runs ZERO code at startup. init_db and
+  the flusher thread start LAZILY behind the first surfacing, off the critical
+  path. Whatever the mechanism, a display feature can no longer sit near the
+  boot sequence. Also fixed a real latent bug found while testing the lazy path
+  (_ensure_flusher froze DB_PATH as a default argument at import time).
+- MY PROCESS ERROR, recorded: the founder asked for a separate BRANCH; I should
+  not have deployed it to the production engine at all. Branch verification
+  needs a non-production path (local sqlite run, or a preview app).
+
+### Open / Next
+- Market N branch awaits: a safe verification path, then board/founder review
+  before any merge or deploy
+- Chairman items still open: worldcup collation A1/A3/A4 residuals
+- Watch: re-arm toward 5/2/3; nightly seal + anchor; CoinAPI ~08-24; FMP 09-05;
+  ACC-Q quarterly scoring 2026-11-30
