@@ -152,9 +152,13 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   const [ex, setEx] = useState<{ short?: string; full?: string } | null>(null)
   const [exLoading, setExLoading] = useState(true)
   const [exStream, setExStream] = useState<string | null>(null)   // P2-A: live token stream
+  // Why there is no definition, straight from the engine ("no explainer provider
+  // available", a credit problem, …). Previously discarded, which forced the UI to
+  // claim a generation was pending even when none could ever happen.
+  const [exReason, setExReason] = useState<string | null>(null)
   const [showFull, setShowFull] = useState(false)
   useEffect(() => {
-    let alive = true; setExLoading(true); setShowFull(false); setEx(null); setExStream(null)
+    let alive = true; setExLoading(true); setShowFull(false); setEx(null); setExStream(null); setExReason(null)
     // P2-A: stream first (cached = one instant event; fresh = words appear <1s).
     // On any stream failure, fall back to the sync endpoint (OpenRouter lane included).
     const cancel = api.streamExplainer(
@@ -164,8 +168,13 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
       () => {
         if (!alive) return
         api.explainer(row.key)
-          .then((x) => alive && setEx(x?.available ? x : null))
-          .catch(() => {}).finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
+          .then((x) => {
+            if (!alive) return
+            setEx(x?.available ? x : null)
+            if (!x?.available) setExReason(x?.error || x?.reason || null)
+          })
+          .catch((e) => { if (alive) setExReason(String(e?.message || e).slice(0, 120)) })
+          .finally(() => { if (alive) { setExStream(null); setExLoading(false) } })
       },
     )
     return () => { alive = false; cancel() }
@@ -242,53 +251,6 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="gauge conf">{ring(row.conf, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{row.conf}</div><div className="gl" style={{ marginTop: 28 }}>{row.v2 ? MC_LABEL : 'Confidence'}</div><div className="gf">{row.v2 ? 'broad market · M' : 'fundamentals + price'}</div></div>
       </div>
 
-      {/* AI Context — the same source-aware definition the Trends rail shows (§12 parity),
-          placed under the score like the trend panel. */}
-      <div className="sect">
-        <h4>AI Context</h4>
-        {exStream ? (
-          <div className="ai-ctx">
-            <div className="ai-preview">{exStream.split(/\n\s*---+\s*\n/)[0]}<span style={{ opacity: 0.5 }}>▍</span></div>
-          </div>
-        ) : ex?.short ? (
-          <div className="ai-ctx">
-            <div className="ai-preview">{ex.short}</div>
-            {ex.full && ex.full.trim() !== ex.short.trim() && (
-              showFull ? <div className="ai-full">{ex.full}</div>
-                : <button className="ai-more" onClick={() => setShowFull(true)}>Read full definition ↓</button>
-            )}
-          </div>
-        ) : (
-          <div className="narr muted">{exLoading ? 'Generating a source-aware definition…' : 'No AI definition yet — it generates on first view and is cached.'}</div>
-        )}
-        {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
-      </div>
-      <div className="sect">
-        {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
-          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
-            ℹ <b>Macro theme.</b> A market-wide theme has no single ticker, so smart-money positioning (FINRA short interest · 13F) and company fundamentals are <b>not applicable</b> — the score reflects only the macro / cross-market inputs that <i>can</i> be measured ({mg.total_inputs} applicable factor{mg.total_inputs === 1 ? '' : 's'}).
-          </div>
-        )}
-        {row.lane !== 'macro_theme' && !row.mda && mg.data_coverage === 'insufficient' && (
-          <div className="narr" style={{ marginBottom: 8, background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
-            ⚠ <b>Insufficient positioning data.</b> Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this instrument yet{mg.absent_inputs != null ? ` (${mg.absent_inputs}/${mg.total_inputs} inputs absent)` : ''}, so it sits near baseline by default — <i>not</i> a confirmed quiet market.
-          </div>
-        )}
-        {row.mda && (
-          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
-            ℹ <b>Market-Confirmation only.</b> No informed-money data exists for this instrument yet (every money-movement input is absent), so the Money Movement read is <b>absent — not zero</b>. Only the broad Market Confirmation (M) is shown.
-          </div>
-        )}
-        <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
-          <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : (mg.gap_state || `${Math.abs(row.gap)}-pt gap`)}{!mg.calibrating && ` · ${Math.abs(row.gap)}-pt gap`}</b>
-          {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
-          {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
-        </div>
-        <div className="disc"><b>What Market Signal measures:</b> {row.v2
-          ? <>The Market Signal section tracks whether money is moving into or out of a particular instrument. {MM_LABEL} “D” = the tracking of informed / early money movement. {MC_LABEL} “M” signals the broad market / economic confirmation of the overall market. The <b>flow</b> (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</>
-          : <>is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</>}</div>
-      </div>
-
       {/* N · Platform Indicator — HELD-OUT. Same card, same words, same rules as the
           Trends rail: shown alongside the money numbers, never inside them. The
           N-inclusive pair is a clearly-fenced what-if; the headline Money Movement /
@@ -324,6 +286,63 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
             <div className="conv-t" style={{ marginTop: 8 }}>Surfaced {pi.detail.total_queries_30d} time(s) in 30 days · {pi.detail.queries_24h} in the last 24h · {pi.detail.daily_rate_7d}/day 7-day baseline.</div>
           )}
         </div>
+      </div>
+
+      {/* AI Context — the same source-aware definition the Trends rail shows (§12 parity),
+          placed under the score like the trend panel. */}
+      <div className="sect">
+        <h4>AI Context</h4>
+        {exStream ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{exStream.split(/\n\s*---+\s*\n/)[0]}<span style={{ opacity: 0.5 }}>▍</span></div>
+          </div>
+        ) : ex?.short ? (
+          <div className="ai-ctx">
+            <div className="ai-preview">{ex.short}</div>
+            {ex.full && ex.full.trim() !== ex.short.trim() && (
+              showFull ? <div className="ai-full">{ex.full}</div>
+                : <button className="ai-more" onClick={() => setShowFull(true)}>Read full definition ↓</button>
+            )}
+          </div>
+        ) : (
+          // §17 honest absence: the engine tells us WHY it has no definition. Promising
+          // "it generates on first view" when no provider is configured is a promise the
+          // system cannot keep — say what is actually true instead.
+          <div className="narr muted">{
+            exLoading ? 'Generating a source-aware definition…'
+              : exReason && /provider|unavailable|credit|key/i.test(exReason)
+                ? 'AI definitions are not available in this environment — no AI provider is configured. This is an honest absence, not a pending result.'
+                : exReason
+                  ? `No AI definition available (${exReason}).`
+                  : 'No AI definition yet — it generates on first view and is cached.'
+          }</div>
+        )}
+        {ex?.short && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
+      </div>
+      <div className="sect">
+        {row.lane === 'macro_theme' && (mg.na_components?.length ?? 0) > 0 && (
+          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
+            ℹ <b>Macro theme.</b> A market-wide theme has no single ticker, so smart-money positioning (FINRA short interest · 13F) and company fundamentals are <b>not applicable</b> — the score reflects only the macro / cross-market inputs that <i>can</i> be measured ({mg.total_inputs} applicable factor{mg.total_inputs === 1 ? '' : 's'}).
+          </div>
+        )}
+        {row.lane !== 'macro_theme' && !row.mda && mg.data_coverage === 'insufficient' && (
+          <div className="narr" style={{ marginBottom: 8, background: '#FFF4E5', border: '1px solid #F0C27B', color: '#8A5A00', borderRadius: 8, padding: '8px 10px' }}>
+            ⚠ <b>Insufficient positioning data.</b> Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this instrument yet{mg.absent_inputs != null ? ` (${mg.absent_inputs}/${mg.total_inputs} inputs absent)` : ''}, so it sits near baseline by default — <i>not</i> a confirmed quiet market.
+          </div>
+        )}
+        {row.mda && (
+          <div className="narr" style={{ marginBottom: 8, background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
+            ℹ <b>Market-Confirmation only.</b> No informed-money data exists for this instrument yet (every money-movement input is absent), so the Money Movement read is <b>absent — not zero</b>. Only the broad Market Confirmation (M) is shown.
+          </div>
+        )}
+        <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
+          <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : (mg.gap_state || `${Math.abs(row.gap)}-pt gap`)}{!mg.calibrating && ` · ${Math.abs(row.gap)}-pt gap`}</b>
+          {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
+          {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
+        </div>
+        <div className="disc"><b>What Market Signal measures:</b> {row.v2
+          ? <>The Market Signal section tracks whether money is moving into or out of a particular instrument. {MM_LABEL} “D” = the tracking of informed / early money movement. {MC_LABEL} “M” signals the broad market / economic confirmation of the overall market. The <b>flow</b> (IN/OUT) is a fact from filings. The accuracy ledger tracks early reads and whether the read is validated against realized price direction. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</>
+          : <>is this stock’s <i>positioning</i> unusual versus its <b>own</b> baseline — a different question from a Trend/Attention score. Detection = analysts + smart-money positioning (leading); Confidence = fundamentals + price (hard data). Measurement only — not financial advice.</>}</div>
       </div>
 
       {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
