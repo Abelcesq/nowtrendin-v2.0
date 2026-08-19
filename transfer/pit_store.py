@@ -43,7 +43,26 @@ epoch scores are hindsight-mutable" â€” Statistician). NEVER prune this tab
 
 FAIL-OPEN: a PIT write failure logs and returns; it can never break scoring.
 Each write uses its OWN pooled connection so a failure cannot poison a scoring
-transaction (Postgres aborts a txn on any statement error).
+transaction (Postgres aborts a txn on any statement error). COUNTED fail-open
+(board condition, updates-review 2026-08-18): every failed write increments a
+process-lifetime counter surfaced in status() — the chain proves integrity,
+never completeness, so drops must be countable; pipeline_integrity additionally
+compares daily PIT accrual against velocity_scores writes.
+
+OPERATIONAL NOTES (board-ordered disclosures, 2026-08-18):
+- The PIT_STORE env flag gates ONLY the hourly seal daemon. The sink WRITES are
+  unconditional (additive + fail-open by design) — unsetting the flag stops
+  sealing, not recording. There is deliberately no kill switch on the record.
+- event_date semantics per kind: trend = the row's scored_at date; market/
+  crypto = the recording cycle's UTC date; index = the calculation UTC day.
+  The event_date/knowable_at axes only genuinely diverge for backdated event
+  kinds — external language says "append-only, knowable_at-stamped" until then.
+- Rows written today sit unsealed until the daily fold (up to ~24h + grace);
+  the seal chain's guarantees begin at each day's seal, not at each write.
+- LOSS-EVIDENCE: seals are additionally anchored OUTSIDE this database
+  (audits/pit-anchors/ in the repo, via /diag/pit/anchors) — the chain alone is
+  tamper-evident, not loss-evident; the external anchor is what makes a
+  truncating restore detectable. Anchor cadence: every session + after deploys.
 """
 from __future__ import annotations
 
@@ -66,6 +85,11 @@ EMPTY_DAY = "PIT-EMPTY"          # rows-hash for a day with zero observations
 _init_done = False
 _init_lock = threading.Lock()
 _last_err_log = 0.0              # rate-limit failure logging (fail-open, not silent)
+_write_failures = 0              # counted fail-open: process-lifetime failed record()s
+SEAL_GRACE_MIN = int(os.getenv("PIT_SEAL_GRACE_MIN", "20"))  # never seal a day until
+                                 # this many minutes past its midnight — a straggler
+                                 # write to a just-sealed day would be a PERMANENT
+                                 # false tamper alarm (board condition 2026-08-18)
 
 
 def _sha(s: str) -> str:
@@ -99,6 +123,9 @@ CREATE TABLE IF NOT EXISTS pit_observations (
     row_sha256 TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pit_obs_day ON pit_observations (knowable_day);
+CREATE INDEX IF NOT EXISTS idx_pit_obs_key ON pit_observations (kind, item_key, event_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pit_one_index_day
+    ON pit_observations (kind, item_key, event_date) WHERE kind = 'index_value';
 CREATE TABLE IF NOT EXISTS pit_seals (
     seal_date TEXT PRIMARY KEY,
     first_id INTEGER,
@@ -135,6 +162,9 @@ CREATE TABLE IF NOT EXISTS pit_observations (
     row_sha256 TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pit_obs_day ON pit_observations (knowable_day);
+CREATE INDEX IF NOT EXISTS idx_pit_obs_key ON pit_observations (kind, item_key, event_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pit_one_index_day
+    ON pit_observations (kind, item_key, event_date) WHERE kind = 'index_value';
 CREATE TABLE IF NOT EXISTS pit_seals (
     seal_date TEXT PRIMARY KEY,
     first_id BIGINT,
@@ -248,9 +278,12 @@ def record(kind: str, item_key: str, event_date: str, payload: dict,
             conn.close()
         return row_sha
     except Exception as e:
+        global _write_failures
+        _write_failures += 1                    # counted fail-open (never silent)
         if time.time() - _last_err_log > 300:   # one log line per 5 min max
             _last_err_log = time.time()
-            print(f"[pit_store] record failed (fail-open): {e}")
+            print(f"[pit_store] record failed (fail-open, "
+                  f"{_write_failures} this process): {e}")
         return None
 
 
@@ -304,11 +337,13 @@ def seal_day(day: str, db_path: str = DB_PATH, conn=None) -> dict:
 def seal_pending(db_path: str = DB_PATH) -> dict:
     """Seal every complete UTC day from the first observation (or the day
     after the last seal) through yesterday. Gap days seal too (EMPTY_DAY),
-    so the chain has no holes."""
+    so the chain has no holes. MIDNIGHT GRACE: a day is only sealable
+    SEAL_GRACE_MIN minutes after its midnight — a write straddling the
+    boundary must never turn into a permanent false tamper alarm."""
     _ensure_init(db_path)
     conn = _connect(db_path)
     try:
-        today = _utcnow().strftime("%Y-%m-%d")
+        today = (_utcnow() - timedelta(minutes=SEAL_GRACE_MIN)).strftime("%Y-%m-%d")
         last = conn.execute(
             "SELECT seal_date FROM pit_seals ORDER BY seal_date DESC LIMIT 1"
         ).fetchone()
@@ -383,15 +418,69 @@ def status(db_path: str = DB_PATH) -> dict:
             "ORDER BY seal_date DESC LIMIT 1").fetchone()
         n_seals = conn.execute("SELECT COUNT(*) AS n FROM pit_seals").fetchone()
         return {
-            "store": "bitemporal PIT (event_date/knowable_at), append-only "
-                     "trigger-enforced, daily hash-chain sealed",
+            "store": "append-only trigger-enforced, knowable_at-stamped, daily "
+                     "hash-chain sealed (externally anchored via /diag/pit/anchors)",
             "observations": obs["n"] if obs else 0,
             "first_day": obs["first_day"] if obs else None,
             "last_day": obs["last_day"] if obs else None,
             "by_kind": {k["kind"]: k["n"] for k in kinds},
             "seals": n_seals["n"] if n_seals else 0,
             "last_seal": dict(last_seal) if last_seal else None,
+            "write_failures_this_process": _write_failures,
         }
+    finally:
+        conn.close()
+
+
+def completeness(db_path: str = DB_PATH, days: int = 2) -> dict:
+    """Counted fail-open, part 2 (board condition 2026-08-18): the chain proves
+    integrity, never completeness — so compare daily PIT trend accrual against
+    the velocity_scores rows actually written. Read-only; consumed by the
+    Pipeline Integrity agent."""
+    _ensure_init(db_path)
+    conn = _connect(db_path)
+    try:
+        out = []
+        for i in range(days):
+            day = (_utcnow() - timedelta(days=i)).strftime("%Y-%m-%d")
+            nxt = (_utcnow() - timedelta(days=i) + timedelta(days=1)).strftime("%Y-%m-%d")
+            v = conn.execute(
+                "SELECT COUNT(*) AS n FROM velocity_scores "
+                "WHERE scored_at >= ? AND scored_at < ?", (day, nxt)).fetchone()
+            p = conn.execute(
+                "SELECT COUNT(*) AS n FROM pit_observations "
+                "WHERE kind = 'trend_score' AND knowable_day = ?", (day,)).fetchone()
+            out.append({"day": day, "velocity_rows": v["n"], "pit_trend_rows": p["n"]})
+        return {"days": out, "write_failures_this_process": _write_failures}
+    finally:
+        conn.close()
+
+
+def anchors(db_path: str = DB_PATH) -> dict:
+    """External-anchor feed (board P0, 2026-08-18): everything needed to anchor
+    the record OUTSIDE this database — every day-seal head, plus every sealed
+    forecast row's hashes. Read-only. The repo file audits/pit-anchors/
+    PIT_SEAL_ANCHORS.md is the anchor; this endpoint is its source."""
+    _ensure_init(db_path)
+    conn = _connect(db_path)
+    try:
+        seals = [dict(r) for r in conn.execute(
+            "SELECT seal_date, row_count, seal_sha256, prev_seal_sha256, sealed_at "
+            "FROM pit_seals ORDER BY seal_date").fetchall()]
+        fx = []
+        for r in conn.execute(
+                "SELECT item_key, event_date, knowable_at, payload, "
+                "payload_sha256, row_sha256 FROM pit_observations "
+                "WHERE kind = 'forecast' ORDER BY id").fetchall():
+            try:
+                text_sha = json.loads(r["payload"]).get("text_sha256")
+            except Exception:
+                text_sha = None
+            fx.append({"item_key": r["item_key"], "event_date": r["event_date"],
+                       "knowable_at": r["knowable_at"],
+                       "payload_sha256": r["payload_sha256"],
+                       "row_sha256": r["row_sha256"], "text_sha256": text_sha})
+        return {"seals": seals, "forecasts": fx}
     finally:
         conn.close()
 

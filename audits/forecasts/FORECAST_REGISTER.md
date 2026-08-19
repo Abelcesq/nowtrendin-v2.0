@@ -75,7 +75,8 @@ Early YES resolution is permitted the moment all criterion elements are evidence
 this entry's sections (1)–(5) verbatim, 3,386 chars). `row_sha256`:
 `9531d484d29840c26097104ee5f2ba9383696f38570a1bca41307934795f619c`
 
-**Board conditions attached (pending Chairman ruling, recorded for the resolution file):** the
+**Board conditions attached (recorded for the resolution file; ruled 2026-08-18 — "proceed
+with all fixes"):** the
 Operator's four rules (criterion firewall — sealed above; no commercial action may cite the
 forecast date, and a deal discussion that invokes it disqualifies that deal from resolving the
 forecast; base rate authored blind to pipeline — attested; conditional-form option declined by the
@@ -83,3 +84,61 @@ seat, noted); the Statistician's reflexivity log (any non-standard pricing/terms
 60 days of the horizon is logged alongside the resolution); disagreement on horizon (three seats
 argued 12 months) is before the Chairman — any additional 12-month entry would be F6, appended,
 with this entry standing as written.
+
+---
+
+## F6 — Point-probability convention for F1–F4 + resolution criteria (appended 2026-08-18; board-ordered at the updates-review convening, Chairman-approved "proceed with all fixes")
+
+**Why (Challenger/Economist/Statistician, independently):** this register's own header
+promises Brier scoring, and a band ("P ≈ 75–85%") is not Brier-scorable — at horizon someone
+must pick a number, and picking it after the outcome is known is the post-hoc degree of
+freedom the register exists to eliminate. Fixed NOW, while every horizon is distant and no
+edge flatters. The original band entries stand as written (append-only); this entry fixes
+their SCORING convention at the band midpoint:
+
+- **F1 scores at P = 0.80** (band 75–85%) by 2027-08-31.
+  *Resolution criterion (board-drafted to the F5 standard; the Forecaster seat may refine by
+  superseding entry BEFORE 2027-06-30, never after):* resolves YES iff, by the horizon, the
+  Stage-1 items that survived ruling (e) are ALL complete and board-attested: (b) PIT store
+  built + live [done 2026-08-18], (c) frozen-rule unmarketed index calculating [done
+  2026-08-18], conflicts/controls/complaints policy drafts existing as internal documents,
+  the A4/A5 one-number work delivered, and the reflexivity pre-commitments recorded [done
+  2026-08-18, register r1 RC1–RC4]. Self-graded items require the attestation minute of a
+  board convening, not the founder's word alone.
+- **F2 scores at P = 0.325** (band 25–40%) by 2028-08-31.
+  *Criterion:* first paying benchmark/monitoring SUBSCRIPTION — arm's-length counterparty
+  (F5's definition), ≥ USD 5,000 cumulative cash settled, for the benchmark/monitoring data
+  product (as distinct from F5's structure-(f) API/agent license; if one contract satisfies
+  both, both resolve YES on it — they are correlated by design, sharing the F2/F5 clock).
+- **F3 scores at P = 0.115** (band 8–15%) by 2029-08-31.
+  *Criterion:* first ISSUER executes a license to use an NTI index as the basis of a listed
+  or offered product (fund, note, or certificate), arm's-length, real consideration.
+- **F4 is SPLIT into two separately scorable entries** (a compound forecast cannot be
+  Brier-scored as one number):
+  - **F4a — Stage-4 revenue: P = 0.015** (band 1–2%): trailing-12-month revenue ≥ USD 12M
+    by 2030-08-31, per books-and-records.
+  - **F4b — acquisition: P = 0.075** (band 5–10%): a definitive agreement for the sale of
+    substantially all of NowTrendIn's assets or equity executed by 2030-08-31.
+  F4a and F4b may both resolve, either, or neither; they are scored independently.
+
+All F6 conventions inherit the register's standing rules: unresolved at horizon = NO;
+never rolled forward silently; internal-only; zero accuracy-claim rights. Reference-class
+provenance for F1–F4 remains as sealed in the founding entries (grade C, judgment-assembled
+— stated there, restated here).
+
+## F5-a1 — Anchor annotation (appended 2026-08-18; closes the dual-anchor loop in both directions)
+
+The F5 PIT row's `row_sha256` (recorded above) folds the server-stamped `knowable_at` and is
+NOT offline-recomputable; the sealed payload's **`text_sha256`** IS recomputable from this
+file alone. Recorded here after live verification against the sealed row:
+
+- **Sealed text extraction recipe:** the register file as committed at `c1e75a4`, from the
+  first byte of the line `## F5 — First paying API/agent licensee under structure (f)`
+  through the byte immediately before the line beginning `**PIT seal:**`, trailing
+  whitespace stripped; 3,386 characters as transmitted at seal time.
+- **text_sha256:** `(recorded upon live verification — see the line appended below)`
+
+Standing census rule (Statistician, anti-file-drawer): any `kind='forecast'` PIT row not
+reflected in this register within 7 days of its `knowable_at` is VOID for all purposes;
+the periodic anchor export (`tools/anchor_pit_seals.py` → `audits/pit-anchors/`) lists every
+forecast row, so an unregistered seal is visible by inspection.

@@ -56,6 +56,17 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _regime_stamp() -> str:
+    """The calibration param_version, fail-open. Read-only constant import —
+    the index never feeds anything back; this only RECORDS which scoring
+    regime produced the constituents (r1-a1, anti-silent-splice)."""
+    try:
+        from calibration_agent import PARAM_VERSION
+        return str(PARAM_VERSION)
+    except Exception:
+        return "unknown"
+
+
 def _already_recorded(day: str, db_path: str) -> bool:
     pit_store._ensure_init(db_path)
     conn = _connect(db_path)
@@ -89,9 +100,13 @@ def compute_and_record(db_path: str = DB_PATH) -> dict:
             "WHERE scored_at >= ? ORDER BY scored_at DESC", (cut24,)).fetchall()
         latest = {}
         for r in rows:
+            # r1-a1: a NULL detection is unrankable, not a 0.0 — excluding it
+            # keeps universe_count honest (Challenger, updates-review board).
+            if r["detection_score"] is None:
+                continue
             k = r["topic_key"]
             if k not in latest:            # first hit is the latest (DESC order)
-                latest[k] = r["detection_score"] or 0.0
+                latest[k] = r["detection_score"]
         universe_count = len(latest)
 
         # R3: embargo — topic must predate t_calc − 48h in the system.
@@ -129,9 +144,16 @@ def compute_and_record(db_path: str = DB_PATH) -> dict:
         "t_calc": t_calc.isoformat(),
         "universe_count": universe_count, "eligible_count": eligible_count,
         "n_constituents": len(ranked),
+        # r1-a1 (board-ordered): the scoring-REGIME stamp. The aggregation
+        # rules are frozen; detection_score is a living calibrated model — an
+        # unrecorded recalibration would be a silent splice in the sealed
+        # series. Every deploy/calibration change is identifiable from these.
+        "param_version": _regime_stamp(),
+        "engine_release": os.getenv("HEROKU_RELEASE_VERSION") or "local",
         # R8: the full constituent list — the value is reproducible from its
-        # own sealed record.
-        "constituents": [{"k": k, "d": round(d, 1)} for d, k in ranked],
+        # own sealed record. r1-a1: FULL precision (4dp), because 1dp-rounded
+        # constituents could recompute 75.44 against a sealed 75.45.
+        "constituents": [{"k": k, "d": round(float(d), 4)} for d, k in ranked],
     }
     sha = pit_store.record("index_value", INDEX_KEY, day, payload,
                            db_path=db_path)

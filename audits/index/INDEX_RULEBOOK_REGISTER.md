@@ -122,4 +122,37 @@ gap; that honesty is the record's strength.
 
 ---
 
+### r1-a1 — 2026-08-18 (ANNOTATION; board-ordered, Chairman-approved same day — the updates-review convening `audits/board/BOARD_updates-review_2026-08-18.md`)
+
+**Level rules R1–R9 UNCHANGED.** This entry records payload-schema additions, one
+clarification, one erratum, and the freeze attestation:
+
+1. **Scoring-regime stamp (anti-silent-splice; Economist/Statistician):** each day's sealed
+   payload now carries `param_version` (the calibration register constant, fail-open
+   `"unknown"`) and `engine_release` (the Heroku release tag). The aggregation rules are
+   frozen; `detection_score` is a living calibrated model — these stamps make every future
+   splice point identifiable inside the sealed record itself. Score-engine calibration
+   changes are additionally noted in this register as annotations, never restatements.
+2. **Full-precision constituents (Forecaster):** constituent detections are sealed at 4dp
+   (was 1dp). R8's reproducibility claim requires that recomputing the mean from the sealed
+   list reproduce the sealed 2dp value exactly; 1dp rounding could recompute 75.44 against a
+   sealed 75.45. **Erratum:** the 2026-08-18 payload (the first value, 75.45) carries 1dp
+   constituents — recorded here, never rewritten; its recomputation tolerance is ±0.05.
+3. **Clarification of R2 (Challenger):** a `velocity_scores` row with NULL `detection_score`
+   is unrankable and is EXCLUDED from the universe (it is not a 0.0) — `universe_count`
+   counts rankable topics only. Effective from the 2026-08-19 value.
+4. **One-value-per-day is now DB-ENFORCED:** a partial unique index on
+   `pit_observations(kind, item_key, event_date) WHERE kind='index_value'` closes the
+   check-then-write race (two processes could otherwise seal two values for one day — a
+   permanent blemish in an append-only record).
+5. **FREEZE ATTESTATION (Statistician's demand, recorded while memory is fresh):** no
+   candidate rule variant — including every entry in r1's considered-and-rejected list —
+   was computed against stored `velocity_scores` (or any other) data before the freeze.
+   The rejected-variants list documents a-priori deliberation only; the constants
+   (TOP_N=50, WINDOW_H=24, EMBARGO_H=48, MIN_ELIGIBLE=10, 01:00 UTC) are CONVENTIONS,
+   set by construction, not estimates derived from data. No historical index value was
+   ever computed under any variant.
+6. **RC4/RC3 gate entries now live in `audits/DEFERRED_ITEMS.md`** (the register ordered
+   this at r1; the omission was caught by four seats — closed 2026-08-18).
+
 *Register is append-only. Next entry: r2 (none planned).*

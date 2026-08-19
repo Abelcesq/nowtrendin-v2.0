@@ -220,6 +220,36 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
     except Exception as e:
         alerts.append({"level": "warn", "block": "B4", "msg": f"freshness check failed: {e}"})
 
+    # PIT COMPLETENESS (board P0, updates-review 2026-08-18): the PIT store's
+    # hash chain proves integrity, never completeness — record() is fail-open,
+    # so a silently broken sink would thin the archive while scoring hums.
+    # Parity check: velocity_scores rows written per day vs pit trend_score
+    # rows. Yesterday must roughly agree; a scored day with ZERO pit rows is
+    # critical. First-deploy day is exempt (store younger than the day).
+    try:
+        import pit_store as _pit
+        comp = _pit.completeness(days=2)
+        summary["pit_completeness"] = comp
+        y = comp["days"][1] if len(comp["days"]) > 1 else None   # yesterday
+        if y and y["velocity_rows"] > 0:
+            if y["pit_trend_rows"] == 0:
+                alerts.append({"level": "critical", "block": "PIT",
+                               "msg": f"PIT silent-write failure: {y['velocity_rows']} "
+                                      f"scores written {y['day']} but ZERO pit "
+                                      f"trend_score rows — fail-open has gone "
+                                      f"fail-silent"})
+            elif y["pit_trend_rows"] < 0.9 * y["velocity_rows"]:
+                alerts.append({"level": "warn", "block": "PIT",
+                               "msg": f"PIT shortfall {y['day']}: "
+                                      f"{y['pit_trend_rows']}/{y['velocity_rows']} "
+                                      f"scores reached the archive (<90%)"})
+        if comp.get("write_failures_this_process", 0) > 0:
+            alerts.append({"level": "warn", "block": "PIT",
+                           "msg": f"{comp['write_failures_this_process']} PIT write "
+                                  f"failure(s) this process (counted fail-open)"})
+    except Exception as _pce:
+        summary["pit_completeness"] = f"check failed: {_pce}"
+
     # Pull the latest row per topic (top by score) for the integrity sample.
     rows = []
     try:

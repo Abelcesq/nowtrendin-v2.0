@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.request import Request, urlopen
 
 import db_compat
@@ -402,11 +402,41 @@ try:
     from zoneinfo import ZoneInfo
     _ET = ZoneInfo("America/New_York")
 except Exception:                                   # tzdata-less fallback (dev boxes)
-    _ET = timezone(timedelta(hours=-4))
+    # Month-band DST approximation (board fix 2026-08-18): the old fixed −4 was
+    # wrong half the year (EST is −5) — a dev box reproducing verdicts in
+    # January would mislabel evening captures. Approximate, dev-only; dynos
+    # always take the zoneinfo path.
+    _ET = None
+
+def _to_et(dt):
+    if _ET is not None:
+        return dt.astimezone(_ET)
+    off = -4 if 3 <= dt.astimezone(timezone.utc).month <= 10 else -5
+    return dt.astimezone(timezone(timedelta(hours=off)))
+
+
+#: NYSE full-closure holidays, FROZEN LIST 2026–2027 (board P1 fix 2026-08-18 —
+#: Labor Day 2026-09-07 lands inside the A2.4 re-arm accrual window; a trading-
+#: day model that counts it would label T on a closed session and poison the
+#: interval join with a NO_PUBLISHED day). Weekend-observed shifts applied
+#: (2026-07-03 for Jul-4-Sat; 2027-06-18, 2027-07-05, 2027-12-24). Dates beyond
+#: 2027 fall back to the weekends-only model until the list is extended —
+#: extend it BEFORE 2028-01-01 (declared, visible: _holiday_coverage_note).
+_US_MARKET_HOLIDAYS = {
+    # 2026
+    date(2026, 1, 1), date(2026, 1, 19), date(2026, 2, 16), date(2026, 4, 3),
+    date(2026, 5, 25), date(2026, 6, 19), date(2026, 7, 3), date(2026, 9, 7),
+    date(2026, 11, 26), date(2026, 12, 25),
+    # 2027
+    date(2027, 1, 1), date(2027, 1, 18), date(2027, 2, 15), date(2027, 3, 26),
+    date(2027, 5, 31), date(2027, 6, 18), date(2027, 7, 5), date(2027, 9, 6),
+    date(2027, 11, 25), date(2027, 12, 24),
+}
+_HOLIDAY_YEARS = (2026, 2027)
 
 
 def _last_bday(d):
-    while d.weekday() >= 5:
+    while d.weekday() >= 5 or d in _US_MARKET_HOLIDAYS:
         d -= timedelta(days=1)
     return d
 
@@ -416,12 +446,13 @@ def _prev_bday(d):
 
 
 def _tdays_range(d_from_excl, d_to_incl):
-    """Trading days in (d_from_excl, d_to_incl] — Mon–Fri, holidays not excluded
-    (same declared basis as latest_delta's gap normalization)."""
+    """Trading days in (d_from_excl, d_to_incl] — Mon–Fri excluding NYSE
+    holidays (frozen 2026–2027 list; board P1 fix 2026-08-18 — was
+    holidays-not-excluded, which would have gone live wrong on Labor Day)."""
     out, d = [], d_from_excl
     while d < d_to_incl:
         d += timedelta(days=1)
-        if d.weekday() < 5:
+        if d.weekday() < 5 and d not in _US_MARKET_HOLIDAYS:
             out.append(d)
     return out
 
@@ -436,7 +467,7 @@ def t_of(captured_at: str):
         dt = datetime.fromisoformat(str(captured_at).replace("Z", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        et = dt.astimezone(_ET)
+        et = _to_et(dt)
         eff = et.date()
         if et.hour < 6:                             # pre-dawn ET = prior evening's book
             eff -= timedelta(days=1)
@@ -495,6 +526,35 @@ def init_reconcile_db2(db_path: str = DB_PATH):
                 verdict TEXT, src TEXT, comparator TEXT,
                 verdict_at TEXT,                      -- Chairman ruling a: date+time stamp
                 PRIMARY KEY (interval_end_date, ticker, rule_version)
+            )
+        """)
+        # Board P1 fix (2026-08-18, Guardian/Executioner): within a rule_version
+        # the daily upsert can revise a FINALIZED verdict when the comparator
+        # restates a published number. "A divergence fires forever" must be true
+        # by construction — every finalized-verdict change is LOGGED here,
+        # append-only, and surfaced in report_a2. PENDING_FINAL → final is the
+        # normal path and is not a transition.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS etf_verdict_transitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                interval_end_date TEXT NOT NULL, ticker TEXT NOT NULL,
+                rule_version TEXT NOT NULL,
+                old_verdict TEXT, new_verdict TEXT,
+                old_verdict_at TEXT, new_verdict_at TEXT,
+                old_published_usd REAL, new_published_usd REAL
+            )
+        """)
+        # Board P1 fix (2026-08-18, Economist/Challenger/Statistician): the
+        # STANDING basis monitor. Sign-flip FAILs only discriminate when flows
+        # alternate; the regime-independent detector of an ASOF_BASIS break is
+        # the stamp+value identity itself — single-trading-day as-of intervals
+        # must keep reproducing the issuer's published flow. Recomputed from
+        # scratch each run (idempotent), per fund.
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS etf_basis_check (
+                ticker TEXT PRIMARY KEY, family TEXT,
+                checked INTEGER, matched INTEGER, consec_mismatch INTEGER,
+                last_interval_end TEXT, updated_at TEXT
             )
         """)
         c.commit()
@@ -564,7 +624,30 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
     conn = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
 
+    basis_stats = {}   # ticker -> [(interval_end_date, matched_bool)] (asof 1-tday pairs)
+
     def _upsert(end_d, tkr, start_d, dusd, pusd, material, dirm, band, verdict, src):
+        # Finalized-verdict transition guard (board P1, 2026-08-18): a comparator
+        # restatement must never silently flip a stored FAIL — log the transition.
+        try:
+            old = conn.execute(
+                f"SELECT verdict, verdict_at, published_usd FROM etf_reconcile_log2 "
+                f"WHERE interval_end_date = {ph} AND ticker = {ph} "
+                f"AND rule_version = {ph}", (end_d, tkr, RULE_VERSION)).fetchone()
+            if (old and old["verdict"] and old["verdict"] != "PENDING_FINAL"
+                    and old["verdict"] != verdict):
+                conn.execute(
+                    f"INSERT INTO etf_verdict_transitions (interval_end_date, ticker, "
+                    f"rule_version, old_verdict, new_verdict, old_verdict_at, "
+                    f"new_verdict_at, old_published_usd, new_published_usd) "
+                    f"VALUES ({','.join([ph]*9)})",
+                    (end_d, tkr, RULE_VERSION, old["verdict"], verdict,
+                     old["verdict_at"], now, old["published_usd"], pusd))
+                print(f"[ALERT][etf-reconcile] finalized verdict TRANSITION "
+                      f"{tkr} {end_d}: {old['verdict']} -> {verdict} "
+                      f"(comparator restatement? logged, never silent)")
+        except Exception as _vte:
+            print(f"[etf-reconcile] transition guard error ({tkr} {end_d}): {_vte}")
         conn.execute(
             f"INSERT INTO etf_reconcile_log2 (interval_end_date,ticker,rule_version,"
             f"interval_start_date,derived_usd,published_usd,material,direction_match,"
@@ -652,6 +735,14 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                         summary["no_published"] += 1
                         continue
                     psum = float(sum(vals))
+                    # Standing basis monitor (board P1): a single-trading-day
+                    # as-of interval IS the stamp+value identity check — under a
+                    # correct ASOF_BASIS its derived Δ must keep reproducing the
+                    # issuer's published flow, in every regime.
+                    if ma == mb == "asof" and len(days) == 1:
+                        _m = abs(dusd - psum) <= max(0.05 * abs(psum), 2_000_000)
+                        basis_stats.setdefault(tkr, []).append(
+                            (end_d, bool(_m), b.get("src") or "fmp"))
                     material = abs(psum) > floor
                     if not material and abs(dusd) > floor:
                         # Material derived flow the issuer says never happened —
@@ -730,6 +821,34 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
                     _upsert(d.isoformat(), tkr, None, None, float(v), 1, None, None,
                             "NO_DERIVED", _src_for_day(d))
                     summary["no_derived"] += 1
+        # Flush the standing basis monitor (recomputed from scratch — idempotent).
+        for tkr, seq in basis_stats.items():
+            seq.sort(key=lambda t: t[0])
+            checked = len(seq)
+            matched = sum(1 for _, m, _s in seq if m)
+            consec = 0
+            for _, m, _s in reversed(seq):
+                if m:
+                    break
+                consec += 1
+            fam = seq[-1][2]
+            conn.execute(
+                f"INSERT INTO etf_basis_check (ticker, family, checked, matched, "
+                f"consec_mismatch, last_interval_end, updated_at) "
+                f"VALUES ({','.join([ph]*7)}) "
+                f"ON CONFLICT (ticker) DO UPDATE SET family=EXCLUDED.family, "
+                f"checked=EXCLUDED.checked, matched=EXCLUDED.matched, "
+                f"consec_mismatch=EXCLUDED.consec_mismatch, "
+                f"last_interval_end=EXCLUDED.last_interval_end, "
+                f"updated_at=EXCLUDED.updated_at",
+                (tkr, fam, checked, matched, consec, seq[-1][0], now))
+            if consec >= 2:
+                print(f"[ALERT][etf-reconcile] BASIS DRIFT {tkr} ({fam}): "
+                      f"{consec} consecutive single-day stamp+value mismatches — "
+                      f"the declared ASOF_BASIS may have broken (issuer page "
+                      f"semantics change); re-verify per §16 before trusting "
+                      f"re-arm progress")
+        summary["basis_checked_funds"] = len(basis_stats)
         conn.commit()
     finally:
         conn.close()
@@ -737,18 +856,29 @@ def reconcile_a2(db_path: str = DB_PATH, coins=None, source: str = "farside") ->
 
 
 def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
-    """A2 gate evidence. gate_status = ALARM semantics over ALL rows (a divergence
-    fires forever). re_arm = flip-readiness per A2.4, counted ONLY on non-FMP src
-    rows (FMP is silent-comparison, disqualified as a flip basis; re-eval 2026-09-05)."""
+    """A2 gate evidence. FIRES-FOREVER (board P1 fix 2026-08-18, Forecaster
+    finding): the GATE, bias runs, and the A2.4 re-arm bad-set are computed over
+    ALL rule_version rows UNWINDOWED — a bad row can never age out of the gate
+    by calendar. The `days` window scopes only the per-fund DISPLAY tallies.
+    Bias (board P1, Executioner): computed on issuer-source rows only — FMP is
+    silent-comparison and per A2.4 never counts toward any flip decision.
+    re_arm = flip-readiness per A2.4, non-FMP src rows only (re-eval 2026-09-05)."""
     init_reconcile_db2(db_path)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
     c = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
     try:
         rows = [dict(r) for r in c.execute(
-            f"SELECT * FROM etf_reconcile_log2 WHERE interval_end_date >= {ph} "
-            f"AND rule_version = {ph} ORDER BY ticker, interval_end_date",
-            (since, RULE_VERSION)).fetchall()]
+            f"SELECT * FROM etf_reconcile_log2 WHERE rule_version = {ph} "
+            f"ORDER BY ticker, interval_end_date", (RULE_VERSION,)).fetchall()]
+        prior = {r["verdict"]: r["n"] for r in c.execute(
+            f"SELECT verdict, COUNT(*) AS n FROM etf_reconcile_log2 "
+            f"WHERE rule_version = {ph} GROUP BY verdict", ("A2",)).fetchall()}
+        basis_rows = [dict(r) for r in c.execute(
+            "SELECT * FROM etf_basis_check ORDER BY ticker").fetchall()]
+        trans = [dict(r) for r in c.execute(
+            f"SELECT * FROM etf_verdict_transitions WHERE rule_version = {ph} "
+            f"ORDER BY id DESC LIMIT 10", (RULE_VERSION,)).fetchall()]
     except Exception as e:
         return {"available": False, "reason": str(e)[:120]}
     finally:
@@ -757,30 +887,34 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
         return {"available": False, "reason": "A2 harness has not run yet",
                 "rule_version": RULE_VERSION, "gate_status": "NOT_RUN"}
     by, fails, no_derived = {}, [], []
+    errors_by = {}                      # issuer-src material PASS/FAIL sign errors
     for r in rows:
-        t = by.setdefault(r["ticker"], {"pass": 0, "fail": 0, "immaterial": 0,
-                                        "pending_final": 0, "empty_interval": 0,
-                                        "no_derived": 0, "no_published": 0,
-                                        "errors": []})
+        in_window = (r["interval_end_date"] or "") >= since
+        if in_window:
+            t = by.setdefault(r["ticker"], {"pass": 0, "fail": 0, "immaterial": 0,
+                                            "pending_final": 0, "empty_interval": 0,
+                                            "no_derived": 0, "no_published": 0})
         v = r.get("verdict")
-        key = {"PASS": "pass", "FAIL": "fail", "IMMATERIAL": "immaterial",
-               "PENDING_FINAL": "pending_final", "EMPTY_INTERVAL": "empty_interval",
-               "NO_DERIVED": "no_derived", "NO_PUBLISHED": "no_published"}.get(v)
-        if key:
-            t[key] += 1
+        if in_window:
+            key = {"PASS": "pass", "FAIL": "fail", "IMMATERIAL": "immaterial",
+                   "PENDING_FINAL": "pending_final", "EMPTY_INTERVAL": "empty_interval",
+                   "NO_DERIVED": "no_derived", "NO_PUBLISHED": "no_published"}.get(v)
+            if key:
+                t[key] += 1
         rec = {k: r.get(k) for k in ("interval_end_date", "interval_start_date",
                                      "ticker", "derived_usd", "published_usd",
                                      "src", "verdict", "verdict_at")}
         if v in ("FAIL", "EMPTY_INTERVAL"):
-            fails.append(rec)
+            fails.append(rec)                     # ALL rows — fires forever
         elif v == "NO_DERIVED":
-            no_derived.append(rec)
-        if r.get("material") and r.get("published_usd") is not None and \
-                r.get("derived_usd") is not None and v in ("PASS", "FAIL"):
-            t["errors"].append(1 if r["derived_usd"] > r["published_usd"] else -1)
+            no_derived.append(rec)                # ALL rows — fires forever
+        if (r.get("material") and r.get("published_usd") is not None
+                and r.get("derived_usd") is not None and v in ("PASS", "FAIL")
+                and (r.get("src") or "fmp") not in ("fmp", "pre_coverage")):
+            errors_by.setdefault(r["ticker"], []).append(
+                1 if r["derived_usd"] > r["published_usd"] else -1)
     bias = []
-    for t, d in by.items():
-        errs = d.pop("errors")
+    for t, errs in errors_by.items():
         run, prev, worst = 0, 0, 0
         for e in errs:
             run = run + 1 if e == prev else 1
@@ -788,8 +922,10 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
             worst = max(worst, run)
         if worst >= BIAS_RUN:
             bias.append({"ticker": t, "consecutive_same_sign_error": worst})
-    material_total = sum(d["pass"] + d["fail"] for d in by.values())
-    gate = ("FAIL" if fails or bias or no_derived else
+    material_total = sum(
+        1 for r in rows if r.get("verdict") in ("PASS", "FAIL"))
+    basis_drift = [b for b in basis_rows if (b.get("consec_mismatch") or 0) >= 2]
+    gate = ("FAIL" if fails or bias or no_derived or basis_drift else
             "PASS" if material_total >= 1 else "NO_MATERIAL_DAYS_YET")
     # A2.4 re-arm: non-FMP src only (issuer-page source), Chairman standard = 5.
     # 'pre_coverage' rows (days predating a fund's first-ever source era — the
@@ -815,8 +951,24 @@ def report_a2(db_path: str = DB_PATH, days: int = 21) -> dict:
     fmp_fails = [f for f in fails if (f.get("src") or "fmp") == "fmp"]
     live_fails = [f for f in fails if (f.get("src") or "fmp") != "fmp"]
     return {
-        "available": True, "rule_version": RULE_VERSION, "window_days": days,
+        "available": True, "rule_version": RULE_VERSION,
+        "window_days": days,
+        "window_note": "the window scopes DISPLAY tallies only; gate/bias/"
+                       "re-arm/fail lists are computed over ALL rows — a bad "
+                       "row never ages out (fires-forever, board P1 2026-08-18)",
         "funds": by, "material_comparisons": material_total,
+        # Prior-rule visibility (board P1, Forecaster): the superseded A2-era
+        # record, so a clean A2.2 sheet is never mistaken for a clean history.
+        "superseded_a2_rows": prior or None,
+        "basis_verification": {
+            "standard": "single-trading-day as-of intervals must reproduce the "
+                        "issuer's published flow (tolerance max(5%, $2M)); >=2 "
+                        "consecutive mismatches = declared-basis drift alarm "
+                        "(fails the gate; re-verify per §16)",
+            "funds": basis_rows or None,
+            "drift": basis_drift or None,
+        },
+        "verdict_transitions_recent": trans or None,
         "open_failures": fails or None,
         "open_failures_fmp": len(fmp_fails),
         "open_failures_live_source": live_fails or None,

@@ -168,11 +168,26 @@ def t5_status_and_failopen():
     check("record on broken path returns None, no raise", r is None)
 
 
+def t6_unique_index_value_per_day():
+    print("t6: DB enforces one index_value per (item_key, event_date); other kinds unlimited")
+    db = fresh_db()
+    r1 = pit_store.record("index_value", "NTI-SD50", "2026-08-18", {"value": 75.45},
+                          db_path=db)
+    r2 = pit_store.record("index_value", "NTI-SD50", "2026-08-18", {"value": 99.0},
+                          db_path=db)
+    check("first index_value records", bool(r1))
+    check("duplicate day is refused by the DB (fail-open returns None)", r2 is None)
+    a = pit_store.record("trend_score", "topic", "2026-08-18", {"v": 1}, db_path=db)
+    b = pit_store.record("trend_score", "topic", "2026-08-18", {"v": 2}, db_path=db)
+    check("non-index kinds still append freely", bool(a) and bool(b))
+
+
 if __name__ == "__main__":
     t1_record_and_hash()
     t2_append_only_triggers()
     t3_seal_chain_and_gaps()
     t4_verify_detects_tampering()
     t5_status_and_failopen()
+    t6_unique_index_value_per_day()
     print(f"\n{PASS} passed, {FAIL} failed")
     sys.exit(1 if FAIL else 0)

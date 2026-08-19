@@ -225,3 +225,43 @@ conditions (board, 6/6): divergence display hard-gated on flow being MEASURABLE 
 `absence_class` — on structurally-blind coins the mania signature is instrument blindness);
 thresholds pre-registered BEFORE first render; held-out with its own ledger before anything
 score-adjacent; user copy says "attention-flow divergence", never "mania"/"bubble".
+
+## IDX-RC4 — index self-influence monitor (PUBLICATION GATE; register r1 obligation)
+
+Register r1 (`audits/index/INDEX_RULEBOOK_REGISTER.md`, RC4) pre-registers the
+self-influence null: H0 = NTI-SD50 constituency has no effect on a topic's subsequent
+attention. Design (sealed in r1): pair each day's constituents with nearest-Detection
+non-constituents (ranks 51–100); compare 7-day forward change in `detection_score`.
+While the index is UNPUBLISHED, that distribution IS the null baseline — measurable only
+now, at AUM=0/zero-readership; every unpublished day without the monitor is baseline
+forgone (Economist: implement early, not at the gate).
+
+**HARD GATE:** the monitor must be IMPLEMENTED and its baseline RECORDED before any
+publication of index values, internal-newsletter included. **Reactivation trigger:** any
+proposal to publish, license, display, or market any NTI-SD50 value → this item becomes
+MANDATORY-before, and the §16a stage discipline applies. Read-only, held-out, never feeds
+any score.
+
+## IDX-RC3 — index capacity/AUM-share cap parameter (PRE-LICENSE GATE; register r1 obligation)
+
+RC3's COMMITMENT is structural (r1); its NUMBER is a placeholder. **Reactivation trigger:**
+before the FIRST license of any index-linked product is signed, the numeric cap must be
+frozen as a register entry (r-note), based on capacity data existing then — never chosen
+mid-negotiation, never after signature.
+
+## FCAST-RESOLUTION — forecast_resolution PIT path (FIRST-RESOLUTION GATE)
+
+`FORECAST_REGISTER.md` resolution mechanics require a `kind='forecast_resolution'` PIT row
+citing the original entry's `row_sha256`. No code path exists yet (the sealing endpoint
+hardcodes `kind='forecast'`) — deliberate deferral (Executioner: build at need, log the
+shelf). **Reactivation trigger:** the first forecast resolution event (earliest plausible:
+F1 horizon 2027-08-31, or an early F5 YES). Build the resolution path + evidence-hash
+recording BEFORE the resolution is recorded, never retrofit after.
+
+## PIT-STORAGE — capacity plan for the never-pruned archive
+
+`pit_observations` accrues one row per served score per cycle, forever (the product).
+§13 already flags the 365-day retention straining the 10GB plan. **Reactivation trigger:**
+engine Postgres usage ≥70% of plan (check via Heroku dashboard on the weekly
+improve-system read) → write the storage tier plan (larger plan vs partition/export
+strategy) BEFORE the disk forces one. Never prune; never let disk-full be the first alarm.

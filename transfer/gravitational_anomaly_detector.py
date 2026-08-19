@@ -7756,6 +7756,20 @@ def diag_index(run: int = 0, days: int = 14):
         return {"available": False, "reason": str(e)[:160]}
 
 
+@app.get("/diag/pit/anchors", dependencies=[Depends(_require_internal)])
+def diag_pit_anchors():
+    """External-anchor feed (board P0, 2026-08-18): every day-seal head +
+    every sealed forecast row's hashes, for export OUTSIDE this database
+    (audits/pit-anchors/PIT_SEAL_ANCHORS.md in the repo). The chain alone is
+    tamper-evident, not loss-evident — the anchor file is what makes a
+    truncating restore detectable, and the grade-A clock starts at anchoring."""
+    try:
+        import pit_store as pit
+        return pit.anchors(DB_PATH)
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
 @app.post("/diag/pit/forecast", dependencies=[Depends(_require_internal)])
 def diag_pit_forecast(payload: dict = Body(...)):
     """Seal a FORECAST REGISTER entry into the PIT store (Chairman minute
