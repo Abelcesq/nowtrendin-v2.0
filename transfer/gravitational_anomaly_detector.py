@@ -6480,6 +6480,20 @@ async def startup_auto_collect():
         except Exception as _pse:
             print(f"[startup] pit-seal failed to start: {_pse}")
 
+    # N · Platform Indicator for Market Signal (founder feature 2026-08-19):
+    # background flusher for instrument surfacing events. HELD-OUT — writes only
+    # instrument_queries; no score reads it (AST-firewall enforced).
+    if os.getenv("MARKET_PLATFORM_INDICATOR", "1").lower() in ("1", "true", "yes"):
+        try:
+            import market_platform_indicator as _mpi
+            _mpi.init_db(DB_PATH)
+            threading.Thread(target=_mpi.flusher_loop, args=(DB_PATH,), daemon=True,
+                             name="market-n-flusher").start()
+            print(f"[startup] market-n flusher started "
+                  f"(dedup {_mpi.DEDUP_MIN}m; held-out, display-only).")
+        except Exception as _mne:
+            print(f"[startup] market-n flusher failed to start: {_mne}")
+
     # NTI-SD50 (Chairman ruling (c), 2026-08-18): frozen-rule UNMARKETED daily
     # index calculation — one sealed value per UTC day into the PIT store.
     # Rules register: audits/index/INDEX_RULEBOOK_REGISTER.md (r1). Held-out.
@@ -7013,8 +7027,44 @@ def risk_scores(limit: int = Query(50, ge=1, le=300), offset: int = Query(0, ge=
         _cache.set("risk_full", full, CACHE_TTL_SCORES_FULL)
     all_results = full.get("results") or []
     page = all_results[offset: offset + limit]
+    # ── N · Platform Indicator (held-out, display-only) ──────────────────────
+    # Attached at SERVE time, never at cache-build time: a prewarm build is not a
+    # surfacing (nobody saw it), and N must mean "surfaced to someone". Copies the
+    # rows before adding N so the cached superset itself stays N-free — the cache
+    # feeds the degenerate census and other read paths, and none of them may ever
+    # see a platform-internal number. Fail-open: no N sooner than a broken feed.
+    page = _attach_market_n(page, "/risk/scores")
     return {"count": len(page), "total": len(all_results),
             "offset": offset, "limit": limit, "results": page}
+
+
+def _attach_market_n(rows: list, endpoint: str) -> list:
+    """Add the platform indicator to served market rows. Held-out: reads only
+    instrument_queries, writes only the surfacing log, and NEVER mutates any
+    scored field (money_movement / market_confirmation / tier are untouched)."""
+    if not rows or os.getenv("MARKET_PLATFORM_INDICATOR", "1").lower() not in (
+            "1", "true", "yes"):
+        return rows
+    try:
+        import market_platform_indicator as _mpi
+        keys = [r.get("item_key") or r.get("risk_topic") or r.get("symbol")
+                for r in rows]
+        keys = [k for k in keys if k]
+        n_by_key = _mpi.compute_many(keys, db_path=DB_PATH)
+        out = []
+        for r in rows:
+            k = r.get("item_key") or r.get("risk_topic") or r.get("symbol")
+            row = dict(r)
+            n = n_by_key.get(k, 0.0)
+            row["platform_indicator"] = round(n)
+            row["platform_indicator_band"] = _mpi.band(n)
+            row["platform_indicator_held_out"] = True
+            out.append(row)
+        _mpi.log_many(keys, endpoint)
+        return out
+    except Exception as _ne:
+        print(f"[market_n] attach skipped: {_ne}")
+        return rows
 
 
 @app.get("/monitor/degenerate-census")
@@ -7508,6 +7558,21 @@ def risk_detail(risk_topic: str):
     d = risk.get_risk_detail(risk_topic, DB_PATH)
     if not d:
         raise HTTPException(404, f"No risk score for {risk_topic}")
+    # N · Platform Indicator block (held-out; the money numbers above are N-free).
+    if os.getenv("MARKET_PLATFORM_INDICATOR", "1").lower() in ("1", "true", "yes"):
+        try:
+            import market_platform_indicator as _mpi
+            _sig = d.get("signal_count")
+            if _sig is None:
+                _sig = len(d.get("signals") or []) or d.get("signals_count")
+            d["platform_indicator"] = _mpi.payload(
+                risk_topic,
+                money_movement=d.get("money_movement", d.get("detection")),
+                market_confirmation=d.get("market_confirmation", d.get("confidence")),
+                signal_count=_sig, db_path=DB_PATH)
+            _mpi.log_query(risk_topic, f"/risk/{risk_topic}")
+        except Exception as _ne:
+            print(f"[market_n] detail block skipped: {_ne}")
     return d
 
 
@@ -7751,6 +7816,24 @@ def diag_index(run: int = 0, days: int = 14):
         if run:
             out["run"] = aidx.compute_and_record(DB_PATH)
         out["recent"] = aidx.recent(days=min(int(days), 60), db_path=DB_PATH)
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
+@app.get("/diag/market-n", dependencies=[Depends(_require_internal)])
+def diag_market_n(item_key: str = ""):
+    """N · Platform Indicator for Market Signal (founder feature 2026-08-19).
+    Operational read: table size, queue depth, log failures, top-surfaced
+    instruments — and, with ?item_key=, the full served block for one item.
+    HELD-OUT: registered in heldout_registry, so a scoring module importing it
+    fails the AST firewall audit. Touches no score, ever."""
+    try:
+        import market_platform_indicator as mpi
+        out = {"status": mpi.status(DB_PATH),
+               "held_out": True, "excluded_from_score": True}
+        if item_key:
+            out["item"] = mpi.payload(item_key, db_path=DB_PATH)
         return out
     except Exception as e:
         return {"available": False, "reason": str(e)[:160]}
