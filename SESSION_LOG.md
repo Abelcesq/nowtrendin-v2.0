@@ -3984,3 +3984,32 @@ coins, 9 days, latest today); FMP ETF-flow re-eval NOT DUE (09-05).
 - WATCH: PIT observations accruing + first day-seal; NTI-SD50 day 2 value;
   A2.2 issuer-source rows deriving (page_asof stamps landing)
 - CoinAPI backtest-before-ship gate opens ~08-24; FMP re-eval 09-05
+
+## 2026-08-18 (PT, cont.-5) — SECOND BOARD CONVENING: engineering review of the day's ships
+
+Nine seats reviewed U1 (A2.2 deploy) / U2 (PIT store) / U3 (NTI-SD50) / U4
+(forecast register) — collation audits/board/BOARD_updates-review_2026-08-18.md,
+RULINGS PENDING CHAIRMAN. 36/36 verdicts are approvals-with-conditions; 4 seats
+independently re-ran all test suites (clean); freeze-before-first-value
+git-proven (148487d). THE CONVERGED FINDING (8/9 seats): the seal chain is
+SELF-ANCHORED — tamper-evident but not loss-evident; grade B not A until the
+daily seal_sha256 is exported outside the DB (git append, the F5 pattern); no
+scheduled engine-DB backup found; every unanchored day is unrecoverable toward
+grade A. P0 batch (unanimous, cheap): external anchoring + backup schedule; PIT
+completeness monitor (fail-open never fail-silent); partial unique index on
+index_value; RC4/RC3/forecast_resolution into DEFERRED_ITEMS (r1 ordered it,
+never added); sealer midnight grace. P1 (before re-arm trusted): U1
+"fires-forever" is NOT implemented (21d window ages bad rows out — Forecaster);
+finalized-verdict overwrite on comparator revision (log transitions); re-arm
+bias term counts FMP rows (contradicts A2.4); US holiday calendar before
+2026-09-07; standing per-fund basis-drift monitor (re-arm has no discriminating
+power in trending regimes — Challenger). P2 register entries: param_version
+stamped into index payload (silent-splice risk — Economist); full-precision
+constituents (sealed 75.45 could recompute 75.44 — Forecaster); F1-F4 point
+probabilities (bands not Brier-scorable); F5 text_sha256 + byte boundaries in
+register; freeze attestation. DATED TRIPWIRE: zero mode=asof issuer intervals by
+08-21 EOD = defect (page_asof persistence), not cold start.
+
+### Open / Next
+- CHAIRMAN: rule on both collations (worldcup-casestudy + updates-review)
+- Then execute the ruled P0/P1/P2 batches
