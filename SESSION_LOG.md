@@ -4163,3 +4163,47 @@ deployed), gh-pages 200.
 - Chairman items still open: worldcup collation A1/A3/A4 residuals
 - Watch: re-arm toward 5/2/3; nightly seal + anchor; CoinAPI ~08-24; FMP 09-05;
   ACC-Q quarterly scoring 2026-11-30
+
+## 2026-08-19 (UTC, cont.) — Market Signal N MERGED + DEPLOYED (founder-approved after preview)
+
+Founder ran the visual check on the preview and found two defects; both fixed,
+then merge + deploy approved.
+
+DEFECTS FIXED (from the founder's screenshots):
+1. N card was INVISIBLE in the market rail. It rendered, but below the long
+   "What Market Signal measures" disclosure - off the first screenful, so it
+   read as missing. Moved ABOVE the AI Context section, high in the rail like
+   the Trends card it mirrors.
+2. AI Context misrepresented reality. The engine returns an explicit reason when
+   it cannot generate ("no explainer provider available"); the UI DISCARDED it
+   and always rendered "No AI definition yet - it generates on first view and is
+   cached" - promising a generation that can never happen without a provider.
+   Now the reason is captured and rendered honestly (generating / provider
+   unavailable = honest absence, not a pending result / specific error).
+   VERIFIED it was environment, not code: prod /explainer/recession returns a
+   real definition; the preview (deliberately keyless) returned the error.
+
+MERGED to main (71e01ab) + DEPLOYED: engine fcc4993 BOOTED CLEAN in ~8s (vs the
+two 60s timeouts of the earlier branch deploy - the structural fix holds);
+gh-pages f26e439 live and verified (N column shipped, honest-AI copy shipped, N
+card precedes AI Context, points at the production engine, no preview URL).
+
+PRODUCTION N IS LIVE AND COLD-START HONEST: instrument_queries created, all
+instruments read "never surfaced" / em-dash rather than a fabricated 0; the
+first serve logged 8 surfacings with 0 failures, so N now accrues. Money reads
+unchanged. Full suite green at merge (36 + 20 + 13 + 33) and firewall 0
+violations.
+
+PREVIEW APP DESTROYED (app + Postgres) after use. NOTE: the production-data
+fork test was NOT completed - the DB tier upgrade was still provisioning when
+the founder approved the merge on the strength of the visual check. So the
+original boot failure was never reproduced against production-like data; what
+IS established is that the code no longer runs during boot at all, and that
+production booted clean on the real database.
+
+### Open / Next
+- Board/founder review of Market N is retrospective now (shipped on founder
+  approval); consider an advisory-board pass on the held-out design
+- Chairman items still open: worldcup collation A1/A3/A4 residuals
+- Watch: N accrual on /diag/market-n; re-arm toward 5/2/3; nightly seal+anchor;
+  CoinAPI ~08-24; FMP 09-05; ACC-Q quarterly scoring 2026-11-30
