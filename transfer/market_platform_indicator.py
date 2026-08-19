@@ -76,6 +76,7 @@ _dedup_seen: dict = {}
 _init_done = False
 _init_lock = threading.Lock()
 _log_failures = 0
+_flusher_started = False
 
 
 def _connect(db_path):
@@ -115,11 +116,41 @@ def init_db(db_path: str = DB_PATH) -> None:
 
 # ── Logging (queue + background flusher, mirrors the topic-side pattern) ─────
 
+def _ensure_flusher(db_path: Optional[str] = None) -> None:
+    """Start the flusher on FIRST USE, never at boot.
+
+    INCIDENT 2026-08-19: an earlier revision called init_db() synchronously in the
+    API startup handler and started this thread there. That deploy failed to boot
+    twice (R10, SIGKILL at 60s) and production was rolled back. The blocking call
+    was never proven — which is exactly why this module no longer runs ANY code
+    during startup. Schema creation and thread start happen lazily behind the
+    first surfacing, off the critical path, so a slow or contended DDL can delay
+    a display feature and nothing else. Boot must never wait on a display read.
+    """
+    global _flusher_started
+    if _flusher_started:
+        return
+    # Resolve the path at CALL time, not at def time — a module-level default
+    # argument would freeze whatever DB_PATH was when this file was imported.
+    db_path = db_path or DB_PATH
+    with _init_lock:
+        if _flusher_started:
+            return
+        try:
+            t = threading.Thread(target=flusher_loop, args=(db_path,), daemon=True,
+                                 name="market-n-flusher")
+            t.start()
+            _flusher_started = True
+        except Exception:
+            pass
+
+
 def log_query(item_key: str, endpoint: str = "/risk/scores") -> None:
     """Record one surfacing. Fail-open, non-blocking, dedup-guarded."""
     if not item_key:
         return
     try:
+        _ensure_flusher()
         if DEDUP_MIN > 0:
             k = (item_key, endpoint)
             now_m = time.monotonic()

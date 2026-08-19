@@ -6480,20 +6480,6 @@ async def startup_auto_collect():
         except Exception as _pse:
             print(f"[startup] pit-seal failed to start: {_pse}")
 
-    # N · Platform Indicator for Market Signal (founder feature 2026-08-19):
-    # background flusher for instrument surfacing events. HELD-OUT — writes only
-    # instrument_queries; no score reads it (AST-firewall enforced).
-    if os.getenv("MARKET_PLATFORM_INDICATOR", "1").lower() in ("1", "true", "yes"):
-        try:
-            import market_platform_indicator as _mpi
-            _mpi.init_db(DB_PATH)
-            threading.Thread(target=_mpi.flusher_loop, args=(DB_PATH,), daemon=True,
-                             name="market-n-flusher").start()
-            print(f"[startup] market-n flusher started "
-                  f"(dedup {_mpi.DEDUP_MIN}m; held-out, display-only).")
-        except Exception as _mne:
-            print(f"[startup] market-n flusher failed to start: {_mne}")
-
     # NTI-SD50 (Chairman ruling (c), 2026-08-18): frozen-rule UNMARKETED daily
     # index calculation — one sealed value per UTC day into the PIT store.
     # Rules register: audits/index/INDEX_RULEBOOK_REGISTER.md (r1). Held-out.
