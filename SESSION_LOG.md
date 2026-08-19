@@ -4054,3 +4054,63 @@ rows fire forever by design).
 - Watch: re-arm accrual toward 5/2/3; basis_check rows populating; day-2
   seal tonight; anchor each session
 - CoinAPI gate ~08-24; FMP re-eval 09-05
+
+## 2026-08-19 (UTC) — Chairman rulings: A2 doctrine = 5 outlets (spike = 1 vote), quarterly benchmarks, continuous accuracy review
+
+A2 RULED + SHIPPED + LIVE (engine v351, flag MAINSTREAM_SPIKE_AS_OUTLET=1):
+the doctrine is FIVE MEDIA OUTLETS, and a magnitude spike carries the same
+weight as ONE outlet - a vote toward the quorum, never a standalone pass. v2
+enforced quorum OR spike (a topic with zero outlets could be badged mainstream
+on magnitude alone - the Challenger gap between adopted rule and enforced rule).
+v2.1: effective_corroboration = distinct_independent_outlets + spike_vote;
+mainstream_confirmed = effective >= 5. The sub-quorum trigger clamp reads the
+SAME effective count so the two boundaries cannot drift. BACKTEST BEFORE FLIP
+(8 live topics): ZERO badge flips, ZERO detection change - every confirmed
+topic reached mainstream on outlets alone (10/10/180/11/27/10/20), so the
+backdoor was real in code but no live topic depended on it. Moat-protective by
+construction (strictly fewer mainstream badges = fewer suppressed early reads).
+
+NEWS OUTLET CENSUS (founder question): 18 DISTINCT outlets in the direct
+always-on RSS roster across 55 feed URLs (verticals share one outlet label -
+BBC's 4 feeds are one voice, by design, so corroboration cannot be inflated);
+86-pattern reputable allowlist gates aggregator-sourced news on top. LIVE
+observed distinct outlets per topic: bitcoin 3, world cup/fifa/nvidia 10,
+openai 12, apple 20, ukraine 28, trump 180 - so a quorum of 5 is comfortably
+reachable for genuinely mainstream topics and correctly out of reach for thin
+ones (bitcoin at 3 stays a dark-matter trigger).
+
+F7 SEALED - QUARTERLY BENCHMARK PROTOCOL (Chairman: 2yr and even 12mo too far
+out). Standing cadence: each quarter, score the expiring set with Brier AND
+seal the next, in one sitting. Q1 horizon 2026-11-30, seven benchmarks with
+live baselines: B1 >=30 sealed-epoch resolved races (0.55), B2 unbroken index
+determination streak (0.85), B3 A2.4 re-arm 5/2/3 (0.55), B4 enrollment
+completeness >=95% (0.70), B5 D-early inversion corrected (0.20), B6 PIT chain
+clean + >=90 anchored days (0.88), B7 >=1 referee-corroborated LED win (0.45).
+P-1 (beat the null) DELIBERATELY EXCLUDED - sealed-epoch cohort cannot reach
+n>=120 in a quarter and a small-sample swing must not read as progress.
+Sealed to PIT (row c298322b.., text 9fbd47cb..) + externally anchored.
+
+LEDGER STATE READ (grounds the benchmarks): total resolved 125 (LED 15,
+same-day 10, lagged 100, FP 0), pending 1,320, tracked-race 26.8% on n=56,
+MEDIAN LEAD 11 DAYS on wins, sealed epoch starts 2026-08-17 (citable cohort =
+sealed-epoch only). TWO CORRECTIONS to the Benchmark Register doc: (a) it
+lists P-2 median lead as "0d recorded" - live is 11d, inside the claimed 3-14d
+band; (b) it does not mention the ENROLLMENT COMPLETENESS HOLE - 17 of the last
+103 enrollment cycles FAILED (83.5%), and first-crossing candidates age out at
+14 days, so detections crossing during those cycles were never enrolled. That
+is a hole in the ledger's own denominator and is now benchmark B4.
+
+CADENCE INSTITUTIONALIZED (DEFERRED_ITEMS): ACC-Q dated trigger 2026-11-30
+(score + reseal); ACC-LC recurring quarterly lifecycle case study with the
+queue ordered to test a DIFFERENT failure mode each time (unscheduled shock ->
+failed-trend graveyard -> a LED win), predecessor task = the football-feed
+post-mortem. SECURITY: verified the repo carries NO INTERNAL_API_KEY VALUE -
+all three .md hits are the key NAME only; the exposure the register describes
+is in an externally-uploaded copy, outside this repo.
+
+### Open / Next
+- Football-feed post-mortem (first A4 engineering task)
+- Chairman rulings still open from the worldcup collation: A1 labeling
+  conditions, A3 tripwire/echo diagnostic, A4 remaining sequencing
+- Watch: re-arm toward 5/2/3; day-2 seal ~17:00 PT; anchor each session
+- CoinAPI gate ~08-24; FMP re-eval 09-05; ACC-Q scoring 2026-11-30

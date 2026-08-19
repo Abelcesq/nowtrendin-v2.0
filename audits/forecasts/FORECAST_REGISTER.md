@@ -167,3 +167,56 @@ forecast row, so an unregistered seal is visible by inspection.
 `'## F5-a1'`, trailing whitespace stripped, 2,876 chars;
 `text_sha256 881becd6b17707ea0d075f4bc9699aa82b1608fc272743727d20e932dd8c17cc`;
 `row_sha256 3e755832de65ce419ddaad8e8033ce20ba3c9a7fc79efaf95cb3573564233a19`.
+
+---
+
+## F7 — QUARTERLY BENCHMARK PROTOCOL + Q1 sealed set (Chairman ruling 2026-08-18: "we need 3 month (quarterly) benchmarks — 2 years or even 12 months is too far out")
+
+**The protocol (standing, from this entry forward).** Every quarter this register seals a
+small set of benchmarks that are (a) objectively resolvable from our own instruments,
+(b) about the ACCURACY MACHINERY rather than commercial outcomes, and (c) short enough that
+being wrong is discovered while it still costs little. At each quarter end we do two things
+in one sitting: **score the expiring set with Brier** (all of it, survivors and misses alike)
+and **seal the next set**. A benchmark unresolved at its horizon resolves NO, per the
+register's standing rule. This is the calibration engine for the founder's standing
+instruction that we must *continuously* test whether the system tracks human attention —
+four scored checkpoints a year instead of one distant bet.
+
+**Why these particular numbers.** They are the measurable gates of the Chairman's Benchmark
+Register (P-1…P-6) plus the two integrity streaks the moat now rests on. Each is stated with
+its live baseline as of the seal, so the movement — not the level — is what gets scored.
+
+### Q1 — horizon **2026-11-30** (all probabilities sealed 2026-08-19 UTC; base-rate provenance grade C, judgment-assembled from the live baselines shown)
+
+| # | Benchmark (resolves YES iff…) | Live baseline at seal | Sealed P |
+|---|---|---|---|
+| **B1** | **≥30 SEALED-EPOCH resolved races** in the attention ledger (epoch began 2026-08-17; only sealed-epoch rows are citable) | ~0 sealed-epoch resolved; 125 resolved lifetime; 1,320 pending; enrollment ~12/day | **0.55** |
+| **B2** | **Index determination streak unbroken** — every UTC day from 2026-08-18 through the horizon carries either a sealed value or an honest ABSENT, with no missing day | 2 days (75.45, 76.50), daemon live, missed days are ABSENT forever by rule | **0.85** |
+| **B3** | **A2.4 flow re-arm reaches 5/2/3** — ≥5 material in-band issuer-source comparisons, ≥2 funds, ≥3 trading days, zero bad | 1 / 1 / 1, open_bad 0, first issuer PASS landed within a day of A2.2 | **0.55** |
+| **B4** | **Enrollment completeness ≥95%** measured over the quarter (failed enrollment cycles silently drop first-crossing candidates, which then age out at 14 days — a hole in the ledger's own denominator) | **83.5%** (17 of last 103 cycles FAILED, last 2026-08-01) | **0.70** |
+| **B5** | **D-early inversion corrected** — median Dark Matter at first sighting is HIGHER for LED winners than for pre-broken rows | inverted: LED median 0.0 vs pre-broken 14.3 | **0.20** |
+| **B6** | **PIT chain clean + externally anchored ≥90 distinct days** — `verify()` passes at horizon AND the git anchor file carries ≥90 day-seal heads | chain verifies; 1 seal anchored (day 1 of the anchor era) | **0.88** |
+| **B7** | **≥1 LED win independently corroborated** by the Wikipedia referee (today every win is honestly "unchecked") | ledCorroborated 0, ledUnchecked ≥1 | **0.45** |
+
+**Explicitly NOT a Q1 benchmark:** P-1 (beating the null). The tracked-race rate sits below
+its naive null at p≈0.001 on a pre-sealed-epoch cohort, and the sealed-epoch cohort will not
+reach the ≥120-race sample inside one quarter. Sealing a probability on it now would invite
+reading a small-sample swing as progress. It re-enters as a benchmark the first quarter B1's
+successor puts ≥120 sealed-epoch races in reach — and until then no accuracy claim leaves the
+building, per the citation bar.
+
+**Scoring note (honesty about correlation):** B1, B4 and B7 are not independent — a fixed
+enrollment pipeline lifts all three. They are scored separately anyway, and the correlation
+is recorded here so a "3 of 7 hit" is never read as three independent successes.
+
+**Resolution:** on 2026-11-30 the Forecaster seat scores each benchmark from the live
+instruments (ledger endpoint, `/diag/index`, `/diag/etf-reconcile`, `/diag/pit`, the anchor
+file), records the Brier score for the set, and seals Q2. The Chairman signs the scoring
+minute. No benchmark may be revised, dropped, or reinterpreted after this seal; a benchmark
+discovered to be badly posed is scored as sealed and *replaced* in the next quarter, never
+retroactively amended.
+
+**F7 PIT seal:** item_key=`FCAST-F7-quarterly-benchmarks-Q1-2026-11-30`, sealed 2026-08-19 UTC.
+Extraction: this file UTF-8, from `## F7` to end-of-file at seal time, trailing whitespace
+stripped, 4275 chars; `text_sha256 9fbd47cbc86d2f631fae206a278c20d095321ef21608b49fe41fe77ac58358b9`;
+`row_sha256 c298322ba49f5f6d72d595c49c05f795ca1081d1d21eb0619d2b0d268e1b6c37`.

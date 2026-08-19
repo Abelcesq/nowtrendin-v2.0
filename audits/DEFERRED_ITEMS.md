@@ -265,3 +265,41 @@ recording BEFORE the resolution is recorded, never retrofit after.
 engine Postgres usage ≥70% of plan (check via Heroku dashboard on the weekly
 improve-system read) → write the storage tier plan (larger plan vs partition/export
 strategy) BEFORE the disk forces one. Never prune; never let disk-full be the first alarm.
+
+## ACC-Q — quarterly benchmark scoring (DATED; Chairman ruling 2026-08-18)
+
+The founder's standing instruction: we must CONTINUOUSLY test whether the system actually
+tracks human attention in trends, money markets and crypto — the accuracy ledger is what
+answers that, so its gates get scored on a short clock, not a two-year one.
+`audits/forecasts/FORECAST_REGISTER.md` **F7** seals seven Q1 benchmarks (B1–B7) with a
+horizon of **2026-11-30**.
+
+**Reactivation trigger — DATE: 2026-11-30.** On that date: score all seven with Brier from
+the live instruments, record the set's Brier score, seal Q2, and have the Chairman sign the
+scoring minute. Benchmarks are never revised, dropped, or reinterpreted after their seal — a
+badly-posed one is scored as sealed and replaced in the next quarter. Missing the date does
+not void the quarter; it resolves the set as sealed (unresolved = NO) and is itself a finding.
+
+## ACC-LC — recurring lifecycle case study (Chairman ruling 2026-08-18: "learn from past events")
+
+The World Cup study proved the format: reconstruct one topic family end-to-end from our own
+sealed data, state the gaps honestly, and let the ledger say where we were late. One study is
+an anecdote; a series is evidence (Friedman & Schwartz discipline — the panel settles what one
+episode cannot). **Cadence: one study per quarter, delivered with the ACC-Q scoring.**
+
+Queue, in order, each chosen to test a DIFFERENT failure mode than the last:
+1. **An unscheduled shock** (geopolitical/market) — the WC was a scheduled mania with a
+   printed calendar, the easiest possible class; the thesis lives or dies on unscheduled ones.
+2. **A failed trend / graveyard study** — topics that crossed the same early thresholds and
+   went nowhere. Until this exists, every lifecycle finding is survivorship-conditioned
+   (Taleb's silent evidence). Costs nothing to collect now, unobtainable retroactively.
+3. **A LED-win study** — a family the engine actually led on, same template. One loss study
+   alone is a confession; loss + win is a diligence pack.
+
+**Immediate predecessor task (blocks nothing but should go first — Operator finding):** the
+read-only post-mortem on why Guardian Football / ESPN Soccer / Football365 (niche tier, live
+since 2026-06-12) produced ~zero niche mentions and D≤9/100 across 532 world-cup cycles.
+Three candidate mechanisms — sports-headline extraction failure, the first-timer numerator
+reading 0 on already-seen topics, or collector under-delivery — imply three different builds
+at three different costs, and backtesting new feeds through the same silent failure would read
+"no lift" as "no edge."
