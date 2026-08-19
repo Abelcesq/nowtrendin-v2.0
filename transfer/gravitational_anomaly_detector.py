@@ -8769,13 +8769,17 @@ def research_mainstream_v2(topics: str = "world cup,mexico world cup,footballer"
             mag_base = mags[len(mags) // 2] if mags else 0.0
             brd_base = brs[len(brs) // 2] if brs else 0.0
 
-            def _run(v2: bool):
+            def _run(v2: bool, spike_as_outlet: bool = False):
                 dp.MAINSTREAM_V2 = v2
+                dp.MAINSTREAM_SPIKE_AS_OUTLET = spike_as_outlet
                 return dp.blend(70, 65, {"M": 40, "I": 30, "P": 50}, sig,
                                 breadth_baseline=brd_base, magnitude_baseline=mag_base,
                                 baseline_cycles=len(hist), expert_confidence=60)
             b1, b2 = _run(False), _run(True)
+            b21 = _run(True, True)          # v2.1: spike counts as ONE outlet
             dp.MAINSTREAM_V2 = (os.getenv("MAINSTREAM_V2", "0") == "1")   # restore live state
+            dp.MAINSTREAM_SPIKE_AS_OUTLET = (
+                os.getenv("MAINSTREAM_SPIKE_AS_OUTLET", "0") == "1")
             news = sorted({(s.get("source_name") or s.get("platform")) for s in sig
                            if (s.get("platform") or "").lower() in dp._NEWS_PLATFORMS})
             out.append({
@@ -8788,6 +8792,17 @@ def research_mainstream_v2(topics: str = "world cup,mexico world cup,footballer"
                        "w": b1["mainstream_ratio"], "mainstream_confirmed": b1["mainstream_confirmed"]},
                 "v2": {"detection": b2["detection"], "pathway": b2["pathway"],
                        "w": b2["mainstream_ratio"], "mainstream_confirmed": b2["mainstream_confirmed"]},
+                # v2.1 — Chairman ruling 2026-08-18: spike = one vote toward the 5-outlet
+                # quorum, never a standalone pass. `changed` marks a badge flip vs v2.
+                "v2_1": {"detection": b21["detection"], "pathway": b21["pathway"],
+                         "w": b21["mainstream_ratio"],
+                         "mainstream_confirmed": b21["mainstream_confirmed"],
+                         "spike_vote": b21.get("spike_vote"),
+                         "effective_corroboration": b21.get("effective_corroboration")},
+                "changed_v2_to_v2_1": (b2["mainstream_confirmed"]
+                                       != b21["mainstream_confirmed"]),
+                "detection_delta_v2_to_v2_1": round(
+                    (b21["detection"] or 0) - (b2["detection"] or 0), 2),
             })
     except Exception as e:
         print(f"[mainstream-v2] {e}")

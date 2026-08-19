@@ -54,8 +54,23 @@ import os
 # (mainstream_v2_backtest / GET /research/mainstream-v2) on the FIFA basket BEFORE flipping.
 MAINSTREAM_V2 = os.getenv("MAINSTREAM_V2", "0") == "1"
 NEWS_QUORUM_V2 = int(os.getenv("NEWS_QUORUM_V2", "5"))        # distinct reputable outlets ⇒ mainstream
-MAG_MAINSTREAM_V2 = float(os.getenv("MAG_MAINSTREAM_V2", "60"))  # magnitude that alone ⇒ mainstream (FIFA ~82)
+MAG_MAINSTREAM_V2 = float(os.getenv("MAG_MAINSTREAM_V2", "60"))  # magnitude spike threshold
 MAG_TRIGGER_FLOOR_V2 = float(os.getenv("MAG_TRIGGER_FLOOR_V2", "30"))  # below this + sub-quorum ⇒ stay trigger
+
+# ── MAINSTREAM v2.1 — SPIKE COUNTS AS ONE OUTLET (Chairman ruling 2026-08-18) ────────────────
+# The v2 rule read `quorum OR magnitude-spike`, so a topic with ZERO corroborating outlets was
+# badged mainstream on magnitude alone — a standalone backdoor around the five-outlet doctrine
+# (the Challenger's finding: "the rule we adopt is not the rule the code enforces"). The
+# Chairman ruled the doctrine IS five media outlets, and that "a spike can have the same weight
+# as a media outlet" — i.e. one VOTE toward the quorum, never a veto over it:
+#     effective_corroboration = distinct_independent_outlets + (1 if magnitude spike else 0)
+#     mainstream_confirmed    = effective_corroboration >= NEWS_QUORUM_V2
+# Consequences, stated plainly: 4 outlets + a spike now confirms (5); a huge spike with no
+# outlets no longer confirms (1) — it stays a dark-matter TRIGGER whose magnitude still drives
+# its weight through magnitude_factor, so it is never "measured as nothing" (A3). This is
+# MOAT-PROTECTIVE: strictly fewer topics get the mainstream badge that suppresses the early
+# read. Score-affecting → flag-gated, backtested via /research/mainstream-v2 before the flip.
+MAINSTREAM_SPIKE_AS_OUTLET = os.getenv("MAINSTREAM_SPIKE_AS_OUTLET", "0") == "1"
 
 # Tiers that represent general-public / discovery attention.
 _MAINSTREAM_TIERS = {"mainstream"}
@@ -269,11 +284,19 @@ def blend(expert_detection: float, expert_overall: float,
     # independent of baseline/magnitude: corroborated across many distinct
     # reputable outlets, OR broadly across mainstream communities. This is the
     # founder's "multiple news sources + other platforms = mainstream" rule.
+    spike_vote = 1 if (mag >= MAG_MAINSTREAM_V2) else 0
+    # v2.1 (Chairman ruling): the spike is worth ONE outlet toward the quorum, never a
+    # standalone pass. Under plain v2 it was its own OR-branch.
+    effective_corroboration = n_news_indep + (spike_vote if MAINSTREAM_SPIKE_AS_OUTLET else 0)
     if MAINSTREAM_V2:
-        # v2: a real news QUORUM (≥5 INDEPENDENT outlets) OR a genuine magnitude spike — NOT a
-        # single outlet, NOT wire-syndication, and NOT the bare community-count branch (which
-        # flipped "footballer" on 1 outlet). Trigger-vs-corroborator: corroboration, not a lone source.
-        mainstream_confirmed = (n_news_indep >= NEWS_QUORUM_V2) or (mag >= MAG_MAINSTREAM_V2)
+        # v2: a real news QUORUM (≥5 INDEPENDENT outlets) — NOT a single outlet, NOT
+        # wire-syndication, and NOT the bare community-count branch (which flipped
+        # "footballer" on 1 outlet). Trigger-vs-corroborator: corroboration, not a lone source.
+        # v2.1 counts a magnitude spike as one corroborating vote inside that quorum;
+        # legacy v2 let magnitude alone confirm (the standalone backdoor the Chairman closed).
+        mainstream_confirmed = (
+            effective_corroboration >= NEWS_QUORUM_V2 if MAINSTREAM_SPIKE_AS_OUTLET
+            else ((n_news_indep >= NEWS_QUORUM_V2) or (mag >= MAG_MAINSTREAM_V2)))
     else:
         mainstream_confirmed = (n_news >= NEWS_MAINSTREAM_MIN) or (cur_n >= _BREADTH_FULL)
 
@@ -313,7 +336,10 @@ def blend(expert_detection: float, expert_overall: float,
     # detection rides the early/expert pathway — the credible source acts as an early signal,
     # not a denominator vote that suppresses it — until DISTINCT outlets actually corroborate
     # (≥ NEWS_QUORUM_V2) or attention magnitude spikes. (Magnitude path keeps FIFA mainstream.)
-    if MAINSTREAM_V2 and n_news_indep < NEWS_QUORUM_V2 and mag < MAG_TRIGGER_FLOOR_V2:
+    # v2.1: the clamp reads the SAME effective corroboration count as the badge, so the
+    # trigger boundary and the mainstream boundary can never drift apart.
+    if (MAINSTREAM_V2 and effective_corroboration < NEWS_QUORUM_V2
+            and mag < MAG_TRIGGER_FLOOR_V2):
         breadth_factor = 0.0
         tier_migration = False
 
@@ -365,9 +391,13 @@ def blend(expert_detection: float, expert_overall: float,
         "n_expert_communities": br.get("n_expert", 0),
         "news_outlets": n_news,
         "mainstream_confirmed": bool(mainstream_confirmed),
-        "mainstream_model": "v2" if MAINSTREAM_V2 else "v1",
+        "mainstream_model": ("v2.1" if (MAINSTREAM_V2 and MAINSTREAM_SPIKE_AS_OUTLET)
+                             else "v2" if MAINSTREAM_V2 else "v1"),
         "news_quorum": (NEWS_QUORUM_V2 if MAINSTREAM_V2 else NEWS_MAINSTREAM_MIN),
         "news_outlets_independent": n_news_indep,
+        # v2.1 transparency: outlets + spike vote, and the vote itself.
+        "spike_vote": spike_vote,
+        "effective_corroboration": effective_corroboration,
         "tier_migration": bool(tier_migration),
         "mainstream_detection": md,
         "expert_detection": round(expert_detection, 2),
