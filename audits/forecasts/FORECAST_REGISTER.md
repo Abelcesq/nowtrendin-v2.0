@@ -142,3 +142,28 @@ Standing census rule (Statistician, anti-file-drawer): any `kind='forecast'` PIT
 reflected in this register within 7 days of its `knowable_at` is VOID for all purposes;
 the periodic anchor export (`tools/anchor_pit_seals.py` → `audits/pit-anchors/`) lists every
 forecast row, so an unregistered seal is visible by inspection.
+
+### F5-a1 VERIFICATION RECORD (appended 2026-08-19 UTC / 2026-08-18 PT — machine-verified, both directions)
+
+- **Sealed `text_sha256`:** `465d9f3d7c5fb848968d5eabb0a0868e18683065559f730a9e3d4494250e4fb2`
+  (fetched from the live PIT row via `/diag/pit/anchors`).
+- **Recomputed independently from git and MATCHED exactly:** the register file's bytes at
+  commit `c1e75a4`, **decoded as cp1252** (the PowerShell 5.1 `Get-Content -Raw` default
+  used at seal time on a BOM-less UTF-8 file — recorded honestly: multibyte characters in
+  the sealed text are their cp1252 mojibake forms), substring from `'## F5'` to the byte
+  before `'**PIT seal:**'`, trailing whitespace stripped, encoded UTF-8 → sha256. 3,386
+  characters. Any future dispute recomputes by this exact recipe.
+- The CONTENT-canonical text remains this file's F5 sections (1)–(5) as committed at
+  `c1e75a4` (byte-identical under utf-8 decode, 3,353 chars, sha256
+  `cca4b7e9338ba443560f6f1fdad93886aceb096c6c684b7de0b85e2aa91020c0` — recorded so both
+  readings are pinned). Future seals use `tools`-scripted UTF-8 extraction so text and
+  seal encodings coincide.
+- **Numbering note:** F5's board-conditions paragraph reserved "F6" for a possible
+  12-month-horizon variant; F6 was subsequently used for the point-convention entry
+  above. Any Chairman-ordered 12-month first-licensee entry is therefore **F7**.
+
+**F6 PIT seal:** `item_key='FCAST-F6-point-convention-F1-F4'`, sealed 2026-08-19 UTC via
+`POST /diag/pit/forecast` — extraction: this file UTF-8, from `'## F6'` to the byte before
+`'## F5-a1'`, trailing whitespace stripped, 2,876 chars;
+`text_sha256 881becd6b17707ea0d075f4bc9699aa82b1608fc272743727d20e932dd8c17cc`;
+`row_sha256 3e755832de65ce419ddaad8e8033ce20ba3c9a7fc79efaf95cb3573564233a19`.

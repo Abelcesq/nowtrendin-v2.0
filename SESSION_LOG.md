@@ -4013,3 +4013,44 @@ register; freeze attestation. DATED TRIPWIRE: zero mode=asof issuer intervals by
 ### Open / Next
 - CHAIRMAN: rule on both collations (worldcup-casestudy + updates-review)
 - Then execute the ruled P0/P1/P2 batches
+
+## 2026-08-18 (PT, cont.-6) — ALL BOARD FIXES EXECUTED (P0+P1+P2, Chairman-ruled); first day-seal + first anchor
+
+Deployed (engine 7bfa3c0) + live-verified. P0: external seal anchoring LIVE —
+/diag/pit/anchors + tools/anchor_pit_seals.py + audits/pit-anchors/
+PIT_SEAL_ANCHORS.md (first anchor exported: day-seal 08-18 + F5 + F6; the
+grade-A clock starts today; anchor cadence added to the nowtrendin2.0 skill);
+Heroku pg:backups DAILY 03:00 UTC scheduled + manual b002 captured (continuous
+protection confirmed already on); PIT completeness check live in
+pipeline_integrity (zero-pit-on-scored-day=critical, <90%=warn, counted
+fail-open); partial UNIQUE index enforces one index_value/day in the DB;
+sealer midnight grace 20min. P1: fires-forever implemented (gate/bias/re-arm
+unwindowed; window=display only); verdict-transition guard +
+etf_verdict_transitions; re-arm bias = issuer-src only; NYSE holiday calendar
+2026-27 frozen (Labor Day 09-07 covered); ET fallback DST fix; STANDING BASIS
+MONITOR (etf_basis_check; >=2 consec single-tday mismatches = drift alarm +
+gate FAIL); superseded-A2 tally served (10 PASS/20 FAIL preserved visible).
+P2: index payload now carries param_version + engine_release + 4dp
+constituents + NULL-exclusion (register r1-a1 w/ day-1 erratum + freeze
+attestation); FORECAST_REGISTER F6 (F1-F4 midpoints 0.80/0.325/0.115 +
+criteria; F4 split F4a 0.015/F4b 0.075) sealed to PIT (row 3e755832..,
+text 881becd6..); F5 text_sha256 MACHINE-VERIFIED both directions
+(465d9f3d.. = cp1252-recipe recompute from c1e75a4, recipe recorded;
+12-month variant renumbered F7); DEFERRED_ITEMS: IDX-RC4/IDX-RC3/
+FCAST-RESOLUTION/PIT-STORAGE. Tests 20/20+13/13+33/33+14/14.
+
+LIVE STATE: PIT 16,318 obs (14,822 trend / 1,493 market / 2 index / 2
+forecast) — completeness watch armed; FIRST DAY-SEAL 2026-08-18 (8,481 rows,
+GENESIS-linked) VERIFIES ok incl. links; NTI-SD50 day 2: 76.50 (08-19,
+01:0x UTC slot, new payload schema). OPERATOR 08-21 TRIPWIRE RESOLVED EARLY:
+first issuer-source A2.2 PASS on the re-arm clock (pass_comparisons=1) —
+page_asof intervals ARE deriving; gate FAIL correctly (old FMP NO_DERIVED
+rows fire forever by design).
+
+### Open / Next
+- Chairman rulings still open from the worldcup-casestudy collation
+  (A1 labeling conditions; A2 prose-vs-OR-form + quorum sweep; A3 tripwire/
+  echo diagnostic; A4 sequencing; F7 12-month variant yes/no)
+- Watch: re-arm accrual toward 5/2/3; basis_check rows populating; day-2
+  seal tonight; anchor each session
+- CoinAPI gate ~08-24; FMP re-eval 09-05
