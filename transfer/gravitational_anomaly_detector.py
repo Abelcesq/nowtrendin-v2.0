@@ -7642,17 +7642,27 @@ def _ledger_data_use(h: dict) -> dict:
                       "data's own timestamps and the assessment timestamp.",
             "sealed_epoch_start": sealed_start,
             "engine_epoch_boundary": ENGINE_EPOCH_BOUNDARY,
-            "rows_resolved": h.get("total"),
-            "rows_pending": h.get("pending"),
+            # The honest report names these `sample_size`/`still_pending`; the SERVED
+            # payload renames them total/pending. Reading the served names off `h` gave a
+            # silent NULL — a provenance log that records the pool but not its size is
+            # not the log the ruling asks for.
+            "rows_resolved": h.get("sample_size"),
+            "rows_pending": h.get("still_pending"),
             "param_version": h.get("param_version"),
         }
+        # Keys are the HONEST-REPORT names, not the served camelCase aliases. Getting
+        # this wrong logs a full set of NULLs that still LOOKS like a complete record —
+        # the failure mode a provenance log must not have.
         values = {
-            "hit_rate": h.get("hit_rate"),
+            "honest_hit_rate_pct": h.get("honest_hit_rate_pct"),
+            "naive_hit_rate_pct": h.get("naive_hit_rate_pct"),
             "tracked_race_hit_rate_pct": h.get("tracked_race_hit_rate_pct"),
             "tracked_race_sample": h.get("tracked_race_sample"),
-            "median_lead": h.get("median_lead"),
-            "led": h.get("led"), "same_day": h.get("same_day"),
-            "lagged": h.get("lagged"), "false_positives": h.get("false_positives"),
+            "median_lead_days": h.get("median_lead_days"),
+            "hits_led": h.get("hits_led"), "same_day": h.get("same_day"),
+            "misses_lagged": h.get("misses_lagged"),
+            "misses_pre_broken": h.get("misses_pre_broken"),
+            "misses_false_positive": h.get("misses_false_positive"),
         }
         _log_data_use_assessment("ledger:attention", source, values)
         return {"source": source, "assessed_at": datetime.now(timezone.utc).isoformat(),
