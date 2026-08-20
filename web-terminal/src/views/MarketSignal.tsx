@@ -555,7 +555,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
   )
 }
 
-export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.ReactNode | null) => void; preset?: { filter: string; n: number } | null; focus?: { key: string; display: string; n: number } | null }) {
+export function MarketSignal({ onRail, preset, focus, query }: { onRail: (node: React.ReactNode | null) => void; preset?: { filter: string; n: number } | null; focus?: { key: string; display: string; n: number } | null; query?: string }) {
   const [rows, setRows] = useState<MRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -563,6 +563,9 @@ export function MarketSignal({ onRail, preset, focus }: { onRail: (node: React.R
   const [laneFilter, setLaneFilter] = useState('all')
   const [dirFilter, setDirFilter] = useState('all')
   const [q, setQ] = useState('')
+  // Top-bar search drives the SAME filter as the in-page box, so either entry point
+  // narrows this table (the top bar used to force-navigate to Trends instead).
+  useEffect(() => { if (query !== undefined) setQ(query) }, [query])
   const [sortKey, setSortKey] = useState<SortKey>('det')
   const [sortDir, setSortDir] = useState(-1)
   const [sel, setSel] = useState<string | null>(null)

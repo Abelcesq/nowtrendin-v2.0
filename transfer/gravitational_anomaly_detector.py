@@ -7586,15 +7586,21 @@ def _ledger_common_mode(h: dict) -> dict:
         led_total = checked + unchecked
         pct = round(100.0 * checked / led_total, 1) if led_total else 0.0
         floor_met = bool(led_total) and pct >= REFEREE_FLOOR_PCT
-        # Sweep starvation: newest-slot ages the sweep itself reports. If the sweep has not
-        # run within the window, resolutions in that gap are referee-starved, not measured.
-        slots = h.get("sweep_newest_slots")
+        # ── CORRECTED 2026-08-19 (Statistician + Forecaster, independently) ──
+        # This tripwire SHIPPED DEAD THIS MORNING. It read `sweep_newest_slots`, which is
+        # NOT an observed sweep age — it is `int(os.getenv("LEDGER_SWEEP_NEWEST_SLOTS","0"))`,
+        # a configured reservation count defaulting to 0. So `0 > 3` evaluated False
+        # permanently and the tripwire could only ever fire if a human set an env var.
+        # That is precisely the "control that exists on paper" defect this hedge was built
+        # to expose — shipped again, the same day, inside the hedge itself. Rather than
+        # infer starvation from a number that does not mean what the name suggests, report
+        # UNMEASURED honestly until it is wired to real sweep timestamps (§15a: an absence
+        # must never render as "fine").
         starved = None
-        try:
-            if isinstance(slots, (int, float)):
-                starved = float(slots) > SWEEP_STARVATION_DAYS
-        except Exception:
-            starved = None
+        starved_note = ("UNMEASURED — not yet wired to observed sweep history. The prior "
+                        "implementation read a configured slot-reservation constant "
+                        "(LEDGER_SWEEP_NEWEST_SLOTS, default 0) as if it were a day-count, "
+                        "so it could never fire. Reporting unknown rather than 'not starved'.")
         return {
             "note": "Google is both a primary discovery pipe and this ledger's referee, and "
                     "both ride one vendor (Apify). These two checks make that dependency "
@@ -7605,31 +7611,46 @@ def _ledger_common_mode(h: dict) -> dict:
                                  "ledTotal": led_total},
             "refereeFloorMet": floor_met,
             "citable": bool(floor_met and corr > 0),
-            # Two DIFFERENT failures, and conflating them would be its own dishonesty:
-            #   • floor NOT met  → the control has barely fired; it is redundancy on paper.
-            #   • floor MET but zero corroborated → the control HAS fired, repeatedly, and
-            #     confirms none of the wins. That is far more serious than silence, and the
-            #     message must say so rather than implying the referee was simply absent.
+            # ── CORRECTED 2026-08-19 after a 5-of-5 board finding against THIS code ──
+            # The earlier wording said the referee "has been exercised and does not confirm
+            # the wins". The code cannot support that sentence. `_referee_corroborate`
+            # (accuracy_ledger_enhanced.py:~189) returns the SAME 0 for four different
+            # worlds: (a) Wikipedia arrival PRECEDES our detection — the only real
+            # disconfirmation; (b) NO qualifying surge found at all — silence, not dispute;
+            # (c) a surge that supports the lead but falls outside ±14d of the GOOGLE
+            # breakout — a disagreement between two proxies, not a verdict on us; (d) a
+            # baseline/sensitivity artifact (SURGE_MIN_ABS=200 views/day is structurally
+            # blind to the low-traffic niche cohort our wins are drawn from).
+            # Reporting that composite as disconfirmation is the SAME defect §15a forbids —
+            # an absence recorded as a finding — committed inside the control that gates
+            # every accuracy claim. Erring toward self-criticism does not make it accurate.
+            # Until the reason-code decomposition lands, the honest state is INCONCLUSIVE.
             "refereeState": (
                 "not_exercised" if not floor_met
-                else "exercised_and_uncorroborating" if corr == 0
+                else "exercised_and_inconclusive" if corr == 0
                 else "exercised_and_corroborating"),
             "citationBlockReason": (
                 None if (floor_met and corr > 0)
-                else f"the independent referee has checked {pct}% of LED wins "
-                     f"({checked} of {led_total}) and corroborated NONE of them — the control "
-                     f"has been exercised and does not confirm the wins; this is a stronger "
-                     f"reason not to cite the rate than an unfired referee would be"
+                else f"the independent referee returned non-confirmation on {checked} of "
+                     f"{led_total} LED wins ({pct}%), but its non-confirmations are a "
+                     f"COMPOSITE of four outcomes the current instrument does not separate "
+                     f"(arrival preceding detection · no qualifying surface at all · surge "
+                     f"outside the ±14d Google-breakout band · below the 200 views/day "
+                     f"sensitivity floor). Corroboration is therefore NOT ESTABLISHED, and "
+                     f"the wins are UNCONFIRMED — not refuted. The referee's power to "
+                     f"confirm a true lead has never been measured (no control arm)."
                 if floor_met and corr == 0
                 else f"independent referee has checked only {pct}% of LED wins "
                      f"(floor {REFEREE_FLOOR_PCT}%) — a second referee that has barely fired "
                      f"is redundancy on paper, not in fact"),
+            "refereeCaveat": (
+                "Non-confirmation != disconfirmation. This block reports COVERAGE, not "
+                "applicability: rows where the referee is not a valid instrument (no article, "
+                "non-English attention, sub-threshold traffic) are currently counted as "
+                "unconfirmed rather than UNREFEREEABLE. Reason-code decomposition pending."),
             "sweepStarvationDays": SWEEP_STARVATION_DAYS,
             "sweepStarved": starved,
-            "sweepStarvedNote": (
-                "sweep newest-slot age exceeds the starvation window — timeouts resolved in "
-                "this gap were judged while the referee's meter was out; report them, never "
-                "blend them into a headline rate" if starved else None),
+            "sweepStarvedNote": starved_note,
         }
     except Exception as e:
         return {"available": False, "reason": str(e)[:120]}

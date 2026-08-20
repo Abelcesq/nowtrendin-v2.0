@@ -26,7 +26,7 @@ function gapMicro(det: number, conf: number) {
 }
 const stageOf = (d: number) => d >= 85 ? 'BREAKOUT' : d >= 70 ? 'STRONG' : d >= 55 ? 'EMERGING' : d >= 35 ? 'MARGINAL' : 'MONITORING'
 
-export function Watchlists({ onOpenDetail }: { onOpenDetail?: (key: string, kind: WatchKind, display: string) => void }) {
+export function Watchlists({ onOpenDetail, query }: { onOpenDetail?: (key: string, kind: WatchKind, display: string) => void; query?: string }) {
   const [lists, setLists] = useState<WatchlistT[]>([])
   const [live, setLive] = useState<Record<string, Live>>({})
   const [active, setActive] = useState<number | null>(null)
@@ -191,7 +191,14 @@ export function Watchlists({ onOpenDetail }: { onOpenDetail?: (key: string, kind
               </tr>
             </thead>
             <tbody>
-              {current.items.map((it) => {
+              {current.items.filter((it: any) => {
+                // Top-bar search narrows the active list (previously the search box
+                // navigated away to Trends, so watchlists could not be searched).
+                const wq = (query || '').trim().toLowerCase()
+                if (!wq) return true
+                return String(it.display || '').toLowerCase().includes(wq)
+                    || String(it.key || '').toLowerCase().includes(wq)
+              }).map((it) => {
                 const lv = live[liveKey(it.kind, it.key)]
                 const det = lv?.det ?? 0, conf = lv?.conf ?? 0, gap = det - conf
                 const scored = !!lv

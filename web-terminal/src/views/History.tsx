@@ -25,11 +25,13 @@ function Spark({ pts, color }: { pts: number[]; color: string }) {
   return <svg width={84} height={26} style={{ display: 'block', flex: '0 0 auto' }}><polyline points={P} style={{ stroke: color, fill: 'none' }} strokeWidth={2} /></svg>
 }
 
-export function History({ initialQ }: { initialQ?: string }) {
+export function History({ initialQ, query }: { initialQ?: string; query?: string }) {
   const [win, setWin] = useState('7d')
   const [rows, setRows] = useState<HistoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState(initialQ ?? '')
+  // Top-bar search narrows history too (previously it navigated away to Trends).
+  useEffect(() => { if (query !== undefined && query !== '') setQ(query) }, [query])
   const [selKey, setSelKey] = useState<string | null>(null)
   const [hist, setHist] = useState<ChartPoint[] | null>(null)   // enriched per-cycle history for the selected topic
   const [an, setAn] = useState<{ available: boolean; short?: string; full?: string; citations?: string[]; reason?: string } | null>(null)

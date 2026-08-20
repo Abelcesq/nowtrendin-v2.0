@@ -28,6 +28,17 @@ export type NavKey =
   | 'dashboard' | 'trends' | 'market' | 'crypto' | 'grade'
   | 'watchlists' | 'alerts' | 'history' | 'ledger' | 'methodology'
 
+//: The top-bar search searches the CURRENT section. Naming the section in the
+//: placeholder is what makes that obvious — otherwise a generic box implies a global
+//: search we do not have, which is how it silently read as "broken" on Market Signal.
+const SEARCH_PLACEHOLDER: Partial<Record<NavKey, string>> = {
+  trends: 'Search trends…',
+  market: 'Search instruments…',
+  crypto: 'Search coins…',
+  history: 'Search history…',
+  watchlists: 'Search watchlists…',
+}
+
 // Phase 2 of the 3-platform UI migration (Charter §0.6): nav icons now come from
 // lucide-react (the web sibling of the mobile app's lucide-react-native), one icon =
 // one meaning across surfaces — replacing the ad-hoc Unicode glyphs (▦ ▲ $ ◎ ★ ⚑ ✓ ❋).
@@ -126,9 +137,12 @@ export function Shell({
         </div>
         <div className="search">
           <Search className="ico" size={14} strokeWidth={2} />
-          <input id="search" type="text" placeholder="Search topics, tickers, screens…" autoComplete="off"
-            value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)}
-            onFocus={() => nav !== 'trends' && onNav('trends')} />
+          {/* The search box searches the section you are IN. It used to force-navigate to
+              Trends on focus, which made Market Signal / Crypto / History / Watchlists
+              unsearchable — you were yanked out of the section before you could type. */}
+          <input id="search" type="text" placeholder={SEARCH_PLACEHOLDER[nav] || 'Search…'}
+            autoComplete="off" value={search ?? ''}
+            onChange={(e) => onSearch?.(e.target.value)} />
           {search ? (
             <button onClick={() => onSearch?.('')} title="Clear" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '2px 4px', display: 'flex', alignItems: 'center' }}><X size={13} /></button>
           ) : (

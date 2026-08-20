@@ -42,7 +42,9 @@ export function App() {
   const [booting, setBooting] = useState(true)
   const [nav, setNav] = useState<NavKey>('dashboard')   // land on the at-a-glance dashboard
   const [rail, setRail] = useState<ReactNode | null>(null)
-  const [q, setQ] = useState('')   // top-bar search → filters the Trends grid
+  // Top-bar search. Applies to whichever section is active — Trends, Market Signal,
+  // Crypto, History and Watchlists each receive it and filter their own rows.
+  const [q, setQ] = useState('')
   const [account, setAccount] = useState(false)   // avatar → account view
   // Favorite click → jump to its section with the filter applied (nonce so
   // re-clicking re-applies even after navigating away).
@@ -106,13 +108,13 @@ export function App() {
   if (account) body = <Account user={user} onSignOut={signOut} onClose={() => setAccount(false)} onUserUpdate={setUser} />
   else if (nav === 'dashboard') body = <Dashboard onNav={go} onNavHistory={onNavHistory} />
   else if (nav === 'trends') body = <Screener onRail={setRail} query={q} preset={screen} focus={trendFocus} />
-  else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} />
-  else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} />
+  else if (nav === 'market') body = <MarketSignal onRail={setRail} preset={marketScreen} focus={marketFocus} query={q} />
+  else if (nav === 'watchlists') body = <Watchlists onOpenDetail={openDetail} query={q} />
   else if (nav === 'grade') body = <Grade user={user} onUser={setUser} />
-  else if (nav === 'crypto') body = <Crypto onRail={setRail} />
+  else if (nav === 'crypto') body = <Crypto onRail={setRail} query={q} />
   else if (nav === 'ledger') body = <Ledger />
   else if (nav === 'alerts') body = <Alerts onOpenDetail={openDetail} />
-  else if (nav === 'history') body = <History key={historyNavKey} initialQ={historyInitQ} />
+  else if (nav === 'history') body = <History key={historyNavKey} initialQ={historyInitQ} query={q} />
   else if (nav === 'methodology') body = <Methodology />
   else body = <Placeholder title={titleFor(nav)} />
 

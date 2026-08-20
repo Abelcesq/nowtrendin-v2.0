@@ -145,7 +145,7 @@ const CRYPTO_DIR_FILTERS: { k: string; label: string; test: (c: CryptoCoin) => b
   { k: 'neutral', label: 'Neutral', test: (c) => c.flow !== 'inflow' && c.flow !== 'outflow' },
 ]
 
-export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void }) {
+export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => void; query?: string }) {
   const [feed, setFeed] = useState<CryptoFeed | null>(null)
   const [err, setErr] = useState('')
   const [sel, setSel] = useState<string | null>(null)
@@ -177,7 +177,13 @@ export function Crypto({ onRail }: { onRail: (node: ReactNode | null) => void })
   // headline a "Money Gradient" with zero money data on any coin.
   const allMoneyAbsent = coins.length > 0 && coins.every((c) => c.money_data_absent)
   const dfl = CRYPTO_DIR_FILTERS.find((x) => x.k === dirFilter)
-  const shown = dfl?.test ? coins.filter(dfl.test) : coins
+  let shown = dfl?.test ? coins.filter(dfl.test) : coins
+  // Top-bar search narrows the coin roster (name or symbol) — previously the search
+  // box navigated away to Trends, so Crypto could not be searched at all.
+  const cq = (query || '').trim().toLowerCase()
+  if (cq) shown = shown.filter((c: any) =>
+    String(c.name || '').toLowerCase().includes(cq) ||
+    String(c.coin || c.symbol || '').toLowerCase().includes(cq))
   return (
     <>
       <div className="main-head">
