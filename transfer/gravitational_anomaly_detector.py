@@ -1876,7 +1876,7 @@ KNOWN_CONCEPT_PHRASES = {
 }
 
 
-def _is_quality_topic(display: str) -> bool:
+def _is_quality_topic(display: str, from_entity_run: bool = False) -> bool:
     """Reject profanity, spam, boilerplate fragments, generic common words, and bare junk
     so the grid reads clean. Applied at extraction AND serve-time (clears the existing pool
     without re-collection) AND by the Pipeline Integrity / situation layers — the ONE shared
@@ -1910,6 +1910,12 @@ def _is_quality_topic(display: str) -> bool:
         w = toks[0]
         if w in DOMAIN_TERMS:
             return True
+        # Single-word proper nouns are the same defect class as the multi-word one
+        # below, and just as costly: 'barcelona', 'liverpool', 'chelsea' are all
+        # ordinary dictionary words. GENERIC_JUNK is still enforced — the exemption
+        # says "capitalized in the source", never "anything goes".
+        if from_entity_run and w not in GENERIC_JUNK:
+            return True
         # reject curated junk OR any frequent common word — a single common word
         # is never a trend, no matter how many times it is posted.
         return not (w in GENERIC_JUNK or _is_common_word(w))
@@ -1930,14 +1936,56 @@ def _is_quality_topic(display: str) -> bool:
         return False
     if any(w in DOMAIN_TERMS for w in toks):
         return True
+    # PROPER-NOUN EXEMPTION (2026-08-20, opt-in — DEFAULT OFF so the existing pool and
+    # every serve-time call are byte-unchanged). The all-common-words rule below asks
+    # "is any token outside everyday vocabulary?" That question is a good junk filter
+    # and a STRUCTURAL BIAS TOWARD TECH: 'nestjs', 'pytest', 'huggingface' are never
+    # dictionary words, but place-derived proper nouns are entirely dictionary words.
+    # Measured live: 'real madrid' REJECTED ('real' junk + 'madrid' common),
+    # 'manchester city' REJECTED (both common) — while the fragment 'turns against
+    # infantino' PASSED on the strength of one rare surname. Rejecting a real entity
+    # costs coverage we cannot see we are missing; that is the expensive, invisible
+    # error (football-feed post-mortem, 2026-08-19).
+    # `from_entity_run=True` is passed ONLY by entity-anchored extractors, which derive
+    # the phrase from a CAPITALIZED RUN in the source headline. That capitalization is
+    # EXTERNAL evidence of a proper noun — not our own score, so this is not circular.
+    # It does not weaken any other gate: profanity, spam, boilerplate, clause-filler,
+    # news-filler anchors and the length caps have all already been applied above.
+    if from_entity_run:
+        return True
     return not all((w in STOP_WORDS or w in GENERIC_JUNK or _is_common_word(w))
                    for w in toks)
 
 
 # Capitalized entity runs (FIFA World Cup, New York Knicks, Elon Musk) and
 # all-caps acronyms (FIFA, NASA, UFC, NBA) — lightweight NER from headline case.
+#
+# UNICODE (2026-08-20): the class was `[A-Z]`, i.e. ASCII-only, so a name beginning
+# with an accented capital never anchored a run — measured live, "Émmanuel Macron
+# meets Olaf Scholz" yielded ONLY 'Olaf Scholz', and "Ángel Di María" yielded
+# 'Di María'. Python's `re` has no \p{Lu}, and simply loosening the class to any
+# letter is WRONG: the alternation would then chain straight through lowercase words
+# and swallow "Erling Haaland scores for Manchester City" as one 4-cap "entity".
+# So the uppercase class is BUILT from str.isupper() over the Latin/Greek/Cyrillic
+# ranges — same semantics as before, just no longer blind outside ASCII. This is the
+# structural reason non-English coverage under-extracts relative to English.
+def _uppercase_class(*ranges) -> str:
+    out = []
+    for lo, hi in ranges:
+        for cp in range(lo, hi + 1):
+            ch = chr(cp)
+            if ch.isupper():
+                out.append(ch)
+    return "".join(out)
+
+
+_UC = "A-Z" + re.escape(_uppercase_class(
+    (0x00C0, 0x024F),    # Latin-1 Supplement + Latin Extended-A/B
+    (0x0386, 0x03FF),    # Greek
+    (0x0400, 0x04FF),    # Cyrillic
+))
 _ENTITY_RUN = re.compile(
-    r'\b([A-Z][\w&.-]*(?:\s+(?:of|the|and|for|&|de|van|der|[A-Z][\w&.-]*)){1,5})')
+    rf'\b([{_UC}][\w&.-]*(?:\s+(?:of|the|and|for|&|de|van|der|[{_UC}][\w&.-]*)){{1,5}})')
 _ACRONYM = re.compile(r'\b([A-Z]{2,6})(?:\b|\d)')
 
 

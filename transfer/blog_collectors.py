@@ -203,6 +203,119 @@ RESEARCH_FEEDS = [
 ]
 GHOST_RESEARCH_ENABLED = os.getenv("GHOST_RESEARCH_FEEDS", "0") == "1"
 
+# ── SPORTS desks → entity-anchored extraction (§16 gate-3 exercise, 2026-08-20) ──
+# FLAG-GATED OFF by default (SPORTS_ENTITY_FEEDS=1). Score-affecting: it changes WHICH
+# topics exist on three live niche-tier feeds, so it ships behind a flag and is reversible
+# by unsetting it — the GHOST_RESEARCH_FEEDS pattern.
+#
+# WHY IT EXISTS: the 2026-08-19 football-feed post-mortem found Guardian Football, ESPN
+# Soccer and Football365 have been live at niche tier since 2026-06-12 — through an entire
+# World Cup — while `niche_mentions` read 0 across all 532 stored `world_cup` cycles. The
+# mechanism is EXTRACTION, not routing (tier is correct) and not delivery (feeds return
+# fresh items). The generic n-gram extractor emits ~10 fragments per headline
+# ("turns against infantino", "kone spurs talk"), each unique to its headline so it never
+# aggregates into a trackable topic — and the quality gate LEAKS some of that junk while
+# REJECTING real entities. Sports headlines are their own grammar and need their own
+# extractor, exactly as research/editorial titles did.
+SPORTS_ENTITY_ENABLED = os.getenv("SPORTS_ENTITY_FEEDS", "0") == "1"
+
+# Sports-desk headline furniture: verbs and nouns that dominate transfer/match copy and
+# would otherwise anchor runs. These are DROPPED as entity anchors but never as context.
+_SPORTS_FILLER = {
+    "agree", "agreed", "agrees", "deal", "deals", "sign", "signs", "signed", "signing",
+    "target", "targets", "targeted", "talk", "talks", "bid", "bids", "move", "moves",
+    "transfer", "transfers", "swap", "loan", "loans", "fee", "fees", "clause", "release",
+    "win", "wins", "won", "beat", "beats", "lose", "loses", "lost", "draw", "draws",
+    "score", "scores", "scored", "goal", "goals", "assist", "assists", "hat",
+    "match", "matches", "game", "games", "fixture", "fixtures", "tie", "ties",
+    "boss", "coach", "manager", "captain", "striker", "midfielder", "defender",
+    "keeper", "goalkeeper", "star", "ace", "hero", "return", "returns", "injury",
+    "injured", "ban", "banned", "red", "yellow", "card", "penalty", "var", "referee",
+    "says", "say", "said", "claims", "claim", "reveals", "reveal", "confirms", "confirm",
+    "eyes", "eyeing", "set", "sets", "close", "closing", "linked", "links", "wants",
+    "want", "ready", "hits", "hit", "slams", "slam", "warns", "warn", "urges", "urge",
+    "old", "next", "last", "late", "season", "seasons", "week",
+}
+# DELIBERATELY NOT FILLER — caught by the §16 gate-3 run, 2026-08-20. An earlier draft
+# trimmed these and turned "Premier League" into 'premier', "Serie A" into 'serie', and
+# would have turned "World Cup" into 'world'. They are COMPONENTS OF COMPETITION NAMES —
+# the single most trackable topics a sports desk produces — and trimming them destroys
+# exactly what this extractor exists to capture: league, cup, final, semi, quarter,
+# round, first..fifth, new. The filler set above is now verbs and role nouns only.
+
+
+def sports_entity_topics(title: str, max_topics: int = 4) -> list:
+    """ENTITY-ANCHORED topic extraction for SPORTS-desk headlines.
+
+    Same contract as `research_entity_topics` — keep maximal capitalized runs that name a
+    real entity, drop everything else, and prefer a MISS over injected junk (niche-tier
+    signals are exempt from the corroboration floor, so precision here is an integrity
+    requirement). Two differences that the sports grammar forces:
+
+      1. A sports-desk filler list (`_SPORTS_FILLER`). Match and transfer copy is dense in
+         capitalized-position verbs and role nouns ("Boss", "Star", "Deal") that the
+         general common-word dictionary does not treat as filler.
+      2. Club names are frequently ENTIRELY dictionary words ("Real Madrid", "Manchester
+         City", "Aston Villa"). Topics from this extractor are therefore admitted with
+         `from_entity_run=True`, which exempts them from the all-common-words rule — the
+         proper-noun evidence is the CAPITALIZATION IN THE SOURCE, not our own score.
+
+    Returns lowercase entity phrases, longest-run-first, capped at `max_topics`."""
+    import re as _re
+    if not title:
+        return []
+
+    def _norm(w):
+        w = _re.sub(r"[’']s$", "", w, flags=_re.IGNORECASE)
+        return w.lower().strip("'’-")
+
+    out, seen = [], []
+    title = title.replace("&amp;", "&").replace("&#038;", "&")
+
+    for seg in _re.split(r"[.:;!?—|]|--", title):
+        words = _re.findall(r"[^\W\d_](?:[^\W\d_]|['’\-])*", seg, flags=_re.UNICODE)
+        if not words:
+            continue
+
+        def _keep(phrase_words, start_idx):
+            lower = [_norm(w) for w in phrase_words]
+            lower = [w for w in lower if w and len(w) > 1]
+            # Trim sports furniture from BOTH ends: "Arsenal Agree" → "arsenal",
+            # "City Target Roma" → "roma". Never trim to nothing.
+            while lower and lower[-1] in _SPORTS_FILLER:
+                lower.pop()
+            while lower and lower[0] in _SPORTS_FILLER:
+                lower.pop(0)
+            if not lower or len(lower) > 3:
+                return
+            # A lone word must be substantial and cannot be segment-initial (where
+            # sentence capitalization carries no proper-noun evidence).
+            if len(lower) == 1 and (len(lower[0]) < 4 or start_idx == 0):
+                return
+            if any(w in STOP_WORDS for w in lower):
+                if len(lower) == 1:
+                    return
+            phrase = " ".join(lower)[:60]
+            if len(phrase) >= 4 and phrase not in seen:
+                seen.append(phrase)
+                out.append(phrase)
+
+        run, start = [], 0
+        for i, w in enumerate(words):
+            if w[0].isupper() and _norm(w) not in STOP_WORDS:
+                if not run:
+                    start = i
+                run.append(w)
+                if len(run) == 3:
+                    _keep(run, start)
+                    run = []
+            else:
+                _keep(run, start)
+                run = []
+        _keep(run, start)
+
+    return out[:max_topics]
+
 
 def _load_common_words_local() -> set:
     """The engine's wordfreq common-word dictionary (common_words.txt, ~10k words).
@@ -257,7 +370,14 @@ def research_entity_topics(title: str, max_topics: int = 5) -> list:
         # segment of the title, so dropping this segment loses nothing.
         if _re.search(r"q\s*&\s*a", seg, flags=_re.IGNORECASE):
             continue
-        words = _re.findall(r"[A-Za-z][A-Za-z'’-]*", seg)
+        # UNICODE (2026-08-20): was `[A-Za-z][A-Za-z'’-]*` — ASCII-only, so every
+        # non-ASCII letter was silently DELETED mid-word. Measured live: "Mbappé" →
+        # 'mbapp', "Koné" → 'kon', and "Ángel Di María" shattered into
+        # ['ngel','Di','Mar','a'] so the entity vanished entirely. `[^\W\d_]` is a
+        # unicode letter (not digit, not underscore), which is what was always meant.
+        # This is a precondition for any non-English or non-tech coverage: those are
+        # exactly the domains whose names carry diacritics.
+        words = _re.findall(r"[^\W\d_](?:[^\W\d_]|['’\-])*", seg, flags=_re.UNICODE)
         if not words:
             continue
         caps = sum(1 for w in words if w[0].isupper())
@@ -956,9 +1076,20 @@ def collect_medium(conn):
             ft = _first_timer(conn, author, "medium", src)
             sid = _id("med", url or title)
             text = f"{title} {item.get('summary', '')[:300]}"
+            # PART 2 of the sports_entity edit. `collect_medium` previously ignored
+            # cfg["mode"] entirely and always called extract_topics — so adding a mode
+            # key to NEWSLETTER_FEEDS alone would have been a silent no-op, the feed
+            # would have looked wired while nothing changed. `collect_ghost` reads mode;
+            # this collector did not, and the sports desks live HERE.
+            if SPORTS_ENTITY_ENABLED and cfg.get("mode") == "sports_entity":
+                topics = sports_entity_topics(title)
+                if not topics:
+                    continue      # no clean entity → write NOTHING (misses > junk)
+            else:
+                topics = extract_topics(text, tags=tags)
             _write_signal(conn, sid, "medium", tier, src,
                           title, url, author, quality, 0, ft, True, text)
-            n = _write_topics(conn, sid, extract_topics(text, tags=tags),
+            n = _write_topics(conn, sid, topics,
                               "medium", tier, src, quality, 0, True)
             total_s += 1; total_t += n; count += 1
         if count:
