@@ -7562,6 +7562,65 @@ def risk_detail(risk_topic: str):
     return d
 
 
+#: Referee-redundancy floor (Operator, board 2026-08-18): the share of resolved LED wins the
+#: INDEPENDENT second referee (Wikipedia pageviews) must have actually checked before any
+#: accuracy claim in that domain may be cited. A second referee that has never fired is a
+#: control that exists on paper. Measurement-only — never blocks a verdict, never edits a row.
+REFEREE_FLOOR_PCT = float(os.getenv("REFEREE_FLOOR_PCT", "20"))
+#: Sweep-starvation tripwire: if the Apify budget guard skipped paid sweeps for more than this
+#: many consecutive days, timeouts resolved in that window were judged by a referee whose meter
+#: had run out. The 365-day patience window says never judge a detection before attention can
+#: arrive; the same fairness applies when OUR instrument, not the world, went quiet.
+SWEEP_STARVATION_DAYS = int(os.getenv("SWEEP_STARVATION_DAYS", "3"))
+
+
+def _ledger_common_mode(h: dict) -> dict:
+    """The two Operator hedges, computed from the honest report itself. Read-only;
+    returns a machine-readable block so no surface can render a rate without being
+    handed its common-mode status."""
+    try:
+        corr = int(h.get("led_referee_corroborated") or 0)
+        uncorr = int(h.get("led_referee_uncorroborated") or 0)
+        unchecked = int(h.get("led_referee_unchecked") or 0)
+        checked = corr + uncorr
+        led_total = checked + unchecked
+        pct = round(100.0 * checked / led_total, 1) if led_total else 0.0
+        floor_met = bool(led_total) and pct >= REFEREE_FLOOR_PCT
+        # Sweep starvation: newest-slot ages the sweep itself reports. If the sweep has not
+        # run within the window, resolutions in that gap are referee-starved, not measured.
+        slots = h.get("sweep_newest_slots")
+        starved = None
+        try:
+            if isinstance(slots, (int, float)):
+                starved = float(slots) > SWEEP_STARVATION_DAYS
+        except Exception:
+            starved = None
+        return {
+            "note": "Google is both a primary discovery pipe and this ledger's referee, and "
+                    "both ride one vendor (Apify). These two checks make that dependency "
+                    "visible on the rate itself rather than in a memo.",
+            "refereeFloorPct": REFEREE_FLOOR_PCT,
+            "refereeCheckedPct": pct,
+            "refereeCheckedOf": {"checked": checked, "unchecked": unchecked,
+                                 "ledTotal": led_total},
+            "refereeFloorMet": floor_met,
+            "citable": bool(floor_met and corr > 0),
+            "citationBlockReason": (
+                None if (floor_met and corr > 0)
+                else f"independent referee has checked {pct}% of LED wins "
+                     f"(floor {REFEREE_FLOOR_PCT}%) and corroborated {corr} — a second "
+                     f"referee that has not fired is not redundancy"),
+            "sweepStarvationDays": SWEEP_STARVATION_DAYS,
+            "sweepStarved": starved,
+            "sweepStarvedNote": (
+                "sweep newest-slot age exceeds the starvation window — timeouts resolved in "
+                "this gap were judged while the referee's meter was out; report them, never "
+                "blend them into a headline rate" if starved else None),
+        }
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:120]}
+
+
 ENGINE_EPOCH_BOUNDARY = os.getenv("ENGINE_EPOCH_BOUNDARY", "2026-06-15")
 
 
@@ -8205,6 +8264,13 @@ def accuracy_ledger_report():
                     "ledUncorroborated": h.get("led_referee_uncorroborated"),
                     "ledUnchecked": h.get("led_referee_unchecked"),
                     "ledAmbiguousQuery": h.get("led_ambiguous_query"),
+                    # ── COMMON-MODE HEDGES (Operator, board 2026-08-18; Chairman-ordered
+                    # 2026-08-19). Google is BOTH a primary discovery pipe AND this ledger's
+                    # referee, and both ride ONE vendor (Apify). A Google methodology change
+                    # moves detections and verdicts together, invisibly; a starved sweep
+                    # silently converts pending detections into timeout verdicts. Neither is
+                    # detectable from a rate alone, so both travel WITH the rate.
+                    "commonMode": _ledger_common_mode(h),
                     "best": [{"topic": b["topic"], "leadDays": b["lead_days"],
                               "refereeCorroborated": b.get("referee_corroborated"),
                               "queryAmbiguous": b.get("query_ambiguous")}
