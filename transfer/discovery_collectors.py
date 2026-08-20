@@ -392,7 +392,13 @@ def collect_google_search_discovery(conn) -> int:
 # Clock-slot compliant: runs only inside the 6h collect cycles, 2 of 4 slots.
 
 _SCRAWL_ENDPOINT = "https://www.socialcrawl.dev/v1/google_trends/rising"
-_SCRAWL_SEEDS = ["ai", "crypto", "stocks", "health", "sports", "entertainment"]
+# Seed roster EXPANDED beyond tech (Chairman-ordered coverage expansion, 2026-08-20).
+# Seeds are query parameters on the already-onboarded vendor — the rotation covers the
+# full list on a fixed cadence, so MORE seeds means each is sampled LESS OFTEN at the
+# same call count and credit budget (~900/mo of 2,500): 12 seeds at 3/slot × 2 slots/day
+# = every seed roughly every 2 days. No new spend, no new vendor, no §16 re-trigger.
+_SCRAWL_SEEDS = ["ai", "crypto", "stocks", "health", "sports", "entertainment",
+                 "music", "movies", "gaming", "science", "travel", "food"]
 _SCRAWL_SLOTS = (0, 2)   # hour//6 ∈ {0,2} → the 00:00 and 12:00 UTC cycle families
 
 

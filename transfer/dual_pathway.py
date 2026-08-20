@@ -167,13 +167,27 @@ def attention_magnitude(signals: list) -> dict:
 _EXPERT_TIERS = {"expert", "niche"}
 
 import re as _re
+import unicodedata as _ud
 
 
 def _title_sig(t: str) -> str:
     """Signature for collapsing wire-syndication: lowercased alphanumerics, first 10 significant
     words. AP/Reuters copy republished verbatim across many outlets maps to the SAME signature, so
-    it counts as ONE independent story — defeating the 'Belgium vs Iran' syndication inflation."""
-    t = _re.sub(r"[^a-z0-9 ]+", " ", (t or "").lower())
+    it counts as ONE independent story — defeating the 'Belgium vs Iran' syndication inflation.
+
+    UNICODE FIX (Chairman-ordered 2026-08-20; the non-Latin gap was raised 3x — session
+    2026-07-10 board, pending #12/#15 — and deferred each time). The old regex kept ONLY
+    [a-z0-9], so every non-Latin-script headline collapsed to the SAME EMPTY signature:
+    five Arabic or Chinese outlets covering one story counted as ONE voice under the §15a
+    quorum's min(distinct outlets, distinct titles) and could NEVER corroborate. Now:
+    NFKD-fold diacritics (Mbappé/Mbappe → one signature — BETTER syndication collapse),
+    then keep unicode letters/digits, so native-script titles produce real, distinct
+    signatures. ASCII titles are byte-identical to the old signature (backtested before
+    ship — audits/backtests/TITLE_SIG_UNICODE_BACKTEST_2026-08-20.md)."""
+    t = _ud.normalize("NFKD", (t or "").lower())
+    t = "".join(c for c in t if not _ud.combining(c))          # é→e, ü→u
+    t = _re.sub(r"[^\w ]+", " ", t, flags=_re.UNICODE)         # keep letters/digits, any script
+    t = t.replace("_", " ")
     return " ".join(t.split()[:10])
 
 

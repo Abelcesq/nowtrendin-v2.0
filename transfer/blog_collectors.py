@@ -116,6 +116,15 @@ DISCOURSE_INSTANCES = [
 WORDPRESS_TAGS = [
     "artificial-intelligence","machine-learning","chatgpt","llm",
     "programming","technology","startup","productivity","python","javascript",
+    # ── TECH FILTER REMOVED (Chairman-ordered coverage expansion, 2026-08-20) ──
+    # WordPress.com is a GENERAL-PURPOSE platform; only our tag list confined it to
+    # tech. These are query parameters on an already-onboarded platform (same host,
+    # same format, same collector), not new sources — §16 does not re-trigger.
+    # Domains chosen for referee visibility: the decomposition proved Wikipedia can
+    # actually adjudicate health/entertainment/sports/geopolitics entities, while
+    # sub-200-view tech topics are structurally unrefereeable.
+    "health","wellness","music","film","sports","politics","science",
+    "travel","food","fashion","climate-change","finance",
 ]
 
 # Tech/AI Blogger blogs — VERIFIED live 2026-06 via blogs/byurl. Google's
@@ -136,13 +145,22 @@ BLOGGER_BLOGS = [
 BLOGGER_SEARCH_TERMS = [
     "artificial intelligence","machine learning","large language model",
     "ChatGPT","AI agent","open source AI","LLM","generative AI",
+    # TECH FILTER REMOVED (2026-08-20): Blogger search is general-purpose; the term
+    # list was the only thing confining it to AI. Same-platform query expansion.
+    "world cup","premier league","olympics","box office","album release",
+    "public health","clinical trial","climate policy","election campaign",
+    "travel trend","fashion week","food trend",
 ]
 
 # Medium tag RSS (https://medium.com/tag/*/feed) is blocked by Medium since 2023.
 # Replaced with curated AI/tech newsletter RSS feeds that return live content.
 NEWSLETTER_FEEDS = [
     {"name": "Ben's Bites",            "url": "https://bensbites.beehiiv.com/feed",                      "tier": "mainstream"},
-    {"name": "The Batch (DeepLearning.AI)", "url": "https://www.deeplearning.ai/the-batch/feed/",        "tier": "expert"},
+    # The Batch (DeepLearning.AI) REMOVED 2026-08-20: /the-batch/feed/ 308-redirects to a
+    # 404 and every alternate (/the-batch/rss/, /blog/feed/, /feed/) also 404s — verified
+    # live. The entry had NEVER produced a row (0 in raw_signals since the roster was
+    # built); it looked like coverage and delivered none. Re-add only through §16 gates
+    # if DeepLearning.AI ever publishes a working feed again.
     {"name": "Latent Space",           "url": "https://www.latent.space/feed",                           "tier": "expert"},
     {"name": "AI Snake Oil",           "url": "https://aisnakeoil.substack.com/feed",                    "tier": "expert"},
     {"name": "Last Week in AI",        "url": "https://lastweekin.ai/feed",                              "tier": "expert"},
@@ -156,9 +174,14 @@ NEWSLETTER_FEEDS = [
     #    a dedicated football/music desk is the devotee tier relative to general
     #    news, so domain-specialist feeds are niche; broad-brand sport/culture
     #    sections are mainstream. All free, keyless RSS. ──
-    {"name": "Guardian Football",      "url": "https://www.theguardian.com/football/rss",               "tier": "niche"},
-    {"name": "ESPN Soccer",            "url": "https://www.espn.com/espn/rss/soccer/news",              "tier": "niche"},
-    {"name": "Football365",            "url": "https://www.football365.com/feed",                       "tier": "niche"},
+    # mode=sports_entity (2026-08-20, the football-feed post-mortem fix): these three
+    # niche desks route through the entity-anchored sports extractor, not the generic
+    # n-gram shredder. Football365's URL repointed /feed (404 since at least today,
+    # 0 rows EVER collected) → /rss (verified 200, 41 items). The mode key is inert
+    # until SPORTS_ENTITY_FEEDS=1 (the collect_medium dispatch checks both).
+    {"name": "Guardian Football",      "url": "https://www.theguardian.com/football/rss",               "tier": "niche", "mode": "sports_entity"},
+    {"name": "ESPN Soccer",            "url": "https://www.espn.com/espn/rss/soccer/news",              "tier": "niche", "mode": "sports_entity"},
+    {"name": "Football365",            "url": "https://www.football365.com/rss",                        "tier": "niche", "mode": "sports_entity"},
     {"name": "BBC Sport Football",     "url": "https://feeds.bbci.co.uk/sport/football/rss.xml",        "tier": "mainstream"},
     {"name": "Sky Sports News",        "url": "https://www.skysports.com/rss/12040",                    "tier": "mainstream"},
     {"name": "Guardian Sport",         "url": "https://www.theguardian.com/sport/rss",                  "tier": "mainstream"},
