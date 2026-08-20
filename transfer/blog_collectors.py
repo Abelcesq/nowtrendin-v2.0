@@ -245,7 +245,8 @@ SPORTS_ENTITY_ENABLED = os.getenv("SPORTS_ENTITY_FEEDS", "0") == "1"
 # Sports-desk headline furniture: verbs and nouns that dominate transfer/match copy and
 # would otherwise anchor runs. These are DROPPED as entity anchors but never as context.
 _SPORTS_FILLER = {
-    "agree", "agreed", "agrees", "deal", "deals", "sign", "signs", "signed", "signing",
+    "agree", "agreed", "agrees", "appoint", "appoints", "appointed",
+    "deal", "deals", "sign", "signs", "signed", "signing",
     "target", "targets", "targeted", "talk", "talks", "bid", "bids", "move", "moves",
     "transfer", "transfers", "swap", "loan", "loans", "fee", "fees", "clause", "release",
     "win", "wins", "won", "beat", "beats", "lose", "loses", "lost", "draw", "draws",
@@ -303,6 +304,7 @@ def sports_entity_topics(title: str, max_topics: int = 4) -> list:
         def _keep(phrase_words, start_idx):
             lower = [_norm(w) for w in phrase_words]
             lower = [w for w in lower if w and len(w) > 1]
+            raw_len = len(lower)
             # Trim sports furniture from BOTH ends: "Arsenal Agree" → "arsenal",
             # "City Target Roma" → "roma". Never trim to nothing.
             while lower and lower[-1] in _SPORTS_FILLER:
@@ -311,10 +313,24 @@ def sports_entity_topics(title: str, max_topics: int = 4) -> list:
                 lower.pop(0)
             if not lower or len(lower) > 3:
                 return
-            # A lone word must be substantial and cannot be segment-initial (where
-            # sentence capitalization carries no proper-noun evidence).
-            if len(lower) == 1 and (len(lower[0]) < 4 or start_idx == 0):
-                return
+            # A lone word must be substantial, and a segment-initial lone word carries
+            # no proper-noun evidence from capitalization alone. TWO exceptions restore
+            # the club in the DOMINANT club-first grammar (board 2026-08-20,
+            # Challenger-verified miss: "Arsenal agree £51m…" lost 'arsenal'):
+            #   1. It got here by TRIMMING a longer capitalized run (raw_len > 1) —
+            #      a multi-word run is proper-noun evidence even at segment start.
+            #   2. The NEXT word is a sports-desk verb/role from _SPORTS_FILLER
+            #      ("Arsenal agree…", "Liverpool sign…", "Chelsea appoint…",
+            #      "Mourinho says…", "England beat…") — subject-verb headline grammar
+            #      marks the subject as the entity. "Gathering clouds building…" stays
+            #      rejected: 'clouds' is not sports furniture.
+            if len(lower) == 1:
+                nxt_i = start_idx + len(phrase_words)
+                nxt = _norm(words[nxt_i]) if nxt_i < len(words) else ""
+                subject_verb = nxt in _SPORTS_FILLER
+                if len(lower[0]) < 4 or (start_idx == 0 and raw_len == 1
+                                         and not subject_verb):
+                    return
             if any(w in STOP_WORDS for w in lower):
                 if len(lower) == 1:
                     return

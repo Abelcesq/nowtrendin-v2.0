@@ -647,8 +647,11 @@ match validity, formula-confidential). (4) **Hardening**: grade `_num` clamps AI
 (queries 30d/24h/rate) recomputed at detail-serve from topic_queries (the "No internal query history yet" at
 N=100 bug); last two silent apply_calibration swallows now log + stamp `calibration_errors`. (5) **Feature
 mining** (read-only, audits/ledger-research/): D=0 at first sighting for winners AND near-misses but 40 for
-pre-broken → current Dark Matter is LATE-confirmation, not early-warning — empirical case for the §15
-GHOST_FEEDS expansion; LED median M=80 vs near-lag 50 (breadth-at-first-sighting separates winners); 5/15
+pre-broken → **RE-SCOPED by the nine-seat D board 2026-08-20 (Chairman-approved): "D AS INSTRUMENTED never
+measured early; whether the hypothesis leads is UNTESTED"** — the D=0 rows were produced while the first-timer
+numerator was structurally dark (ft=0 hardcoded in the blog/discovery topic writers; Reddit down; authorless
+denominator dilution — all code-verified, `BOARD_darkmatter_2026-08-20.md`). Never quote the old
+"late-confirmation" sentence unqualified; LED median M=80 vs near-lag 50 (breadth-at-first-sighting separates winners); 5/15
 near-misses lost by 1–2 days (fast-lane recheck flips them). (6) **Founder-approved DISCLAIMER (verbatim,
 sign-off to edit)** on all platforms, panels top AND bottom: "*All information contained herein may not be
 accurate including any and all figures indicated in this section and or site and may be an approximation and
