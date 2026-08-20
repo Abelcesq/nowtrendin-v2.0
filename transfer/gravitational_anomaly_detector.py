@@ -7605,11 +7605,25 @@ def _ledger_common_mode(h: dict) -> dict:
                                  "ledTotal": led_total},
             "refereeFloorMet": floor_met,
             "citable": bool(floor_met and corr > 0),
+            # Two DIFFERENT failures, and conflating them would be its own dishonesty:
+            #   • floor NOT met  → the control has barely fired; it is redundancy on paper.
+            #   • floor MET but zero corroborated → the control HAS fired, repeatedly, and
+            #     confirms none of the wins. That is far more serious than silence, and the
+            #     message must say so rather than implying the referee was simply absent.
+            "refereeState": (
+                "not_exercised" if not floor_met
+                else "exercised_and_uncorroborating" if corr == 0
+                else "exercised_and_corroborating"),
             "citationBlockReason": (
                 None if (floor_met and corr > 0)
-                else f"independent referee has checked {pct}% of LED wins "
-                     f"(floor {REFEREE_FLOOR_PCT}%) and corroborated {corr} — a second "
-                     f"referee that has not fired is not redundancy"),
+                else f"the independent referee has checked {pct}% of LED wins "
+                     f"({checked} of {led_total}) and corroborated NONE of them — the control "
+                     f"has been exercised and does not confirm the wins; this is a stronger "
+                     f"reason not to cite the rate than an unfired referee would be"
+                if floor_met and corr == 0
+                else f"independent referee has checked only {pct}% of LED wins "
+                     f"(floor {REFEREE_FLOOR_PCT}%) — a second referee that has barely fired "
+                     f"is redundancy on paper, not in fact"),
             "sweepStarvationDays": SWEEP_STARVATION_DAYS,
             "sweepStarved": starved,
             "sweepStarvedNote": (
