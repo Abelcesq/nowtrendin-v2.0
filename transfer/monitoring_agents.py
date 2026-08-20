@@ -17,7 +17,8 @@ checks match exactly what the pipeline does.
 ================================================================
 """
 
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 
 try:
     import collector_health
@@ -87,6 +88,21 @@ def source_watchdog(conn=None, db_path=None) -> dict:
             # first; the detail already says which one it is.
             alerts.append({"level": "warn", "block": "B2", "source": name,
                            "msg": f"DEGRADED — {detail}"})
+    # ── PER-FEED ZERO-ROW TRIPWIRE (nine-seat D board 2026-08-20, six seats; rides
+    # the A3-TRIPWIRE monitoring slot). The watchdog above monitors collector BLOCKS;
+    # a dead feed INSIDE a healthy collector was invisible — The Batch delivered zero
+    # rows for its entire configured life and Football365's /feed 404'd from
+    # onboarding to 2026-08-20, both unnoticed. A silent dead feed is fabricated
+    # absence: the roster claims coverage the data never had, and a shadow-trial
+    # candidate dying mid-trial converts "no measurement" into "no edge" at readout.
+    # Rule: every feed CONFIGURED in the blog rosters must have ≥1 raw_signals row in
+    # the last FEED_SILENCE_DAYS (7 — inside the operational retention by design).
+    # Read-only, alarm-only. Verified on a fixture that fires (test_feed_tripwire).
+    try:
+        alerts.extend(_feed_silence_tripwire(conn=conn, db_path=db_path))
+    except Exception as _fe:
+        alerts.append({"level": "warn", "block": "B2",
+                       "msg": f"feed tripwire errored (never silently absent): {_fe}"})
     return {
         "agent": "source_watchdog",
         "status": _roll_up(alerts),
@@ -95,6 +111,63 @@ def source_watchdog(conn=None, db_path=None) -> dict:
         "critical_problems": rep.get("critical_problems", []),
         "checked_at": _now().isoformat(),
     }
+
+
+_FEED_SILENCE_DAYS = int(os.getenv("FEED_SILENCE_DAYS", "7"))
+
+
+def _configured_feeds() -> list:
+    """(name, stored_name_patterns) for every individually-configured feed. Stored
+    source_name carries collector prefixes (newsletter/X, blogger/X, X/latest), so
+    each feed matches by substring — the naming lesson from the 08-20 census."""
+    try:
+        import blog_collectors as bc
+    except Exception:
+        return []
+    feeds = []
+    for cfg in getattr(bc, "NEWSLETTER_FEEDS", []):
+        feeds.append(cfg["name"])
+    for cfg in getattr(bc, "GHOST_FEEDS", []):
+        feeds.append(cfg["name"])
+    if getattr(bc, "GHOST_RESEARCH_ENABLED", False):
+        for cfg in getattr(bc, "RESEARCH_FEEDS", []):
+            feeds.append(cfg["name"])
+    for cfg in getattr(bc, "BLOGGER_BLOGS", []):
+        feeds.append(cfg["name"])
+    for cfg in getattr(bc, "DISCOURSE_INSTANCES", []):
+        feeds.append(cfg["name"])
+    return feeds
+
+
+def _feed_silence_tripwire(conn=None, db_path=None) -> list:
+    """One alert per configured feed with ZERO raw_signals rows in the window."""
+    import db_compat
+    own = conn is None
+    if own:
+        conn = db_compat.connect(db_path or os.getenv("DB_PATH", "anomaly_detector.db"))
+    try:
+        cut = (_now() - timedelta(days=_FEED_SILENCE_DAYS)).strftime(
+            "%Y-%m-%dT%H:%M:%S")
+        ph = "%s" if db_compat.USE_PG else "?"
+        alerts = []
+        for name in _configured_feeds():
+            row = conn.execute(
+                f"SELECT 1 FROM raw_signals WHERE source_name LIKE {ph} "
+                f"AND collected_at >= {ph} LIMIT 1",
+                (f"%{name}%", cut)).fetchone()
+            if not row:
+                alerts.append({
+                    "level": "warn", "block": "B2", "source": name,
+                    "msg": (f"FEED SILENT — 0 rows in {_FEED_SILENCE_DAYS}d for a "
+                            f"configured feed (dead-feed class: The Batch / "
+                            f"Football365). Roster claims coverage the data lacks.")})
+        return alerts
+    finally:
+        if own:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 # ── Agent K: SCORER WATCHDOG (B4 process liveness) ──────────────────────────

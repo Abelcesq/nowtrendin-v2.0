@@ -351,3 +351,24 @@ readout overdue).
 > it does not gate the shadow trial, but its answer must be in hand BEFORE step 1's result is
 > interpreted. A null from step 1 may not be read as "no edge" until step 3 has ruled out silent
 > non-measurement.
+
+## D-REMINE — LED feature-mining re-run on the repaired instrument (DATED; board 2026-08-20)
+
+The 2026-07-07 mining ("D=0 at first sighting") was measured through the disconnected
+instrument (ft=0 writers, Reddit dark, diluted denominator — all verified,
+`BOARD_darkmatter_2026-08-20.md`); the doctrine sentence is re-scoped accordingly and the
+numbers must never be quoted unqualified. **Triggers (either):** DATE **2026-09-30** — re-run
+over whatever first-crossing cohort has resolved, on the then-current regime, citing the
+REGIME_LEDGER rows spanning the window; and AGAIN at each shadow-trial readout
+(11-30 interim, then per the prereg schedule). Compare against the sealed M0 baseline
+(`/diag/dark-early`, snapshot pre-09-01 per the prereg §9). Read-only, held-out.
+
+## D-RIGHTS — per-source rights file for the D roster (board 2026-08-20, Buyer gate 3)
+
+"Five onboarding gates for format and access, none for a written redistribution right —
+'it's public RSS' is not a license schedule." **Trigger:** before ANY external licensing
+conversation (structure-f API licensee, index licensee, DDQ response), a one-page-per-source
+rights register (what is pulled, under what terms, redistribution posture) must exist for
+every source feeding a licensed output — extend `docs/buyer-diligence/RIGHTS_REGISTER.md`
+to cover the blog/newsletter/socialcrawl/firecrawl D roster. Never blocks collection;
+blocks LICENSING.

@@ -54,6 +54,12 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "insider_flow":        "the append-only Form-4 panel + universe promotion",
     "coinapi_derivs":      "crypto derivatives positioning accumulation (funding/OI) — "
                            "held-out baseline; wiring requires backtest + board",
+    "darkmatter_indicators": "authorless-feed D leading indicators (venue first-coverage, "
+                             "incumbent displacement, breadth velocity, engagement "
+                             "divergence) — shadow-trial candidates, board 2026-08-20; "
+                             "wiring any into a score requires sealed backtest + board",
+    "shadow_ledger":         "A4 shadow trial ledger — sealed candidate-feed races; "
+                             "never read by scoring or the published ledgers",
     "coinbase_premium":    "Coinbase retail-spot premium accumulation (demand proxy; "
                            "separate price_class, never a market price) — 5-day review "
                            "2026-08-15",

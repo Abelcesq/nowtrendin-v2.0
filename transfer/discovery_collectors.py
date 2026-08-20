@@ -407,6 +407,12 @@ _SCRAWL_ENDPOINT = "https://www.socialcrawl.dev/v1/google_trends/rising"
 _SCRAWL_SEEDS = ["ai", "crypto", "stocks", "health", "sports", "entertainment",
                  "music", "movies", "gaming", "science", "travel", "food"]
 _SCRAWL_SLOTS = (0, 2)   # hour//6 ∈ {0,2} → the 00:00 and 12:00 UTC cycle families
+# GEO PARAMETERIZED (board 2026-08-20, Expansionist: the one purpose-built rising-
+# discovery lane was pinned to the US as a string literal). Comma-separated roster,
+# rotated with the same day/slot arithmetic as the seeds — larger roster = same call
+# count, each geo sampled less often. Default preserves live behavior exactly.
+_SCRAWL_GEOS = [g.strip().upper() for g in
+                os.getenv("SOCIALCRAWL_GEOS", "US").split(",") if g.strip()]
 
 
 def collect_socialcrawl_rising(conn, force: bool = False) -> int:
@@ -452,8 +458,9 @@ def collect_socialcrawl_rising(conn, force: bool = False) -> int:
     written, credits_used, credits_left, failed = 0, 0, None, False
     for seed in seeds:
         try:
+            geo = _SCRAWL_GEOS[(offset + slot) % len(_SCRAWL_GEOS)]
             r = requests.get(_SCRAWL_ENDPOINT,
-                             params={"keyword": seed, "geo": "US"},
+                             params={"keyword": seed, "geo": geo},
                              headers={"x-api-key": api_key,
                                       "User-Agent": "NowTrendIn/2.0 (+discovery)"},
                              timeout=30)

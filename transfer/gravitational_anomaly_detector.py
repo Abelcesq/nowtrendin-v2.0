@@ -8197,6 +8197,34 @@ def diag_index(run: int = 0, days: int = 14):
         return {"available": False, "reason": str(e)[:160]}
 
 
+@app.get("/diag/d-indicators", dependencies=[Depends(_require_internal)])
+def diag_d_indicators(topic_key: str = "", snapshot_top: int = 0):
+    """Authorless-feed D leading indicators (board 2026-08-20 item 9) — HELD-OUT
+    research reads: venue first-coverage, incumbent displacement, expert-breadth
+    velocity, engagement divergence. `?topic_key=` computes one topic live;
+    `?snapshot_top=N` persists snapshots for the N most-recently-scored topics into
+    the non-pruned research table (shadow-trial evidence must outlive the 7-day
+    operational retention — the GHOST close-out lesson). Never a score input."""
+    try:
+        import darkmatter_indicators as dmi
+        out = {"held_out": True, "excluded_from_score": True, "kind": dmi.SNAPSHOT_KIND}
+        if topic_key:
+            out["topic"] = dmi.compute_all(topic_key, DB_PATH)
+        if snapshot_top:
+            conn = get_db(DB_PATH)
+            try:
+                keys = [r["topic_key"] for r in conn.execute(
+                    "SELECT topic_key, MAX(scored_at) AS m FROM velocity_scores "
+                    "GROUP BY topic_key ORDER BY m DESC LIMIT ?",
+                    (min(int(snapshot_top), 500),)).fetchall()]
+            finally:
+                conn.close()
+            out["snapshotted"] = dmi.snapshot(keys, DB_PATH)
+        return out
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
 @app.get("/diag/market-n", dependencies=[Depends(_require_internal)])
 def diag_market_n(item_key: str = ""):
     """N · Platform Indicator for Market Signal (founder feature 2026-08-19).
