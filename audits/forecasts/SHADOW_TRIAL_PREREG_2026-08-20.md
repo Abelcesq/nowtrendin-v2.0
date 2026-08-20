@@ -3,10 +3,10 @@
 ### Ruled sequence: A4-SEQ step 1 (Chairman 2026-08-19); contents per the nine-seat D board 2026-08-20 (decision item 6), all seat conditions incorporated.
 ### Instrument: `transfer/shadow_ledger.py` (held-out; registered in `heldout_registry`).
 
-> **STATUS: DRAFT UNTIL SEALED.** Sealing = PIT row (`kind='forecast'`,
-> `item_key=PREREG-shadow-trial-2026`) recorded BEFORE the first enrollment, hash noted
-> here. If not sealed by 2026-08-29, THE START DATE SLIPS — rules are never sealed after
-> first data (Executioner).
+> **STATUS: SEALED 2026-08-20** (Chairman order: "fix the seal issue") — PIT row
+> (`kind='forecast'`, `item_key=PREREG-shadow-trial-2026`), hashes in the seal block
+> below, recorded BEFORE any enrollment (window opens 09-01). M0 baseline sealed
+> separately (`M0-dark-early-2026-08-20`, row `77d49c00..`).
 
 ---
 
@@ -62,17 +62,29 @@ real ledger produced 7 LED rows in ~2.5 months — single-digit resolved races p
 
 ## 6. CANDIDATE FEED SETS (each through §16 five gates + the extractor acceptance harness BEFORE enrollment — Operator condition, mandatory per roster)
 
-To be finalized at sealing; the sealed list is frozen for the window. Composition
-requirement (Expansionist): at least one non-English, one non-US-market, one non-tech
-cohort. Every feed-set variant CONSIDERED is logged in this document's appendix at
-sealing — the variant log is the forking-paths defense; an unlogged variant disqualifies
-a positive result.
+**SEALED FEED SETS (frozen for the window; gate-4 access verified live 2026-08-20;
+gates 1–3 + the extractor acceptance harness run per feed BEFORE its first enrollment,
+wiring held-out):**
+
+| Cohort | Feeds (feed_set id) | Domain |
+|---|---|---|
+| NON-ENGLISH (Latin-script per the case-anchor ceiling) | Marca (`marca-es`, 74 items), Kicker (`kicker-de`, 20) | sports |
+| NON-US MARKET (English) | Nikkei Asia (`nikkei-asia`, 51), SCMP News (`scmp-hk`, 50) | geopolitics/business |
+| NON-TECH DOMAIN | STAT News (`stat-health`, 20), Deadline (`deadline-ent`, 12), ScienceAlert (`scialert-sci`, 10) | health / entertainment / science |
+
+**VARIANT LOG (every alternative considered — the forking-paths defense):** L'Équipe
+(REJECTED at gate 4: /rss/actu_rss.xml 404 on the production UA, 2026-08-20); NBER
+(REJECTED: two documented §16 FORMAT failures); Pew Research (REJECTED: report sub-page
+pollution, 2026-07-07); any CJK/Arabic/Hebrew feed (DEFERRED: the case-anchor extraction
+ceiling makes their null uninterpretable — D_UNIVERSE_STATEMENT §4); Reddit-based
+candidates (EXCLUDED: platform formally retired 2026-08-20). No other variants were
+tried; any variant appearing later must be appended here BEFORE its data is used.
 
 ## 7. INSTRUMENT FREEZE + REGIME (sealed facts)
 
-- **Epoch:** engine v364/v365 code (commits d4d73e0, 1473e1c, b39f2e3) + the
-  `D_PLUMBING_V2` state AT SEALING (the Chairman's flip decision fixes this; recommended
-  ON before 09-01 so the trial never straddles the boundary). NO mid-window changes to
+- **Epoch:** engine code through commit 8716502 (v363–v367 releases) with
+  **`D_PLUMBING_V2 = ON` (Chairman-ruled 2026-08-20, engine v367)** — the trial runs
+  entirely on the repaired instrument and never straddles the boundary. NO mid-window changes to
   extractors, tiers, seeds, quality gates, or quorum constants on any enrolled feed's
   path; an emergency hotfix voids affected cells and is logged here.
 - **Regime facts every analysis must carry:** Reddit FORMALLY RETIRED 2026-08-20
@@ -116,6 +128,8 @@ evidence. A null with the extractor acceptance harness unrun on the affected ros
 UNINTERPRETABLE, not "no edge" (the Operator's standing rule, third invocation).
 
 ---
-*PIT seal block (filled at sealing): row_sha256 ________ · text_sha256 ________ ·
-sealed_at ________ · D_PLUMBING_V2 state ________ · candidate feed sets + variant log
-appendix appended and hashed with the text.*
+**PIT SEAL:** `row_sha256 e90af6df909de1393fc580622fecca53bdacf7a0cb056d0ec5b54a2c7789cf98` ·
+`text_sha256 25b69ffc8e88d393348b73081477c586ff5ba7fa49d822541534ac9b497f6e3e` (document body
+through the line before this block) · sealed 2026-08-20 UTC · `D_PLUMBING_V2 = ON` (engine
+v367) · feed sets + variant log frozen above · M0 baseline row `77d49c00..` · sealed BEFORE
+any enrollment (window opens 2026-09-01).

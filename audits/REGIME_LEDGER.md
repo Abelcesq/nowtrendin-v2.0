@@ -21,6 +21,9 @@
 | 2026-08-20 | **Reddit FORMALLY RETIRED** (Chairman; stale creds unset, engine v365) | Author-bearing universe = GitHub/HN/bluesky/lemmy (+blog lane under D_PLUMBING_V2). Reactivation = new ruling + §16 re-onboarding |
 | 2026-08-20 | `d_measured` column live (tri-state; NULL = rows before this date) | D honest-absence begins accruing; pre-epoch rows' D=0 is unlabeled (unknown blind-vs-quiet) |
 | 2026-08-20 | `D_PLUMBING_V2` BUILT, default OFF (writer ft, author-bearing denominator, community-age guard) — backtested, flip pending Chairman | While OFF: series unchanged. THE FLIP DATE (when ruled) is D's largest-ever epoch boundary — record it here the day it happens |
+| 2026-08-20 | **`D_PLUMBING_V2 = ON`** (Chairman-ruled, engine v367, ~22:2x UTC) | **D's largest epoch boundary**: real ft bits from blog lane; author-bearing denominator; community-age guard. First scored cycle on the new regime = the first post-22:30 cycle. D series NOT comparable across this row |
+| 2026-08-20 | GHOST_RESEARCH_FEEDS: **KEEP** (Chairman-ruled at close-out) | Research feeds permanent roster; trial question transferred to shadow trial as UNANSWERED |
+| 2026-08-20 | Ben's Bites + Wired AI URLs repointed (tripwire catches #1/#2 on its first production run) | Two silently-dead mainstream feeds resume |
+| 2026-08-20 | Shadow-trial prereg SEALED (PIT `e90af6df..`) + M0 baseline sealed (`77d49c00..`) | Trial rules frozen before window opens 09-01 |
 
-*Next expected entries: D_PLUMBING_V2 flip; shadow-trial prereg seal (≤2026-08-29);
-candidate-feed wiring dates; wiki-v3/GDELT referee arm.*
+*Next expected entries: candidate-feed wiring dates; wiki-v3/GDELT referee arm.*

@@ -79,4 +79,5 @@ honestly stated.
 3. "UNANSWERED" is a written verdict option, distinct from failed (this document is the
    precedent).
 
-*Read-only. No flag changed by this document; the KEEP/ROLLBACK ruling is the Chairman's.*
+**RULED — Chairman, 2026-08-20, same day: KEEP.** The research feeds are permanent roster;
+the unanswered trial question transfers to the sealed shadow trial (prereg PIT `e90af6df..`).

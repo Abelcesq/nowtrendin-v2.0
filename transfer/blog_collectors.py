@@ -155,7 +155,9 @@ BLOGGER_SEARCH_TERMS = [
 # Medium tag RSS (https://medium.com/tag/*/feed) is blocked by Medium since 2023.
 # Replaced with curated AI/tech newsletter RSS feeds that return live content.
 NEWSLETTER_FEEDS = [
-    {"name": "Ben's Bites",            "url": "https://bensbites.beehiiv.com/feed",                      "tier": "mainstream"},
+    # Ben's Bites repointed 2026-08-20: the beehiiv /feed 404s (caught by the per-feed
+    # tripwire on its FIRST production run — the dead-feed class working as designed).
+    {"name": "Ben's Bites",            "url": "https://www.bensbites.com/feed",                          "tier": "mainstream"},
     # The Batch (DeepLearning.AI) REMOVED 2026-08-20: /the-batch/feed/ 308-redirects to a
     # 404 and every alternate (/the-batch/rss/, /blog/feed/, /feed/) also 404s — verified
     # live. The entry had NEVER produced a row (0 in raw_signals since the roster was
@@ -168,7 +170,9 @@ NEWSLETTER_FEEDS = [
     {"name": "MIT Tech Review AI",     "url": "https://www.technologyreview.com/feed/",                  "tier": "mainstream"},
     {"name": "The Sequence",           "url": "https://thesequence.substack.com/feed",                   "tier": "expert"},
     {"name": "Ars Technica Tech",      "url": "https://feeds.arstechnica.com/arstechnica/technology-lab","tier": "mainstream"},
-    {"name": "Wired AI",               "url": "https://www.wired.com/feed/tag/artificial-intelligence/rss","tier":"mainstream"},
+    # Wired AI repointed 2026-08-20: the artificial-intelligence tag feed 400s;
+    # /tag/ai/latest/rss verified 200 with live items (tripwire catch #2).
+    {"name": "Wired AI",               "url": "https://www.wired.com/feed/tag/ai/latest/rss",            "tier":"mainstream"},
     # ── Sports + culture desks (added 2026-06-12) — with Reddit disabled these
     #    are the niche-tier sensors for non-tech domains. "Tier" is per-domain:
     #    a dedicated football/music desk is the devotee tier relative to general
