@@ -1,5 +1,26 @@
 # The FIFA World Cup Trend Family — Full Lifecycle Case Study
 *Chairman-commissioned · 2026-08-17 · read-only reconstruction from the platform's own live data + audit records*
+
+> ## ⚠ CORRECTION NOTICE — issued 2026-08-19 (Chairman-ordered, A1)
+> **Defect found by the Challenger seat** (`BOARD_worldcup-casestudy_2026-08-18.md`): this study
+> quoted "mexico world cup … det **38.5→70**" in Q5 and Q7/Q8 while its own Q1 table records that
+> topic's all-time peak served detection as **48.96** across 222 cycles. A served detection of 70
+> is impossible against that ceiling, and the two figures sat in the same register as though both
+> were served data.
+>
+> **Reconciled — they measure different things, and neither number is wrong:**
+> - **48.96** is the real, SERVED peak from stored history (`topic_lifecycle` / `velocity_scores`).
+> - **38.5→70** is a **VALIDATION-HARNESS read** from `GET /research/mainstream-v2` on 2026-06-26,
+>   which is held-out and changes no score. Critically, that endpoint **pins `expert_detection` at
+>   a fixed 70 reference by design** ("so the PATHWAY/weight shift is the meaningful output").
+>   The "70" is therefore that synthetic constant surfacing once the topic is demoted to the
+>   expert/dark-matter pathway — **not a score the engine ever served, and not a prediction that it
+>   would**. The meaningful content of the comparison is the DIRECTION (sub-quorum ⇒ demotion to
+>   the trigger pathway ⇒ Detection rises off the mainstream floor), never the magnitude.
+>
+> Both passages below are corrected in place and marked. **Standing rule this establishes:**
+> harness/what-if reads are never printed in the same register as served values; they carry their
+> source and their fixed-reference caveat, every time.
 *Doctrine under test: "If it is trending on Google, it is not dark matter but more likely already trending; if news sources confirm in addition to Google Trends, it is very likely already mainstream."*
 
 ---
@@ -121,7 +142,7 @@ The system was honest about it, in layers:
 
 ## Q5. Corroboration machinery — Mainstream v2 quorum + lexicon
 
-- **Mainstream v2** (`MAINSTREAM_V2=1`, live 2026-06-26; NEWS_QUORUM_V2=5, syndication-collapsed `min(distinct outlets, distinct titles)`): FIFA was the validation basket. "world cup" at **134 independent outlets** stayed mainstream (w=1.0) — quorum vastly exceeded. Thin-credible **"mexico world cup" (5→4 stories) demoted to a dark-matter TRIGGER, det 38.5→70** — the doctrine's boundary case: a few news stories do NOT make a topic mainstream; five distinct outlets do.
+- **Mainstream v2** (`MAINSTREAM_V2=1`, live 2026-06-26; NEWS_QUORUM_V2=5, syndication-collapsed `min(distinct outlets, distinct titles)`): FIFA was the validation basket. "world cup" at **134 independent outlets** stayed mainstream (w=1.0) — quorum vastly exceeded. Thin-credible **"mexico world cup" (5→4 stories) demoted to a dark-matter TRIGGER** — the doctrine's boundary case: a few news stories do NOT make a topic mainstream; five distinct outlets do. *(CORRECTED 2026-08-19 — see the correction notice at the top: the previously-printed "det 38.5→70" was a validation-harness read whose "70" is that endpoint's FIXED `expert_detection` reference, not a served score. The topic's real served peak detection was **48.96**. The demotion DIRECTION is the finding; the magnitude was never a served value.)*
 - **Common-word filter** (2026-06-15): "fifa" was explicitly kept (proper noun) while junk common words were purged — the family survived the quality purge.
 - **KNOWN_CONCEPT_PHRASES recall whitelist** (2026-06-23e): fixed a pre-existing quality-gate drop of "world cup"; it re-entered `/scores` at 94.8 the same day.
 - **Situation model** (2026-06-23e, held-out): "japan" hub-clustered into 3 separate situations, one of them world-cup — evidence the family bled into country-name blobs.
@@ -161,7 +182,7 @@ The Chairman's recollection is confirmed by the dated record, with one important
 Google breakout May 22–30; our first sighting June 8–13; verdict LAGGED, lead −8 to −22 days, pre_broken on all 7 rows. By the time the World Cup was Google-trending it was not merely "likely already trending" — it was already 1–3 weeks past breakout. And the engine's D component read 0–9/100 throughout: Google-borne discovery is *structurally* not dark matter in this architecture (discovery feeds are mainstream-tier by design).
 
 **Clause 2 — "If news sources confirm in addition to Google Trends, it is very likely already mainstream": CONFIRMED, and codified.**
-By 06-26 the WC had 134 independent outlets; `mainstream_confirmed=true`, w=1.0, pathway=mainstream under both v1 and v2 rules. Mainstream v2 *is* this clause turned into an algorithm — with the crucial quantitative boundary the doctrine's prose lacks: **news confirmation is quorum-dependent.** "mexico world cup" at 4–5 stories was demoted to a dark-matter trigger (det 38.5→70); one-to-four credible outlets is a lead to chase, not mainstream arrival. Five distinct, syndication-collapsed outlets is.
+By 06-26 the WC had 134 independent outlets; `mainstream_confirmed=true`, w=1.0, pathway=mainstream under both v1 and v2 rules. Mainstream v2 *is* this clause turned into an algorithm — with the crucial quantitative boundary the doctrine's prose lacks: **news confirmation is quorum-dependent.** "mexico world cup" at 4–5 stories was demoted to a dark-matter trigger *(corrected 2026-08-19: the demotion is the finding; the previously-quoted "det 38.5→70" was a harness read against a fixed 70 reference, not a served score — served peak was 48.96)*; one-to-four credible outlets is a lead to chase, not mainstream arrival. Five distinct, syndication-collapsed outlets is.
 
 **Three complications the data adds (none refute the doctrine):**
 1. **The converse failure mode.** Before the dual-pathway fix, the engine over-applied the doctrine's spirit: mainstream-born = ratio-zero = scored 41 while 777K people looked at it. "Already mainstream" correctly means "not our early-detection trade"; it must not mean "measured as nothing." The fix keeps both truths: honest magnitude on M, moat untouched on D.

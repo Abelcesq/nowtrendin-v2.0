@@ -303,3 +303,51 @@ Three candidate mechanisms — sports-headline extraction failure, the first-tim
 reading 0 on already-seen topics, or collector under-delivery — imply three different builds
 at three different costs, and backtesting new feeds through the same silent failure would read
 "no lift" as "no edge."
+
+## A3-CEILING / A3-ECHO / A3-TRIPWIRE — completion items for the "never measured as nothing" invariant (Chairman-adopted 2026-08-19, CLAUDE.md §15a)
+
+The invariant is adopted; these are the three open ends the board attached to it. Each is
+read-only or display-side and touches no score.
+
+- **A3-CEILING** — the `_soft_cap` hard pin. FIFA and "obama" both pinned at 100 and were
+  UNRANKABLE; the order-preserving soft ceiling (knee 85) exists, so what remains is a
+  regression fixture proving BOTH ends at once: the 777K-views→41 floor case and
+  ceiling separation between two saturated topics. **Trigger:** any new pathway or
+  magnitude term shipping, or the next scoring-contract audit — whichever is first.
+- **A3-ECHO** — the converse defect the Challenger and Operator both flagged: "aftermath echo"
+  BREAKOUTs of 93–95 on 90–194 mentions AFTER a ~97% mention collapse. The same
+  honest-absolute-magnitude pathway that cures the floor case appears to over-reward relative
+  moves off a collapsed base. **Order (§10a): a read-only DIAGNOSTIC of the mainstream-pathway
+  acceleration term on post-peak topics FIRST — no fix ships on the hypothesis.**
+  **Trigger:** a second event family showing an aftermath echo at ≥ its true-peak stage on <30%
+  of peak mentions.
+- **A3-TRIPWIRE** — the standing detector so this class can never again be found by a case study:
+  flag any topic carrying external magnitude ≥ `MAG_MAINSTREAM_V2` whose served detection sits
+  below a floor for ≥N cycles. Read-only, alarm-only; verify on a synthetic plateau fixture
+  before trusting it. **Trigger:** ship with the next monitoring-agent change.
+
+## A4-SEQ — the GHOST_FEEDS remedy sequence (Chairman-RULED 2026-08-19; execute in this order)
+
+The gap statement is adopted (in any domain whose first pipe is Google Trends + news, the engine
+is structurally 1–3 weeks late). The remedy sequence is ruled:
+
+**1 → shadow trial vs retro backtest** (decide the instrument, prefer the prospective shadow trial:
+candidate feeds held-out, first sightings enrolled in a SHADOW ledger under the same sealed rules,
+2026-09-01→11-30 on the sealed-epoch clock — it manufactures real sealed races, which a retro
+backtest can never do).
+**2 → pre-registered PIT-sealed backtest** (hypothesis, success threshold, holdout window, minimum
+N, AND a log of every feed-set variant tried, sealed to the PIT store BEFORE the run).
+**3 → football-feed post-mortem** (why Guardian Football / ESPN Soccer / Football365 — niche tier,
+live since 2026-06-12 — produced ~zero niche mentions and D≤9/100 across 532 world-cup cycles).
+**4 → GHOST_RESEARCH_FEEDS trial close-out** (live 2026-07-15, two-week window elapsed ~07-29,
+readout overdue).
+
+> ⚠ **RECORDED RISK on this ordering (Operator, dissenting; ruling followed).** The Operator's
+> case was that step 3 must come FIRST, because if the extraction / first-timer / delivery defect
+> that silenced the three existing football feeds is still live, a shadow trial runs new feeds
+> through the SAME silent failure and its null reads as "no edge" when it is actually "no
+> measurement." **Mitigation adopted so the ruling stands without carrying that risk:** the
+> post-mortem is READ-ONLY and cheap, so run it in PARALLEL with step 1 rather than after it —
+> it does not gate the shadow trial, but its answer must be in hand BEFORE step 1's result is
+> interpreted. A null from step 1 may not be read as "no edge" until step 3 has ruled out silent
+> non-measurement.

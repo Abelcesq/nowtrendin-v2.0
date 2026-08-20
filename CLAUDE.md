@@ -470,6 +470,59 @@ part 1 still in design.** Two coupled changes:
    Feeds validated (production UA). Adversarial integrity verify + backtest still required
    before deploy.
 
+## 15a. THE MAINSTREAM QUORUM DOCTRINE + THE "NEVER MEASURED AS NOTHING" INVARIANT
+### (Chairman rulings 2026-08-18/19, on the nine-seat World Cup board. These two are the written
+### form of what the code enforces — if code and this section ever disagree, that IS the defect.)
+
+**A2 — THE QUORUM DOCTRINE (v2.1, LIVE `MAINSTREAM_SPIKE_AS_OUTLET=1`).**
+> **Five independent media outlets make a topic mainstream. A magnitude spike carries the same
+> weight as one media outlet — a vote toward the five, never a veto over them.**
+
+    effective_corroboration = distinct_independent_outlets + (1 if magnitude spike else 0)
+    mainstream_confirmed    = effective_corroboration >= NEWS_QUORUM_V2   (5)
+
+- "Independent" is syndication-collapsed (`min(distinct outlets, distinct titles)`), so one wire
+  story through forty mastheads is one voice, not forty.
+- Below quorum the topic stays a Dark-Matter **TRIGGER**: its early read is preserved on the
+  expert pathway instead of being suppressed into the mainstream denominator.
+- 4 outlets + a spike confirms (5). A large spike with **zero** outlets does **not** (1) — it
+  remains a trigger whose magnitude still drives its weight, so it is never "measured as nothing."
+- **WHY v2.1 EXISTS:** v2 enforced `quorum OR magnitude`, so a topic with no corroborating outlets
+  could be badged mainstream on magnitude alone — the adopted rule was not the enforced rule (the
+  Challenger's finding). Backtested before the flip on 8 live topics: **zero badge flips, zero
+  detection change** — every confirmed topic already cleared five on outlets alone.
+- The quorum constants (`NEWS_QUORUM_V2`, `MAG_MAINSTREAM_V2`, `MAG_TRIGGER_FLOOR_V2`) are
+  SCORE-AFFECTING. They may never be changed by an env flip alone: backtest + board note first.
+  Q=5 is currently **set by construction, sensitivity sweep pending** — do not describe it as
+  evidence-derived until the sweep exists.
+
+**A3 — THE "NEVER MEASURED AS NOTHING" INVARIANT (adopted unanimously; Chairman-ratified).**
+> **"Already mainstream" is a statement about whose trade it is, never a statement that nothing is
+> happening. A topic outside our early-detection edge must be labelled outside it — never scored
+> as small.**
+
+- **Canonical violation:** the World Cup at 777K Wikipedia views/day served **41/WATCHING** while a
+  fragmented news n-gram scored 47. A structural zero is a fabricated read exactly as surely as a
+  fabricated hundred; a false ZERO is as much a defect as a false peak.
+- **Fix in force:** `detection = (1-w)·expert + w·mainstream`, where the mainstream pathway scores
+  honest absolute magnitude/breadth/acceleration. At w=1.0 a mainstream-born topic is judged as
+  what it is.
+- **THE HARD FENCE (Guardian, non-negotiable):** this invariant governs MEASUREMENT of magnitude
+  ONLY. It never softens a ledger verdict and never becomes an accuracy claim. A correctly-measured
+  mainstream 96 is still LAGGED/pre_broken in the ledger. "We scored the World Cup 96" is a
+  thermometer reading, not a forecast, and earns nothing.
+- **This is a defect CLASS, not a past bug.** It has two ends and both are violations:
+  the FLOOR end (mainstream measured as ~nothing) and the CEILING end (a hard pin at 100 that makes
+  the hottest topics unrankable). Its open completion items are tracked in
+  `audits/DEFERRED_ITEMS.md` (`A3-CEILING`, `A3-ECHO`, `A3-TRIPWIRE`).
+- **Related sibling rule (§16a):** honest absence at the cold-start end — a degenerate baseline
+  serves `null`, never a floor value wearing a measured badge. Same sin, different end.
+
+**Standing evidence-hygiene rule (from the A1 correction, 2026-08-19):** a validation-harness or
+what-if read is NEVER printed in the same register as a served value. It carries its source and any
+fixed-reference caveat every time. (The World Cup study quoted a harness "det 70" whose 70 was that
+endpoint's pinned `expert_detection` constant, against a real served peak of 48.96.)
+
 ## 16. SOURCE ONBOARDING PROTOCOL (hard rule — no source is linked until ALL 5 gates pass)
 
 > **Before linking ANY new media/data source** (RSS, API, feed, collector) you MUST clear all
@@ -678,8 +731,9 @@ AV→fallback; integrity fix = insider **BUYING** is the signal (net is sell-dom
 Signal de-Congress**: user-facing "Congress" → "insider tracking" everywhere (text/AI prompt/explainer/Methodology);
 "Positioning Concentration"→**Insider Tracking**, "Dark Positioning"→**Macro Positioning**; tier **BUILDING→MODERATE**
 (all platforms); SOURCES now add the score-driving FINRA/OFR/FMP/13F (§17). (3) **Mainstream v2** (`MAINSTREAM_V2=1`,
-LIVE): credible media is a Dark-Matter TRIGGER until ≥5 INDEPENDENT outlets corroborate (syndication-collapsed) or
-magnitude spikes — FIFA-validated. (4) **Crypto Money Gradient LIVE** (`CRYPTO_SIGNAL=1`): 12 coins (BTC/ETH/SOL/XRP/
+LIVE, amended to **v2.1** 2026-08-19 — see §15a): credible media is a Dark-Matter TRIGGER until **≥5 INDEPENDENT
+outlets** corroborate (syndication-collapsed); a magnitude spike counts as **ONE outlet's worth of corroboration**
+toward that five, never a standalone pass. FIFA-validated. (4) **Crypto Money Gradient LIVE** (`CRYPTO_SIGNAL=1`): 12 coins (BTC/ETH/SOL/XRP/
 BNB/DOGE/ADA/AVAX/LINK/DOT/LTC/BCH), proxy-based Dark Matter (D, crypto-exposure 13F/insider via Finviz) + FMP coin
 price (M); master/detail `/crypto` page + nav (under Market Signal, above Grade) + Dashboard tile; **served from the
 prewarm cache** (live compute uses FAST Finviz-only DM — AV 13F too slow; `CRYPTO_FULL_DM=1` for research); its OWN
