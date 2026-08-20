@@ -2306,9 +2306,17 @@ def _reddit_posts_for_sub(reddit, sub_name: str) -> list:
 def collect_reddit(conn: sqlite3.Connection) -> int:
     """Collect posts from Reddit and extract topics from each.
 
-    DISABLED unless REDDIT_CLIENT_ID/SECRET are set (2026-06-12, user call:
-    API access not secured). When creds land in Heroku config the collector —
-    including the sports/culture niche subs — reactivates with no code change."""
+    FORMALLY RETIRED (founder ruling 2026-08-20: "we will not obtain the API key
+    needed"). Not pending, not deferred — retired. History: credentials were deferred
+    2026-06-12; STALE credentials then sat in the engine config, so this guard never
+    fired and praw 403'd on every subreddit, every cycle, for two months — an
+    un-decided decision wearing an error log (the 2026-08-20 Dark Matter board's
+    finding). The stale creds were unset at engine v365; this guard now short-circuits
+    cleanly. CONSEQUENCE FOR D (record, per the same board): Reddit was the design's
+    primary author-identity surface; with it retired, the first-timer numerator's
+    author-bearing universe is GitHub/HackerNews(/bluesky/lemmy), and D's stated
+    exclusion boundary must say so. Reactivation is a NEW founder decision + §16
+    re-onboarding, not a config flip."""
     if not (REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET):
         print("  Reddit: disabled — no API credentials (set REDDIT_CLIENT_ID/"
               "SECRET to reactivate)")
