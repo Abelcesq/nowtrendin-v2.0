@@ -7562,16 +7562,108 @@ def risk_detail(risk_topic: str):
     return d
 
 
-#: Referee-redundancy floor (Operator, board 2026-08-18): the share of resolved LED wins the
-#: INDEPENDENT second referee (Wikipedia pageviews) must have actually checked before any
-#: accuracy claim in that domain may be cited. A second referee that has never fired is a
-#: control that exists on paper. Measurement-only — never blocks a verdict, never edits a row.
-REFEREE_FLOOR_PCT = float(os.getenv("REFEREE_FLOOR_PCT", "20"))
-#: Sweep-starvation tripwire: if the Apify budget guard skipped paid sweeps for more than this
-#: many consecutive days, timeouts resolved in that window were judged by a referee whose meter
-#: had run out. The 365-day patience window says never judge a detection before attention can
-#: arrive; the same fairness applies when OUR instrument, not the world, went quiet.
-SWEEP_STARVATION_DAYS = int(os.getenv("SWEEP_STARVATION_DAYS", "3"))
+# ══════════════════════════════════════════════════════════════════════════════════════
+# THE CITATION BAR — SEALED CONSTANTS (Chairman ruling 2026-08-20)
+# ══════════════════════════════════════════════════════════════════════════════════════
+# These are NOT env-tunable, deliberately. They gate whether an accuracy figure may be
+# cited at all, and an integrity gate readable from `os.getenv` is a gate the party who
+# benefits can widen in ninety seconds with no commit, no review and no trace — exactly
+# when a deal is on the table (Operator S1, Guardian, Statistician, Expansionist, all
+# independently). Changing any value here is a code change: it shows up in review, in
+# git, and in the PIT seal. That is the point.
+#
+# The bar itself is the one the 2026-08-17 credibility board already RULED. The code
+# previously enforced `corr > 0` — ONE corroboration would have unlocked citation — which
+# was weaker than the ruled standard. That is the same "adopted rule is not the enforced
+# rule" defect as the pre-v2.1 quorum doctrine; at runtime the code always wins, so the
+# code must carry the ruling.
+REFEREE_FLOOR_PCT = 20.0          # share of LED wins the independent referee must have CHECKED
+REFEREE_FLOOR_MIN_N = 10          # …and an absolute floor, because 20% of 15 is 3 checks and
+                                  # 20% of 5 is one. A percentage with no N is satisfiable at N=1.
+REFEREE_MAJORITY_FRAC = 0.5       # of the CHECKED wins, this share must be CORROBORATED
+REFEREE_MAX_AMBIGUOUS_FRAC = 0.5  # …and no more than this share of wins may rest on queries
+                                  # the system itself flags ambiguous
+#: Sweep-starvation tripwire: resolutions judged while the paid sweep's meter was out.
+#: The 365-day patience window says never judge a detection before attention can arrive;
+#: the same fairness applies when OUR instrument, not the world, went quiet.
+SWEEP_STARVATION_DAYS = 3
+
+#: Content-hash of the last assessment logged per key, so a repeated identical serve does
+#: not spam the bitemporal log while a CHANGED assessment always writes a new record.
+_last_assessment_sha: dict = {}
+
+
+def _log_data_use_assessment(item_key: str, source: dict, values: dict) -> None:
+    """BITEMPORAL DATA-USE LOG — Chairman ruling 2026-08-20.
+
+    Ruling: legacy (pre-sealed-epoch) data MAY be used, in BOTH directions — but every
+    use is logged, carrying the SOURCE data's own timestamps AND the timestamp of the
+    assessment made from it. That is what makes admissibility symmetric by construction:
+    an adverse number and a favourable number drawn from the same pool leave the identical
+    trail, so neither can be quietly preferred after the fact. It also means any assessment
+    we ever published can be reconstructed later: which rows, from when, read when.
+
+    Records to the append-only PIT store (`kind='assessment'`), whose `knowable_at` is
+    server-stamped and cannot be backdated. Content-deduped: an unchanged assessment does
+    not rewrite history, it simply leaves the prior record standing with its own timestamp.
+    Fail-open — a logging failure can never break a serve.
+    """
+    try:
+        import hashlib as _hl
+        import pit_store as _pit
+        payload = {"source": source, "assessment": values}
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        sha = _hl.sha256(body.encode("utf-8")).hexdigest()
+        if _last_assessment_sha.get(item_key) == sha:
+            return                       # identical assessment — prior record stands
+        _last_assessment_sha[item_key] = sha
+        _pit.record("assessment", item_key,
+                    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    {**payload, "assessment_sha256": sha}, db_path=DB_PATH)
+    except Exception as _ae:
+        print(f"[data-use-log] skipped ({item_key}): {_ae}")
+
+
+def _ledger_data_use(h: dict) -> dict:
+    """Bitemporal provenance for every rate this endpoint serves (Chairman ruling
+    2026-08-20). States WHICH data was read — legacy vs sealed-epoch, with the pool's own
+    boundary date and row counts — and stamps WHEN the assessment was made. Logged to the
+    append-only PIT store so any published assessment can later be reconstructed: which
+    rows, from when, read when. Symmetric by construction — an adverse number and a
+    favourable one from the same pool leave the same trail."""
+    try:
+        sealed = h.get("sealed_epoch") or {}
+        sealed_start = sealed.get("start") if isinstance(sealed, dict) else None
+        source = {
+            "pool": "blended_legacy_and_sealed",
+            "legacy_admissible": True,
+            "ruling": "Chairman 2026-08-20 — legacy (pre-sealed-epoch) rows ARE admissible "
+                      "in BOTH directions, provided every use is logged with the source "
+                      "data's own timestamps and the assessment timestamp.",
+            "sealed_epoch_start": sealed_start,
+            "engine_epoch_boundary": ENGINE_EPOCH_BOUNDARY,
+            "rows_resolved": h.get("total"),
+            "rows_pending": h.get("pending"),
+            "param_version": h.get("param_version"),
+        }
+        values = {
+            "hit_rate": h.get("hit_rate"),
+            "tracked_race_hit_rate_pct": h.get("tracked_race_hit_rate_pct"),
+            "tracked_race_sample": h.get("tracked_race_sample"),
+            "median_lead": h.get("median_lead"),
+            "led": h.get("led"), "same_day": h.get("same_day"),
+            "lagged": h.get("lagged"), "false_positives": h.get("false_positives"),
+        }
+        _log_data_use_assessment("ledger:attention", source, values)
+        return {"source": source, "assessed_at": datetime.now(timezone.utc).isoformat(),
+                "logged_to": "pit_observations kind='assessment' (append-only, "
+                             "knowable_at server-stamped)",
+                "note": "Legacy rows are admissible in BOTH directions under the 2026-08-20 "
+                        "ruling. Every assessment built from them is logged with the source "
+                        "pool's own dates and this read's timestamp, so no number — adverse "
+                        "or favourable — can be preferred after the fact."}
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:120]}
 
 
 def _ledger_common_mode(h: dict) -> dict:
@@ -7582,10 +7674,21 @@ def _ledger_common_mode(h: dict) -> dict:
         corr = int(h.get("led_referee_corroborated") or 0)
         uncorr = int(h.get("led_referee_uncorroborated") or 0)
         unchecked = int(h.get("led_referee_unchecked") or 0)
+        ambiguous = int(h.get("led_ambiguous_query") or 0)
         checked = corr + uncorr
         led_total = checked + unchecked
         pct = round(100.0 * checked / led_total, 1) if led_total else 0.0
+        # ── THE BOARD-RULED BAR, now enforced in code (Chairman ruling 2026-08-20) ──
+        # Was: floor_met and corr > 0 — a SINGLE corroboration unlocked citation, which is
+        # weaker than the standard the 2026-08-17 credibility board actually ruled. Four
+        # conditions now, all of which must hold:
         floor_met = bool(led_total) and pct >= REFEREE_FLOOR_PCT
+        min_n_met = checked >= REFEREE_FLOOR_MIN_N          # a % with no N is satisfiable at N=1
+        majority_met = bool(checked) and corr > checked * REFEREE_MAJORITY_FRAC
+        ambiguity_ok = (not led_total) or (ambiguous <= led_total * REFEREE_MAX_AMBIGUOUS_FRAC)
+        bar = {"floor_met": floor_met, "min_checks_met": min_n_met,
+               "majority_corroborated": majority_met, "queries_unambiguous": ambiguity_ok}
+        unmet = [k for k, v in bar.items() if not v]
         # ── CORRECTED 2026-08-19 (Statistician + Forecaster, independently) ──
         # This tripwire SHIPPED DEAD THIS MORNING. It read `sweep_newest_slots`, which is
         # NOT an observed sweep age — it is `int(os.getenv("LEDGER_SWEEP_NEWEST_SLOTS","0"))`,
@@ -7610,7 +7713,21 @@ def _ledger_common_mode(h: dict) -> dict:
             "refereeCheckedOf": {"checked": checked, "unchecked": unchecked,
                                  "ledTotal": led_total},
             "refereeFloorMet": floor_met,
-            "citable": bool(floor_met and corr > 0),
+            # The ruled bar, itemised so a reader sees WHICH condition blocks, not just that
+            # something does. All four must hold; today none of majority/min-N hold.
+            "citationBar": {
+                **bar,
+                "thresholds": {"floor_pct": REFEREE_FLOOR_PCT,
+                               "min_checks": REFEREE_FLOOR_MIN_N,
+                               "majority_frac_of_checked": REFEREE_MAJORITY_FRAC,
+                               "max_ambiguous_frac": REFEREE_MAX_AMBIGUOUS_FRAC},
+                "thresholds_are_sealed_constants": True,
+                "note": "Sealed in code, NOT env-tunable — an integrity gate readable from "
+                        "os.getenv is one the beneficiary can widen with no commit and no "
+                        "trace. Changing a value here is a reviewable code change.",
+                "unmet": unmet or None,
+            },
+            "citable": bool(floor_met and min_n_met and majority_met and ambiguity_ok),
             # ── CORRECTED 2026-08-19 after a 5-of-5 board finding against THIS code ──
             # The earlier wording said the referee "has been exercised and does not confirm
             # the wins". The code cannot support that sentence. `_referee_corroborate`
@@ -8306,6 +8423,7 @@ def accuracy_ledger_report():
                     # silently converts pending detections into timeout verdicts. Neither is
                     # detectable from a rate alone, so both travel WITH the rate.
                     "commonMode": _ledger_common_mode(h),
+                    "dataUseLog": _ledger_data_use(h),
                     "best": [{"topic": b["topic"], "leadDays": b["lead_days"],
                               "refereeCorroborated": b.get("referee_corroborated"),
                               "queryAmbiguous": b.get("query_ambiguous")}
