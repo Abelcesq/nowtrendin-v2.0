@@ -1105,6 +1105,22 @@ FIRST_TIMER_THRESHOLD  = 0.35   # 35% of commenters new to subreddit
 GRADIENT_RATIO_THRESHOLD = 4.0  # niche density 4x greater than mainstream
 ENGAGEMENT_ASYM_RATIO  = 0.30   # comments-to-upvotes ratio above this
 
+# D PLUMBING V2 (nine-seat board 2026-08-20, Chairman-approved build; DEFAULT OFF —
+# score-affecting, flips only after the held-out backtest + founder sign-off).
+# Gates the three verified numerator/denominator repairs as ONE regime:
+#   (1b) ft_ratio denominator = author-bearing signals only (compute_dark_matter);
+#   (1c) community-age guard on first-timer status (check_author_is_first_timer) —
+#        without it, every author on a newly-onboarded feed reads "first-timer" and
+#        the shadow trial would manufacture its own positive result (Guardian F2);
+#   (1a) the blog/discovery topic writers pass the REAL first-timer bit (forward-only).
+# One flag for all three so the regime ledger records a single epoch boundary.
+D_PLUMBING_V2 = os.getenv("D_PLUMBING_V2", "0") == "1"
+_D_PLUMBING_V2 = D_PLUMBING_V2   # local alias used inside compute_dark_matter
+# 1c parameter: a community contributes first-timer credit only after our own
+# collection of it is at least this old (the §16a CALIBRATING stage at community
+# granularity). 14 days ≈ the ledger's enroll-recent window.
+D_COMMUNITY_MIN_AGE_DAYS = int(os.getenv("D_COMMUNITY_MIN_AGE_DAYS", "14"))
+
 # Velocity score thresholds
 BREAKOUT_THRESHOLD = 85
 STRONG_THRESHOLD   = 70
@@ -1620,6 +1636,25 @@ def get_db(path: str = DB_PATH) -> sqlite3.Connection:
                     conn.rollback()
                 except Exception:
                     pass
+    # ── Live migration: d_measured (board item 8, 2026-08-20 — honest absence for D).
+    # NULL = row predates the flag (unknown); 1 = D's instruments could read the topic;
+    # 0 = neither indicator had input (no author-bearing, no engagement-bearing signals)
+    # so the stored dark_matter 0 means COULD-NOT-READ, never "read quiet".
+    try:
+        conn.execute("SELECT d_measured FROM velocity_scores LIMIT 1")
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE velocity_scores ADD COLUMN d_measured INTEGER")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
     # ── Live migration: baseline-relative breadth/magnitude history columns ──
     # Stored each cycle so the dual-pathway can compute mainstreaming as a
     # DEVIATION from the topic's own baseline (fame vs. diffusion).
@@ -2278,6 +2313,31 @@ def check_author_is_first_timer(
             VALUES (?, ?, ?, ?)
         """, (author, platform, community,
               datetime.now(timezone.utc).isoformat()))
+        # COMMUNITY-AGE GUARD (board 2026-08-20, Guardian F2; gated D_PLUMBING_V2,
+        # default OFF = historical behavior). Without this, every author on a NEWLY
+        # ONBOARDED community reads as a "first-timer" until history accrues —
+        # fabricated earliness that measures our own onboarding, not attention
+        # movement, and would let the shadow trial manufacture its own positive
+        # result. Rule: first-timer credit only once OUR collection of this
+        # community is at least D_COMMUNITY_MIN_AGE_DAYS old (§16a CALIBRATING at
+        # community granularity). The author row is still recorded above either
+        # way, so history accrues during the calibration window.
+        if D_PLUMBING_V2:
+            try:
+                oldest = conn.execute("""
+                    SELECT MIN(first_seen_at) AS m FROM author_history
+                    WHERE platform = ? AND community = ?
+                """, (platform, community)).fetchone()
+                m = oldest["m"] if oldest and hasattr(oldest, "keys") else (
+                    oldest[0] if oldest else None)
+                if m:
+                    age_days = (datetime.now(timezone.utc)
+                                - datetime.fromisoformat(str(m).replace("Z", ""))
+                                .replace(tzinfo=timezone.utc)).days
+                    if age_days < D_COMMUNITY_MIN_AGE_DAYS:
+                        return False   # calibrating: recorded, not credited
+            except Exception:
+                pass   # fail-open to historical behavior, never block collection
         return True
 
 
@@ -3978,8 +4038,8 @@ def persist_velocity_score(conn, result) -> None:
             total_mentions, niche_mentions, mainstream_mentions,
             platforms_active, first_timer_ratio, engagement_asymmetry,
             gradient_ratio, signal_stage, is_gravitational_anomaly,
-            anomaly_reason, why_this_matters, what_to_watch
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            anomaly_reason, why_this_matters, what_to_watch, d_measured
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         score_id, result["scored_at"], result["topic_key"], result["topic_display"],
         result["gradient_strength"], result["inertia_score"], result["platform_diversity"],
@@ -3990,6 +4050,7 @@ def persist_velocity_score(conn, result) -> None:
         result["platforms_active"], result["first_timer_ratio"], result["engagement_asymmetry"],
         result["gradient_ratio"], result["signal_stage"], result["is_gravitational_anomaly"],
         result["anomaly_reason"], result["why_this_matters"], result["what_to_watch"],
+        result.get("d_measured"),   # None = unknown (legacy builder), honest tri-state
     ))
     conn.commit()
 
@@ -4390,33 +4451,72 @@ class GravitationalAnomalyDetector:
 
     def compute_dark_matter(
         self, signals: list[dict]
-    ) -> tuple[float, float, bool]:
+    ) -> tuple[float, float, bool, bool]:
         """
-        D — Dark Matter Inference (15% weight)
-
-        The unique component no competitor measures.
-        Infers hidden private conversations from public anomalies.
+        D — first-timer influx + engagement asymmetry on the author-bearing
+        expert/niche platforms we collect. (Docstring de-poeticized per the
+        2026-08-20 board — the old "hidden private conversations no competitor
+        measures" claim described an aspiration, not the instrument; that
+        register-mixing is what the A1 correction banned.)
 
         Three indicators:
         1. First-Timer Ratio  — new community members flooding in
         2. Engagement Asymmetry — comments disproportionate to upvotes
         3. (Implicit) Organic concentration — quality signals, not bots
 
-        Returns: (score, first_timer_ratio, asymmetry_detected)
-        """
+        Returns (score, ft_ratio, asymmetry, d_measured). `d_measured` is the
+        honest-absence flag (board item 8, §16a stage-2 pointed inward): False
+        when the topic's signal set contains NO author-bearing signals and NO
+        engagement-bearing signals — i.e. BOTH indicators were structurally
+        blind, and the returned 0 means "could not read", never "read quiet".
+        Measurement metadata only: the composite still receives the numeric
+        score exactly as before (the D8 pattern — count at the neutral value,
+        DISCLOSE the absence); no score path changes.
+
+        D_PLUMBING_V2 (flag, default OFF — board item 1, score-affecting,
+        backtest-before-flip): when ON, ft_ratio's denominator is the
+        AUTHOR-BEARING signals only, matching this function's own long-standing
+        comment. When OFF (live default), the historical behavior is preserved
+        bit-for-bit: denominator = all signals, which mechanically dilutes the
+        ratio toward zero as mainstream/authorless coverage arrives — the
+        board-verified defect (four seats; collator-confirmed)."""
         if not signals:
-            return 0.0, 0.0, False
+            return 0.0, 0.0, False, False
+
+        # ── Instrument coverage (board item 8) ────────────────
+        # Author-bearing = platforms whose collectors genuinely resolve an author
+        # into topic_signals.is_first_timer. REGIME-DEPENDENT: legacy regime =
+        # reddit/github/hackernews/bluesky/lemmy only (the blog/discovery writers
+        # hardcoded 0 — the board's writer defect); under D_PLUMBING_V2 the blog
+        # lane's writers pass the real bit, so those platforms join the set. The
+        # writer fix is forward-only, so platform membership is the honest proxy
+        # for rows on both sides of the epoch.
+        # Engagement-bearing = carries real upvotes (RSS rows never do).
+        _AUTHOR_PLATFORMS = {"reddit", "github", "hackernews", "bluesky", "lemmy"}
+        if _D_PLUMBING_V2:
+            _AUTHOR_PLATFORMS = _AUTHOR_PLATFORMS | {
+                "devto", "hashnode", "discourse", "wordpress", "blogger",
+                "medium", "ghost"}
+        author_bearing = [s for s in signals
+                          if (s.get("platform") or "").lower() in _AUTHOR_PLATFORMS]
+        engagement_bearing = [s for s in signals if (s.get("upvotes") or 0) > 5]
+        d_measured = bool(author_bearing or engagement_bearing)
 
         # ── First-Timer Ratio ──────────────────────────────────
         # Across ALL platforms that carry author identity (not Reddit-only —
-        # Reddit is off, which silently forced this to 0 on every topic). We
-        # require a minimum sample so a 1-author topic can't read a spurious
-        # 100%. Signals whose collector cannot resolve an author are excluded
-        # from the denominator rather than counted as non-first-timers.
+        # Reddit formally RETIRED 2026-08-20). Minimum sample so a 1-author
+        # topic can't read a spurious 100%.
         MIN_FT_SAMPLE = 3
-        if len(signals) >= MIN_FT_SAMPLE:
-            first_timers = sum(1 for s in signals if s.get("is_first_timer"))
-            ft_ratio = first_timers / len(signals)
+        if _D_PLUMBING_V2:
+            # Board item 1b: denominator = author-bearing signals ONLY — the
+            # behavior this function's comment always claimed. A topic's news
+            # coverage no longer mechanically erases its expert-community read.
+            pool = author_bearing
+        else:
+            pool = signals
+        if len(pool) >= MIN_FT_SAMPLE:
+            first_timers = sum(1 for s in pool if s.get("is_first_timer"))
+            ft_ratio = first_timers / len(pool)
         else:
             ft_ratio = 0.0
 
@@ -4454,7 +4554,8 @@ class GravitationalAnomalyDetector:
 
         dark_score = evidence * quality
 
-        return round(min(100, dark_score), 2), round(ft_ratio, 4), asymmetry_detected
+        return (round(min(100, dark_score), 2), round(ft_ratio, 4),
+                asymmetry_detected, d_measured)
 
     def compute_confidence_decay(
         self, signals: list[dict], topic_key: str
@@ -4786,7 +4887,7 @@ class GravitationalAnomalyDetector:
         G, gradient_ratio      = self.compute_gradient_strength(signals)
         I                      = self.compute_inertia(signals)
         M, platform_list       = self.compute_platform_diversity(signals)
-        D, ft_ratio, asymmetry = self.compute_dark_matter(signals)
+        D, ft_ratio, asymmetry, d_measured = self.compute_dark_matter(signals)
         C                      = self.compute_confidence_decay(signals, topic_key)
         P, lifecycle_data      = self.compute_persistence(topic_key)
         N, nowtrendin_data     = self.compute_nowtrendin_score(topic_key)
@@ -4972,6 +5073,11 @@ class GravitationalAnomalyDetector:
             "mainstream_mentions": main_count,
             "platforms_active":  json.dumps(platform_list),
             "first_timer_ratio": ft_ratio,
+            # Board item 8 (honest absence, §16a stage-2 pointed inward): 0 when the
+            # topic carried NO author-bearing and NO engagement-bearing signals —
+            # i.e. D's 0 means COULD NOT READ, never "read quiet". Measurement
+            # metadata; the composite is unchanged (D still counts numerically).
+            "d_measured": 1 if d_measured else 0,
             "engagement_asymmetry": 1 if asymmetry else 0,
             "gradient_ratio":    gradient_ratio,
 
@@ -5408,10 +5514,10 @@ class GravitationalAnomalyDetector:
                     anomaly_reason, why_this_matters, what_to_watch,
                     attention_magnitude, n_mainstream_platforms,
                     detection_pathway, mainstream_ratio, mainstream_breadth,
-                    news_outlets, mainstream_confirmed, tier_migration
+                    news_outlets, mainstream_confirmed, tier_migration, d_measured
                 ) VALUES (
                     ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-                    ?,?,?,?,?,?
+                    ?,?,?,?,?,?,?
                 )
             """, (
                 score_id,
@@ -5449,6 +5555,7 @@ class GravitationalAnomalyDetector:
                 int(result.get("news_outlets", 0) or 0),
                 1 if result.get("mainstream_confirmed") else 0,
                 1 if result.get("tier_migration") else 0,
+                result.get("d_measured"),   # tri-state: None=unknown, 1=readable, 0=blind
             ))
 
             # Bitemporal PIT record (Chairman ruling (b), 2026-08-18): append the

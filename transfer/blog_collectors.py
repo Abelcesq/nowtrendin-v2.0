@@ -652,7 +652,20 @@ def _write_signal(conn, sig_id, platform, tier, source, title, url, author,
         upvotes, comments, _eng(upvotes, comments), _sent(title),
         1 if ft else 0, 1 if organic else 0, (raw_text or title or "")[:500]))
 
-def _write_topics(conn, sig_id, topics, platform, tier, source, upvotes, comments, organic):
+def _write_topics(conn, sig_id, topics, platform, tier, source, upvotes, comments,
+                  organic, first_timer=False):
+    """THE ft=0 WRITER DEFECT, fixed (nine-seat board 2026-08-20, Challenger's
+    preliminary finding — the single line that disconnected D's numerator from every
+    feed-based source). This function wrote a LITERAL 0 into topic_signals.is_first_timer
+    for every blog/newsletter/ghost/discourse/wordpress/blogger topic row, while the same
+    collectors computed a real `_first_timer()` value and stored it only in raw_signals —
+    which D's scorer never reads. Callers now pass the real bit. FLAG-GATED
+    (D_PLUMBING_V2, default OFF): while off, behavior is bit-identical to the defect
+    (write 0) so the score regime is unchanged until the held-out backtest + founder
+    flip; the flag flip is the epoch boundary the regime ledger records. Forward-only —
+    historical rows keep their stored 0 and cannot be repaired retroactively."""
+    _ft_v2 = os.getenv("D_PLUMBING_V2", "0") == "1"
+    ft_bit = (1 if first_timer else 0) if _ft_v2 else 0
     eng = _eng(upvotes, comments)
     n = 0
     for topic in topics:
@@ -662,7 +675,7 @@ def _write_topics(conn, sig_id, topics, platform, tier, source, upvotes, comment
             "INSERT OR IGNORE INTO topic_signals VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             t_id, _now(), topic, k, sig_id,
             platform, tier, source,
-            upvotes, comments, eng, 0, 1 if organic else 0))
+            upvotes, comments, eng, ft_bit, 1 if organic else 0))
         n += 1
     return n
 
@@ -773,7 +786,8 @@ def collect_devto(conn):
             _write_signal(conn, sid, "devto", "expert", src, title, url, author,
                           upvotes, comments * 2 if asymmetric else comments, ft, organic, text)
             n = _write_topics(conn, sid, extract_topics(text, tags=tags),
-                              "devto", "expert", src, upvotes, comments, organic)
+                              "devto", "expert", src, upvotes, comments, organic,
+                              first_timer=ft)
             total_s += 1; total_t += n
 
     for tag in DEVTO_TAGS:
@@ -862,7 +876,8 @@ def collect_hashnode(conn):
             _write_signal(conn, sid, "hashnode", "expert", src, title, url, author,
                           reactions, responses * 2 if asymmetric else responses, ft, True, text)
             n = _write_topics(conn, sid, extract_topics(text, tags=tags),
-                              "hashnode", "expert", src, reactions, responses, True)
+                              "hashnode", "expert", src, reactions, responses, True,
+                              first_timer=ft)
             total_s += 1; total_t += n
 
     # Tag-based queries: public, no auth required
@@ -936,7 +951,7 @@ def collect_discourse(conn):
                               replies * 2 if asymmetric else replies, ft, True, title)
                 n = _write_topics(conn, sid, extract_topics(title),
                                   "discourse", tier, f"{name}/{label}",
-                                  likes, replies, True)
+                                  likes, replies, True, first_timer=ft)
                 total_s += 1; total_t += n; count += 1
             time.sleep(0.3)
 
@@ -984,7 +999,7 @@ def collect_wordpress(conn):
                           title, url, author, likes, comments, ft, organic, text)
             n = _write_topics(conn, sid, extract_topics(text, tags=tags_raw),
                               "wordpress", "mainstream", f"wordpress/{tag}",
-                              likes, comments, organic)
+                              likes, comments, organic, first_timer=ft)
             total_s += 1; total_t += n
         time.sleep(0.3)
 
@@ -1034,7 +1049,8 @@ def collect_blogger(conn):
             _write_signal(conn, sid, "blogger", tier, src,
                           title, url, author, 0, comments, ft, True, text)
             n = _write_topics(conn, sid, extract_topics(text, tags=labels),
-                              "blogger", tier, src, 0, comments, True)
+                              "blogger", tier, src, 0, comments, True,
+                              first_timer=ft)
             total_s += 1; total_t += n
 
     def _posts_for(bid):
@@ -1129,7 +1145,8 @@ def collect_medium(conn):
             _write_signal(conn, sid, "medium", tier, src,
                           title, url, author, quality, 0, ft, True, text)
             n = _write_topics(conn, sid, topics,
-                              "medium", tier, src, quality, 0, True)
+                              "medium", tier, src, quality, 0, True,
+                              first_timer=ft)
             total_s += 1; total_t += n; count += 1
         if count:
             print(f"    {cfg['name']}: {count} articles")
@@ -1187,7 +1204,8 @@ def collect_ghost(conn):
             _write_signal(conn, sid, "ghost", tier, cfg["name"],
                           title, link, author, 60, 0, ft, True, text)
             n = _write_topics(conn, sid, topics,
-                              "ghost", tier, cfg["name"], 60, 0, True)
+                              "ghost", tier, cfg["name"], 60, 0, True,
+                              first_timer=ft)
             total_s += 1; total_t += n; count += 1
         print(f"    {cfg['name']}: {count} articles")
         time.sleep(0.4)

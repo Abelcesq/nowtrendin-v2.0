@@ -107,6 +107,13 @@ def _write_signal(conn, *, sig_id, platform, tier, source, title, url,
 
 def _write_topic(conn, *, sig_id, topic, platform, tier, source,
                  engagement, upvotes=0, comments=0):
+    """is_first_timer is written 0 here BY TRUTH, not by defect (board 2026-08-20
+    clarification): discovery rows (trending queries, RSS feeds, socialcrawl) carry NO
+    author identity — there is no computed first-timer value being discarded, unlike the
+    blog lane's fixed ft=0 writer. Under D_PLUMBING_V2 these rows are correctly EXCLUDED
+    from D's author-bearing denominator rather than diluting it; the leading indicator
+    for authorless lanes is venue-level first-coverage (darkmatter_indicators.py), not
+    first-timer."""
     t_key = _topic_key(topic)
     if len(t_key) < 3:
         return 0
