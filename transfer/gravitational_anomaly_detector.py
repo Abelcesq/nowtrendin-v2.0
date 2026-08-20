@@ -6638,6 +6638,12 @@ async def startup_auto_collect():
             print(f"[startup] market_signal init error: {_msee}")
         if _LEDGER_PLUS_AVAILABLE:
             try:
+                # Announce BEFORE entering — two boot crashes (08-19, 08-20) hung
+                # inside this call with nothing printed, so the hang point had to be
+                # inferred from the absence of the success line. Never again: the
+                # entry print makes the next such hang unambiguous in one log read.
+                print("[startup] accuracy ledger init entering (ALTERs bounded by "
+                      "lock_timeout=5s)…", flush=True)
                 ledger_plus.init_pending_db(DB_PATH)
                 print("[startup] accuracy ledger (pending + ledger) tables ensured.")
                 # S3-a: create the intake log at BOOT, not lazily on first write. Created

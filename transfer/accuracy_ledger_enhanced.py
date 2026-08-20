@@ -62,6 +62,26 @@ except Exception:
 
 def init_pending_db(db_path: str = DB_PATH):
     conn = db_compat.connect(db_path)
+    # ── BOOT-CRASH FIX (2026-08-20; mechanism PROVEN from two incidents) ─────────
+    # Two production boot crashes (2026-08-19 market-N deploy, 2026-08-20 coverage
+    # deploy — completely different code deltas) died at the SAME step: the last log
+    # line was "[startup] market_signal_history table ensured", the next line (this
+    # function's "accuracy ledger tables ensured") never printed, SIGKILL at the 60s
+    # boot timeout. Healthy boots cross this gap in <1s. Cause: on Postgres, the
+    # idempotent duplicate-column ALTERs below must acquire ACCESS EXCLUSIVE on the
+    # table BEFORE failing — so if any concurrent transaction is reading
+    # accuracy_ledger/pending_detections at that instant (startup threads were
+    # demonstrably querying during the hang window), the ALTER queues indefinitely
+    # and silently spends the whole boot budget. lock_timeout bounds the wait: a
+    # blocked ALTER now fails in 5s into the SAME rollback-guard path the duplicate-
+    # column error already uses, and the boot proceeds. A genuinely-new column that
+    # hits the timeout simply retries on the next boot — and prints, so it's visible.
+    if getattr(db_compat, "USE_PG", False):
+        try:
+            conn.execute("SET lock_timeout = '5s'")
+            conn.execute("SET statement_timeout = '30s'")
+        except Exception:
+            pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pending_detections (
             id TEXT PRIMARY KEY, topic_key TEXT, topic_display TEXT,
@@ -133,6 +153,18 @@ def init_pending_db(db_path: str = DB_PATH):
                 conn.rollback()
             except Exception:
                 pass
+    # RESET the session timeouts before the connection RETURNS TO THE POOL —
+    # db_compat pools connections, and SET is session-scoped: without this, the 30s
+    # statement_timeout would leak into whichever caller draws this session next and
+    # kill their legitimate long-running query (a superset build, a sweep). That
+    # would be trading a visible boot crash for an invisible query killer.
+    if getattr(db_compat, "USE_PG", False):
+        try:
+            conn.execute("RESET lock_timeout")
+            conn.execute("RESET statement_timeout")
+            conn.commit()
+        except Exception:
+            pass
     conn.close()
 
 
