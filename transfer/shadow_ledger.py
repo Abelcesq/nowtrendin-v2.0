@@ -165,14 +165,17 @@ def enroll(*, arm: str, feed_set: str, domain: str, topic_key: str,
             f"topic_key, topic_display, enrolled_at, detection_date, "
             f"instrument_epoch, regime, d_measured, d_indicators, "
             f"signals_at_enroll, venues_at_enroll, sealed_query, "
-            f"sealed_wiki_article) VALUES "
+            f"sealed_wiki_article, pre_broken, calibrating, implied_prob, "
+            f"patience_days, window_open, window_close) VALUES "
             f"({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},"
-            f"{ph},{ph},{ph},{ph})",
+            f"{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})",
             (rid, arm, feed_set, domain, topic_key, topic_display, _now_iso(),
              detection_date, instrument_epoch, regime, d_measured,
              json.dumps(d_indicators, default=str) if d_indicators else None,
              signals_at_enroll, venues_at_enroll,
-             sealed_query or topic_display, sealed_wiki_article))
+             sealed_query or topic_display, sealed_wiki_article,
+             pre_broken, calibrating, implied_prob,
+             SHADOW_PATIENCE_DAYS, ENROLL_OPEN, ENROLL_CLOSE))
         conn.commit()
         return rid
     finally:

@@ -11745,8 +11745,24 @@ def get_topic_detail(topic_key: str):
             "D_dark_matter": {
                 "score":              s["dark_matter_score"],
                 "weight_overall": "13%", "weight_detect": "22%", "weight_conf": "4%",
-                "first_timer_ratio":  s.get("first_timer_ratio"),
+                # HONEST ABSENCE, SERVED (board 2026-08-20 evening, claim
+                # C-DMEASURED-SERVED). d_measured was stored and reached no surface —
+                # "disclosed to a database column is not disclosed" — while the UI kept
+                # rendering a 0% first-timer ratio with a note asserting it meant
+                # something. NULL on pre-epoch rows (unknown), 1 readable, 0 blind.
+                # When it is 0, first_timer_ratio is served as NULL rather than a
+                # number: §17 forbids rendering a non-contributing input as a value,
+                # and §16a stage-2 forbids a floor value wearing a measured badge.
+                "d_measured":         (None if s.get("d_measured") is None
+                                       else bool(s.get("d_measured"))),
+                "first_timer_ratio":  (s.get("first_timer_ratio")
+                                       if s.get("d_measured") != 0 else None),
                 "asymmetry_detected": bool(s.get("engagement_asymmetry")),
+                "unmeasured_note": (
+                    None if s.get("d_measured") != 0 else
+                    "UNMEASURED — this topic carried no author-bearing and no "
+                    "engagement-bearing signals, so D could not be read. The 0 means "
+                    "COULD NOT READ, never 'read quiet'."),
                 "plain_english": _explain_d(
                     s["dark_matter_score"],
                     s.get("first_timer_ratio", 0),

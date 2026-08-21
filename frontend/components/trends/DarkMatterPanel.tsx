@@ -46,6 +46,11 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
   // Only render when we actually have dark-matter data.
   if (dm == null && signal.firstTimerRatio == null && signal.engagementAsymmetry == null) return null;
 
+  // `?? 0` WAS THE DEFECT (Challenger, board 2026-08-20): on a topic we could not
+  // measure, it rendered "First-Timer Ratio 0%" beside copy asserting the number means
+  // something — a floor value wearing a measured badge (§16a stage 2) and a
+  // non-contributing input rendered as a value (§17). Absence is now shown as absence.
+  const dUnmeasured = signal.dMeasured === false;
   const ftr = signal.firstTimerRatio ?? 0;
   const ftrPct = Math.round(ftr * 100);
 
@@ -66,8 +71,8 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
 
       <Indicator
         label="First-Timer Ratio"
-        value={`${ftrPct}%`}
-        active={ftr >= 0.35}
+        value={dUnmeasured ? 'Unmeasured' : `${ftrPct}%`}
+        active={!dUnmeasured && ftr >= 0.35}
         desc={
           ftr >= 0.35
             ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → private-channel activity inferred.`

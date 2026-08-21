@@ -111,24 +111,30 @@ CLAIMS = [
      "the 2026-08-20 board finding (test_feed_tripwire was cited and absent)",
      "ASSERTED", "lint", "L2"),
 
-    # ── OPEN: known NOT yet true. The board found these false; recorded, not hidden. ──
+    # ── CLOSED 2026-08-20 (evening+): all three were OPEN for one working session. ──
     ("C-DMEASURED-SERVED",
-     "d_measured is SURFACED to users — the UNMEASURED state is visible, and the UI "
-     "stops rendering firstTimerRatio ?? 0 on topics we could not measure",
-     "evidence pack claimed '32.4% now disclosed' — the board found it stored, not served",
-     "OPEN", "lint", "L3"),
+     "d_measured is SURFACED to users — the UNMEASURED state is visible, and no surface "
+     "renders firstTimerRatio ?? 0 on topics we could not measure",
+     "engine D_dark_matter payload; Screener.tsx; DarkMatterPanel.tsx",
+     "ASSERTED", "lint", "L3"),
 
     ("C-KILL-CRITERION",
-     "D has a pre-committed kill-or-pivot criterion: a stated result and date that would "
-     "demote it from a scored component",
-     "Buyer's Desk, 2026-08-20 board; awaiting Chairman ruling",
-     "OPEN", "none", ""),
+     "D has a pre-committed kill-or-pivot criterion — a stated result, threshold and date "
+     "that demote it from a scored component, sealed before any result was knowable",
+     "audits/forecasts/D_KILL_CRITERION_2026-08-20.md (PIT caf62911..)",
+     "ASSERTED", "sealed", "audits/forecasts/D_KILL_CRITERION_2026-08-20.md::2027-02-28"),
 
     ("C-SHADOW-SELECTOR",
-     "The shadow trial's arm-selection code exists, so 'identical sealed rules' is "
-     "executable rather than prose",
-     "SHADOW_TRIAL_PREREG §3; ERRATUM 01 E8",
-     "OPEN", "none", ""),
+     "The shadow trial's arm-selection code exists and enforces cross-arm exclusivity, a "
+     "deterministic null draw, and the calibrating stamp",
+     "transfer/shadow_enroll.py; SHADOW_TRIAL_PREREG §3",
+     "ASSERTED", "test", "test_shadow_enroll.py::t1"),
+
+    ("C-NULL-DETERMINISM",
+     "The null_random draw is reproducible from the sealed prereg hash + cycle date — a "
+     "null a human can re-roll is not a null",
+     "shadow_enroll._cycle_seed",
+     "ASSERTED", "test", "test_shadow_enroll.py::t2"),
 ]
 
 # L1 — constants that MUST be literals (module, name)
@@ -203,6 +209,17 @@ def _enforcer_live(kind: str, ref: str):
     if kind == "hookgate":
         hook = _read(os.path.join(ROOT, ".githooks", "commit-msg"))
         return (ref in hook, "" if ref in hook else "gate text absent from commit-msg")
+    if kind == "sealed":
+        path, _, marker = ref.partition("::")
+        full = os.path.join(ROOT, path)
+        if not os.path.exists(full):
+            return False, f"sealed doc missing: {path}"
+        body = _read(full)
+        if "PIT SEAL" not in body:
+            return False, f"{path} carries no PIT seal block"
+        if marker and marker not in body:
+            return False, f"{path} does not contain {marker!r}"
+        return True, ""
     if kind == "lint":
         return (ref in ("L1", "L2", "L3"), "" if ref in ("L1", "L2", "L3")
                 else f"unknown lint id {ref}")
@@ -316,9 +333,9 @@ def lint_L3_stored_never_served() -> None:
         if hit:
             print(f"  OK    {field} appears on a surface ({os.path.basename(hit)})")
         else:
-            _note.append(f"L3: {field} ({desc}) is stored but reaches NO surface "
-                         f"— registered OPEN as C-DMEASURED-SERVED")
-            print(f"  OPEN  {field} stored but on no surface (claim C-DMEASURED-SERVED)")
+            _fail.append(f"L3: {field} ({desc}) is stored but reaches NO surface — "
+                         f"disclosed to a database column is not disclosed")
+            print(f"  FAIL  {field} stored but on no surface")
 
 
 def main() -> int:

@@ -131,7 +131,14 @@ function deriveDivergence(components: any, gap: number) {
   const rows: { label: string; value: string; favors: 'DET' | 'CONF'; note: string }[] = []
   const d = components?.D_dark_matter, m = components?.M_platform_diversity
   if (d?.score != null) rows.push({ label: 'UNDER-THE-RADAR (D)', value: `${Math.round(d.score)}/100`, favors: 'DET', note: 'hidden early activity → lifts Detection' })
-  if (d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
+  // HONEST ABSENCE FOR D (board 2026-08-20, claim C-DMEASURED-SERVED). d_measured===false
+  // means the topic carried no author-bearing and no engagement-bearing signals, so D
+  // could not be read at all. Rendering "0%" with a note saying it means something is the
+  // §16a stage-2 defect (a floor value wearing a measured badge) and the §17 defect
+  // (a non-contributing input rendered as a value). Say UNMEASURED instead of implying a
+  // reading — and never fall back to 0.
+  if (d?.d_measured === false) rows.push({ label: 'FIRST-TIMER RATIO', value: 'UNMEASURED', favors: 'DET', note: 'no author-bearing signals for this topic — D could not be read (not "read quiet")' })
+  else if (d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
   if (d?.asymmetry_detected != null) rows.push({ label: 'ENGAGEMENT ASYMMETRY', value: d.asymmetry_detected ? 'Detected' : 'Normal', favors: 'DET', note: 'deep discussion vs surface votes → lifts Detection' })
   const pc = Array.isArray(m?.platforms) ? m.platforms.length : null
   if (pc != null) rows.push({ label: 'PLATFORM SPREAD', value: `${pc} platform${pc === 1 ? '' : 's'}`, favors: 'CONF', note: 'broad cross-platform presence → lifts Confidence' })
@@ -214,7 +221,9 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   ])
   const ntgD = r.nowtrending_gradient_detection, ntgC = r.nowtrending_gradient_confidence
   const dm = Math.round(r.dark_matter_score ?? d?.components?.D_dark_matter?.score ?? 0)
-  const ftPct = r.first_timer_ratio != null ? Math.round(r.first_timer_ratio * 100) : null
+  // d_measured===0 → the ratio is not a reading; suppress rather than show a 0 (C-DMEASURED-SERVED)
+  const dUnmeasured = r.d_measured != null && Number(r.d_measured) === 0
+  const ftPct = (!dUnmeasured && r.first_timer_ratio != null) ? Math.round(r.first_timer_ratio * 100) : null
   const asym = r.engagement_asymmetry != null ? Boolean(Number(r.engagement_asymmetry)) : null
   const variations: any[] = Array.isArray(r.variations) ? r.variations : []
   // F1 R-D: "already arrived" mainstream disclosure — present ONLY for Tier-4 umbrella

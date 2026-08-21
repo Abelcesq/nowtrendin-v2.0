@@ -121,6 +121,11 @@ export interface Signal {
   // Dark Matter signatures (inferred private-conversation indicators)
   darkMatter?: number;          // D component 0–100
   firstTimerRatio?: number;     // 0–1 — share of first-time participants
+  // HONEST ABSENCE (board 2026-08-20, C-DMEASURED-SERVED): undefined = unknown
+  // (pre-epoch row), true = D was readable, false = the topic carried NO
+  // author-bearing and NO engagement-bearing signals, so a D of 0 means COULD
+  // NOT READ, never 'read quiet'. Never coerce firstTimerRatio to 0 when false.
+  dMeasured?: boolean;
   engagementAsymmetry?: boolean; // comments exceed normal upvote ratio
   // Maturity classification (calibration lifecycle)
   maturityClass?: string;       // NEW | EMERGING | ESTABLISHED | RESURGENT | MONITORING
