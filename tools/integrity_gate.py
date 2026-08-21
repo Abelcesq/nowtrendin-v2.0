@@ -183,6 +183,12 @@ SEALED_CONSTANTS = [
     ("transfer/shadow_ledger.py", "SEALED_FEED_SETS"),
     ("transfer/gravitational_anomaly_detector.py", "REFEREE_FLOOR_PCT"),
     ("transfer/gravitational_anomaly_detector.py", "REFEREE_FLOOR_MIN_N"),
+    # Round 5: the retention floor protecting the POST-flip arm of AB-ATTRIBUTION. It
+    # lived only in a Heroku config var — no file, no seal, no commit — so a config
+    # rollback, a fresh dyno with stale config, or a pipeline promote would silently
+    # restore 7-day retention and destroy the half of the comparison that the
+    # 2026-08-21 snapshot does not cover.
+    ("transfer/gravitational_anomaly_detector.py", "SIGNAL_RETENTION_FLOOR_DAYS"),
 ]
 
 # L3 — (field, human description). Must appear on at least one surface.
@@ -302,7 +308,7 @@ def _enforcer_live(kind: str, ref: str):
                            "on edit is a timestamp, not a commitment.")
         return True, ""
     if kind == "lint":
-        return (ref in ("L1", "L2", "L3"), "" if ref in ("L1", "L2", "L3")
+        return (ref in ("L1", "L2", "L3", "L4"), "" if ref in ("L1", "L2", "L3", "L4")
                 else f"unknown lint id {ref}")
     return False, f"unknown enforcer kind {kind}"
 
@@ -388,6 +394,59 @@ def lint_L2_phantom_fixture() -> None:
           if not any(f.startswith("L2:") for f in _fail) else "")
 
 
+def lint_L4_phantom_mutation() -> None:
+    """A negative control must PROVE it perturbed the system before concluding anything.
+
+    THE DEFECT THIS EXISTS FOR — committed by the author of the fix it was guarding,
+    2026-08-21. A test written to prove the sealed-document enforcer catches tampering
+    mutated b"is DEMOTED" and b"0.50". Neither string is in the document (it reads "is
+    demoted", lowercase), so bytes.replace() matched NOTHING, the file was never written,
+    the enforcer correctly verified an untouched file, and the test reported ENFORCER
+    BROKEN twice. It was one message away from being escalated to the Chairman as a live
+    defect in a seal that was in fact intact.
+
+    This is L2's phantom-fixture shape wearing a negative control's clothes. L2 catches a
+    test that does not EXIST; L4 catches a test that exists, runs, passes, and TESTS
+    NOTHING. A mutation test that cannot show it changed its input is not evidence about
+    the enforcer — it is evidence about string literals.
+
+    RULE: a test that mutates bytes and feeds them to a gate must compare the mutated
+    value against the original before drawing a conclusion.
+    """
+    print("\nLAYER 3 - L4 mutation tests prove they mutated")
+    print("-" * 72)
+    checked = 0
+    for fname in sorted(os.listdir(TRANSFER)):
+        if not (fname.startswith("test_") and fname.endswith(".py")):
+            continue
+        try:
+            body = _read(os.path.join(TRANSFER, fname))
+        except Exception:
+            continue
+        writes_back = ('open(path, "wb")' in body or "open(path, 'wb')" in body
+                       or 'open(p, "wb")' in body)
+        if not (".replace(" in body and writes_back):
+            continue
+        checked += 1
+        guarded = any(tok in body for tok in (
+            "== orig", "!= orig", "== _orig", "!= _orig",
+            "mutation is real", "mutation matched", "bytes_changed"))
+        if guarded:
+            print(f"  OK    {fname} guards its mutations")
+        else:
+            _fail.append(
+                f"L4: {fname} mutates a file and feeds it to a gate but never asserts the "
+                "mutation CHANGED anything. A replace() matching nothing yields a green "
+                "gate on an unmodified file, which is indistinguishable from a passing "
+                "test AND from a broken enforcer.")
+            print(f"  FAIL  {fname} - unguarded mutation (phantom-control risk)")
+    if checked == 0:
+        # 0-of-0 must never read as healthy; that is this file's own founding lesson.
+        print("  NOTE  no mutation-style tests found to check")
+    else:
+        print(f"  {checked} mutation-style test file(s) checked")
+
+
 def lint_L3_stored_never_served() -> None:
     """A field described as served/disclosed must appear on a surface. Disclosed to a
     database column is not disclosed. NOTE: registered OPEN today — the board found this
@@ -431,6 +490,7 @@ def main() -> int:
     lint_L1_sealed_constants()
     lint_L2_phantom_fixture()
     lint_L3_stored_never_served()
+    lint_L4_phantom_mutation()
     print("\n" + "=" * 72)
     if _note:
         print("RECORDED (non-blocking, OPEN claims):")

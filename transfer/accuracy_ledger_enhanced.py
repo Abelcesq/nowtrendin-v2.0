@@ -132,7 +132,13 @@ def init_pending_db(db_path: str = DB_PATH):
     for _col, _typ in (("enroll_arm", "TEXT"), ("breadth_at_enroll", "INTEGER"),
                        ("sealed_query", "TEXT"), ("sealed_wiki_article", "TEXT"),
                        ("d_at_enroll", "REAL"), ("d_early_at_enroll", "REAL"),
-                       ("sealed_query_ambiguous", "INTEGER")):
+                       ("sealed_query_ambiguous", "INTEGER"),
+                       # round 5: the flag that makes d_at_enroll triageable, and an
+                       # IMMUTABLE enrollment stamp. last_checked is overwritten by
+                       # every sweep, so it cannot serve as the entry time a
+                       # left-truncated (delayed-entry) estimator requires.
+                       ("d_measured_at_enroll", "INTEGER"),
+                       ("enrolled_at", "TEXT")):
         try:
             conn.execute(f"ALTER TABLE pending_detections ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -144,7 +150,8 @@ def init_pending_db(db_path: str = DB_PATH):
     # accuracy_ledger carries the stamps through resolution (rollback-guarded ALTERs):
     # referee_sealed = 1 the referee used the SEALED article, 0 = hindsight opensearch
     # fallback (Forecaster defect #1 — such checks are second-class, marked forever).
-    for _col, _typ in (("d_at_enroll", "REAL"), ("referee_sealed", "INTEGER")):
+    for _col, _typ in (("d_at_enroll", "REAL"), ("referee_sealed", "INTEGER"),
+                       ("d_measured_at_enroll", "INTEGER"), ("enrolled_at", "TEXT")):
         try:
             conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -359,18 +366,52 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
     # d_at_enroll (step-0 prerequisite #0) + d_early_at_enroll (Lever A DARK PHASE —
     # logged, feeds NOTHING): the topic's dark_matter score and its expert-tier
     # provenance evidence at the moment of enrollment. Fail-open NULL, never guessed.
+    # d_measured_at_enroll ADDED 2026-08-21 (board round 5, named independently by the
+    # Statistician, Economist, Executioner and Forecaster). The stamp read the MAGNITUDE
+    # and not the measurement flag, while `velocity_scores.d_measured` sat in the SAME
+    # TABLE and was simply not selected. compute_dark_matter returns 0.0 on the unmeasured
+    # path, so a fabricated zero and a genuinely-quiet zero were being written into
+    # d_at_enroll INDISTINGUISHABLY — and live `unmeasured_fraction` is 0.752, i.e. about
+    # three quarters of stamped rows. Any AUC over that column partly measures "did the
+    # author-resolution path fire", a property of the collector roster, not of D.
+    #
+    # This is forward-only and cannot be recovered later: every row stamped between
+    # 2026-08-17 and today carries a magnitude with no way to triage it, permanently.
+    # That is why it is fixed now rather than sequenced behind anything else.
+    #
+    # NULL, never 0, when unknown — a zero here would recreate the exact defect. Rows
+    # enrolled before velocity_scores.d_measured existed read NULL and must be reported
+    # as their own third stratum, never pooled with measured-zero.
     d_at_enroll = None
+    d_measured_at_enroll = None
     d_early = None
     try:
         _vrow = conn.execute(
-            "SELECT dark_matter_score FROM velocity_scores WHERE topic_key = ? "
+            "SELECT dark_matter_score, d_measured FROM velocity_scores WHERE topic_key = ? "
             "ORDER BY scored_at DESC LIMIT 1", (topic_key,)).fetchone()
         if _vrow is not None:
-            _v = dict(_vrow) if hasattr(_vrow, "keys") else {"dark_matter_score": _vrow[0]}
+            if hasattr(_vrow, "keys"):
+                _v = dict(_vrow)
+            else:
+                _v = {"dark_matter_score": _vrow[0], "d_measured": _vrow[1]}
             if _v.get("dark_matter_score") is not None:
                 d_at_enroll = round(float(_v["dark_matter_score"]), 2)
+            if _v.get("d_measured") is not None:
+                d_measured_at_enroll = 1 if int(_v["d_measured"]) else 0
     except Exception:
-        pass
+        # Older rows predate the d_measured column; SELECT fails wholesale. Retry for the
+        # magnitude alone so this fix cannot regress d_at_enroll coverage.
+        try:
+            _vrow = conn.execute(
+                "SELECT dark_matter_score FROM velocity_scores WHERE topic_key = ? "
+                "ORDER BY scored_at DESC LIMIT 1", (topic_key,)).fetchone()
+            if _vrow is not None:
+                _v = (dict(_vrow) if hasattr(_vrow, "keys")
+                      else {"dark_matter_score": _vrow[0]})
+                if _v.get("dark_matter_score") is not None:
+                    d_at_enroll = round(float(_v["dark_matter_score"]), 2)
+        except Exception:
+            pass
     try:
         # Venue-class provenance at enrollment: share of the topic's signals carried
         # on expert/niche-tier platforms. Recorded provenance, not inferred intent;
@@ -393,12 +434,12 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
                     (id, topic_key, topic_display, detection_date, detection_score,
                      timeout_date, last_checked, status, enroll_arm, breadth_at_enroll,
                      sealed_query, sealed_wiki_article, d_at_enroll, d_early_at_enroll,
-                     sealed_query_ambiguous)
-                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)
+                     sealed_query_ambiguous, d_measured_at_enroll, enrolled_at)
+                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)
             """, (rec_id, topic_key, topic_display, detection_date,
                   detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll,
                   sealed_query, sealed_article, d_at_enroll, d_early,
-                  sealed_ambiguous))
+                  sealed_ambiguous, d_measured_at_enroll, now))
             conn.commit()
     except Exception as e:
         print(f"[ledger] record_detection error: {e}")
@@ -437,13 +478,18 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
     _arm = p.get("enroll_arm") if hasattr(p, "get") else None
     _brd = p.get("breadth_at_enroll") if hasattr(p, "get") else None
     _dae = p.get("d_at_enroll") if hasattr(p, "get") else None
+    # round 5: carry the measurement flag and the immutable entry time through
+    # resolution, or the ledger row cannot be triaged or left-truncated later.
+    _dme = p.get("d_measured_at_enroll") if hasattr(p, "get") else None
+    _ea = p.get("enrolled_at") if hasattr(p, "get") else None
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
              breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
              sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken,
-             enroll_arm, breadth_at_enroll, d_at_enroll, referee_sealed)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             enroll_arm, breadth_at_enroll, d_at_enroll, referee_sealed,
+             d_measured_at_enroll, enrolled_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
@@ -452,11 +498,13 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
             referee_corroborated=EXCLUDED.referee_corroborated,
             at_detection_days=EXCLUDED.at_detection_days, pre_broken=EXCLUDED.pre_broken,
             enroll_arm=EXCLUDED.enroll_arm, breadth_at_enroll=EXCLUDED.breadth_at_enroll,
-            d_at_enroll=EXCLUDED.d_at_enroll, referee_sealed=EXCLUDED.referee_sealed
+            d_at_enroll=EXCLUDED.d_at_enroll, referee_sealed=EXCLUDED.referee_sealed,
+            d_measured_at_enroll=EXCLUDED.d_measured_at_enroll,
+            enrolled_at=EXCLUDED.enrolled_at
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
           p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
           sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken,
-          _arm, _brd, _dae, referee_sealed))
+          _arm, _brd, _dae, referee_sealed, _dme, _ea))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:

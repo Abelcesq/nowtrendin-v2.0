@@ -11434,11 +11434,35 @@ def api_usage_report():
 # Scoring reads only the last 72h of signals, so anything older is dead weight
 # except author_history (first-timer memory — separate table, untouched).
 
+# SEALED CONSTANT (board round 5, 2026-08-21). A literal, never os.getenv — the env
+# var may raise retention above this floor but can never lower it below. Protects
+# the POST-flip arm of the AB-ATTRIBUTION comparison, which no snapshot covers.
+# Lowering this is a commit + a board note, by construction. Guarded by L1.
+SIGNAL_RETENTION_FLOOR_DAYS = 30
+
+
 def _prune_signal_tables(days: int = None) -> dict:
     """DELETE raw_signals/topic_signals older than `days` (floor 4 to protect
     the 72h scoring window) and topic_queries older than 45d (N uses 30d).
     Returns per-table deleted row counts."""
-    days = max(4, int(days or os.getenv("SIGNAL_RETENTION_DAYS", "7")))
+    # SIGNAL_RETENTION_FLOOR_DAYS is a SEALED CONSTANT (board round 5, 2026-08-21).
+    #
+    # WHY. The AB-ATTRIBUTION comparison needs BOTH arms: the pre-flip cohort (frozen to
+    # disk on 2026-08-21, sha256'd, deadline beaten) and the POST-flip cohort, which is
+    # still accruing in these tables. The 7 -> 30 raise that protects the post-flip arm
+    # was made as a HEROKU CONFIG VAR — in no file, in no seal, in no commit. The
+    # Executioner found it: a config rollback, a fresh dyno with stale config, or a
+    # pipeline promote silently restores 7 days and DESTROYS the half of the comparison
+    # that no snapshot covers. That is a live clock defended by one unversioned env var.
+    #
+    # The floor is now a literal that L1 guards. The env var may still RAISE retention
+    # (operationally useful, and safe — more history never destroys a comparison), but it
+    # can no longer LOWER it below the sealed floor. Reducing the floor requires editing
+    # this literal, which is a commit, a diff, and a board note — exactly the friction a
+    # destructive-and-irreversible change should carry.
+    _env = os.getenv("SIGNAL_RETENTION_DAYS", "")
+    _want = int(_env) if str(_env).strip().isdigit() else SIGNAL_RETENTION_FLOOR_DAYS
+    days = max(4, SIGNAL_RETENTION_FLOOR_DAYS, int(days or _want))
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     q_cutoff = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
     out = {"retention_days": days}
