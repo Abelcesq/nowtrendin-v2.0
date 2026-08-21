@@ -127,6 +127,46 @@ EOF
     exit 1
   fi
 fi
+# ── SERVE-PAYLOAD GATE (board 2026-08-20 late — the pattern's next costume) ───────
+# FOUND BY EXPERIMENT, not by review. C-DMEASURED-SERVED claims "d_measured is
+# SURFACED to users". Its enforcer is L3, a SOURCE lint. Both were green while
+# production served, for hours, a stored serve_payload written between the commit that
+# added d_measured and the commit that added the plain_english guard — so the live
+# payload said d_measured=false and, in the same object, "No dark matter signatures.
+# Signal appears to originate publicly." The claim was about PRODUCTION STATE; the
+# enforcement was about SOURCE TEXT. A static lint cannot see a stale blob, so the
+# register's own strongest layer had the very defect it was built to kill.
+#
+# A hook cannot verify production either. What it CAN do is refuse to let a
+# payload-shape change ship while its author is unaware the rebuild is a separate act:
+# deploying is necessary and NOT sufficient (POST /precompute, then re-probe a row).
+# Trigger = the hunk-header function context, which git supplies for free.
+if git diff --cached -U0 -- transfer/gravitational_anomaly_detector.py 2>/dev/null \
+   | grep -q '^@@.*\(get_topic_detail\|_precompute_serve_payloads\|_serve_payload\)'; then
+  case "$msg" in
+    *"[payload-rebuilt]"*) : ;;
+    *)
+      cat >&2 <<'EOF'
+
+  SERVE-PAYLOAD GATE  (GOTCHA G1 / INV-1)
+  ----------------------------------------------------------------------
+  This commit changes a serve-payload builder. Rows older than
+  SERVE_LIVECAL_MAX_AGE_H serve the STORED blob verbatim, so the change is
+  INVISIBLE in production until the payload is rebuilt — and a half-old blob
+  can carry new fields beside old prose, which reads as a contradiction in a
+  single object rather than as a stale cache.
+
+  After deploying:
+      POST /precompute?top_n=800   (x-internal-key header)
+      then re-probe a row that exercises the changed branch
+
+  Then add to the message:
+      [payload-rebuilt]
+  ----------------------------------------------------------------------
+EOF
+      exit 1 ;;
+  esac
+fi
 # ── TEST GATE (board 2026-08-20 evening — the Guardian's pattern, root instance) ──
 # The repo held SEVEN test files and NOTHING that ran them: no CI, no hook, no make
 # target. Every "behavior-tested" / "fixture-verified" / "36/36 green" in a commit message

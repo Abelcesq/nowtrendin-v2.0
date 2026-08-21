@@ -112,11 +112,37 @@ CLAIMS = [
      "ASSERTED", "lint", "L2"),
 
     # ── CLOSED 2026-08-20 (evening+): all three were OPEN for one working session. ──
+    # SCOPE NARROWED 2026-08-20 (late), and the narrowing is the finding. This row read
+    # "d_measured is SURFACED to users" and was enforced by L3 — a SOURCE lint. Both were
+    # green while production served, for hours, a stored serve_payload written between the
+    # commit that added d_measured and the commit that added the plain_english guard: the
+    # live object said d_measured=false AND "No dark matter signatures. Signal appears to
+    # originate publicly." A claim about PRODUCTION STATE enforced by a check on SOURCE
+    # TEXT is the board's pattern inside the register built to end it. A lint cannot see a
+    # stale blob, so the claim now says only what the lint proves, and the production half
+    # is a separate claim with its own enforcer (C-PAYLOAD-REBUILD).
     ("C-DMEASURED-SERVED",
-     "d_measured is SURFACED to users — the UNMEASURED state is visible, and no surface "
-     "renders firstTimerRatio ?? 0 on topics we could not measure",
-     "engine D_dark_matter payload; Screener.tsx; DarkMatterPanel.tsx",
+     "the d_measured UNMEASURED state is WIRED to every surface in source — no surface "
+     "renders firstTimerRatio ?? 0 on topics we could not measure. Scope: source wiring "
+     "only; this enforcer cannot and does not attest to what production is serving",
+     "engine D_dark_matter payload; Screener.tsx; DarkMatterPanel.tsx. Production "
+     "verified once, 2026-08-20, engine v370 after a /precompute rebuild, on the blind "
+     "row 'хапоэль_беэршева_сабах': d_measured=false, first_timer_ratio=null, "
+     "plain_english=UNMEASURED. A dated observation, not a standing guarantee.",
      "ASSERTED", "lint", "L3"),
+
+    # The production half of the claim above. It cannot be verified by a hook either —
+    # what a hook CAN do is refuse to let a payload-shape change land while its author
+    # believes deploying was sufficient. INV-1 serves stored blobs verbatim past
+    # SERVE_LIVECAL_MAX_AGE_H, so a shipped payload change is invisible until rebuilt,
+    # and a half-old blob carries new fields beside old prose — a contradiction inside a
+    # single served object, which reads to a buyer as fabrication rather than as cache.
+    ("C-PAYLOAD-REBUILD",
+     "a change to a serve-payload builder cannot land claiming to be live: the commit is "
+     "refused unless it asserts [payload-rebuilt], i.e. /precompute was POSTed after the "
+     "deploy and a row exercising the changed branch was re-probed",
+     ".githooks/commit-msg SERVE-PAYLOAD GATE; endpoint POST /precompute",
+     "ASSERTED", "hookgate", "SERVE-PAYLOAD GATE"),
 
     ("C-KILL-CRITERION",
      "D has a pre-committed kill-or-pivot criterion — a stated result, threshold and date "
