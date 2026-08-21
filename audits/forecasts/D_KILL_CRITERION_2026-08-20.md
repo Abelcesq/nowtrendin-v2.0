@@ -75,3 +75,33 @@ construction — that is the whole point of sealing it now.
 this block). Cites prereg `e90af6df..` and erratum `6f9ed05f..`. Sealed **before the trial
 window opens and before any result is knowable**. Enforced by claim `C-KILL-CRITERION` in
 `tools/integrity_gate.py`.
+
+
+---
+**EXTRACTION RECIPE (added 2026-08-21, BELOW the sealed boundary — this block is not
+part of the hashed body and does not alter it).** Recorded because board round 5 proved
+the seal was verifiable in principle and unverifiable in practice: two competent seats
+disagreed on whether it reproduced at all. One had it; the other ran 36 decode/encode/
+whitespace recipes and failed, because none tried CRLF->LF normalization — which on a
+Windows checkout is the entire difference. A seal a third party cannot reproduce is,
+to that third party, indistinguishable from a broken one. Per the F5-a1 standard:
+
+    file      : audits/forecasts/D_KILL_CRITERION_2026-08-20.md
+    read      : bytes
+    normalize : b'
+' -> b'
+'   (canonical LF; the repo checks out CRLF on Windows)
+    boundary  : everything up to and INCLUDING the newline that precedes the line
+                '---' which opens the '**PIT SEAL:**' block
+                i.e. raw[: raw.find(b'
+---
+**PIT SEAL:**') + 1]
+    length    : 4100 bytes == 4065 characters (they differ because the em-dashes are
+                3 bytes each in UTF-8 — this is what made two seats' numbers look
+                incompatible when both were right)
+    digest    : sha256 -> 403b6a7e86fb20794c8637ecdcc25d57c97be3fcc1a94f45d78407ebf6f4c448
+
+Verified 2026-08-21 by exhaustive brute force over EVERY prefix length in three
+line-ending variants. `tools/integrity_gate.py` now recomputes this on every run and
+refuses the build if the body no longer matches. Do NOT re-seal to make a failure pass:
+a seal silently refreshed on edit is a timestamp, not a commitment.

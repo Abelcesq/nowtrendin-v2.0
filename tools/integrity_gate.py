@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import io
 import os
 import re
@@ -144,6 +145,17 @@ CLAIMS = [
      ".githooks/commit-msg SERVE-PAYLOAD GATE; endpoint POST /precompute",
      "ASSERTED", "hookgate", "SERVE-PAYLOAD GATE"),
 
+    # Added board round 5. The `sealed` enforcer used to be a substring test; the
+    # Forecaster mutated every binding number in the kill criterion and it stayed GREEN.
+    # It now recomputes the published text_sha256 over a recorded byte-exact boundary.
+    ("C-SEAL-RECOMPUTED",
+     "a sealed document's enforcer RECOMPUTES its published text_sha256 over a recorded "
+     "byte-exact extraction recipe — editing any binding term turns the gate RED, and "
+     "appending errata below the seal boundary does not",
+     "tools/integrity_gate.py _enforcer_live(kind='sealed'); the recipe block appended "
+     "to D_KILL_CRITERION_2026-08-20.md on 2026-08-21",
+     "ASSERTED", "test", "test_seal_enforcer.py::t3"),
+
     ("C-KILL-CRITERION",
      "D has a pre-committed kill-or-pivot criterion — a stated result, threshold and date "
      "that demote it from a scored component, sealed before any result was knowable",
@@ -236,6 +248,27 @@ def _enforcer_live(kind: str, ref: str):
         hook = _read(os.path.join(ROOT, ".githooks", "commit-msg"))
         return (ref in hook, "" if ref in hook else "gate text absent from commit-msg")
     if kind == "sealed":
+        # RECOMPUTES THE HASH (board round 5, 2026-08-21). It did not before, and the
+        # Forecaster produced the receipt: he mutated EVERY binding number in
+        # D_KILL_CRITERION — N>=20 -> N>=120, >=10 points -> >=40, >=3 days -> >=30, i.e.
+        # the exact Part A substitution — and this branch returned GREEN. Only deleting
+        # the literal marker string turned it red. One token of a four-parameter
+        # criterion was enforced, so a superseding criterion could have been installed
+        # INSIDE the sealed document and nothing would have noticed.
+        #
+        # THE EXTRACTION RECIPE IS NOW PART OF THE CHECK, not folklore. The same round
+        # produced a second receipt for why: two seats disagreed on whether the seal was
+        # even reproducible. The Economist reproduced it (round 4); the Forecaster could
+        # not, across 36 decode/encode/whitespace recipes. Both were competent; the
+        # Forecaster's recipes simply never tried CRLF->LF normalization, which on a
+        # Windows checkout is the whole difference. Resolved 2026-08-21 by exhaustive
+        # brute force over every prefix length: the seal IS intact, at 4100 bytes of the
+        # LF-normalized body (== 4065 CHARACTERS — the em-dashes are 3 bytes each, which
+        # is what made the two seats' numbers look incompatible).
+        #
+        # The lesson is not "the seal was fine." It is that a seal whose extraction
+        # recipe is unrecorded is verifiable in principle and unverifiable in practice —
+        # which is indistinguishable, to a third party, from a broken seal.
         path, _, marker = ref.partition("::")
         full = os.path.join(ROOT, path)
         if not os.path.exists(full):
@@ -245,6 +278,28 @@ def _enforcer_live(kind: str, ref: str):
             return False, f"{path} carries no PIT seal block"
         if marker and marker not in body:
             return False, f"{path} does not contain {marker!r}"
+
+        raw = open(full, "rb").read().replace(b"\r\n", b"\n")   # canonical: LF
+        m = re.search(rb"text_sha256\s*`?([0-9a-f]{64})`?", raw)
+        if not m:
+            return False, (f"{path} publishes no text_sha256 — a seal that states no "
+                           "hash cannot be verified by anyone, including us")
+        claimed = m.group(1).decode()
+
+        # The sealed body is everything ABOVE the '---' that opens the PIT SEAL block.
+        cut = raw.find(b"\n---\n**PIT SEAL:**")
+        if cut < 0:
+            return False, (f"{path} has no '---' + '**PIT SEAL:**' boundary; the "
+                           "extraction recipe cannot be applied (F5-a1 requires the "
+                           "byte-exact boundary be recorded, not inferred)")
+        actual = hashlib.sha256(raw[:cut + 1]).hexdigest()
+        if actual != claimed:
+            return False, (f"{path} SEAL BROKEN — the sealed body no longer hashes to "
+                           f"its published text_sha256 (claims {claimed[:16]}.., "
+                           f"computes {actual[:16]}..). Either the document was edited "
+                           "after sealing, or the recorded boundary is wrong. Do NOT "
+                           "re-seal to make this pass: a seal that is silently refreshed "
+                           "on edit is a timestamp, not a commitment.")
         return True, ""
     if kind == "lint":
         return (ref in ("L1", "L2", "L3"), "" if ref in ("L1", "L2", "L3")
