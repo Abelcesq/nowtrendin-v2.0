@@ -607,7 +607,59 @@ walk becomes furniture.
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-07-11 — **Catch-all warm/cold refresh: writer-guard + warm-on-boot snapshot (Board-ruled).**
+*Last updated: 2026-08-21 — **Board round 4: root cause FALSIFIED by three seats; six live defects; ten Chairman rulings.**
+RESUME AUTHORITY: `audits/board/CHAIRMAN_RULINGS_2026-08-20D.md` (A = ten ruled items, B = 18 unallocated board
+items). Collation: `audits/board/BOARD_round4_2026-08-20D.md`. **DONE:** 1a cohort snapshot (`e4215d4`),
+1b `SIGNAL_RETENTION_DAYS` 7→30, 8 accuracy-figures reversal (`81a6e79`). **OPEN:** 1c/1d, 2c, 3b+3c, 4c, 5, 6, 7,
+9, 10 + all of Section B. **NEXT: 4c.**
+**(1) THE ROOT CAUSE I REPORTED WAS WRONG — do not re-assert it.** A served contradiction (`d_measured:false`
+beside "Signal appears to originate publicly") was NOT INV-1/stale `serve_payload`. `get_topic_detail` does
+`s = json.loads(_payload)` at `:11680`, so ALL FOUR D fields come from ONE dict — a stale blob makes them
+*consistently* stale, never contradictory; `plain_english` was never stored at all; and the field entered the
+payload only ~11h before the guard, so the 48h rule could not apply. **Real class: a DEPLOY-VERSION WINDOW.**
+`/precompute` neither caused nor cured it and `[payload-rebuilt]` would not have prevented it. This was a **§10a
+violation** (hypothesis shipped as diagnosis) and the wrong narrative is STILL in comments in
+`.githooks/commit-msg` + `tools/integrity_gate.py`. ⚠ The exact sub-mechanism at probe time (dyno-fleet split vs
+`≤120s CACHE_TTL_DETAIL`) is **still not traced to a line — assert neither.**
+**NEW HARD RULE (atomic field-and-prose):** a payload key and every sentence interpreting it ship in ONE commit,
+or the key ships behind a flag the prose reads. No intermediate deployed version may emit a contradictory pair.
+**(2) SIX LIVE DEFECTS, code-verified, NOT yet fixed.** (a) **`D_dark_matter.score` serves a fabricated `0`**
+beside UNMEASURED prose — `compute_dark_matter` returns `0.0` on the unmeasured path; **not display-only** (~13%
+of composite / 22% of detection); §15a-A3 floor-end IN THE SCORE. Its docstring says "count at the neutral value"
+— **0 is the FLOOR, not neutral, on 0–100.** `WhyScoresDiverge.tsx` has no guard at all. (b) **`d_measured IS
+NULL` stratum** — added with NO backfill; `None != 0` and `None == 0` both fall through, so every pre-08-20 row
+serves a numeric `first_timer_ratio` + "originates publicly." **Est. >90% of topics**; dormant rows stay NULL
+forever; `/precompute` cannot fix it (live-computed → code fix + backfill). (c) **§15a quorum is enforced
+ASYMMETRICALLY BY WRITING SYSTEM** — CJK has no spaces so `_title_sig` does exact-string not prefix matching;
+five CJK mastheads on one wire story read as five voices → `mainstream_confirmed`, where English correctly stays
+a Dark-Matter trigger. **FAILS OPEN in the largest non-Latin market** (score-affecting → backtest + board note).
+(d) `DarkMatterPanel.tsx:78-90` evaluates `ftr >= 0.35` BEFORE `dUnmeasured`. (e) editing **`_explain_d`** — the
+function that emitted the incident text — does NOT trigger the new gate. (f) the PIT seal is cryptographically
+INTACT but its enforcer never checks it (mutating the sealed prose kept the gate green); `pit_store.verify()`
+exists at `:373` and **nothing schedules it**.
+**(3) THE CLAIM REGISTER FAILED ITS OWN TEST.** A seat DELETED the whole enforcement block from `commit-msg` and
+the register still printed `OK` — green on a **comment**. `kind="lint"` is `ref in ("L1","L2","L3")`, a
+**constant-True tautology covering 3 of 15 rows**; the "15 of 15" headline **prints BEFORE the lints run** so it
+stays green on a run that exits 1. **Honest figure: 1 of 15 enforcers demonstrated to fail on a fixture.**
+NEVER publish "15/15 enforced" externally. **Corrected figures:** suite is **9 passed / 1 skipped**, not 10/10;
+verification ran at `top_n=800` while the scheduler rebuilds **600** (verified state ≠ steady state; the "dated
+observation" half-life is **≈8 hours**, not 30 days). **"Honest absence works end to end" is WITHDRAWN.**
+**(4) 1a — THE RETENTION CLOCK HAD ~1 DAY LEFT, NOT 7.** Snapshot: `topic_signals` 297,036 + `raw_signals` 45,625,
+window 08-14→08-19. Oldest row 08-14 prunes at 08-21; `DEFERRED_ITEMS` said 08-27. **Statistician's binding
+caveat (in the script docstring): five treatments at one switch point = design matrix RANK 1 — the snapshot buys
+OPTIONALITY ONLY and identifies exactly ONE treatment, conditionally.** ⚠ **The `.gz` files are on ONE LAPTOP**;
+manifest (with both SHA-256s) is in the founder's Drive. **Founder must drag-drop from `audits/ab-attribution/`
+— tooling cannot upload them.** NOT pushed to GitHub: repo is **PUBLIC** and **30% of `raw_signals` rows carry
+real author handles**, which cannot be redacted because D's first-timer ratio is computed from them.
+**(5) UNVERIFIED — do not act on it.** An outside review claimed the fabricated D zero invalidates our
+`D_KILL_CRITERION`. Ours judges race rates/lead times BETWEEN ARMS, not D magnitudes, and `shadow_enroll` enrolls
+on first-crossing, not a D threshold. **Verify before amending anything sealed.**
+**(6) STANDING LESSON.** *"Same dict literal" is a valid **ELIMINATOR**, an invalid **SELECTOR*** — it rules out
+partial code application within one process, not two processes on different code. And in four rounds **every
+defect was found by EXPERIMENT (running the gate, probing production), never by source review** — nine
+independent seats reading artifacts directly is currently the only control that demonstrably works (ruled item
+10: put it on a cadence).
+Prior: 2026-07-11 — **Catch-all warm/cold refresh: writer-guard + warm-on-boot snapshot (Board-ruled).**
 Two advisory-board reviews (audits/board/BOARD_catchall-eod_2026-07-10.md + BOARD_warm-cold-refresh_2026-07-10.md).
 **Root finding (code-inventoried):** the serve-time category `_category_for` reads two IN-MEMORY maps
 (`_SITUATION_CAT`/`_CONTEXT_CAT`) that reset EMPTY on every process restart and rebuild via a background daemon

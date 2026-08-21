@@ -3,7 +3,118 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-07-26 (money-movement program: R7 + dead insider source + runbook Steps 0-2 live)_
+_Last updated: 2026-08-21 (board round 4: root cause FALSIFIED, six live defects, ten Chairman rulings — 1a/1b/8 done, rest open)_
+
+---
+
+## Session 2026-08-20/21 — Board round 4. The board falsified my root cause; six defects found that the pack did not contain.
+
+### RESUME HERE
+Authority on what was ORDERED vs DONE: **`audits/board/CHAIRMAN_RULINGS_2026-08-20D.md`**
+(Section A = the ten ruled items; Section B = 18 board items with no home in those ten).
+Full nine-seat collation: `audits/board/BOARD_round4_2026-08-20D.md`.
+
+| Item | Ruling | Status |
+|---|---|---|
+| 1a snapshot pre-flip cohort | do | **DONE** `e4215d4` — *needs Drive drag-drop to truly close* |
+| 1b `SIGNAL_RETENTION_DAYS` 7→30 | do | **DONE** (engine config) |
+| 8 accuracy figures reversal | do | **DONE** `81a6e79` |
+| 1c/1d, 2c, 3b+3c, 4c, 5, 6, 7, 9, 10 | do all | **SPECIFIED, NOT BUILT** |
+| Section B (18 items) | — | recorded, not built |
+
+**Next item is 4c** (NULL tri-state serve fix). Deliberately not started: it changes what
+production returns for an est. >90% of topics, and starting it without room to finish and
+verify would reproduce the exact half-applied-change failure this round was about.
+
+### WHAT HAPPENED (the short version)
+I reported that a served contradiction — `d_measured: false` beside *"No dark matter
+signatures. Signal appears to originate publicly."* — was caused by INV-1 serving a stale
+`serve_payload`, and built a commit-msg gate around that diagnosis. **Three seats, blind to
+each other, falsified it**, and a fourth reached the same place from timestamps:
+
+- `get_topic_detail` sets `s = json.loads(_payload)` at `:11680` — **all four D fields come
+  from ONE dict**, so a stale blob makes them *consistently* stale, never contradictory.
+- `_explain_d` has one caller; `_precompute_serve_payloads` stores a flat `velocity_scores`
+  row with no `components` key — **`plain_english` was never in the blob.**
+- `d_measured` entered the payload 10:26, the guard at 21:22 → any blob carrying the field
+  was **≤11h old**. The 48h rule could not have applied. **The blob was fresh, not stale.**
+
+**Real class: a deploy-version window.** `/precompute` neither caused nor cured it, and
+`[payload-rebuilt]` would not have prevented it — the rebuild ran every cycle and propagated
+the half-state. That is a **§10a VERIFY-BEFORE-FIX violation**, and the wrong narrative is
+still enshrined in comments in `.githooks/commit-msg` and `tools/integrity_gate.py`
+(correcting it is ruled item 2c/6 work, not yet done).
+
+⚠ **The exact sub-mechanism at probe time (dyno fleet split vs `≤120s CACHE_TTL_DETAIL`) is
+STILL NOT TRACED TO A LINE. Do not assert either.**
+
+### SIX LIVE DEFECTS THE BOARD FOUND (all code-verified by seats; first two I verified myself)
+1. **`D_dark_matter.score` serves a fabricated `0`** beside UNMEASURED prose.
+   `compute_dark_matter` returns `0.0` on the unmeasured path. **Not display-only** — ~13% of
+   composite / 22% of detection. §15a-A3 floor-end, in the score. The docstring convicts
+   itself: *"the returned 0 means 'could not read'"* beside *"count at the neutral value"* —
+   **0 is the floor, not neutral, on 0–100.** `WhyScoresDiverge.tsx` has no guard at all.
+2. **The `d_measured IS NULL` stratum** — column added with **no backfill**; `None != 0` and
+   `None == 0` both fall through, so every pre-08-20 row serves a numeric `first_timer_ratio`
+   + *"originates publicly."* Est. **>90% of distinct topics**; dormant rows stay NULL forever.
+   My probe's `WHERE d_measured = 0` **excluded this stratum by construction** (SQL `NULL = 0`
+   is NULL) — the frame was exactly the population where the fix cannot fail.
+3. **§15a quorum enforced asymmetrically BY WRITING SYSTEM.** CJK has no spaces → `_title_sig`
+   does exact-string not prefix matching → five CJK mastheads on one wire story read as five
+   voices → `mainstream_confirmed`, where English correctly stays a Dark-Matter trigger.
+   **Fails OPEN in the largest non-Latin market.**
+4. `DarkMatterPanel.tsx:78-90` evaluates `ftr >= 0.35` **before** `dUnmeasured`.
+5. Editing **`_explain_d`** — the function that emitted the incident text — **does not trigger
+   the new gate.** Nor does `nowtrend_integration.py`.
+6. The PIT seal is **cryptographically intact** (Economist reproduced `403b6a7e..` from
+   `body[:4065]`) but the enforcer never checks it — he mutated `demote`→`PROMOTE` and the
+   gate stayed green. `pit_store.verify()` exists at `:373`; **nothing schedules it.**
+
+### THE REGISTER FAILED ITS OWN TEST
+The Forecaster **deleted the entire enforcement block** from `commit-msg` — the gate
+physically cannot fire — and the register still printed `OK C-PAYLOAD-REBUILD`, green on a
+**comment**. `kind="lint"` is `ref in ("L1","L2","L3")`, a **constant-True tautology covering
+3 of 15 rows**. The "15 of 15" headline **prints before the lints run**, so it stays green on
+a run that exits 1. Honest figure: **1 of 15 enforcers demonstrated to fail on a fixture.**
+
+### FIGURES PREVIOUSLY PUBLISHED THAT WERE WRONG (do not re-assert)
+- "10 files, 10 passed" → **9 passed, 1 skipped**; `test_etf_issuer_pages.py` runs in no gate.
+- Verified at `top_n=800`; the scheduler rebuilds **600** → verified state ≠ steady state.
+  The Forecaster puts the "dated observation" half-life at **≈8 hours**, not 30 days.
+- *"Honest absence now works end to end"* — **WITHDRAWN.** It works in four fields and fails
+  in the fifth, which is the one carrying weight into the score.
+
+### 1a — THE CLOCK WAS NEARLY OUT
+`topic_signals` 297,036 rows · `raw_signals` 45,625 · window 2026-08-14 → 08-19.
+`DEFERRED_ITEMS` said the deadline was 08-27. **Oldest surviving row was 08-14, which at
+7-day retention prunes 08-21 — about ONE DAY of margin, not seven.**
+Statistician's binding caveat, carried in the script docstring: five treatments at one switch
+point = **design matrix RANK 1**. The snapshot buys **optionality only**; it does NOT make
+five treatments identifiable. The recompute identifies exactly one (`D_PLUMBING_V2`), and
+only as `E[T5 | T1..T4 = ON]`.
+
+⚠ **OPEN RISK: the two 126MB→14MB `.gz` files are on ONE LAPTOP.** Manifest is in the founder's
+Drive folder (`AB-ATTRIBUTION_MANIFEST_2026-08-20.json`) with both SHA-256s and a
+`READ_THIS_FIRST` saying the preservation is incomplete without them. **Cannot be uploaded by
+tooling** (Drive MCP takes inline content only; ~19MB base64 is infeasible; no rclone/gdrive/
+gcloud on the box). **Founder must drag-drop from `audits/ab-attribution/`.** Not pushed to
+GitHub because the repo is **PUBLIC** and **30% of `raw_signals` rows carry real author
+handles** — and the author column cannot be redacted, since D's first-timer ratio is computed
+from it.
+
+### UNVERIFIED — DO NOT ACT ON WITHOUT CHECKING
+An outside review claimed the fabricated D zero invalidates our `D_KILL_CRITERION`. **Ours
+judges race rates and lead times BETWEEN ARMS, not D magnitudes**, and `shadow_enroll` enrolls
+on first-crossing, not a D threshold — so the contamination binds only if arm assignment or
+enrollment touches D. **Verify before amending anything sealed.**
+
+### THE STANDING LESSON
+*"Same dict literal" is a valid **ELIMINATOR** and an invalid **SELECTOR.*** It rules out
+partial code application within one process; it does not rule out two processes on different
+code. And in four rounds, **every defect was found by EXPERIMENT — running the gate, probing
+production — never by source review.** Nine independent seats reading artifacts directly is
+currently the only control in this system that demonstrably works (ruled item 10: put it on a
+schedule).
 
 ---
 
