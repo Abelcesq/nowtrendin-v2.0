@@ -63,6 +63,25 @@ SEALED_FEED_SETS = ("marca-es", "kicker-de", "nikkei-asia", "scmp-hk",
                     "stat-health", "deadline-ent", "scialert-sci",
                     "existing-roster")   # the control arm's own set
 
+# LOCALE CLEARANCE (board 2026-08-20 late — the Expansionist, verified). ERRATUM 01 E4/E5
+# declared it "binding" that non-English cohorts do not enroll until (a) the arbiter's
+# locale is declared per feed_set and (b) the acceptance harness carries labelled ES/DE
+# fixtures. NEITHER WAS ENFORCED ANYWHERE: `marca-es` and `kicker-de` sat in
+# SEALED_FEED_SETS, so a Marca topic passed every check and wrote a row. The board's own
+# pattern — a claim written in one register and enforced in a weaker one — reproduced
+# inside the document written to correct that pattern.
+# A feed set is SEALED (frozen into the trial) but only enrolls once it is LOCALE-CLEARED.
+# Moving a set into this tuple is a reviewable code change plus a prereg erratum, and
+# requires BOTH conditions actually met — not asserted.
+# Grounds for the current exclusions, recorded so the bar is not re-litigated by memory:
+#   · the Trends sweep posts no geo/hl, so a Spanish topic is judged on an undeclared
+#     default curve (google_trends_validation.py ~L193);
+#   · sports_entity anchors on capitalised runs — German capitalises every noun, so the
+#     extractor's core evidence signal does not exist there, while TWO precision waivers
+#     (from_entity_run + niche-tier corroboration exemption) run on top of it.
+LOCALE_CLEARED_FEED_SETS = ("nikkei-asia", "scmp-hk", "stat-health", "deadline-ent",
+                            "scialert-sci", "existing-roster")   # English-language
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -142,6 +161,12 @@ def enroll(*, arm: str, feed_set: str, domain: str, topic_key: str,
         raise ValueError(
             f"feed_set {feed_set!r} is not in the sealed set {SEALED_FEED_SETS} — "
             f"enrolling an unsealed feed defeats the variant log (prereg §6)")
+    if feed_set not in LOCALE_CLEARED_FEED_SETS:
+        raise ValueError(
+            f"feed_set {feed_set!r} is SEALED but not LOCALE-CLEARED — ERRATUM 01 "
+            f"E4/E5 bind it until the arbiter locale is declared per feed_set AND the "
+            f"acceptance harness carries labelled fixtures for its language. A null "
+            f"from an unrun harness is UNINTERPRETABLE, not 'no edge' (prereg §10).")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not (ENROLL_OPEN <= today <= ENROLL_CLOSE):
         return None   # outside the sealed window: a refusal, not an error

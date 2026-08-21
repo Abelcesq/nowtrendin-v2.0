@@ -55,6 +55,7 @@ CALIBRATING_DAYS = 14          # venue-age threshold; matches D_COMMUNITY_MIN_AG
 NULL_RANDOM_RATIO = 1.0        # draw size = this * the cycle's candidate count
 
 _D_TIERS = ("expert", "niche")
+ARMS_ALL = ("candidate", "control", "null_random", "null_volume")
 
 
 def _ph() -> str:
@@ -165,16 +166,36 @@ def enroll_cycle(*, feed_map: dict, control_sources: list,
             return {"topic_key": cand["topic_key"], "row": rid,
                     "calibrating": calibrating}
 
-        # ── candidate ────────────────────────────────────────────────────────────
-        cand_rows, cand_all = [], []
+        # ── PARTITION FIRST, THEN FILL (board 2026-08-20 late — FATAL defect found
+        # independently by the Statistician, Economist, Forecaster and Guardian, and
+        # reproduced by probe: candidate 30 / null_random 0 / null_volume 0).
+        # The first cut enrolled EVERY candidate before building the nulls, adding each
+        # topic to `taken` — so `pool = [c for c in cand_all if c not in taken]` was
+        # empty BY CONSTRUCTION. Cross-arm exclusivity, applied in enrollment order,
+        # annihilated the very nulls it was written to protect, and the trial's firing
+        # condition (beat BOTH nulls at N>=20) became unreachable rather than unlikely.
+        # Exclusivity is now a property of a PARTITION computed before any arm enrolls,
+        # never of the order in which arms are filled.
+        # ALLOCATION BIAS also fixed: drawing candidate first deterministically gave the
+        # arm-under-test every topic that overlapped the control roster — and overlap
+        # topics have broader supply, hence higher breakout probability.
+        cand_all = []
         for feed_set, sources in feed_map.items():
-            domain = _DOMAIN_OF.get(feed_set, "unknown")
-            found = _first_crossings(conn, sources, cutoff)
-            cand_all.extend(found)
-            for c in found:
-                r = _enroll("candidate", c, feed_set, domain)
-                if r:
-                    cand_rows.append(r)
+            for c in _first_crossings(conn, sources, cutoff):
+                c["_feed_set"] = feed_set
+                c["_domain"] = _DOMAIN_OF.get(feed_set, "unknown")
+                cand_all.append(c)
+        # Deterministic split of the SAME pool: seeded from the sealed prereg hash +
+        # cycle date, so anyone holding the prereg reproduces this exact partition.
+        eligible = [c for c in cand_all if c["topic_key"] not in taken]
+        eligible.sort(key=lambda c: c["topic_key"])      # stable base order before shuffle
+        rng.shuffle(eligible)
+        half = len(eligible) // 2
+        cand_slice = eligible[:half] if half else eligible[:1]
+        null_slice = eligible[half:]
+
+        cand_rows = [r for r in (_enroll("candidate", c, c["_feed_set"], c["_domain"])
+                                 for c in cand_slice) if r]
         out["arms"]["candidate"] = {"enrolled": len(cand_rows),
                                     "calibrating": sum(r["calibrating"] for r in cand_rows)}
 
@@ -185,22 +206,30 @@ def enroll_cycle(*, feed_map: dict, control_sources: list,
         out["arms"]["control"] = {"enrolled": len(ctrl_rows),
                                   "calibrating": sum(r["calibrating"] for r in ctrl_rows)}
 
-        # ── null_random: same feeds, NO signal logic, deterministic draw ──────────
-        pool = [c for c in cand_all if c["topic_key"] not in taken]
-        n_draw = int(round(len(cand_rows) * NULL_RANDOM_RATIO))
-        rng.shuffle(pool)
-        nr_rows = [r for r in (_enroll("null_random", c, "existing-roster", "mixed")
-                               for c in pool[:n_draw]) if r]
+        # ── null_random: the OTHER half of the partition, no signal logic ────────
+        # PROVENANCE FIX (Forecaster): null rows keep their TRUE feed_set and domain.
+        # Recording a topic drawn from Marca as "existing-roster/mixed" is a
+        # misstatement in the row itself, and it destroys §5's per-domain
+        # stratification permanently — rows are immutable.
+        n_draw = int(round(len(cand_rows) * NULL_RANDOM_RATIO)) or len(null_slice)
+        nr_rows = [r for r in (_enroll("null_random", c, c["_feed_set"], c["_domain"])
+                               for c in null_slice[:n_draw]) if r]
         out["arms"]["null_random"] = {"enrolled": len(nr_rows), "draw_target": n_draw,
-                                      "pool": len(pool)}
+                                      "pool": len(null_slice)}
 
-        # ── null_volume: the dumb-volume rule ────────────────────────────────────
-        nv_pool = [c for c in cand_all
+        # ── null_volume: the dumb-volume rule over the UNCLAIMED remainder ───────
+        nv_pool = [c for c in null_slice[n_draw:]
                    if int(c.get("n") or 0) >= NULL_VOLUME_K
                    and c["topic_key"] not in taken]
-        nv_rows = [r for r in (_enroll("null_volume", c, "existing-roster", "mixed")
+        nv_rows = [r for r in (_enroll("null_volume", c, c["_feed_set"], c["_domain"])
                                for c in nv_pool) if r]
-        out["arms"]["null_volume"] = {"enrolled": len(nv_rows), "k": NULL_VOLUME_K}
+        out["arms"]["null_volume"] = {"enrolled": len(nv_rows), "k": NULL_VOLUME_K,
+                                      "pool": len(nv_pool)}
+        # ZERO-ARM DISCLOSURE (Forecaster §4): an arm with no rows must read N=0, never
+        # be absent — absence in a report is the §15a floor-end sin inside the
+        # instrument built to police it.
+        for _arm in ARMS_ALL:
+            out["arms"].setdefault(_arm, {"enrolled": 0, "note": "N=0 — NO-TEST"})
         return out
     finally:
         try:

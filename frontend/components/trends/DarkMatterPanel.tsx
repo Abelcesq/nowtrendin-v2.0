@@ -50,7 +50,11 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
   // measure, it rendered "First-Timer Ratio 0%" beside copy asserting the number means
   // something — a floor value wearing a measured badge (§16a stage 2) and a
   // non-contributing input rendered as a value (§17). Absence is now shown as absence.
-  const dUnmeasured = signal.dMeasured === false;
+  // `=== false` alone left the UNKNOWN case (pre-epoch rows, and INV-1 stale
+  // serve_payloads older than 48h) rendering a ratio again. Treat unknown as
+  // unmeasured when no ratio is present — never fall back to 0.
+  const dUnmeasured = signal.dMeasured === false
+    || (signal.dMeasured === undefined && signal.firstTimerRatio == null);
   const ftr = signal.firstTimerRatio ?? 0;
   const ftrPct = Math.round(ftr * 100);
 
@@ -76,6 +80,12 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         desc={
           ftr >= 0.35
             ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → private-channel activity inferred.`
+            // The BADGE was fixed and the SENTENCE was not (Guardian, board 2026-08-20
+            // late): on an unmeasured topic the panel read value "Unmeasured" with
+            // "0% new participants — below the threshold" directly beneath it. The
+            // sentence asserting the number means something is the defect, not the number.
+            : dUnmeasured
+            ? `No author-bearing signals reached us for this topic, so the first-timer ratio could not be read at all. This is absence of measurement — not evidence that nothing is happening.`
             : `${ftrPct}% new participants — below the private-channel threshold; monitor for an increase.`
         }
       />

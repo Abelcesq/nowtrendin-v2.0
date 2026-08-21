@@ -60,6 +60,11 @@ HELD_OUT_ARRIVAL_INPUTS = {
                              "wiring any into a score requires sealed backtest + board",
     "shadow_ledger":         "A4 shadow trial ledger — sealed candidate-feed races; "
                              "never read by scoring or the published ledgers",
+    # shadow_enroll's docstring ASSERTED "Registered held-out" while absent from this
+    # dict (Operator + Guardian, board 2026-08-20 late) — a registration claim with no
+    # registration, which is the pattern in its purest form. Registered now.
+    "shadow_enroll":         "A4 shadow trial enrollment driver — selects arms and writes "
+                             "ONLY to the shadow ledger; never touches a score or verdict",
     "coinbase_premium":    "Coinbase retail-spot premium accumulation (demand proxy; "
                            "separate price_class, never a market price) — 5-day review "
                            "2026-08-15",

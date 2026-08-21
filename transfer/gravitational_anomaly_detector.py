@@ -11763,11 +11763,21 @@ def get_topic_detail(topic_key: str):
                     "UNMEASURED — this topic carried no author-bearing and no "
                     "engagement-bearing signals, so D could not be read. The 0 means "
                     "COULD NOT READ, never 'read quiet'."),
-                "plain_english": _explain_d(
-                    s["dark_matter_score"],
-                    s.get("first_timer_ratio", 0),
-                    bool(s.get("engagement_asymmetry"))
-                ),
+                # The narration must not contradict the field above it (Operator,
+                # board 2026-08-20 late). _explain_d returns "No dark matter signatures.
+                # Signal appears to originate publicly." — an affirmative MEASURED claim —
+                # which was being served beside d_measured=false. No UI renders this
+                # field, but the licensing product IS the payload.
+                "plain_english": (
+                    "UNMEASURED — no author-bearing or engagement-bearing signals for "
+                    "this topic, so no dark-matter reading exists. This is absence of "
+                    "measurement, not evidence of public origin."
+                    if s.get("d_measured") == 0 else
+                    _explain_d(
+                        s["dark_matter_score"],
+                        s.get("first_timer_ratio", 0),
+                        bool(s.get("engagement_asymmetry"))
+                    )),
             },
             "C_confidence_decay": {
                 "score":  s["confidence_decay"],

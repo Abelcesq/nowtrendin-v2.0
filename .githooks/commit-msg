@@ -108,14 +108,15 @@ if git diff --cached --name-only 2>/dev/null | grep -q '^transfer/.*\.py$'; then
 r=h.audit_firewall()
 sys.stdout.write('OK' if r.get('ok') else '|'.join(
   f\"{v['scoring_module']} imports {v['imports_held_out']}\" for v in (r.get('violations') or [])))" 2>/dev/null)"
-  if [ -n "$fw" ] && [ "$fw" != "OK" ]; then
+  if [ "$fw" != "OK" ]; then
     cat >&2 <<EOF
 
   HELD-OUT FIREWALL VIOLATION  (heldout_registry, rule R2)
   ----------------------------------------------------------------------
   A scoring module imports a HELD-OUT module with no acknowledged exception:
 
-      $fw
+      ${fw:-(the audit produced NO OUTPUT — it failed to run. A control that returns
+      nothing must never read as healthy: that is the t6 defect this gate enforces.)}
 
   A held-out input that a scorer can see is the circularity the registry exists
   to prevent. Either remove the import, or — if it is a read-only SERVE path —
@@ -138,7 +139,10 @@ fi
 # Emergency bypass is deliberate and visible: TESTS_SKIP=1 git commit ...
 if git diff --cached --name-only 2>/dev/null | grep -q '^transfer/.*\.py$'; then
   if [ "${TESTS_SKIP:-0}" = "1" ]; then
-    echo "  [test gate] SKIPPED via TESTS_SKIP=1 — the skip is on the record." >&2
+    printf '
+Integrity-Gate-Skipped: TESTS_SKIP=1
+' >> "$msg_file"
+    echo "  [test gate] SKIPPED — recorded as a commit trailer (git log --grep)." >&2
   elif [ -f tools/run_tests.py ]; then
     if ! python tools/run_tests.py --offline >/tmp/nt_tests.log 2>&1; then
       cat >&2 <<EOF
@@ -167,7 +171,10 @@ fi
 # Deliberate, visible bypass: INTEGRITY_SKIP=1 git commit ...
 if git diff --cached --name-only 2>/dev/null | grep -qE '^(transfer|tools)/.*\.py$|^\.githooks/'; then
   if [ "${INTEGRITY_SKIP:-0}" = "1" ]; then
-    echo "  [integrity gate] SKIPPED via INTEGRITY_SKIP=1 — the skip is on the record." >&2
+    printf '
+Integrity-Gate-Skipped: INTEGRITY_SKIP=1
+' >> "$msg_file"
+    echo "  [integrity gate] SKIPPED — recorded as a commit trailer (git log --grep)." >&2
   elif [ -f tools/integrity_gate.py ]; then
     if ! python tools/integrity_gate.py >/tmp/nt_integrity.log 2>&1; then
       cat >&2 <<EOF

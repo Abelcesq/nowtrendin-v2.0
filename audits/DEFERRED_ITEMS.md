@@ -372,3 +372,33 @@ rights register (what is pulled, under what terms, redistribution posture) must 
 every source feeding a licensed output — extend `docs/buyer-diligence/RIGHTS_REGISTER.md`
 to cover the blog/newsletter/socialcrawl/firecrawl D roster. Never blocks collection;
 blocks LICENSING.
+
+## AB-ATTRIBUTION — the paired A/B recompute (HARD DEADLINE 2026-08-27; set by data expiry)
+
+**Why this row exists:** the nine-seat board named this the single fastest way out of the
+five-change attribution knot of 2026-08-20 (sports_entity flip · 12 new WordPress lanes +
+`_title_sig` unicode · Reddit retirement · two feed repoints · `D_PLUMBING_V2` ON — all
+touching D, all mutually confounded). It was named in three board documents and **had no
+row, no script, and no clock** until the Executioner pointed out that `/monitor/
+deferred-triggers` walks THIS file and would therefore never see it. A deadline that lives
+only in prose is the pattern this board spent the day naming.
+
+**The deadline is mechanical, not preferential.** `_prune_signal_tables()` deletes
+`topic_signals`/`raw_signals` older than `SIGNAL_RETENTION_DAYS` (7), called every worker
+cycle. `velocity_scores` survives 365 days — **the OUTPUTS survive; the INPUTS do not**, and
+a recompute needs inputs. After ~2026-08-27 the pre-flip comparison rows are gone and the
+attribution is permanently unrecoverable. No revert restores pruned rows.
+
+**What to run:** pull ONE fixed post-flip scored cohort; recompute `compute_dark_matter`
+over the IDENTICAL rows twice, `_D_PLUMBING_V2` forced True then False. Report the delta by
+(i) platform, (ii) feed cohort (pre-08-20 roster vs the 12 new WordPress lanes vs the 3
+sports desks), and (iii) **`ft_ratio` bucketed by community collection age (<14d vs ≥14d)** —
+which simultaneously proves or disproves the cold-start guard with a number and sizes how
+much of any apparent D gain is fabrication rather than repair. Commit as
+`tools/d_plumbing_ab.py` with row-level JSON so the trial close can re-run it against a
+sealed baseline (the D_PLUMBING_V2 backtest's grade-C "no script retained" defect, not
+repeated).
+
+**Trigger:** DATE **2026-08-27** — after which the row is resolved as PERMANENTLY
+UNMEASURABLE and that fact is recorded in `REGIME_LEDGER.md` beside the flip row, so every
+later reader knows the five changes of 2026-08-20 can never be separated.

@@ -93,9 +93,13 @@ def main() -> int:
                          cycle_date="2026-09-05", db_path=p, dry_run=True)
     r2 = se.enroll_cycle(feed_map=feed_map, control_sources=[],
                          cycle_date="2026-09-05", db_path=p, dry_run=True)
+    # t2 — also strengthened: comparing two EMPTY dicts is trivially true, so the old
+    # form certified determinism on an instrument that drew nothing. Require a non-empty
+    # draw first, then require the draws to match.
     check("t2 same cycle date -> identical draw (deterministic null)",
-          r1["arms"] == r2["arms"],
-          f"{r1['arms']} != {r2['arms']} — a null a human can re-roll is not a null")
+          r1["arms"] == r2["arms"]
+          and r1["arms"].get("null_random", {}).get("enrolled", 0) > 0,
+          f"{r1['arms']} vs {r2['arms']} — equal-but-empty is not determinism")
 
     r3 = se.enroll_cycle(feed_map=feed_map, control_sources=[],
                          cycle_date="2026-10-11", db_path=p, dry_run=True)
@@ -103,12 +107,24 @@ def main() -> int:
           se._cycle_seed("2026-09-05").random() != se._cycle_seed("2026-10-11").random(),
           "different cycles must give different draws, or it is a constant not a draw")
 
-    # t1 — cross-arm exclusivity: no topic_key appears twice across all arms.
-    total = sum(a.get("enrolled", 0) for a in r1["arms"].values())
-    check("t1 cross-arm exclusivity holds within a cycle",
-          total <= 3,
-          f"{total} enrollments from 3 topics — a topic entered more than one arm, "
-          f"which biases the candidate-vs-null difference toward zero")
+    # t1 — REWRITTEN AS A LOWER BOUND (board 2026-08-20 late). The original asserted
+    # `total <= 3` — an UPPER bound, which is satisfied MAXIMALLY by an instrument that
+    # enrolls nothing. It passed green while both null arms were structurally empty, and
+    # four seats found the annihilation the test was supposed to catch. An enforcer that
+    # can only detect presence-of-too-much will never detect absence-of-everything.
+    # An assertion about something EXISTING must be a lower bound or a positive claim.
+    arms1 = r1["arms"]
+    check("t1a candidate arm is NON-EMPTY",
+          arms1.get("candidate", {}).get("enrolled", 0) > 0, f"{arms1}")
+    check("t1b null_random is NON-EMPTY — a trial without a null can only produce a "
+          "narrative",
+          arms1.get("null_random", {}).get("enrolled", 0) > 0, f"{arms1}")
+    check("t1c no arm is silently absent from the report (N=0 must READ as N=0)",
+          all(a in arms1 for a in ("candidate", "control", "null_random", "null_volume")),
+          f"arms present: {sorted(arms1)}")
+    total = sum(a.get("enrolled", 0) for a in arms1.values())
+    check("t1d exclusivity: enrollments never exceed the eligible pool",
+          total <= 3, f"{total} from 3 topics — a topic entered more than one arm")
 
     # t4 — calibrating stamp: young venue stamped, mature venue not.
     conn = db_compat.connect(p)
