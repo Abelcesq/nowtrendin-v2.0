@@ -50,6 +50,8 @@ DB_PATH = os.getenv("DB_PATH", "anomaly_detector.db")
 _D_TIERS = ("expert", "niche")
 # Incumbent = an author with at least this many prior posts in the community.
 INCUMBENT_MIN_POSTS = int(os.getenv("DIND_INCUMBENT_MIN_POSTS", "5"))
+# Cold-start standard, shared with the author-side guard (§16a).
+COLD_START_DAYS = int(os.getenv("D_COMMUNITY_MIN_AGE_DAYS", "14"))
 # Venue first-coverage lookback: an entity is "new to the venue" if the venue never
 # carried it before this window's start (bounded by the venue's own observed history).
 SNAPSHOT_KIND = "d_indicators_v1"
@@ -117,10 +119,14 @@ def venue_first_coverage(conn, topic_key: str, window_h: int = 24) -> Optional[d
     # US, which is the cold-start fabrication class — excluded, Guardian F2).
     firsts = 0
     for r in in_window:
+        # The venue must predate the COLD-START STANDARD (14d), not merely the 24h
+        # window (Challenger F5): a feed wired 36 hours ago was passing as "not new to
+        # us" and reading maximum first-coverage on every entity it touched — the
+        # author-side guard's own defect, one granularity over.
         older = conn.execute(
             f"SELECT 1 FROM topic_signals WHERE source_name = {ph} "
             f"AND extracted_at < {ph} LIMIT 1",
-            (r["source_name"], w0)).fetchone()
+            (r["source_name"], _cut(24 * COLD_START_DAYS))).fetchone()
         if older:
             firsts += 1
     return {"venue_first_coverage": firsts, "venue_total": len(rows),
@@ -137,14 +143,25 @@ def incumbent_displacement(conn, topic_key: str, window_h: int = 48) -> Optional
     Reads author names from raw_signals joined via signal_id (topic_signals carries no
     author); post counts from author_history."""
     ph = _ph()
+    tiers = ",".join([ph] * len(_D_TIERS))
     w0 = _cut(window_h)
     rows = conn.execute(
         f"SELECT rs.author, rs.platform, rs.source_name FROM topic_signals ts "
         f"JOIN raw_signals rs ON rs.id = ts.signal_id "
         f"WHERE ts.topic_key = {ph} AND ts.extracted_at >= {ph} "
-        f"AND rs.author IS NOT NULL AND rs.author != ''",
-        (topic_key, w0)).fetchall()
-    authors = {(r["author"], r["platform"], r["source_name"]) for r in rows}
+        f"AND rs.author IS NOT NULL AND rs.author != '' "
+        f"AND ts.platform_tier IN ({tiers})",
+        (topic_key, w0, *_D_TIERS)).fetchall()
+    # PSEUDO-AUTHOR EXCLUSION (board 2026-08-20 evening — Challenger F4 and Economist F2,
+    # independently). collect_medium/collect_ghost set `author = item["author"] or
+    # cfg["name"]`, so an authorless RSS feed writes its OWN NAME as the author. That
+    # pseudo-author crosses the incumbent threshold after 5 articles, and this indicator
+    # then read 1.0 — "maximum established-expert reallocation" — as a pure function of
+    # how long we have polled the feed. A fabricated maximum is the mirror image of the
+    # fabricated first-timer. An author identical to its venue is not a person.
+    authors = {(r["author"], r["platform"], r["source_name"]) for r in rows
+               if (r["author"] or "").strip().lower()
+               != (r["source_name"] or "").strip().lower()}
     if not authors:
         return None
     incumbents = 0
@@ -208,19 +225,38 @@ def engagement_divergence(conn, topic_key: str, window_h: int = 48) -> Optional[
         f"GROUP BY source_name", (topic_key, *_D_TIERS, w0)).fetchall()
     if not rows:
         return None
-    premiums = []
+    premiums, degenerate = [], 0
     for r in rows:
-        norm = conn.execute(
-            f"SELECT AVG(engagement_raw) AS e FROM topic_signals "
+        # DEGENERATE-VENUE GUARD (board 2026-08-20 evening, Economist F3 — verified).
+        # The RSS lanes do not carry real engagement: collect_ghost writes the LITERAL
+        # `60, 0` on every row, so _eng() is the same constant for every ghost signal and
+        # topic_mean / venue_mean was EXACTLY 1.0, always — a measured-looking number that
+        # is pure arithmetic. collect_medium is barely better (engagement = summary
+        # LENGTH). Because `engagement_raw > 0` passed, the old code never returned None
+        # on these lanes, breaching this module's own None-not-zero contract and the §15a
+        # A3 invariant it was built to honor. This is the §16a degenerate-baseline class:
+        # zero variance in the venue's own distribution means the premium is undefined,
+        # not 1.0. NOTE for the trial: the sealed candidate feeds all wire through these
+        # two lanes, so this indicator is expected to read absent for them until a real
+        # engagement field exists.
+        stats = conn.execute(
+            f"SELECT AVG(engagement_raw) AS e, MIN(engagement_raw) AS lo, "
+            f"MAX(engagement_raw) AS hi FROM topic_signals "
             f"WHERE source_name = {ph} AND extracted_at >= {ph} "
-            f"AND engagement_raw > 0", (r["source_name"], w0)).fetchone()
-        base = (norm["e"] if hasattr(norm, "keys") else norm[0]) or 0
-        if base > 0:
+            f"AND engagement_raw > 0 AND topic_key != {ph}",   # exclude self (F6)
+            (r["source_name"], w0, topic_key)).fetchone()
+        base = (stats["e"] if stats else 0) or 0
+        lo = (stats["lo"] if stats else 0) or 0
+        hi = (stats["hi"] if stats else 0) or 0
+        if base > 0 and hi > lo:          # real variance required
             premiums.append(float(r["e"]) / float(base))
+        elif base > 0:
+            degenerate += 1
     if not premiums:
-        return None
+        return None                        # absence, never a fabricated 1.0
     return {"engagement_divergence": round(sum(premiums) / len(premiums), 4),
-            "venues_with_norms": len(premiums)}
+            "venues_with_norms": len(premiums),
+            "venues_degenerate_excluded": degenerate}
 
 
 # ── Snapshot + serve ─────────────────────────────────────────────────────────────

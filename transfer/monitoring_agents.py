@@ -136,6 +136,12 @@ def _configured_feeds() -> list:
         feeds.append(cfg["name"])
     for cfg in getattr(bc, "DISCOURSE_INSTANCES", []):
         feeds.append(cfg["name"])
+    # WORDPRESS_TAGS added 2026-08-20 evening (Buyer's Desk + Expansionist, both
+    # independently): the 12-domain WordPress expansion was the day's headline coverage
+    # win and was the ONE lane with no tripwire — the exact blind spot the tripwire
+    # exists to remove. Stored source_name is "wordpress/<tag>".
+    for tag in getattr(bc, "WORDPRESS_TAGS", []):
+        feeds.append(f"wordpress/{tag}")
     return feeds
 
 

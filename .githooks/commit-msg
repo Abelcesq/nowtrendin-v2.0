@@ -83,4 +83,37 @@ EOF
     exit 1
   fi
 fi
+# ── FIREWALL GATE (board 2026-08-20 evening, Guardian's pattern finding) ──────────
+# The held-out firewall shipped RED for a working day: darkmatter_indicators was
+# registered held-out, then imported to serve its diag endpoint with no acknowledged
+# exception — and nothing ran the audit, so nothing failed. shadow_ledger's own
+# docstring asserted "the AST firewall makes a scoring-side import a build failure."
+# It made one; the build shipped. An integrity claim written in prose and enforced by a
+# function nobody calls is the exact defect this board keeps finding. This gate makes
+# the claim true: any commit touching transfer/*.py runs the audit and REFUSES on an
+# unacknowledged violation. Fix by adding the import's justification to
+# ACKNOWLEDGED_EXCEPTIONS (auditable) — never by removing the module from the registry.
+if git diff --cached --name-only 2>/dev/null | grep -q '^transfer/.*\.py$'; then
+  fw="$(cd transfer 2>/dev/null && python -c "import heldout_registry as h,sys
+r=h.audit_firewall()
+sys.stdout.write('OK' if r.get('ok') else '|'.join(
+  f\"{v['scoring_module']} imports {v['imports_held_out']}\" for v in (r.get('violations') or [])))" 2>/dev/null)"
+  if [ -n "$fw" ] && [ "$fw" != "OK" ]; then
+    cat >&2 <<EOF
+
+  HELD-OUT FIREWALL VIOLATION  (heldout_registry, rule R2)
+  ----------------------------------------------------------------------
+  A scoring module imports a HELD-OUT module with no acknowledged exception:
+
+      $fw
+
+  A held-out input that a scorer can see is the circularity the registry exists
+  to prevent. Either remove the import, or — if it is a read-only SERVE path —
+  add it to ACKNOWLEDGED_EXCEPTIONS with its justification and its re-check note.
+  Never delete the module from the registry to silence this.
+  ----------------------------------------------------------------------
+EOF
+    exit 1
+  fi
+fi
 exit 0

@@ -42,11 +42,26 @@ import db_compat
 DB_PATH = os.getenv("DB_PATH", "anomaly_detector.db")
 
 ARMS = ("candidate", "control", "null_random", "null_volume")
-# Same patience the real ledger runs (365d); enrollment window per the prereg.
-SHADOW_PATIENCE_DAYS = int(os.getenv("SHADOW_PATIENCE_DAYS", "365"))
-ENROLL_OPEN = os.getenv("SHADOW_ENROLL_OPEN", "2026-09-01")
-ENROLL_CLOSE = os.getenv("SHADOW_ENROLL_CLOSE", "2026-11-30")
+# SEALED CONSTANTS — NOT env-readable (board 2026-08-20 evening: Operator S2 +
+# Executioner F5, independently). The first cut read these from os.getenv, so the
+# "sealed" window and the 365-day patience were one config var wide — and
+# SHADOW_PATIENCE_DAYS=90 would have been exactly the quiet re-imposition of a
+# demo-friendly window that the Forecaster's censoring condition exists to forbid.
+# This codebase already ruled the principle on the referee constants: "an integrity
+# gate readable from os.getenv is one the beneficiary can widen with no commit and no
+# trace." The same standard now governs the trial's own parameters. Changing any value
+# here is a reviewable code change plus a prereg erratum.
+SHADOW_PATIENCE_DAYS = 365
+ENROLL_OPEN = "2026-09-01"
+ENROLL_CLOSE = "2026-11-30"
 PREREG_DOC = "audits/forecasts/SHADOW_TRIAL_PREREG_2026-08-20.md"
+PREREG_TEXT_SHA256 = "25b69ffc8e88d393348b73081477c586ff5ba7fa49d822541534ac9b497f6e3e"
+# The six sealed feed-set ids (prereg §6). free-text feed_set was an unvalidated
+# forking path: an unsealed feed could enroll under any string, defeating §6's
+# variant-log defense at the keyboard (Operator S1).
+SEALED_FEED_SETS = ("marca-es", "kicker-de", "nikkei-asia", "scmp-hk",
+                    "stat-health", "deadline-ent", "scialert-sci",
+                    "existing-roster")   # the control arm's own set
 
 
 def _now_iso() -> str:
@@ -70,6 +85,23 @@ def init_db(db_path: str = DB_PATH) -> None:
                 d_measured INTEGER, d_indicators TEXT,
                 signals_at_enroll INTEGER, venues_at_enroll INTEGER,
                 sealed_query TEXT, sealed_wiki_article TEXT,
+                -- sealed-rule fields the prereg makes load-bearing (added before the
+                -- first enrollment, board 2026-08-20 evening — Forecaster: a sealed
+                -- field with no column cannot be executed from the stored schema, and
+                -- rows are immutable so it cannot be added after 09-01 without a
+                -- mid-window instrument change):
+                --   pre_broken   §4 "pre-broken excluded (never a race)" — the H-A
+                --                denominator exclusion
+                --   calibrating  §7 cold-start: feeds wired <14d before enrollment are
+                --                stamped and excluded from H-A/H-B denominators
+                --   implied_prob the probability attached to each trigger, so the trial
+                --                can be scored by a PROPER rule (Brier) and not only by
+                --                a distribution comparison
+                --   patience_days / window_open / window_close: the OPERATIVE sealed
+                --                calendar stamped ON THE ROW, so a later constant change
+                --                is detectable per-row rather than silent
+                pre_broken INTEGER, calibrating INTEGER, implied_prob REAL,
+                patience_days INTEGER, window_open TEXT, window_close TEXT,
                 -- resolution fields: written ONCE by resolve(), NULL until then
                 resolved_at TEXT, breakout_date TEXT, lead_time_days INTEGER,
                 verdict TEXT, query_ambiguous INTEGER, referee_note TEXT)
@@ -94,15 +126,35 @@ def enroll(*, arm: str, feed_set: str, domain: str, topic_key: str,
            d_indicators: Optional[dict] = None, signals_at_enroll: int = 0,
            venues_at_enroll: int = 0, sealed_query: Optional[str] = None,
            sealed_wiki_article: Optional[str] = None,
+           pre_broken: Optional[int] = None, calibrating: Optional[int] = None,
+           implied_prob: Optional[float] = None,
            db_path: str = DB_PATH) -> Optional[str]:
     """Append one shadow race. Refuses outside the sealed enrollment window and
     refuses unknown arms — the window and arms are prereg'd, not parameters.
     Idempotent per (arm, topic, detection_date). Returns row id or None."""
     if arm not in ARMS:
         raise ValueError(f"unknown arm {arm!r} — arms are sealed in the prereg")
+    # FEED-SET VALIDATION (Operator S1): free text here was an unvalidated forking
+    # path — an unsealed feed could enroll under any string and defeat §6's variant-log
+    # defense at the keyboard. A feed not in the sealed set does not enroll; adding one
+    # is a prereg erratum, not a parameter.
+    if feed_set not in SEALED_FEED_SETS:
+        raise ValueError(
+            f"feed_set {feed_set!r} is not in the sealed set {SEALED_FEED_SETS} — "
+            f"enrolling an unsealed feed defeats the variant log (prereg §6)")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not (ENROLL_OPEN <= today <= ENROLL_CLOSE):
         return None   # outside the sealed window: a refusal, not an error
+    # DERIVE the instrument epoch + regime from LIVE STATE, never from the caller
+    # (Operator S1, Forecaster §6): caller-supplied strings let a row attest
+    # "D_PLUMBING_V2=ON" regardless of what the flag actually was, which would make the
+    # trial's own epoch record unfalsifiable. The caller's values are kept only as a
+    # declared-vs-actual annotation.
+    live_v2 = os.getenv("D_PLUMBING_V2", "0") == "1"
+    live_epoch = f"D_PLUMBING_V2={'ON' if live_v2 else 'OFF'}"
+    if instrument_epoch and instrument_epoch != live_epoch:
+        regime = f"{regime or ''}|declared_epoch={instrument_epoch}|ACTUAL={live_epoch}"
+    instrument_epoch = live_epoch
     init_db(db_path)
     conn = db_compat.connect(db_path)
     ph = _ph()

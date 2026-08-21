@@ -122,6 +122,21 @@ ACKNOWLEDGED_EXCEPTIONS = {
     ("gravitational_anomaly_detector", "market_platform_indicator"):
         "serves the Market Signal N block (/risk/scores rows, /risk/{key} detail, "
         "/diag/market-n) + logs surfacing events; display-only, never an input",
+    # D leading indicators (board 2026-08-20). Same shape as the ledger-serving
+    # exceptions: the detector hosts the API surface, so serving /diag/d-indicators
+    # necessarily imports the module. The import is LAZY (inside the endpoint), the
+    # direction is detector -> indicators, and it is SERVE-only.
+    # ⚠ THE REVIEW MUST RE-CHECK: these four indicators are shadow-trial CANDIDATES,
+    # never components. The day compute_dark_matter, any weight, any tier, or any
+    # ledger enrollment reads darkmatter_indicators, that is the circularity this
+    # registry exists to prevent — revoke this exception, do not widen it.
+    # RECORDED: this exception was MISSING when the module shipped 2026-08-20, so the
+    # firewall audit ran RED for one working day and no gate caught it (Guardian's
+    # finding at the evening board). The audit is only as strong as the thing that
+    # runs it — see the standing note in audit_firewall's docstring.
+    ("gravitational_anomaly_detector", "darkmatter_indicators"):
+        "serves GET /diag/d-indicators (lazy import, read-only research reads + "
+        "snapshot writes to its OWN table); held-out candidates, never a score input",
     ("gravitational_anomaly_detector", "accuracy_ledger_enhanced"):
         "serves GET /accuracy/ledger; ledger is DB-driven and read-only from the API path",
     ("gravitational_anomaly_detector", "market_accuracy_ledger"):

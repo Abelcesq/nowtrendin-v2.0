@@ -633,7 +633,30 @@ def _http_get(url, params=None, headers=None, timeout=12):
     except Exception as e:
         print(f"    HTTP error: {e}"); return None
 
+_D_COMMUNITY_MIN_AGE_DAYS = int(os.getenv("D_COMMUNITY_MIN_AGE_DAYS", "14"))
+
+
 def _first_timer(conn, author, platform, community):
+    """COLD-START GUARD ADDED HERE 2026-08-20 (Buyer's Desk finding, same-day board;
+    verified and confirmed). The guard was built into the DETECTOR's
+    check_author_is_first_timer — which serves github/hackernews/bluesky/lemmy — while
+    THIS function serves devto/hashnode/discourse/wordpress/blogger/medium/ghost: the
+    exact lane D_PLUMBING_V2 newly admits to the author-bearing pool, and the lane the
+    shadow trial's candidate feeds will use. The guard therefore protected the platforms
+    that were already mature and protected NONE of the ones the flip switched on. The
+    sealed prereg §7 asserted it was "enforced in code under V2"; that assertion was
+    wrong for the lane that matters, and it is corrected by appended errata, never by
+    editing the seal.
+
+    LIVE IMPACT when found: commit 1473e1c added 12 WordPress tags this morning, each its
+    own community key, and D_PLUMBING_V2 flipped ON this evening — so every author in 12
+    brand-new communities read as a genuine first-timer. The instrument was reading
+    maximum earliness off our own onboarding, in precisely the non-tech domains the
+    expansion exists to prove.
+
+    Rule (§16a CALIBRATING at community granularity): the author row is ALWAYS recorded,
+    so history accrues during the window; first-timer CREDIT is withheld until our own
+    collection of that community is >= D_COMMUNITY_MIN_AGE_DAYS old."""
     if not author: return False
     row = conn.execute(
         "SELECT post_count FROM author_history WHERE author=? AND platform=? AND community=?",
@@ -645,7 +668,22 @@ def _first_timer(conn, author, platform, community):
             (author, platform, community)); return False
     conn.execute(
         "INSERT INTO author_history (author,platform,community,first_seen_at) VALUES (?,?,?,?)",
-        (author, platform, community, _now())); return True
+        (author, platform, community, _now()))
+    if os.getenv("D_PLUMBING_V2", "0") == "1":
+        try:
+            r = conn.execute(
+                "SELECT MIN(first_seen_at) AS m FROM author_history "
+                "WHERE platform=? AND community=?", (platform, community)).fetchone()
+            m = r["m"] if r and hasattr(r, "keys") else (r[0] if r else None)
+            if m:
+                age = (datetime.now(timezone.utc)
+                       - datetime.fromisoformat(str(m).replace("Z", ""))
+                       .replace(tzinfo=timezone.utc)).days
+                if age < _D_COMMUNITY_MIN_AGE_DAYS:
+                    return False   # calibrating: recorded, not credited
+        except Exception:
+            pass   # fail-open to historical behavior; never block collection
+    return True
 
 def _write_signal(conn, sig_id, platform, tier, source, title, url, author,
                   upvotes, comments, ft, organic, raw_text=""):
@@ -1132,7 +1170,13 @@ def collect_medium(conn):
             tags   = item["tags"]
             if not title: continue
             quality = min(80, len(item.get("summary", "")) // 10)
-            ft = _first_timer(conn, author, "medium", src)
+            # MASTHEAD-FALLBACK EXCLUSION (board 2026-08-20 evening, Buyer's Desk +
+            # Statistician, both independently): `author` falls back to the FEED NAME
+            # when the item carries none, so an authorless RSS feed would write a
+            # SYNTHETIC identity into author_history and score itself a first-timer
+            # exactly once. A fabricated identity in the substrate of the earliness
+            # metric is the same class as a fabricated score. Pass the REAL author only.
+            ft = _first_timer(conn, item["author"], "medium", src)
             sid = _id("med", url or title)
             text = f"{title} {item.get('summary', '')[:300]}"
             # PART 2 of the sports_entity edit. `collect_medium` previously ignored
@@ -1192,7 +1236,7 @@ def collect_ghost(conn):
             tags   = item["tags"]
             if not title: continue
             tier = cfg.get("tier", "expert")
-            ft = _first_timer(conn, author, "ghost", cfg["name"])
+            ft = _first_timer(conn, item["author"], "ghost", cfg["name"])   # real author only (see collect_medium)
             sid = _id("ghost", link or title)
             text = f"{title} {item.get('summary', '')[:300]}"
             # Research/editorial outlets use the ENTITY-ANCHORED extractor — the

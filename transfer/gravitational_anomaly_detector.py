@@ -4251,7 +4251,7 @@ class GravitationalAnomalyDetector:
         # (identical headlines across outlets) when counting the mainstream news quorum (v2).
         # LEFT JOIN keeps every signal even if the raw row is gone (title → None, no collapse).
         rows = conn.execute("""
-            SELECT ts.*, rs.title AS title
+            SELECT ts.*, rs.title AS title, rs.author AS author
             FROM topic_signals ts
             LEFT JOIN raw_signals rs ON rs.id = ts.signal_id
             WHERE ts.topic_key = ? AND ts.extracted_at >= ?
@@ -4500,7 +4500,19 @@ class GravitationalAnomalyDetector:
         author_bearing = [s for s in signals
                           if (s.get("platform") or "").lower() in _AUTHOR_PLATFORMS]
         engagement_bearing = [s for s in signals if (s.get("upvotes") or 0) > 5]
-        d_measured = bool(author_bearing or engagement_bearing)
+        # d_measured = AUTHOR RESOLUTION, not platform membership (Statistician +
+        # Buyer's Desk, both independently, 2026-08-20 evening board — CONFIRMED).
+        # The first cut asked "is this platform in the author-bearing set?", so five
+        # authorless RSS rows on `medium` read d_measured=1 with D=0: "read quiet"
+        # when the truth is "could not read". That is the §15a A3 floor-end sin
+        # reintroduced INSIDE the field built to close it. Now it asks whether a real
+        # author was actually resolved on this topic's signals. `author` is joined in
+        # from raw_signals at the scoring query; rows predating the join, or genuinely
+        # authorless ones, correctly read blind. The masthead fallback
+        # (author = feed name) is excluded upstream in blog_collectors so it cannot
+        # fabricate an identity here either.
+        resolved_authors = [s for s in author_bearing if (s.get("author") or "").strip()]
+        d_measured = bool(resolved_authors or engagement_bearing)
 
         # ── First-Timer Ratio ──────────────────────────────────
         # Across ALL platforms that carry author identity (not Reddit-only —
