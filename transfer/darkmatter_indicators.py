@@ -159,9 +159,16 @@ def incumbent_displacement(conn, topic_key: str, window_h: int = 48) -> Optional
     # then read 1.0 — "maximum established-expert reallocation" — as a pure function of
     # how long we have polled the feed. A fabricated maximum is the mirror image of the
     # fabricated first-timer. An author identical to its venue is not a person.
+    def _venue_names(src):
+        """Stored source_name carries a collector prefix ('newsletter/X', 'blogger/X',
+        'X/latest'). Comparing the bare author to the prefixed venue missed the ENTIRE
+        newsletter lane (Challenger, board 2026-08-20 late) — the same naming lesson the
+        tripwire already learned. Compare against every component."""
+        s = (src or "").strip().lower()
+        return {s, s.split("/")[-1], s.split("/")[0]}
     authors = {(r["author"], r["platform"], r["source_name"]) for r in rows
                if (r["author"] or "").strip().lower()
-               != (r["source_name"] or "").strip().lower()}
+               not in _venue_names(r["source_name"])}
     if not authors:
         return None
     incumbents = 0

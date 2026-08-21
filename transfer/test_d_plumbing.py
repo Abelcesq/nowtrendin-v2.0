@@ -105,7 +105,7 @@ def main() -> int:
     isrc = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "darkmatter_indicators.py"), encoding="utf-8").read()
     check("C-MASTHEAD indicators exclude author==venue",
-          '!= (r["source_name"] or "").strip().lower()' in isrc,
+          "_venue_names" in isrc and "not in _venue_names" in isrc,
           "pseudo-authors would read as maximum incumbent displacement")
 
     # ── C-GUARD-DET ─────────────────────────────────────────────────────────────
@@ -140,6 +140,22 @@ def main() -> int:
     withauthor = [sig("medium", author="real.person") for _ in range(5)]
     d2 = inst.compute_dark_matter(withauthor)
     check("C-DMEASURED resolved authors read MEASURED", d2[3] is True)
+
+    # END-TO-END: the hand-built dicts above never traversed collector -> raw_signals ->
+    # scoring join, which is exactly where the masthead fabrication was injected
+    # (Challenger: "the fixture cannot observe the defect by construction"). Assert the
+    # collector does not write a venue name into the author column.
+    _src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "blog_collectors.py"), encoding="utf-8").read()
+    check("C-MASTHEAD raw_signals.author gets the REAL byline, not the masthead",
+          'title, url, item["author"] or "", quality' in _src
+          and 'title, link, item["author"] or "", 60' in _src,
+          "the display fallback still reaches the column that feeds the scoring join")
+    _isrc = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "darkmatter_indicators.py"), encoding="utf-8").read()
+    check("C-MASTHEAD venue exclusion strips collector prefixes",
+          "_venue_names" in _isrc,
+          "bare author vs 'newsletter/X' comparison misses the whole newsletter lane")
 
     engagement_only = [sig("newsapi_org", up=50, com=40) for _ in range(3)]
     d3 = inst.compute_dark_matter(engagement_only)

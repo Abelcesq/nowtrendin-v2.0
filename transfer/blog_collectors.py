@@ -1190,8 +1190,13 @@ def collect_medium(conn):
                     continue      # no clean entity → write NOTHING (misses > junk)
             else:
                 topics = extract_topics(text, tags=tags)
+            # `author` is the DISPLAY fallback (masthead when the item has no byline).
+            # It must NOT reach raw_signals.author: that column feeds the scoring join,
+            # where a venue name masquerading as a person makes d_measured read TRUE on
+            # an authorless feed — fabricating the measured badge the field exists to
+            # prevent (Challenger F1, verified end-to-end). Store the REAL byline only.
             _write_signal(conn, sid, "medium", tier, src,
-                          title, url, author, quality, 0, ft, True, text)
+                          title, url, item["author"] or "", quality, 0, ft, True, text)
             n = _write_topics(conn, sid, topics,
                               "medium", tier, src, quality, 0, True,
                               first_timer=ft)
@@ -1250,7 +1255,7 @@ def collect_ghost(conn):
             else:
                 topics = extract_topics(text, tags=tags)
             _write_signal(conn, sid, "ghost", tier, cfg["name"],
-                          title, link, author, 60, 0, ft, True, text)
+                          title, link, item["author"] or "", 60, 0, ft, True, text)
             n = _write_topics(conn, sid, topics,
                               "ghost", tier, cfg["name"], 60, 0, True,
                               first_timer=ft)
