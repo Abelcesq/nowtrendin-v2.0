@@ -11,17 +11,33 @@
 ## 1. The canonical per-ledger answers (as of 2026-08-09)
 
 ### Attention ledger (`GET /accuracy/ledger`) — the only ledger with a citable rate today
-- **Tracked-race hit rate 27.1% (N = 48 races run).** Blended honest rate 11.7%
-  (N = 111 resolved, of which 63 were pre-existing breakouts that were never races).
-  1,195 detections pending under the 365-day patience window.
+
+> **ORDER REVERSED 2026-08-21 (board round 4, Buyer's Desk; Chairman-ruled).** This section
+> previously LED with 27.1% / 48 races and carried the current-engine number in a subordinate
+> clause. Everything was disclosed — but a headline about a system we no longer run, with the
+> live number below it, is the shape *SEC v. App Annie* (2021) penalised: the enforcement was
+> for MISDESCRIBING methodology and controls to buyers, not for bad data. Emphasis is part of
+> a description. The figures below are unchanged; only which one leads has changed.
+
+- **CURRENT ENGINE — the number to quote: 5.0% tracked-race hit rate (n = 20).**
+  Blended honest rate 2.9%. Races still young and maturing under the 365-day window.
+  **This is the engine that is running today. It is the only rate that describes the
+  product a buyer would be licensing.**
+- **RETIRED v1 ENGINE — history, not performance: 42.9% tracked (n = 28), 15.8% blended.**
+  Cite only as prior-epoch history, always named as retired.
+- **POOLED ACROSS BOTH EPOCHS: 27.1% tracked (N = 48 races), 11.7% blended (N = 111
+  resolved, of which 63 were pre-existing breakouts that were never races).** **Do NOT lead
+  with this figure.** 76 of the 111 resolved rows come from the retired engine, so the
+  pooled number mostly measures a system that no longer exists. 1,195 detections pending.
 - **Mandatory qualifications on ANY citation:**
-  - **PROVISIONAL** — 0 of the 13 LED wins are yet corroborated by the independent
-    Wikipedia-pageviews referee (10 sit on ambiguous single-word queries). The API
-    itself stamps the rate "served for transparency, not citation."
-  - **Epoch split** — the headline is dominated by the RETIRED v1 engine (76 of 111
-    resolved rows; v1: 15.8% blended / 42.9% tracked, n=28). The CURRENT engine
-    epoch reads 2.9% blended / 5.0% tracked (n=20), young races still maturing.
-    Quoting 27.1% without the split mostly quotes the retired engine.
+  - **PROVISIONAL, AND THIS IS THE MOST MATERIAL LINE IN THE DOCUMENT** — **0 of the 13 LED
+    wins are corroborated by the independent Wikipedia-pageviews referee**, and 10 of them
+    sit on ambiguous single-word queries. The early-detection claim is the entire moat, and
+    it is currently *unverified by any independent instrument*. This belongs in the first
+    breath of any accuracy conversation, not in a footnote. The API itself stamps the rate
+    "served for transparency, not citation."
+  - **Epoch split** — see above. Quoting 27.1% without the split mostly quotes the retired
+    engine.
   - Kaplan-Meier eventual-confirmation estimate 4.0% (1,243 observations, 1,195
     censored) is a held-out COMPANION read, never a substitute.
   - Enrollment completeness 69.6% (39/56 cycles) — intake gaps are disclosed, not
@@ -79,6 +95,28 @@
 
 ## 4. The DDQ sentence (verbatim, safe to give a buyer today)
 
+> **SUPERSEDED 2026-08-21.** The prior sentence led with 27.1% / 48 races and placed the
+> current engine in a trailing clause. Preserved verbatim below the replacement, per the
+> ratchet rule: an amended claim keeps its old wording and the reason it changed, so the
+> amendment is auditable rather than invisible.
+
+**CURRENT (use this):**
+
+"Our attention-detection ledger, on the engine we run today, shows a tracked-race hit rate
+of 5.0% across 20 resolved races (blended 2.9%), with those races still young under a
+365-day resolution window and 1,195 detections pending. This figure is PROVISIONAL in a
+specific and material way: none of our 13 recorded early-detection wins has yet been
+corroborated by an independent referee, and most rest on ambiguous single-word queries, so
+we do not present the early-detection claim as verified. A retired prior engine recorded
+42.9% tracked (n=28); pooling both epochs gives 27.1% across 48 races, but 76 of the 111
+pooled rows come from the retired engine, so we do not lead with the pooled number and
+advise against citing it. Our market and crypto money-flow ledgers withhold rates by design
+until their clean cohorts reach pre-declared minimums (4/30 and 0/30 respectively). All
+figures are recomputed from never-deleted, held-out ledgers and are reproducible on request
+as of any stated date."
+
+**PRIOR (do not use — retained for audit):**
+
 "Our attention-detection ledger currently shows a tracked-race hit rate of 27.1%
 across 48 resolved races (blended 11.7% across 111 resolved detections including
 pre-existing breakouts), provisional pending independent referee corroboration, with
@@ -87,3 +125,8 @@ pending under a 365-day resolution window; our market and crypto money-flow ledg
 withhold rates by design until their clean cohorts reach pre-declared minimums
 (4/30 and 0/30 respectively); all figures are recomputed from never-deleted,
 held-out ledgers and are reproducible on request as of any stated date."
+
+**Why the replacement is longer and worse-sounding, stated so nobody quietly reverts it:**
+it is. A 5.0% that a buyer can reproduce, offered alongside an unverified moat we name
+ourselves, survives diligence. A 27.1% they later discover is 76/111 retired-engine rows
+does not — and under the App Annie rule the exposure is the description, not the data.

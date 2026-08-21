@@ -143,6 +143,86 @@ on a cadence (with `/improve-system`, Sat 06:01), not on demand.
 
 ---
 
+# SECTION B — BOARD ITEMS WITH NO HOME IN THE TEN OPTIONS
+### Raised by seats in round 4, outside the ten items ruled on. Recorded here because the
+### Guardian's REJECT was precisely that known-open work living in prose is a TODO in a drawer.
+### NOT independently re-verified by me — these are as-reported by the seats. Verify before acting.
+
+## B1 — THE FOUR "FREE NOW, IMPOSSIBLE LATER" ITEMS (same class as 1a; highest priority)
+- **IDX-RC4 — index self-influence baseline (Operator).** The null is measurable ONLY at AUM=0
+  and zero readership. The first demo, newsletter, or licensing conversation showing an index
+  value destroys the baseline **permanently**. Every unpublished day without the monitor is
+  baseline forgone. Build the monitor while it is still free.
+- **IDX-RC3 — capacity cap (Operator).** Written as "freeze before the first license is signed."
+  Correction: **freeze before any CONVERSATION.** At signature you have the least freedom you
+  will ever have.
+- **Tail-conditioned arm of the D kill criterion (Economist P3, Taleb).** Attention lives in
+  Extremistan; a mean-based threshold kills a detector that is right about the 2% that matter.
+  Pre-commit a hit rate restricted to topics whose eventual peak lands in the top decile,
+  alongside the blended rate. **Worth nothing unless sealed before results are knowable.**
+- **D's manipulation cost (Economist P8, Adam Smith).** D rewards first-timers and low-breadth
+  signals — the profile an adversary manufactures most cheaply, since **sockpuppets are
+  first-timers by construction**. Seal the dollar cost to move a topic's D by a stated amount
+  BEFORE D is scored, or the threshold gets chosen after the answer is known.
+
+## B2 — COMMERCIAL BLOCKERS (Buyer's Desk, both outright REJECT)
+- **Gate 6 IDENTIFIERS.** Ticker strings only; no FIGI/CUSIP/permID; the attention leg has **no
+  instrument identifier at all**. *"A fund cannot join topics to its book."* Everything upstream
+  is unmonetizable until a mapping layer exists. Decide: OpenFIGI on the instrument legs + a
+  curated topic→issuer map, or sell the attention leg only to non-quant buyers.
+- **Gate 7 COVERAGE.** Distinct-mapped-ticker count and coverage-by-month series **never
+  compiled**; nothing run against the 75-ticker quant threshold. Deliverable: one chart —
+  mapped instruments per month since inception, **degenerate share shaded** (§16a means coverage
+  and USABLE coverage are different numbers, and neither is charted).
+
+## B3 — COMPLIANCE / LEGAL
+- **Rights H3:** the direct-RSS class (FT, Economist, BBC, CNBC, Guardian, ~20 more) has **no
+  outlet-level permission document**. Metadata-only ingestion with derived-aggregate output is a
+  defensible posture; it is not a right. **H8:** Google Trends arrives only via Apify with no
+  Google-side license. Answer point-blank: *if the FT sends a letter next month, which feeds turn
+  off, and what happens to the score that day?*
+- **PII erasure path.** The author store has **no retention limit and no deletion mechanism**,
+  while D is computed FROM resolved authors. Answer mechanically: a named forum user requests
+  deletion — what happens, and does the first-timer ratio change?
+- **`D_dark_matter` / `darkMatter` API field name.** Display was renamed to "Under-the-Radar"
+  (`cb44e04`); **the payload was not** — and under ruling (f) the payload IS the licensed
+  product. "Dark matter" reads to a CCO as "information other people can't see." Finish the
+  rename in the payload.
+- **Trial-license notification trigger** — write it now, while no customer exists and it is free.
+
+## B4 — ECONOMICS
+Cost Sentinel **CRITICAL $718.82 vs the $700 cap**, and the accuracy ledger — the moat —
+resolves through a **single metered vendor**. Unanswered: *if Apify triples its price, does the
+ledger stop resolving, and what is the second source for that validation curve?*
+
+## B5 — MEASUREMENT (each changes what may be CLAIMED)
+- **Construct validity of `d_measured` (Statistician).** Everything tested so far is whether the
+  DISPLAY discriminates. Nothing tests whether the flag is **assigned correctly**. Needs an
+  independent labelled audit of the author-resolution path.
+- **Publish `n` + the unmeasured count beside EVERY rate (Economist P7).** A rate whose
+  denominator silently includes unreadable rows is the A3 sin relocated from the score to the
+  statistics.
+- **Recurrence ledger (Economist P6).** Append-only; one CLASS id per defect; a row per
+  recurrence with date, costume, and the register it hid in. **The row count IS the metric.**
+  Today's was roughly the sixth instance of one class and nobody has counted — *"that absent
+  count is the whole disease."*
+- **Time-to-detect (Operator S5).** Stop scoring "we caught it ourselves"; a run of self-caught
+  defects is equally consistent with a change rate manufacturing defects faster than review finds
+  them. Today's contradiction was live for hours; that metric has n=1 and no instrument.
+- **Captured, hashed probe artifacts (Challenger).** The probed blob no longer exists — no
+  retained JSON, no hash, no request id — in a codebase that PIT-seals its forecasts.
+
+## B6 — HYGIENE
+- `rsd.py` and `maint_precompute.py` call `_precompute_serve_payloads(600)` **outside the gate and
+  outside the endpoint's auth**. Consolidate or delete.
+- The five hand-maintained lists (`SRC_FILES`, `UNIV_FILES`, `SEALED_CONSTANTS`, `SERVED_FIELDS`,
+  `NETWORK_TESTS`) **fail silently OPEN when they shrink** — the Forecaster's P3 prediction
+  (p=0.55 by 2026-10-05).
+- Deploy skill gains the sequence: full suite → deploy → `POST /precompute` → re-probe →
+  **check `/prewarm last_run`** (the wedged-prewarm outage class).
+
+---
+
 ## STANDING CORRECTIONS TO THE RECORD (carry forward; do not re-assert the old forms)
 - **INV-1 did NOT cause the 2026-08-20 contradiction.** Deploy-version window. `s = json.loads(
   _payload)` at `:11680` → all four D fields come from ONE dict, so a stale blob makes them
