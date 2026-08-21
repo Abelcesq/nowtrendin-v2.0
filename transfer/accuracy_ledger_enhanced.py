@@ -138,7 +138,16 @@ def init_pending_db(db_path: str = DB_PATH):
                        # every sweep, so it cannot serve as the entry time a
                        # left-truncated (delayed-entry) estimator requires.
                        ("d_measured_at_enroll", "INTEGER"),
-                       ("enrolled_at", "TEXT")):
+                       ("enrolled_at", "TEXT"),
+                       # Round 5 rating-factor stamps. A rating factor that is
+                       # RECOMPUTED at read time is not a rating factor, it is a
+                       # hindsight query: corroboration cannot be rebuilt once
+                       # topic_signals prunes, and category via _category_for
+                       # depends on in-memory maps that reset on every restart
+                       # (33% warm vs 68% cold), so cell membership would be a
+                       # function of dyno uptime. Both are frozen HERE, once.
+                       ("corroboration_at_enroll", "INTEGER"),
+                       ("category_at_enroll", "TEXT")):
         try:
             conn.execute(f"ALTER TABLE pending_detections ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -151,7 +160,9 @@ def init_pending_db(db_path: str = DB_PATH):
     # referee_sealed = 1 the referee used the SEALED article, 0 = hindsight opensearch
     # fallback (Forecaster defect #1 — such checks are second-class, marked forever).
     for _col, _typ in (("d_at_enroll", "REAL"), ("referee_sealed", "INTEGER"),
-                       ("d_measured_at_enroll", "INTEGER"), ("enrolled_at", "TEXT")):
+                       ("d_measured_at_enroll", "INTEGER"), ("enrolled_at", "TEXT"),
+                       ("corroboration_at_enroll", "INTEGER"),
+                       ("category_at_enroll", "TEXT")):
         try:
             conn.execute(f"ALTER TABLE accuracy_ledger ADD COLUMN {_col} {_typ}")
             conn.commit()
@@ -309,7 +320,8 @@ def _parse(date_str: str) -> datetime:
 
 def record_detection(topic_key, topic_display, detection_date, detection_score,
                      timeout_days=DEFAULT_TIMEOUT_DAYS, db_path=DB_PATH, conn=None,
-                     enroll_arm=None, breadth_at_enroll=None):
+                     enroll_arm=None, breadth_at_enroll=None,
+                     corroboration_at_enroll=None, category_at_enroll=None):
     """Log a detection as PENDING the moment the engine flags it. Idempotent on
     (topic_key, detection_date).
 
@@ -434,12 +446,14 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
                     (id, topic_key, topic_display, detection_date, detection_score,
                      timeout_date, last_checked, status, enroll_arm, breadth_at_enroll,
                      sealed_query, sealed_wiki_article, d_at_enroll, d_early_at_enroll,
-                     sealed_query_ambiguous, d_measured_at_enroll, enrolled_at)
-                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)
+                     sealed_query_ambiguous, d_measured_at_enroll, enrolled_at,
+                     corroboration_at_enroll, category_at_enroll)
+                VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?,?,?)
             """, (rec_id, topic_key, topic_display, detection_date,
                   detection_score, timeout_dt, now, enroll_arm, breadth_at_enroll,
                   sealed_query, sealed_article, d_at_enroll, d_early,
-                  sealed_ambiguous, d_measured_at_enroll, now))
+                  sealed_ambiguous, d_measured_at_enroll, now,
+                  corroboration_at_enroll, category_at_enroll))
             conn.commit()
     except Exception as e:
         print(f"[ledger] record_detection error: {e}")
@@ -482,14 +496,17 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
     # resolution, or the ledger row cannot be triaged or left-truncated later.
     _dme = p.get("d_measured_at_enroll") if hasattr(p, "get") else None
     _ea = p.get("enrolled_at") if hasattr(p, "get") else None
+    _cor = p.get("corroboration_at_enroll") if hasattr(p, "get") else None
+    _cat = p.get("category_at_enroll") if hasattr(p, "get") else None
     conn.execute("""
         INSERT INTO accuracy_ledger
             (id, topic_key, topic_display, detection_date, detection_score,
              breakout_date, breakout_multiple, lead_time_days, verdict, validated_at, provider,
              sweep_query, query_ambiguous, referee_corroborated, at_detection_days, pre_broken,
              enroll_arm, breadth_at_enroll, d_at_enroll, referee_sealed,
-             d_measured_at_enroll, enrolled_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             d_measured_at_enroll, enrolled_at, corroboration_at_enroll,
+             category_at_enroll)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id) DO UPDATE SET
             breakout_date=EXCLUDED.breakout_date, breakout_multiple=EXCLUDED.breakout_multiple,
             lead_time_days=EXCLUDED.lead_time_days, verdict=EXCLUDED.verdict,
@@ -500,11 +517,13 @@ def _upsert_ledger(conn, rec_id, p, breakout_date, multiple, lead_days, verdict,
             enroll_arm=EXCLUDED.enroll_arm, breadth_at_enroll=EXCLUDED.breadth_at_enroll,
             d_at_enroll=EXCLUDED.d_at_enroll, referee_sealed=EXCLUDED.referee_sealed,
             d_measured_at_enroll=EXCLUDED.d_measured_at_enroll,
-            enrolled_at=EXCLUDED.enrolled_at
+            enrolled_at=EXCLUDED.enrolled_at,
+            corroboration_at_enroll=EXCLUDED.corroboration_at_enroll,
+            category_at_enroll=EXCLUDED.category_at_enroll
     """, (rec_id, p["topic_key"], p["topic_display"], p["detection_date"],
           p["detection_score"], breakout_date, multiple, lead_days, verdict, now, provider,
           sweep_query, query_ambiguous, referee_corroborated, at_det_days, pre_broken,
-          _arm, _brd, _dae, referee_sealed, _dme, _ea))
+          _arm, _brd, _dae, referee_sealed, _dme, _ea, _cor, _cat))
 
 
 def sweep_pending(db_path=DB_PATH, breakout_threshold=2.5, fetch_fn=None, limit=None) -> dict:

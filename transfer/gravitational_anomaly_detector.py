@@ -780,8 +780,33 @@ def _record_top_detections(limit=20, min_detection=None):
                 dd = date_utils.to_iso_date(r["det_date"])
                 if not dd:
                     continue
+                # ROUND-5 FIX: the LIVE path stamped none of the rating factors. Only
+                # the A/B branch passed breadth, and LEDGER_AB_D9 defaults "0", so the
+                # branch that runs in production wrote NULL — forever, and
+                # unrecoverably once topic_signals prunes. Any base rate keyed on
+                # corroboration was therefore a hindsight query, not a rating factor.
+                #
+                # corroboration_at_enroll is the §15a-SHAPED count: DISTINCT independent
+                # outlets, syndication-collapsed via min(distinct sources, distinct
+                # titles), so one wire story through forty mastheads counts once.
+                # NOTE it is deliberately NOT the same object as breadth_at_enroll,
+                # which is len(platforms_active) — a PLATFORM count. Conflating the two
+                # is what made this look stamped when it was not.
+                #
+                # category_at_enroll uses the STATELESS _topic_category, never
+                # _category_for: the latter reads in-memory maps that reset empty on
+                # every process restart (~68% catch-all cold vs ~33% warm), so a cell
+                # assigned by it would depend on dyno uptime and two users could see
+                # different base rates for the same topic in the same minute.
+                _corr = _corroboration_at_enroll(conn, r["topic_key"])
+                try:
+                    _cat = _topic_category(r["topic_display"] or r["topic_key"])
+                except Exception:
+                    _cat = None          # fail-open NULL, never a guessed cell
                 ledger_plus.record_detection(r["topic_key"], r["topic_display"], dd,
-                                             r["detection_score"] or 0, conn=conn)
+                                             r["detection_score"] or 0, conn=conn,
+                                             corroboration_at_enroll=_corr,
+                                             category_at_enroll=_cat)
                 n += 1
         else:
             # ── D9 A/B path (registered design §7): candidates -> exclude already-
@@ -11433,6 +11458,35 @@ def api_usage_report():
 # raw_signals + topic_signals were UNBOUNDED (every other table had pruning).
 # Scoring reads only the last 72h of signals, so anything older is dead weight
 # except author_history (first-timer memory — separate table, untouched).
+
+def _corroboration_at_enroll(conn, topic_key: str):
+    """DISTINCT independent outlets for a topic AT ENROLLMENT, syndication-collapsed.
+
+    §15a defines independence as min(distinct outlets, distinct titles) so that one wire
+    story carried by forty mastheads counts as ONE voice, not forty. That count is
+    computed live inside mainstream_breadth and persisted NOWHERE, which is why the
+    proposed base-rate cell keyed on it could only ever have been reconstructed from
+    today's corpus — hindsight, not a rating factor. Frozen here, once, at enrollment.
+
+    Returns None (never 0) on any failure: an unknown corroboration is a third stratum,
+    and a zero would read as 'measured, no outlets' — the A3 floor-end defect again.
+    """
+    try:
+        row = conn.execute(
+            "SELECT COUNT(DISTINCT source_name) AS n_src, COUNT(DISTINCT title) AS n_ttl "
+            "FROM raw_signals WHERE id IN ("
+            "  SELECT signal_id FROM topic_signals WHERE topic_key = ?)",
+            (topic_key,)).fetchone()
+        if row is None:
+            return None
+        d = dict(row) if hasattr(row, "keys") else {"n_src": row[0], "n_ttl": row[1]}
+        n_src, n_ttl = d.get("n_src"), d.get("n_ttl")
+        if n_src is None or n_ttl is None:
+            return None
+        return int(min(int(n_src), int(n_ttl)))
+    except Exception:
+        return None
+
 
 # SEALED CONSTANT (board round 5, 2026-08-21). A literal, never os.getenv — the env
 # var may raise retention above this floor but can never lower it below. Protects

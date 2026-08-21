@@ -148,6 +148,24 @@ CLAIMS = [
     # Added board round 5. The `sealed` enforcer used to be a substring test; the
     # Forecaster mutated every binding number in the kill criterion and it stayed GREEN.
     # It now recomputes the published text_sha256 over a recorded byte-exact boundary.
+    # Round 5. Both rules already existed as prose and ONE HAD ALREADY BEEN CROSSED:
+    # the Base Rate Panel design specified its market surface on realized EOD direction
+    # while the R1 ruling forbidding exactly that sat verbatim in arrival_clock.py.
+    ("C-R1-PARTICIPATION",
+     "a panel surface's arrival event is PARTICIPATION (volume/breadth), never PAYOFF "
+     "(price/return) — a probability over a price ledger is a return forecast, which "
+     "this board ruled out by name",
+     "transfer/arrival_clock.py R1 firewall; transfer/panel_invariants.py",
+     "ASSERTED", "test", "test_panel_invariants.py::t1"),
+
+    ("C-R2-REFLEXIVITY",
+     "the panel's own display may never feed the outcome that validates it: above a "
+     "sealed audience trip, rows displayed before arrival are excluded from the base "
+     "rate, and a cell with no clean rows serves ABSENT rather than a number",
+     "transfer/panel_invariants.py; the Economist's round-5 finding that this is a "
+     "circularity through a different door than the standing N-exclusion invariant",
+     "ASSERTED", "test", "test_panel_invariants.py::t8"),
+
     ("C-SEAL-RECOMPUTED",
      "a sealed document's enforcer RECOMPUTES its published text_sha256 over a recorded "
      "byte-exact extraction recipe — editing any binding term turns the gate RED, and "
@@ -189,6 +207,11 @@ SEALED_CONSTANTS = [
     # restore 7-day retention and destroy the half of the comparison that the
     # 2026-08-21 snapshot does not cover.
     ("transfer/gravitational_anomaly_detector.py", "SIGNAL_RETENTION_FLOOR_DAYS"),
+    # Round 5: the reflexivity trip, fixed while the audience is five seats and
+    # nobody has an interest in the answer. Env-readable, it could be raised out
+    # of reach by whoever benefits from the panel never being called reflexive.
+    ("transfer/panel_invariants.py", "REFLEXIVITY_AUDIENCE_TRIP"),
+    ("transfer/panel_invariants.py", "REFLEXIVITY_MIN_PAIRS"),
 ]
 
 # L3 — (field, human description). Must appear on at least one surface.

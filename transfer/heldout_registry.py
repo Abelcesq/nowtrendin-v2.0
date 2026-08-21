@@ -43,6 +43,10 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 #: import these — doing so would let the thing being measured see its own referee.
 HELD_OUT_ARRIVAL_INPUTS = {
     "arrival_clock":       "mainstream-arrival ground truth (abnormal share volume)",
+    # Round 5: the panel invariants exist to REFUSE (R1 participation clock, R2
+    # reflexivity). A scoring module importing them would mean a score path is
+    # consulting panel doctrine — the wrong direction entirely.
+    "panel_invariants":    "R1/R2 panel refusal gates; measurement doctrine, never an input",
     "flow_ledger":         "the disclosure-to-participation latency register",
     "ledger_survival":     "survival/interval math over ledger outcomes",
     "referee_wikipedia":   "held-out attention referee (pre-existing precedent)",
