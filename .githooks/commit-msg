@@ -155,4 +155,34 @@ EOF
     fi
   fi
 fi
+# ── INTEGRITY GATE (Layers 2+3, board 2026-08-20) ────────────────────────────────
+# Layer 2: every ASSERTED integrity claim must name an enforcer that EXISTS (a test, an
+# audit, a hook gate, a lint). A claim with a fictional or missing enforcer fails here —
+# which inverts the old default, where a claim with nothing behind it was invisible.
+# Layer 3: three lints, one per defect shape actually observed on 2026-08-20 —
+#   L1 a constant declared sealed must be a literal, never os.getenv;
+#   L2 a comment citing a test by name must resolve to a test that exists;
+#   L3 a field described as served must appear on a surface (reports, does not block).
+# Verified to FIRE on fixtures for all three before being wired.
+# Deliberate, visible bypass: INTEGRITY_SKIP=1 git commit ...
+if git diff --cached --name-only 2>/dev/null | grep -qE '^(transfer|tools)/.*\.py$|^\.githooks/'; then
+  if [ "${INTEGRITY_SKIP:-0}" = "1" ]; then
+    echo "  [integrity gate] SKIPPED via INTEGRITY_SKIP=1 — the skip is on the record." >&2
+  elif [ -f tools/integrity_gate.py ]; then
+    if ! python tools/integrity_gate.py >/tmp/nt_integrity.log 2>&1; then
+      cat >&2 <<EOF
+
+  INTEGRITY GATE FAILED
+  ----------------------------------------------------------------------
+$(grep -E '  (FAIL|✗)' /tmp/nt_integrity.log | head -12)
+  ----------------------------------------------------------------------
+  An integrity claim has lost its enforcer, or a sealed thing stopped being sealed.
+  Fix the code, or move the claim to status OPEN in tools/integrity_gate.py with the
+  reason — an OPEN claim is honest; a claim with nothing behind it is the defect.
+  Deliberate, recorded bypass:  INTEGRITY_SKIP=1 git commit ...
+EOF
+      exit 1
+    fi
+  fi
+fi
 exit 0
