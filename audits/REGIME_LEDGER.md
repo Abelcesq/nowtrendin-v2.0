@@ -26,4 +26,10 @@
 | 2026-08-20 | Ben's Bites + Wired AI URLs repointed (tripwire catches #1/#2 on its first production run) | Two silently-dead mainstream feeds resume |
 | 2026-08-20 | Shadow-trial prereg SEALED (PIT `e90af6df..`) + M0 baseline sealed (`77d49c00..`) | Trial rules frozen before window opens 09-01 |
 
-*Next expected entries: candidate-feed wiring dates; wiki-v3/GDELT referee arm.*
+| 2026-08-20 (eve) | **CORRECTION to the row above** (this ledger's own rule: corrections are NEW rows citing the old). The `D_PLUMBING_V2=ON` row described the community-age guard as in force. It was NOT in force on the blog lane — the guard sat in the detector's function (github/HN/bluesky/lemmy) while the blog lane uses its own. Six board seats found it independently. | For any window between the flip (~22:2x UTC) and commit `d6de777`, first-timer credit on devto/hashnode/discourse/wordpress/blogger/medium/ghost was UNGUARDED — 12 new WordPress communities in particular could read ft≈1.0. Any analysis spanning that window must say so |
+| 2026-08-20 (eve) | Guard landed on the blog lane; held-out firewall exception registered + commit-msg gate added; `d_measured` re-keyed to author resolution; pseudo-authors excluded; `engagement_divergence` degenerate-venue guard (`d6de777`) | `d_measured`'s 32.4% blind figure is an UNDERCOUNT until re-censused. Indicator values computed before this row are not comparable |
+| 2026-08-20 (eve) | Shadow-trial prereg **ERRATUM 01** sealed (PIT `6f9ed05f..`, cites parent `e90af6df..`) | Operative trial epoch is now `d6de777`; non-English cohorts blocked pending arbiter-locale declaration and ES/DE acceptance fixtures |
+
+*Next expected entries: candidate-feed wiring dates; wiki-v3/GDELT referee arm; the
+post-flip re-census of `d_measured`; the paired A/B recompute (due before 2026-08-27,
+while pre-flip comparison rows still exist).*

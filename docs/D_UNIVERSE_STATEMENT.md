@@ -38,6 +38,8 @@ rows carry real first-timer bits going forward.
 ## The standing interpretation rule
 
 **A topic with `d_measured = 0` (or NULL, pre-epoch) has an UNREADABLE D — its stored 0
-is "could not read", never "read quiet."** ~32.4% of the current working set is in this
-state (backtest census, 2026-08-20). Any D-based claim carries this scope or it
+is "could not read", never "read quiet."** The backtest census read ~32.4% of the working set in this state — but that
+figure was computed from PLATFORM MEMBERSHIP, not author resolution, so it is an
+**UNDERCOUNT** (board 2026-08-20 evening). It is corrected to an author-resolution basis
+after the next census; until then cite it as a floor, not a measurement. Any D-based claim carries this scope or it
 overclaims. This is §15a / A3 pointed at our own component.
