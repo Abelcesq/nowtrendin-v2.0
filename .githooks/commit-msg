@@ -9,9 +9,18 @@ msg_file="${1:-}"
 if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then exit 0; fi
 msg="$(tr -d '\r' < "$msg_file" 2>/dev/null)"
 
-# Already asserted, or a merge/revert → allow.
+# GATE-CHAIN NOTE (board 2026-08-20 evening — found by testing that the new test gate
+# actually fires; it did not). Every gate below used `exit 0` to mean "I have nothing to
+# say", which ENDED THE WHOLE HOOK and silently skipped every later gate. So the
+# cold-start, firewall and test gates only ran when a collector file happened to be
+# touched, and ANY commit carrying [source-onboarded] bypassed all of them. That is the
+# board's own pattern once more: gates that exist and do not run.
+# RULE NOW: a passing gate sets its skip flag and FALLS THROUGH. Only `exit 1` (a
+# refusal) or the single final `exit 0` ends this script.
+SKIP_SOURCE=0
 case "$msg" in
-  *"[source-onboarded]"*|"Merge "*|"Revert "*) exit 0 ;;
+  *"[source-onboarded]"*) SKIP_SOURCE=1 ;;
+  "Merge "*|"Revert "*)   SKIP_SOURCE=1 ;;
 esac
 
 # Collector / source-registry files where a new source gets wired (single line — no
@@ -20,13 +29,13 @@ SRC_FILES="transfer/blog_collectors.py transfer/news_collectors.py transfer/disc
 
 # Added lines only (staged diff), minus the +++ header lines.
 added="$(git diff --cached --unified=0 -- $SRC_FILES 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+')"
-if [ -z "$added" ]; then exit 0; fi
+if [ -z "$added" ]; then SKIP_SOURCE=1; fi
 
 # Source-shaped addition = a feed URL (rss/feed/atom/.xml) OR a new collector-health
 # expectation (max_gap_minutes) OR a source-list marker (GHOST_FEEDS/_RSS_FEEDS/reputable).
 hits="$(printf '%s\n' "$added" | grep -Eic 'https?://[^ ]*(rss|/feed|atom|\.xml)|max_gap_minutes|GHOST_FEEDS|_RSS_FEEDS|_NEWS_REPUTABLE_SOURCES')"
 
-if [ "${hits:-0}" -gt 0 ]; then
+if [ "${hits:-0}" -gt 0 ] && [ "$SKIP_SOURCE" = "0" ]; then
   cat >&2 <<'EOF'
 
   SOURCE ONBOARDING GATE  (CLAUDE.md §16 / DATA_BUILDING_BLOCKS B1a)
@@ -57,14 +66,15 @@ fi
 # window handling per the §16a 3-stage posture. Blocks a watchlist/universe-shaped change
 # unless the message asserts [cold-start-stated]. Author confirms; the hook refuses silent
 # universe growth that skips the honest-absence posture.
+SKIP_COLDSTART=0
 case "$msg" in
-  *"[cold-start-stated]"*) exit 0 ;;
+  *"[cold-start-stated]"*) SKIP_COLDSTART=1 ;;
 esac
 UNIV_FILES="transfer/financial_risk_gradient.py transfer/crypto_signals.py transfer/crypto_money_gradient.py transfer/market_signal_engine.py"
 uadded="$(git diff --cached --unified=0 -- $UNIV_FILES 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+')"
 if [ -n "$uadded" ]; then
   uhits="$(printf '%s\n' "$uadded" | grep -Eic 'WATCHLIST_TICKERS|CRYPTO_COINS|COIN_PROXY|_UNIVERSE|add.*ticker|new (asset|instrument|coin|region)|_market_lane|na_components|_MARKET_MACRO_NA')"
-  if [ "${uhits:-0}" -gt 0 ]; then
+  if [ "${uhits:-0}" -gt 0 ] && [ "${SKIP_COLDSTART:-0}" = "0" ]; then
     cat >&2 <<'EOF'
 
   COLD-START GATE  (CLAUDE.md §16a)
@@ -114,6 +124,35 @@ sys.stdout.write('OK' if r.get('ok') else '|'.join(
   ----------------------------------------------------------------------
 EOF
     exit 1
+  fi
+fi
+# ── TEST GATE (board 2026-08-20 evening — the Guardian's pattern, root instance) ──
+# The repo held SEVEN test files and NOTHING that ran them: no CI, no hook, no make
+# target. Every "behavior-tested" / "fixture-verified" / "36/36 green" in a commit message
+# or docstring was therefore true when typed and unverifiable ever after — and one comment
+# cited a fixture (test_feed_tripwire) that did not exist as a file. That is the pattern
+# the board named: a claim written in prose and enforced by nothing.
+# This gate runs the suite OFFLINE (deterministic, ~3s) on any commit touching transfer/
+# and REFUSES on failure. Network tests are skipped here BY NAME and reported by the
+# runner — never a silent subset; run the full suite before deploying.
+# Emergency bypass is deliberate and visible: TESTS_SKIP=1 git commit ...
+if git diff --cached --name-only 2>/dev/null | grep -q '^transfer/.*\.py$'; then
+  if [ "${TESTS_SKIP:-0}" = "1" ]; then
+    echo "  [test gate] SKIPPED via TESTS_SKIP=1 — the skip is on the record." >&2
+  elif [ -f tools/run_tests.py ]; then
+    if ! python tools/run_tests.py --offline >/tmp/nt_tests.log 2>&1; then
+      cat >&2 <<EOF
+
+  TEST GATE FAILED
+  ----------------------------------------------------------------------
+$(tail -18 /tmp/nt_tests.log)
+  ----------------------------------------------------------------------
+  A failing suite means an integrity claim somewhere has stopped being true.
+  Fix the test or fix the code — do not weaken the assertion to make it pass.
+  Deliberate, recorded bypass:  TESTS_SKIP=1 git commit ...
+EOF
+      exit 1
+    fi
   fi
 fi
 exit 0
