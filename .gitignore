@@ -23,3 +23,7 @@ transfer/anomaly_detector.db
 HEDGE_FUND_BUYER_ROADMAP_20260809.md.docx
 TWO_POLES_TCI_MEDALLION_20260809.md.docx
 grifin.pdf
+
+# AB-ATTRIBUTION cohort snapshot (board round 4, item 1a) — 126MB of preserved
+# pre-flip inputs. The MANIFEST (counts + sha256) IS committed; the payload is not.
+audits/ab-attribution/*.jsonl

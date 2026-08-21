@@ -1,0 +1,27 @@
+{
+  "purpose": "AB-ATTRIBUTION pre-flip input preservation (board round 4, item 1a)",
+  "flip_utc": "2026-08-20T00:00:00",
+  "taken_at_utc": "2026-08-21T05:53:32Z",
+  "read_only": true,
+  "caveat_rank1": "Five treatments at one switch point = design matrix rank 1. This snapshot preserves optionality only; it does NOT make the five treatments identifiable. The recompute arm identifies exactly one (D_PLUMBING_V2), conditionally on the other four being ON.",
+  "tables": {
+    "topic_signals": {
+      "time_column": "extracted_at",
+      "rows_counted": 297036,
+      "rows_written": 297036,
+      "oldest": "2026-08-14T06:30:33.016880+00:00",
+      "newest": "2026-08-19T19:40:03.889720+00:00",
+      "file": "preflip_topic_signals.jsonl",
+      "sha256_of_lines": "71773319ae0dbacaad204febdb783715eb45afe6d8ca5a25af6e80adeab16971"
+    },
+    "raw_signals": {
+      "time_column": "collected_at",
+      "rows_counted": 45625,
+      "rows_written": 45625,
+      "oldest": "2026-08-14T06:30:33.016880+00:00",
+      "newest": "2026-08-19T19:40:03.888406+00:00",
+      "file": "preflip_raw_signals.jsonl",
+      "sha256_of_lines": "d8d89a2b3a7c1ee07c96d20e1a98dcb904bdbe09a87952be8296ee17b38677e7"
+    }
+  }
+}
