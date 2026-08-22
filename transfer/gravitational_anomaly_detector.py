@@ -11460,7 +11460,47 @@ def api_usage_report():
 # except author_history (first-timer memory — separate table, untouched).
 
 def _corroboration_at_enroll(conn, topic_key: str):
-    """DISTINCT independent outlets for a topic AT ENROLLMENT, syndication-collapsed.
+    """DISABLED 2026-08-22 — returns None. Do not re-enable without the three conditions.
+
+    THREE SEATS found independently that this computed a DIFFERENT quantity wearing
+    §15a's name. Divergences, every one biasing UPWARD:
+      1. No `_title_sig` — raw exact-string DISTINCT title, so a masthead suffix or an
+         "EXCLUSIVE:" prefix turned one wire story into two independent voices.
+      2. No tier filter and no news-platform filter — Reddit, GitHub, blogs and ghost
+         feeds counted as "independent media outlets". Five subreddits and zero
+         newsrooms stamped corroboration=5, i.e. quorum met.
+      3. No 72-hour window — up to 30 days of post-detection accumulation, so the count
+         was confounded with topic age.
+      4. No v2.1 spike vote, so it is not §15a arithmetic at all.
+      5. And it contradicted its own docstring: COUNT(DISTINCT ...) over an empty set
+         returns 0, not None — "measured, zero outlets", the A3 floor-end defect the
+         docstring named as the reason not to.
+
+    A stamp is permanent (topic_signals prunes), so every wrong row is uncorrectable.
+    A wrong value is worse than NULL: NULL is an honest third stratum, a plausible
+    integer is indistinguishable from a measured one. Freeze the definition, THEN the
+    values.
+
+    RE-ENABLING REQUIRES ALL THREE: (a) call `dual_pathway.mainstream_breadth` itself,
+    never a re-implementation, with a regression test asserting equality; (b) bound it
+    `<= detection_date` so it is as-of DETECTION, not as-of enrollment (up to 14 days of
+    lookahead otherwise); (c) a sealed `corroboration_sig_version`, because the CJK
+    `_title_sig` defect is open and fails OPEN.
+
+    ── AND THE REASON THIS DOCSTRING EXISTS TWICE ──────────────────────────────────
+    This disable was written once, on 2026-08-22, and LOST before it reached a commit:
+    nine board agents were reviewing the tree concurrently, one restored this file from
+    its own experiment and overwrote the edit, and `git add -A` then committed a
+    DIFFERENT agent's live mutation (REFLEXIVITY_AUDIENCE_TRIP 250 -> 5001) while the
+    commit message asserted "Suite 13 passed, 0 failed" — which was false at that commit.
+    The Challenger found both by running the suite instead of reading it.
+    """
+    return None
+
+
+def _corroboration_at_enroll_DISABLED_ORIGINAL(conn, topic_key: str):
+    """RETAINED, UNREACHABLE, for the record. This is the implementation that shipped on
+    2026-08-21 and must not be restored as-is; see the conditions above.
 
     §15a defines independence as min(distinct outlets, distinct titles) so that one wire
     story carried by forty mastheads counts as ONE voice, not forty. That count is
