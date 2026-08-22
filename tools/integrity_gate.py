@@ -322,6 +322,51 @@ def _enforcer_live(kind: str, ref: str):
                            "hash cannot be verified by anyone, including us")
         claimed = m.group(1).decode()
 
+        # ── THE ANCHOR CROSS-CHECK (2026-08-22). WITHOUT THIS THE SEAL IS CIRCULAR. ──
+        # Yesterday this enforcer recomputed the body hash and compared it to the digest
+        # printed INSIDE THE SAME DOCUMENT. It therefore compared the document to itself,
+        # which is falsifiable against ACCIDENT (a stray edit, a typo, a bad merge) and
+        # not against an EDITOR — the only threat model a seal exists for.
+        #
+        # The Forecaster attacked it seven ways and SIX PASSED GREEN, including:
+        #   E1  the exact Part A substitution + republish the recomputed digest
+        #   E3  insert an earlier PIT-SEAL-shaped line so the regex takes a different hash
+        #   E5b replace the ENTIRE document with a two-line self-sealing stub reading
+        #       "D is retained permanently. No result at 2027-02-28 demotes it."
+        # Only deleting the digest outright turned it red. A seal that survives being
+        # replaced by its own negation is not a seal.
+        #
+        # PIT_SEAL_ANCHORS.md is append-only, carries both digests, and was written when
+        # the criterion was sealed. It was four lines away the whole time.
+        anchors_path = os.path.join(ROOT, "audits", "pit-anchors", "PIT_SEAL_ANCHORS.md")
+        item_key = None
+        km = re.search(rb"item_key=([A-Za-z0-9\-_]+)", raw)
+        if km:
+            item_key = km.group(1).decode()
+        if item_key and os.path.exists(anchors_path):
+            anchored_text, anchored_row = None, None
+            for line in _read(anchors_path).splitlines():
+                parts = line.strip().split("|")
+                # rows look like: F|<item_key>|<date>|<row_sha256>|<text_sha256>
+                if len(parts) >= 5 and parts[1].strip() == item_key:
+                    anchored_row, anchored_text = parts[3].strip(), parts[4].strip()
+                    break
+            if anchored_text and anchored_text != claimed:
+                return False, (
+                    f"{path} SEAL DISAGREES WITH ITS INDEPENDENT ANCHOR — the document "
+                    f"publishes {claimed[:16]}.. but PIT_SEAL_ANCHORS.md recorded "
+                    f"{anchored_text[:16]}.. for {item_key}. Either the sealed body was "
+                    "edited and its digest re-published in the same commit (which is "
+                    "void by construction), or the anchor was altered. Do NOT reconcile "
+                    "by editing the anchor: it is append-only and it is the only record "
+                    "that does not live inside the thing it certifies.")
+            if anchored_row and anchored_row not in raw.decode("utf-8", "replace"):
+                return False, (f"{path} does not carry its anchored row_sha256 "
+                               f"{anchored_row[:16]}.. — the PIT anchor is unverifiable")
+        elif item_key:
+            return False, (f"{path} has no row in PIT_SEAL_ANCHORS.md for {item_key!r}; "
+                           "an unanchored seal certifies only itself")
+
         # The sealed body is everything ABOVE the '---' that opens the PIT SEAL block.
         cut = raw.find(b"\n---\n**PIT SEAL:**")
         if cut < 0:
