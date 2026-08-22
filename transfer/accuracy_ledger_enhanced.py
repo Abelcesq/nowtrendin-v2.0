@@ -383,9 +383,21 @@ def record_detection(topic_key, topic_display, detection_date, detection_score,
     # and not the measurement flag, while `velocity_scores.d_measured` sat in the SAME
     # TABLE and was simply not selected. compute_dark_matter returns 0.0 on the unmeasured
     # path, so a fabricated zero and a genuinely-quiet zero were being written into
-    # d_at_enroll INDISTINGUISHABLY — and live `unmeasured_fraction` is 0.752, i.e. about
-    # three quarters of stamped rows. Any AUC over that column partly measures "did the
+    # d_at_enroll INDISTINGUISHABLY. Any AUC over that column partly measures "did the
     # author-resolution path fire", a property of the collector roster, not of D.
+    #
+    # ⚠ FIGURE RETRACTED 2026-08-22 (Statistician, round 6). This comment previously said
+    # "live unmeasured_fraction is 0.752, i.e. about three quarters of stamped rows". THAT
+    # NUMBER IS FROM A DIFFERENT POPULATION. `unmeasured_fraction` is computed in the
+    # degenerate census as unmeasured_components/total_components over MARKET INSTRUMENT
+    # gradient components — a different lane, a different unit of observation, and a
+    # different definition of "unmeasured". It says nothing about the D-unmeasured share
+    # of ledger rows, which NO QUERY IN THIS REPO COMPUTES and which is therefore UNKNOWN.
+    # Four board seats reasoned from the figure and the author repeated it in two board
+    # documents and here. It is the §15a-A1 evidence-hygiene rule — a harness read printed
+    # in the same register as a served value — recurring as a DIFFERENT POPULATION's
+    # metric printed as this population's. Do not quote 0.752 for D again; compute the
+    # real rate or state it as unknown.
     #
     # This is forward-only and cannot be recovered later: every row stamped between
     # 2026-08-17 and today carries a magnitude with no way to triage it, permanently.

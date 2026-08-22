@@ -88,14 +88,16 @@ to that third party, indistinguishable from a broken one. Per the F5-a1 standard
 
     file      : audits/forecasts/D_KILL_CRITERION_2026-08-20.md
     read      : bytes
-    normalize : b'
-' -> b'
-'   (canonical LF; the repo checks out CRLF on Windows)
+    normalize : replace CR-LF byte pairs with a single LF byte (canonical LF; this
+                repository checks out CRLF on Windows, which is the single reason a
+                competent third party ran 36 recipes and could not reproduce this seal)
+                in Python:  raw = raw.replace(b"\r\n", b"\n")
     boundary  : everything up to and INCLUDING the newline that precedes the line
                 '---' which opens the '**PIT SEAL:**' block
-                i.e. raw[: raw.find(b'
----
-**PIT SEAL:**') + 1]
+                in Python:  raw[: raw.find(b"\n---\n**PIT SEAL:**") + 1]
+                (the marker is: LF, three hyphens, LF, then the literal text
+                 '**PIT SEAL:**' — spelled out here because the escape form of this
+                 very line was mangled once already, see the note below)
     length    : 4100 bytes == 4065 characters (they differ because the em-dashes are
                 3 bytes each in UTF-8 — this is what made two seats' numbers look
                 incompatible when both were right)

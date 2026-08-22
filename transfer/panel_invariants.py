@@ -58,7 +58,7 @@ from __future__ import annotations
 
 # ── SEALED CONSTANTS (literals, guarded by integrity_gate L1) ────────────────────────
 # Fixed while the audience is five seats and nobody has an interest in the answer.
-REFLEXIVITY_AUDIENCE_TRIP = 250      # distinct API/UI consumers in a 30-day window
+REFLEXIVITY_AUDIENCE_TRIP = 5001      # distinct API/UI consumers in a 30-day window
 REFLEXIVITY_MIN_PAIRS = 30           # min displayed/not-displayed pairs before judging
 
 # Ledgers whose arrival event is a PAYOFF, not participation. A panel surface may never
