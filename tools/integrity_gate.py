@@ -151,6 +151,13 @@ CLAIMS = [
     # Round 5. Both rules already existed as prose and ONE HAD ALREADY BEEN CROSSED:
     # the Base Rate Panel design specified its market surface on realized EOD direction
     # while the R1 ruling forbidding exactly that sat verbatim in arrival_clock.py.
+    ("C-D-TRISTATE",
+     "d_measured has THREE states and the affirmative narration is opt-IN: only "
+     "d_measured==1 serves a first_timer_ratio or a measured claim; 0 (blind) and NULL "
+     "(unknown) withhold it and say DIFFERENT things",
+     "gravitational_anomaly_detector D_dark_matter payload; ruling 4c",
+     "ASSERTED", "test", "test_d_tristate.py::t3"),
+
     ("C-R1-PARTICIPATION",
      "a panel surface's arrival event is PARTICIPATION (volume/breadth), never PAYOFF "
      "(price/return) — a probability over a price ledger is a return forecast, which "

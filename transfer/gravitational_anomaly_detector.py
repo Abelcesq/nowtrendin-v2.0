@@ -11833,29 +11833,55 @@ def get_topic_detail(topic_key: str):
                 # and §16a stage-2 forbids a floor value wearing a measured badge.
                 "d_measured":         (None if s.get("d_measured") is None
                                        else bool(s.get("d_measured"))),
+                # ── THE TRI-STATE FIX (ruling 4c, board round 5) ────────────────────
+                # d_measured has THREE states and the old guards handled two. The column
+                # was added by live migration with no backfill, so every row scored
+                # before 2026-08-20 holds NULL — an estimated >90% of distinct topics,
+                # and dormant topics stay NULL forever. In Python `None != 0` is True and
+                # `None == 0` is False, so those rows fell through BOTH guards and were
+                # served a numeric first_timer_ratio beside "No dark matter signatures.
+                # Signal appears to originate publicly." — an affirmative MEASURED claim
+                # about a topic whose measurement status is unknown. That is §16a stage-2
+                # and §17 violated on the wire, on the largest stratum, and /precompute
+                # could not fix it because this block is computed live.
+                #
+                # UNKNOWN and BLIND are different facts and must never be pooled:
+                #   None -> we never recorded whether D was readable  (pre-epoch/dormant)
+                #   0    -> we looked and D was unreadable            (measured blind)
+                #   1    -> D was read                                (a real value)
+                # Both non-1 states withhold the ratio, but they say different things,
+                # because "we don't know" is not "we know it was blind".
                 "first_timer_ratio":  (s.get("first_timer_ratio")
-                                       if s.get("d_measured") != 0 else None),
+                                       if s.get("d_measured") == 1 else None),
                 "asymmetry_detected": bool(s.get("engagement_asymmetry")),
                 "unmeasured_note": (
-                    None if s.get("d_measured") != 0 else
-                    "UNMEASURED — this topic carried no author-bearing and no "
-                    "engagement-bearing signals, so D could not be read. The 0 means "
-                    "COULD NOT READ, never 'read quiet'."),
+                    None if s.get("d_measured") == 1 else
+                    ("UNKNOWN — this topic was last scored before D's readability was "
+                     "recorded, so we cannot say whether D was measurable for it. This "
+                     "is missing metadata, not a finding about the topic."
+                     if s.get("d_measured") is None else
+                     "UNMEASURED — this topic carried no author-bearing and no "
+                     "engagement-bearing signals, so D could not be read. The 0 means "
+                     "COULD NOT READ, never 'read quiet'.")),
                 # The narration must not contradict the field above it (Operator,
                 # board 2026-08-20 late). _explain_d returns "No dark matter signatures.
                 # Signal appears to originate publicly." — an affirmative MEASURED claim —
                 # which was being served beside d_measured=false. No UI renders this
                 # field, but the licensing product IS the payload.
                 "plain_english": (
-                    "UNMEASURED — no author-bearing or engagement-bearing signals for "
-                    "this topic, so no dark-matter reading exists. This is absence of "
-                    "measurement, not evidence of public origin."
-                    if s.get("d_measured") == 0 else
                     _explain_d(
                         s["dark_matter_score"],
                         s.get("first_timer_ratio", 0),
                         bool(s.get("engagement_asymmetry"))
-                    )),
+                    )
+                    if s.get("d_measured") == 1 else
+                    ("UNKNOWN — this topic was last scored before D's readability was "
+                     "recorded. We are not saying D was quiet; we are saying we did not "
+                     "record whether it could be read. Re-scoring will resolve it."
+                     if s.get("d_measured") is None else
+                     "UNMEASURED — no author-bearing or engagement-bearing signals for "
+                     "this topic, so no dark-matter reading exists. This is absence of "
+                     "measurement, not evidence of public origin.")),
             },
             "C_confidence_decay": {
                 "score":  s["confidence_decay"],

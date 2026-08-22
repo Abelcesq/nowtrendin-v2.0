@@ -78,14 +78,20 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
         value={dUnmeasured ? 'Unmeasured' : `${ftrPct}%`}
         active={!dUnmeasured && ftr >= 0.35}
         desc={
-          ftr >= 0.35
+          // ORDER MATTERS, and it was wrong (Economist, board round 5). This ternary
+          // tested `ftr >= 0.35` FIRST, so the unmeasured branch was only reachable when
+          // the ratio happened to be low. Give it an unmeasured topic carrying a stale
+          // ratio at or above the threshold — exactly the half-old payload this project
+          // keeps producing — and it rendered "X% of participants are new here …
+          // private-channel activity inferred" on a topic we could not read at all.
+          // The badge was guarded and the sentence was not; the sentence is the claim.
+          //
+          // Unmeasurability is now checked BEFORE any threshold, so no arithmetic on a
+          // number we do not have can reach a user-facing assertion.
+          dUnmeasured
+            ? `The first-timer ratio could not be read for this topic — no author-bearing signals reached us. This is absence of measurement, not evidence that nothing is happening.`
+            : ftr >= 0.35
             ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → private-channel activity inferred.`
-            // The BADGE was fixed and the SENTENCE was not (Guardian, board 2026-08-20
-            // late): on an unmeasured topic the panel read value "Unmeasured" with
-            // "0% new participants — below the threshold" directly beneath it. The
-            // sentence asserting the number means something is the defect, not the number.
-            : dUnmeasured
-            ? `No author-bearing signals reached us for this topic, so the first-timer ratio could not be read at all. This is absence of measurement — not evidence that nothing is happening.`
             : `${ftrPct}% new participants — below the private-channel threshold; monitor for an increase.`
         }
       />

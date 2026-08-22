@@ -18,10 +18,20 @@ export function WhyScoresDiverge({ signal }: { signal: Signal }) {
   // Each row carries the signal's real value + which score it pushes toward.
   const rows: { label: string; value: string; favors: 'DET' | 'CONF'; note: string }[] = [];
 
-  if (signal.darkMatter != null)
+  // This file had NO d_measured guard at all (Guardian + Challenger, board round 5), so
+  // it rendered "UNDER-THE-RADAR (D) 0/100" on topics where D could not be read — a
+  // structural zero presented as a measured one, on a panel whose whole job is to explain
+  // WHY two scores diverge. §16a stage-2: a floor value must never wear a measured badge.
+  // dMeasured is tri-state: 1 read, 0 blind, null/undefined unknown (pre-epoch rows).
+  const dReadable = signal.dMeasured === true || signal.dMeasured === 1;
+
+  if (signal.darkMatter != null && dReadable)
     rows.push({ label: 'UNDER-THE-RADAR (D)', value: `${Math.round(signal.darkMatter)}/100`,
       favors: 'DET', note: 'hidden early activity → lifts Detection' });
-  if (ftPct != null)
+  else if (signal.darkMatter != null)
+    rows.push({ label: 'UNDER-THE-RADAR (D)', value: 'Unmeasured',
+      favors: 'DET', note: 'D could not be read for this topic — absence of measurement, not a low reading' });
+  if (ftPct != null && dReadable)
     rows.push({ label: 'FIRST-TIMER RATIO', value: `${ftPct}%`,
       favors: 'DET', note: 'new participants flooding in → lifts Detection' });
   if (signal.engagementAsymmetry != null)
