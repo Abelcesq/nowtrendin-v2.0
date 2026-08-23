@@ -47,11 +47,18 @@ awaits ruling; scraper-vendor lanes rest on vendor relationships with a general
 acceptability ruling still to be recorded.
 
 ## Gate 4 — PII
-**Answer:** none collected, none shipped (`PII_POLICY.md`). Aggregate topic/
-instrument product; public bylines retained internally as attribution metadata only;
-statutory public disclosures (Form-4, STOCK Act) ingested post-publication;
-PII-requiring sources excluded at onboarding by written protocol. Discovery of PII
-is an incident with immediate removal (no review-cycle delay).
+**Answer (corrected 2026-08-23; the prior answer said "none collected" and was not
+accurate):** none SHIPPED — no API response, UI surface, or export contains
+person-level data. Internally we DO hold one per-person behavioural table:
+`author_history` (public byline × platform × community, first-seen date, post
+count, ~32,000 rows), used solely to derive the boolean `is_first_timer` scoring
+input. Never served, never enriched, never identity-joined; personal data under
+GDPR Art 4(1) and disclosed as such in `PII_POLICY.md` §2 together with its three
+open gaps (no retention limit, no erasure path, no recorded lawful-basis
+assessment — tracked as PII-AUTHOR-HISTORY). Statutory public disclosures (Form-4,
+STOCK Act) ingested post-publication; PII-requiring sources excluded at onboarding
+by written protocol. Discovery of unexpected PII is an incident with immediate
+removal (no review-cycle delay).
 
 ## Gate 5 — MNPI
 **Answer:** architecturally excluded (`MNPI_POLICY.md`): public information or

@@ -87,9 +87,19 @@ scoring change and executes immediately.
 
 ## 5. Buyer-facing summary (DDQ answer)
 
-"We do not collect or ship PII. Product data is aggregate topic- and
-instrument-level. Internal raw stores retain public bylines/handles solely as
-source attribution on public content; no person-level profiling, enrichment, or
-identity joins are performed. Insider and congressional inputs are public statutory
-disclosures ingested post-publication. Sources that would require personal data are
-excluded at onboarding by written protocol."
+"We do not ship PII; product data is aggregate topic- and instrument-level. We DO
+hold one internal per-person behavioural table: `author_history`, keyed on public
+byline × platform × community, carrying first-seen date and post count (~32,000
+rows), used solely to derive one boolean scoring input (is this byline new to this
+community). It is never served, never enriched, and never identity-joined across
+sources; under GDPR Art 4(1) it is personal data and we describe it as such (§2 of
+this policy, corrected 2026-08-22, including its three open gaps: no retention
+limit, no erasure path, no recorded lawful-basis assessment). Insider and
+congressional inputs are public statutory disclosures ingested post-publication.
+Sources that would require non-public personal data are excluded at onboarding by
+written protocol."
+
+*(This summary previously said "no person-level profiling" while §2 above, corrected
+2026-08-22, disclosed `author_history`. A buyer-facing summary that contradicts its
+own policy body is worse than either statement alone; the summary now matches the
+mechanism.)*
