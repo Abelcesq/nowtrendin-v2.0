@@ -1294,6 +1294,7 @@ def apply_calibration(
             "inertia":             inertia,
             "persistence":         raw_result.get("persistence_score", 0) or 0,
             "dark_matter":         dark_d,
+            "d_measured":          raw_result.get("d_measured"),  # tri-state (4c)
             "confidence_decay":    decay_d,
             # N "now trending" internal demand is stored as `nowtrendin_score`
             # (with `nowtrend_internal` as a legacy fallback alias). Reading the

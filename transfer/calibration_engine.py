@@ -916,6 +916,9 @@ def build_component_groups(components: dict) -> dict:
     d = components.get("dark_matter", 0)
     c = components.get("confidence_decay", 0)
     n = components.get("nowtrend_internal", 0)
+    # Tri-state D readability (ruling 4c): 1 read, 0 measured-blind, None unknown.
+    # Callers that predate the fix pass nothing -> None -> honestly UNKNOWN.
+    dm = components.get("d_measured")
 
     # ── Group 1: Signal Quality ──────────────────────────────────
     quality_avg = (g + m) / 2
@@ -1012,12 +1015,38 @@ def build_component_groups(components: dict) -> dict:
             "status": context_status,
             "note":   context_label,
             "components": {
-                "dark_matter": {
-                    "det":  d,
-                    "conf": d,
-                    "desc": "First-timer ratio — inferred private conversation",
-                    "pending": False,
-                },
+                # ── 4c TRI-STATE, GROUPED-BREAKDOWN PATH (ruling 4c; ships with
+                # the detail-block, /scores-list and Screener fixes — all four
+                # together or none). This block used to render `pending: False`
+                # plus numeric det/conf unconditionally: on a d_measured NULL/0
+                # row the served number is a structural floor wearing a measured
+                # badge (§16a stage-2, §17). Opt-in `== 1` only; UNKNOWN and
+                # BLIND both withhold the number but say different things. The
+                # group STATUS still counts d at its stored value (composite
+                # disclosure, not deletion — display-only, no score impact).
+                "dark_matter": (
+                    {
+                        "det":  d,
+                        "conf": d,
+                        "desc": "First-timer ratio — inferred private conversation",
+                        "pending": False,
+                        "d_measured": True,
+                    } if dm == 1 else {
+                        "det":  None,
+                        "conf": None,
+                        "desc": "First-timer ratio — inferred private conversation",
+                        "pending": False,
+                        "absent": True,
+                        "d_measured": (None if dm is None else False),
+                        "note": (
+                            "UNKNOWN — scored before D's readability was recorded; "
+                            "missing metadata, not a finding about the topic."
+                            if dm is None else
+                            "UNMEASURED — no author-bearing or engagement-bearing "
+                            "signals; the stored 0 means COULD NOT READ, never "
+                            "'read quiet'."),
+                    }
+                ),
                 "confidence_decay": {
                     "det":  c,
                     "conf": c,
@@ -1419,6 +1448,7 @@ class CalibrationEngine:
             "inertia":                 I,
             "persistence":             0,  # populated after multiple cycles
             "dark_matter":             D,
+            "d_measured":              raw_result.get("d_measured"),  # tri-state (4c)
             "confidence_decay":        C,
             "nowtrend_internal":       0,
         })

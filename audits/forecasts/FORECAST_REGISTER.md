@@ -220,3 +220,19 @@ retroactively amended.
 Extraction: this file UTF-8, from `## F7` to end-of-file at seal time, trailing whitespace
 stripped, 4275 chars; `text_sha256 9fbd47cbc86d2f631fae206a278c20d095321ef21608b49fe41fe77ac58358b9`;
 `row_sha256 c298322ba49f5f6d72d595c49c05f795ca1081d1d21eb0619d2b0d268e1b6c37`.
+
+## F8 — Base-rate calibration-log pre-registration (appended 2026-08-23; board round 7 convergent condition 3, Chairman-ratified)
+
+Sealed BEFORE `base_rate_calibration_log` has a writer, a row, or a served number. Full terms
+in `CALIBRATION_LOG_PREREG_2026-08-23.md`: server-writes-at-serve-time; per-row sealed
+`F_port`; **BSS_port** as the ONLY decision-binding number; **withdrawal pre-committed** at
+BSS_port < 0, n ≥ 50, two consecutive quarterly scorings (last day of Feb/May/Aug/Nov);
+completeness audit disables the section when served ≠ logged; no user-facing render before
+n ≥ 60 shadow-mode resolutions AND one published quarterly scoring. Amendable only by a
+superseding sealed entry made before the scoring it affects.
+
+**F8 PIT seal:** item_key=`PREREG-calibration-log-2026-08-23`, sealed 2026-08-23 UTC.
+`text_sha256 c25766e63c69a4534186e63b12b67c4120fcbf85ed2b21c792f4ef7c70b72271` (4801 bytes
+LF-normalized, D-KILL extraction recipe);
+`row_sha256 e75a71ec2f8496d8c88787e7510dc24faac428e8b203e285491a12f3570bdd5b`. Anchored in
+`audits/pit-anchors/PIT_SEAL_ANCHORS.md` same day.

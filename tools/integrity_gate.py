@@ -187,6 +187,16 @@ CLAIMS = [
      "audits/forecasts/D_KILL_CRITERION_2026-08-20.md (PIT caf62911..)",
      "ASSERTED", "sealed", "audits/forecasts/D_KILL_CRITERION_2026-08-20.md::2027-02-28"),
 
+    ("C-CALLOG-PREREG",
+     "The base-rate calibration log has a sealed pre-registration WRITTEN BEFORE ITS FIRST "
+     "ROW — server-writes-at-serve, per-row sealed F_port, BSS_port decision-binding, "
+     "withdrawal at BSS_port<0 n>=50 two consecutive quarterly scorings, completeness "
+     "audit that disables the section when served != logged",
+     "audits/forecasts/CALIBRATION_LOG_PREREG_2026-08-23.md (PIT e75a71ec..); board "
+     "round 7 convergent condition 3, Chairman-ratified 2026-08-23",
+     "ASSERTED", "sealed",
+     "audits/forecasts/CALIBRATION_LOG_PREREG_2026-08-23.md::BSS_port"),
+
     ("C-SHADOW-SELECTOR",
      "The shadow trial's arm-selection code exists and enforces cross-arm exclusivity, a "
      "deterministic null draw, and the calibrating stamp",

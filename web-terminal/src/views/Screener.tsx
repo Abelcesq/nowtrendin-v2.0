@@ -137,8 +137,12 @@ function deriveDivergence(components: any, gap: number) {
   // §16a stage-2 defect (a floor value wearing a measured badge) and the §17 defect
   // (a non-contributing input rendered as a value). Say UNMEASURED instead of implying a
   // reading — and never fall back to 0.
+  // 4c TRI-STATE: `=== false` alone let NULL (the unknown stratum) fall through to
+  // the numeric branch. NULL is a third fact — readability never recorded — and it
+  // renders as UNKNOWN, never as a number and never pooled with UNMEASURED.
   if (d?.d_measured === false) rows.push({ label: 'FIRST-TIMER RATIO', value: 'UNMEASURED', favors: 'DET', note: 'no author-bearing signals for this topic — D could not be read (not "read quiet")' })
-  else if (d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
+  else if (d && 'd_measured' in d && d.d_measured == null) rows.push({ label: 'FIRST-TIMER RATIO', value: 'UNKNOWN', favors: 'DET', note: 'scored before D readability was recorded — missing metadata, not a finding' })
+  else if (d?.d_measured === true && d?.first_timer_ratio != null) rows.push({ label: 'FIRST-TIMER RATIO', value: `${Math.round(d.first_timer_ratio * 100)}%`, favors: 'DET', note: 'new participants flooding in → lifts Detection' })
   if (d?.asymmetry_detected != null) rows.push({ label: 'ENGAGEMENT ASYMMETRY', value: d.asymmetry_detected ? 'Detected' : 'Normal', favors: 'DET', note: 'deep discussion vs surface votes → lifts Detection' })
   const pc = Array.isArray(m?.platforms) ? m.platforms.length : null
   if (pc != null) rows.push({ label: 'PLATFORM SPREAD', value: `${pc} platform${pc === 1 ? '' : 's'}`, favors: 'CONF', note: 'broad cross-platform presence → lifts Confidence' })
@@ -221,9 +225,16 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
   ])
   const ntgD = r.nowtrending_gradient_detection, ntgC = r.nowtrending_gradient_confidence
   const dm = Math.round(r.dark_matter_score ?? d?.components?.D_dark_matter?.score ?? 0)
-  // d_measured===0 → the ratio is not a reading; suppress rather than show a 0 (C-DMEASURED-SERVED)
-  const dUnmeasured = r.d_measured != null && Number(r.d_measured) === 0
-  const ftPct = (!dUnmeasured && r.first_timer_ratio != null) ? Math.round(r.first_timer_ratio * 100) : null
+  // ── 4c TRI-STATE (board round 5; ships with the engine's three serve-path
+  // guards). The old guard was `!= null && Number(...) === 0`: NULL — the
+  // unknown stratum — fell through BOTH tests and rendered a numeric ratio on
+  // a row whose measurement status was never recorded. Opt-in: the ratio is a
+  // reading ONLY when d_measured is affirmatively 1/true. NULL → UNKNOWN
+  // (missing metadata), 0/false → UNMEASURED (looked, could not read) — two
+  // different facts, never pooled, never silently a number.
+  const dMeasured = r.d_measured === true || Number(r.d_measured ?? NaN) === 1
+  const dUnknown = r.d_measured == null
+  const ftPct = (dMeasured && r.first_timer_ratio != null) ? Math.round(r.first_timer_ratio * 100) : null
   const asym = r.engagement_asymmetry != null ? Boolean(Number(r.engagement_asymmetry)) : null
   const variations: any[] = Array.isArray(r.variations) ? r.variations : []
   // F1 R-D: "already arrived" mainstream disclosure — present ONLY for Tier-4 umbrella
@@ -439,6 +450,7 @@ function DetailRail({ row, onClose }: { row: Row; onClose: () => void }) {
           <div className="narr" style={{ marginBottom: 8 }}>Inferred private-conversation activity — early movement that hasn't surfaced publicly yet.</div>
           <div className="comp-row"><span className="cl">Under-the-radar score</span><span className="comp-bar"><i style={{ width: `${Math.min(100, dm)}%`, background: MC.purple }} /></span><span className="cv">{dm}</span></div>
           {ftPct != null && <div className="comp-row"><span className="cl">First-timer ratio</span><span className="comp-bar"><i style={{ width: `${Math.min(100, ftPct)}%`, background: MC.detection }} /></span><span className="cv">{ftPct}%</span></div>}
+          {ftPct == null && <div className="kv"><span>First-timer ratio</span><b style={{ color: MC.muted }}>{dUnknown ? 'UNKNOWN — readability not recorded for this row' : 'UNMEASURED — D could not be read (not "read quiet")'}</b></div>}
           {asym != null && <div className="kv"><span>Engagement asymmetry</span><b style={{ color: asym ? MC.detection : MC.muted }}>{asym ? 'Detected' : 'Normal'}</b></div>}
         </div>
       )}

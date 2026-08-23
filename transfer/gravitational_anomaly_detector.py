@@ -11876,8 +11876,10 @@ def get_topic_detail(topic_key: str):
                 # ── THE TRI-STATE FIX (ruling 4c, board round 5) ────────────────────
                 # d_measured has THREE states and the old guards handled two. The column
                 # was added by live migration with no backfill, so every row scored
-                # before 2026-08-20 holds NULL — an estimated >90% of distinct topics,
-                # and dormant topics stay NULL forever. In Python `None != 0` is True and
+                # before 2026-08-20 holds NULL — measured coverage is position-
+                # dependent (~14.5% NULL top-of-feed, 63-70% deep; the earlier ">90%"
+                # figure was retracted as a different population), and dormant topics
+                # stay NULL forever. In Python `None != 0` is True and
                 # `None == 0` is False, so those rows fell through BOTH guards and were
                 # served a numeric first_timer_ratio beside "No dark matter signatures.
                 # Signal appears to originate publicly." — an affirmative MEASURED claim
@@ -13079,6 +13081,24 @@ def _format_score_rows(rows) -> dict:
             continue
         if not s.get("category"):
             s["category"] = _category_for(s.get("topic_key", ""), disp)
+        # ── 4c TRI-STATE GUARD, LIST PATH (ruling 4c; Executioner: all four
+        # serve paths ship together or none). The detail path guards the D
+        # block, but this list feeds /scores AND result["rich"], and all three
+        # sub-paths above (serve_payload fast path, stale-stored, live-cal)
+        # carried a numeric first_timer_ratio beside d_measured NULL/0 — a
+        # MEASURED-looking value on a row whose D was unknown or unreadable
+        # (§16a stage-2 / §17 on the wire). Opt-in `== 1` only; None (unknown)
+        # and 0 (measured blind) both withhold the ratio, and d_measured is
+        # normalized to the same tri-state served by the detail path so the
+        # two surfaces cannot disagree about the same row.
+        if s.get("d_measured") == 1:
+            s["d_measured"] = True
+        elif s.get("d_measured") is None:
+            s["d_measured"] = None
+            s["first_timer_ratio"] = None
+        else:
+            s["d_measured"] = False
+            s["first_timer_ratio"] = None
         cleaned.append(s)
     results = cleaned
 
