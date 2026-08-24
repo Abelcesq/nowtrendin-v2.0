@@ -11798,7 +11798,13 @@ def get_topic_detail(topic_key: str):
     _payload = s.pop("serve_payload", None)
     if _payload:
         try:
-            s = _parse_json_fields(json.loads(_payload))
+            _p = _parse_json_fields(json.loads(_payload))
+            # Ruling 2c(c): a blob stamped by a DIFFERENT code version is never
+            # served — the deploy-version window class, closed structurally.
+            if _p.get("payload_schema_version") == PAYLOAD_SCHEMA_VERSION:
+                s = _p
+            else:
+                s = _calibrate_score_fields(s)
         except Exception:
             s = _calibrate_score_fields(s)
     else:
@@ -13043,6 +13049,12 @@ def _format_score_rows(rows) -> dict:
         if payload:
             try:
                 p = json.loads(payload)
+                # Ruling 2c(c): serve a blob only if it was built by THIS code
+                # version. A mismatched stamp (or a pre-stamp blob) falls through
+                # exactly like a corrupt one — the deploy-version window class
+                # can no longer serve another binary's fields.
+                if p.get("payload_schema_version") != PAYLOAD_SCHEMA_VERSION:
+                    raise ValueError("payload schema version mismatch")
                 # The precomputed payload omits first_scored_at (added later for
                 # tier data-aging). Inject the true first-seen from the joined row
                 # so Consumer/Business tiers age in correctly — without it the
@@ -13054,7 +13066,7 @@ def _format_score_rows(rows) -> dict:
                 results.append(p)
                 continue
             except Exception:
-                pass  # corrupt/absent → fall through to live calibration
+                pass  # corrupt/absent/mismatched → fall through to live calibration
         s = _parse_json_fields(s)
         if _serve_row_is_stale(s.get("scored_at")):
             # STALE row (fell out of the precompute top-N; last scored days ago):
@@ -13123,26 +13135,39 @@ def _format_score_rows(rows) -> dict:
     return {"count": len(results), "results": results}
 
 
+# Ruling 2c(c), board round 4: every precomputed blob is stamped with this code
+# LITERAL (sealed under L1 — never an env var), and the serve side ignores any
+# blob stamped with a DIFFERENT version, falling through to live calibration.
+# That closes the deploy-version window class structurally: a new binary can
+# never serve a blob built by old code as if it were its own. Bump it in the
+# SAME commit as any change to what the payload contains or means (the atomic
+# field-and-prose rule) — the stale blobs then self-invalidate at read time
+# instead of waiting for a rebuild.
+PAYLOAD_SCHEMA_VERSION = "2026-08-24.1"
+
+
 def _precompute_serve_payloads(top_n: int = 600) -> int:
     """Precompute the fully-calibrated /scores row for the top `top_n` latest
     topics and store it in velocity_scores.serve_payload as JSON.
 
-    Run once per worker cycle. The /scores serve path then reads serve_payload
-    directly (cheap json.loads) instead of recalibrating 160–200 candidate rows
-    per request, which is what made cold /scores 6–11s. Long-tail topics without
-    a payload fall back to live calibration in _format_score_rows.
+    Run once per worker cycle (and, per ruling 2c(a), in the Heroku release
+    phase via maint_precompute.py). The /scores serve path then reads
+    serve_payload directly (cheap json.loads) instead of recalibrating 160–200
+    candidate rows per request, which is what made cold /scores 6–11s.
+    Long-tail topics without a payload fall back to live calibration in
+    _format_score_rows.
 
-    First clears ALL existing payloads so none can go stale: topics that drop out
-    of the top-N (e.g. AI-taxonomy topics that rank high on display but low on raw
-    score) would otherwise keep an old cached payload forever. Cleared rows simply
-    fall back to live calibration until the next cycle refreshes them.
+    NON-DESTRUCTIVE (ruling 2c(b), the Executioner's dissent honoured): the
+    old version NULLed every payload FIRST and rebuilt after, so a mid-run
+    failure — dyno restart, DB outage, release kill — left EVERY payload NULL
+    against the pool that caused the 2026-07-06 outage. Now the new payloads
+    are computed fully in memory first; if that yields nothing, the stored
+    state is untouched; and the write is ONE transaction that (1) writes the
+    new blobs, (2) clears superseded blobs on other rows of the same topics,
+    (3) clears blobs on topics that dropped out of the top-N (the staleness
+    guarantee, preserved). A failure anywhere rolls the whole swap back and
+    yesterday's payloads keep serving.
     """
-    pconn = get_db(DB_PATH)
-    try:
-        pconn.execute("UPDATE velocity_scores SET serve_payload = NULL WHERE serve_payload IS NOT NULL")
-        pconn.commit()
-    finally:
-        pconn.close()
     conn = get_db(DB_PATH)
     try:
         rows = conn.execute(
@@ -13167,22 +13192,57 @@ def _precompute_serve_payloads(top_n: int = 600) -> int:
         s.pop("serve_payload", None)  # don't nest the column inside its own payload
         try:
             s = _calibrate_score_fields(s)
+            s["payload_schema_version"] = PAYLOAD_SCHEMA_VERSION
             updates.append((json.dumps(s, default=str), r["topic_key"], r["scored_at"]))
         except Exception:
             continue
 
     if not updates:
+        # Skip-on-error: an empty build must never wipe the serving state.
+        print("[precompute] 0 payloads built — stored payloads left untouched")
         return 0
+
+    keys = sorted({tk for _, tk, _ in updates})
     w = get_db(DB_PATH)
     try:
         w.executemany(
             "UPDATE velocity_scores SET serve_payload = ? WHERE topic_key = ? AND scored_at = ?",
             updates,
         )
+        # Clear superseded blobs on OTHER rows of the refreshed topics.
+        w.executemany(
+            "UPDATE velocity_scores SET serve_payload = NULL "
+            "WHERE topic_key = ? AND scored_at != ? AND serve_payload IS NOT NULL",
+            [(tk, sa) for _, tk, sa in updates],
+        )
+        # Clear blobs on topics that dropped OUT of the top-N (the staleness
+        # guarantee). The drop-out set is computed in Python and cleared with
+        # chunked IN — chunks of an IN union correctly; chunking a NOT IN would
+        # clear every topic outside the current chunk, fresh writes included.
+        held = [r["topic_key"] if hasattr(r, "keys") else r[0]
+                for r in w.execute(
+                    "SELECT DISTINCT topic_key FROM velocity_scores "
+                    "WHERE serve_payload IS NOT NULL").fetchall()]
+        dropped = sorted(set(held) - set(keys))
+        for i in range(0, len(dropped), 500):
+            chunk = dropped[i:i + 500]
+            ph = ",".join("?" for _ in chunk)
+            w.execute(
+                f"UPDATE velocity_scores SET serve_payload = NULL "
+                f"WHERE serve_payload IS NOT NULL AND topic_key IN ({ph})",
+                chunk,
+            )
         w.commit()
+    except Exception:
+        try:
+            w.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         w.close()
-    print(f"[precompute] serve_payload written for {len(updates)} topics")
+    print(f"[precompute] serve_payload written for {len(updates)} topics "
+          f"(schema {PAYLOAD_SCHEMA_VERSION}, swap transactional)")
     return len(updates)
 
 

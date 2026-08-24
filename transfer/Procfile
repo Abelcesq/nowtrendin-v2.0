@@ -1,2 +1,3 @@
+release: python maint_precompute.py
 web: python gravitational_anomaly_detector.py --mode=api
 worker: python gravitational_anomaly_detector.py --mode=worker

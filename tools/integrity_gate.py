@@ -224,6 +224,10 @@ SEALED_CONSTANTS = [
     # restore 7-day retention and destroy the half of the comparison that the
     # 2026-08-21 snapshot does not cover.
     ("transfer/gravitational_anomaly_detector.py", "SIGNAL_RETENTION_FLOOR_DAYS"),
+    # Ruling 2c(c), board round 4: the payload schema stamp closes the
+    # deploy-version window class. As an env var it could be aligned to a stale
+    # blob with no commit and no trace — sealed as a literal.
+    ("transfer/gravitational_anomaly_detector.py", "PAYLOAD_SCHEMA_VERSION"),
     # Round 5: the reflexivity trip, fixed while the audience is five seats and
     # nobody has an interest in the answer. Env-readable, it could be raised out
     # of reach by whoever benefits from the panel never being called reflexive.
