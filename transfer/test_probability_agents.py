@@ -530,48 +530,90 @@ def t_market_macro_classifiers():
 # End-to-end on an in-memory SQLite fixture
 # ===========================================================================
 
-def _make_trend_db() -> sqlite3.Connection:
-    con = sqlite3.connect(":memory:")
+def _real_ddl_connection(init_fns) -> sqlite3.Connection:
+    """ROUND-8, real-DDL fixtures (round-7 convergent condition 5): the ledger
+    tables are created by the PRODUCTION init functions themselves — the exact
+    DDL the engine runs at boot — never by CREATE TABLE statements written to
+    match an agent's SELECT.  The old fixture hand-wrote a table named
+    `accuracy_ledger_enhanced` (the MODULE's name; no such table exists) and
+    the suite was green while every production call threw — the circular-
+    fixture defect six seats named.  With this builder, a SELECT naming a
+    phantom table or column fails HERE exactly as it fails on the wire."""
+    import tempfile
+    path = tempfile.mktemp(suffix=".db")
+    for fn in init_fns:
+        fn(path)
+    con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
+    return con
+
+
+def _ins_resolved(cur, topic, det, brk, verdict, *, pre_broken=0,
+                  d_measured=1, corroboration=1):
+    """Resolved race into the REAL accuracy_ledger, explicit columns only.
+    corroboration_at_enroll is a real column (round 5); its production writer
+    is disabled (round 6) so live rows are NULL — a fixture writing it
+    simulates the future canonical stamp, not a phantom schema."""
+    cur.execute(
+        "INSERT INTO accuracy_ledger (id, topic_key, detection_date, "
+        "breakout_date, verdict, pre_broken, d_measured_at_enroll, "
+        "corroboration_at_enroll) VALUES (?,?,?,?,?,?,?,?)",
+        (f"r-{topic}", topic, det, brk, verdict, pre_broken, d_measured,
+         corroboration))
+
+
+def _ins_pending(cur, topic, det, *, d_measured=1, corroboration=1):
+    """Pending race into the REAL pending_detections — its own table, which the
+    old single-table read never saw (the resolved-only inflation defect)."""
+    cur.execute(
+        "INSERT INTO pending_detections (id, topic_key, detection_date, "
+        "status, d_measured_at_enroll, corroboration_at_enroll) "
+        "VALUES (?,?,?,'pending',?,?)",
+        (f"p-{topic}", topic, det, d_measured, corroboration))
+
+
+def _make_trend_db() -> sqlite3.Connection:
+    import accuracy_ledger_enhanced as _ale
+    con = _real_ddl_connection([_ale.init_pending_db])
     cur = con.cursor()
+    # Auxiliary detector tables (owned by gravitational_anomaly_detector, not
+    # the ledger module): only the served subset of columns, incl. `title` for
+    # the §15a syndication collapse.
     cur.executescript(
         """
         CREATE TABLE topic_lifecycle (topic_key TEXT, maturity_class TEXT,
                                       first_seen TEXT);
         CREATE TABLE raw_signals (topic_key TEXT, source_name TEXT,
-                                  platform_tier TEXT, signal_date TEXT);
-        CREATE TABLE accuracy_ledger_enhanced (
-            topic_key TEXT, detection_date TEXT, breakout_date TEXT,
-            verdict TEXT, pre_broken INTEGER, d_measured INTEGER);
+                                  platform_tier TEXT, signal_date TEXT,
+                                  title TEXT);
         CREATE TABLE velocity_scores (topic_key TEXT, signal_date TEXT,
                                       stage TEXT);
         """
     )
-    # target topic
+    # target topic — expert provenance, no mainstream outlets (band "1")
     cur.execute("INSERT INTO topic_lifecycle VALUES ('agentic coding','EMERGING','2026-06-01')")
     for src in ("github", "hn", "devto"):
-        cur.execute("INSERT INTO raw_signals VALUES ('agentic coding',?,'expert','2026-07-01')",
-                    (src,))
-    # cohort: 12 comparable topics, 5 arrived, 7 still pending
+        cur.execute("INSERT INTO raw_signals VALUES ('agentic coding',?,'expert','2026-07-01',?)",
+                    (src, f"title-{src}"))
+    # cohort: 12 comparable topics — 5 resolved LED in accuracy_ledger,
+    # 7 STILL PENDING in pending_detections (their own table, right-censored)
     for i in range(12):
         tk = f"peer{i}"
         cur.execute("INSERT INTO topic_lifecycle VALUES (?,'EMERGING','2026-05-01')", (tk,))
         for src in ("a", "b", "c"):
-            cur.execute("INSERT INTO raw_signals VALUES (?,?,'expert','2026-06-01')", (tk, src))
+            cur.execute("INSERT INTO raw_signals VALUES (?,?,'expert','2026-06-01',?)",
+                        (tk, src, f"t-{tk}-{src}"))
         if i < 5:
-            cur.execute(
-                "INSERT INTO accuracy_ledger_enhanced VALUES (?,?,?,?,0,1)",
-                (tk, "2026-06-01", f"2026-06-{10 + i:02d}", "LED"))
+            _ins_resolved(cur, tk, "2026-06-01", f"2026-06-{10 + i:02d}", "LED")
         else:
-            cur.execute(
-                "INSERT INTO accuracy_ledger_enhanced VALUES (?,?,NULL,'PENDING',0,1)",
-                (tk, "2026-06-01"))
-    # one UNKNOWN-measurement row that must be excluded, not treated as blind
+            _ins_pending(cur, tk, "2026-06-01")
+    # one UNKNOWN-measurement row that must be COUNTED, never excluded (I2)
     cur.execute("INSERT INTO topic_lifecycle VALUES ('ghost','EMERGING','2026-05-01')")
     for src in ("a", "b", "c"):
-        cur.execute("INSERT INTO raw_signals VALUES ('ghost',?,'expert','2026-06-01')", (src,))
-    cur.execute("INSERT INTO accuracy_ledger_enhanced VALUES "
-                "('ghost','2026-06-01','2026-06-05','LED',0,NULL)")
+        cur.execute("INSERT INTO raw_signals VALUES ('ghost',?,'expert','2026-06-01',?)",
+                    (src, f"t-ghost-{src}"))
+    _ins_resolved(cur, "ghost", "2026-06-01", "2026-06-05", "LED",
+                  d_measured=None)
     con.commit()
     return con
 
@@ -711,10 +753,10 @@ def t_r7_TRIPWIRE_lagged_rows_counted_not_silently_dropped():
     cur = con.cursor()
     cur.execute("INSERT INTO topic_lifecycle VALUES ('nearmiss','EMERGING','2026-05-01')")
     for src in ("a", "b", "c"):
-        cur.execute("INSERT INTO raw_signals VALUES ('nearmiss',?,'expert','2026-06-01')", (src,))
+        cur.execute("INSERT INTO raw_signals VALUES ('nearmiss',?,'expert','2026-06-01',?)",
+                    (src, f"t-nearmiss-{src}"))
     # breakout two days BEFORE detection — the near-miss shape
-    cur.execute("INSERT INTO accuracy_ledger_enhanced VALUES "
-                "('nearmiss','2026-06-10','2026-06-08','LAGGED',0,1)")
+    _ins_resolved(cur, "nearmiss", "2026-06-10", "2026-06-08", "LAGGED")
     con.commit()
     agent = TrendProbabilityAgent(fetch=_fetch_for(con))
     out = agent.score("agentic coding", as_of="2026-08-21", horizon_days=30)
@@ -820,6 +862,163 @@ def t_r7_plain_english_denominator_is_the_cohorts():
     assert "portfolio rate 31%" in s, s
     assert "95%" not in s, "the mixture band is being mislabeled a 95% CI again"
     assert "too thin" in s, "z<0.30 must carry the thin-cohort warning"
+
+
+# ===========================================================================
+# ROUND 8 — schema truth: the SQL must run on the REAL DDL, pending rows must
+# actually censor, stamps must never be recomputed, every exit door counted
+# ===========================================================================
+
+def t_r8_TRIPWIRE_trend_sql_runs_on_real_ddl():
+    """The old SQL selected FROM accuracy_ledger_enhanced — the MODULE's name,
+    not a table (production: 'relation does not exist' on every call, laundered
+    honest as INSTRUMENT_ERROR but unusable, while this suite stayed green on a
+    hand-written fixture). This tripwire is the structural guard: the agent's
+    exact queries run against the exact production DDL. It FAILS on the
+    pre-round-8 SQL."""
+    out = TrendProbabilityAgent(fetch=_fetch_for(_make_trend_db())).score(
+        "agentic coding", as_of="2026-08-21", horizon_days=30)
+    assert out.rise.state is not State.INSTRUMENT_ERROR, (
+        f"trend cohort SQL fails on the real DDL: {out.rise.reason}")
+
+
+def t_r8_TRIPWIRE_market_crypto_ledger_sql_runs_on_real_ddl():
+    """Same guard for the market and crypto LEDGER queries (their old SELECTs
+    named sector/direction/distinct_buyers/short_percentile/vol_percentile/
+    rates_regime/credit_regime — none exist in the real tables). The state-side
+    queries (market_positioning / crypto_signal_state) still name tables that
+    do not exist anywhere: that is the missing PIT-stamped data layer, and it
+    must keep surfacing as an INSTRUMENT fault — asserted below so the day it
+    silently changes, this fails."""
+    import market_accuracy_ledger as _mal
+    import crypto_accuracy_ledger as _cal
+    con = _real_ddl_connection([_mal.init_market_ledger_db,
+                                _cal.init_crypto_ledger_db])
+    fetch = _fetch_for(con)
+
+    m = MarketFlowProbabilityAgent(fetch=fetch)
+    rows, err = m._cohort_rows("2026-08-21")
+    assert err is None, f"market ledger SQL fails on the real DDL: {err}"
+    c = CryptoFlowProbabilityAgent(fetch=fetch)
+    rows, err = c._cohort_rows("2026-08-21")
+    assert err is None, f"crypto ledger SQL fails on the real DDL: {err}"
+
+    # The state queries name the NOT-YET-BUILT positioning layer: an honest
+    # instrument fault, never a fabricated "no positioning observed".
+    out = m.score("Technology", as_of="2026-08-21")
+    assert out.inflow_move.state is State.INSTRUMENT_ERROR, (
+        "market state query no longer faults — if the data layer now exists, "
+        "update this test with its real DDL; if not, an error is being "
+        "laundered")
+
+
+def t_r8_TRIPWIRE_pending_rows_censored_into_risk_set():
+    """THE resolved-only inflation defect (modelled 6-19x): pending races live
+    in pending_detections, which the old single-table read never saw, so every
+    curve was fit on resolved rows only while the docstring claimed censoring.
+    Resolved-only here reads 6/6 arrivals (F -> 1.0); the 7 long-pending peers
+    must pull F down. This FAILS on any regression to a resolved-only read."""
+    con = _make_trend_db()
+    agent = TrendProbabilityAgent(fetch=_fetch_for(con))
+    out = agent.score("agentic coding", as_of="2026-08-21", horizon_days=30)
+    assert out.rise.state is State.MEASURED, out.rise.reason
+    assert out.rise.n_cohort == 13, (
+        f"n_cohort={out.rise.n_cohort}: the 7 pending rows are not entering "
+        f"the risk set — the resolved-only read is back")
+    assert out.rise.raw_rate is not None and out.rise.raw_rate < 0.75, (
+        f"raw_rate={out.rise.raw_rate}: with 7 of 13 races unresolved the "
+        f"cohort rate cannot sit at the resolved-only 1.0")
+
+
+def t_r8_TRIPWIRE_corroboration_stamp_never_recomputed():
+    """Round-7 convergent condition 2: the agents read corroboration_at_enroll,
+    never a recomputation. A row with a NULL stamp but FIVE mainstream outlets
+    sitting in raw_signals must band 'unknown' (stamp) — under the old
+    recomputing subquery it banded '5+' and cohort membership was a function of
+    the prune horizon."""
+    con = _make_trend_db()
+    cur = con.cursor()
+    # a mainstream target whose live band is 5+ …
+    cur.execute("INSERT INTO topic_lifecycle VALUES ('bigstory','EMERGING','2026-05-01')")
+    for i in range(5):
+        cur.execute(
+            "INSERT INTO raw_signals VALUES ('bigstory',?,'mainstream','2026-06-01',?)",
+            (f"outlet{i}", f"headline-{i}"))
+    # … and a ledger peer with the SAME rich raw_signals but a NULL stamp
+    cur.execute("INSERT INTO topic_lifecycle VALUES ('wirepeer','EMERGING','2026-05-01')")
+    for i in range(5):
+        cur.execute(
+            "INSERT INTO raw_signals VALUES ('wirepeer',?,'mainstream','2026-06-01',?)",
+            (f"outlet{i}", f"headline-{i}"))
+    _ins_resolved(cur, "wirepeer", "2026-06-10", "2026-06-12", "LED",
+                  corroboration=None)
+    con.commit()
+    out = TrendProbabilityAgent(fetch=_fetch_for(con)).score(
+        "bigstory", as_of="2026-08-21", horizon_days=30)
+    assert out.cohort is not None and out.cohort.corroboration == "5+", (
+        "fixture failed to give the target a 5+ live band")
+    assert out.rise.state is State.ABSENT, (
+        "a NULL-stamped row matched a 5+ cohort — corroboration is being "
+        "recomputed from raw_signals again (prune-horizon membership)")
+
+
+def t_r8_TRIPWIRE_undated_rows_counted():
+    """The last uncounted exit door: a row with an unparseable detection_date
+    used to vanish via bare `continue`. It must be counted and served."""
+    con = _make_trend_db()
+    cur = con.cursor()
+    cur.execute("INSERT INTO topic_lifecycle VALUES ('undated','EMERGING','2026-05-01')")
+    # ISO-shaped so it survives the SQL's detection_date <= ? string bound,
+    # but not a parseable date — the quarantine class §14 exists for.
+    _ins_resolved(cur, "undated", "2026-06-XX", "2026-06-12", "LED")
+    con.commit()
+    out = TrendProbabilityAgent(fetch=_fetch_for(con)).score(
+        "agentic coding", as_of="2026-08-21", horizon_days=30)
+    assert out.dropped_undated == 1, (
+        f"dropped_undated={out.dropped_undated}: the unparseable-date row left "
+        f"through an uncounted door")
+    assert out.to_payload()["dropped_undated"] == 1
+
+
+def t_r8_market_direction_derived_from_flow_and_verdict():
+    """The real ledger stores flow + verdict, no direction column. CONFIRMED
+    moved WITH the flow; NOT_CONFIRMED crossed the OPPOSITE threshold first
+    (market_accuracy_ledger._evaluate's contract); NO_MOVE and PENDING carry no
+    directional event and censor. Both agents must reconstruct that exactly."""
+    import market_accuracy_ledger as _mal
+    from market_flow_probability_agent import MarketCohort
+    con = _real_ddl_connection([_mal.init_market_ledger_db])
+    cur = con.cursor()
+    rows_spec = [
+        ("t1", "inflow", "CONFIRMED", "2026-06-10"),       # -> up event
+        ("t2", "inflow", "NOT_CONFIRMED", "2026-06-11"),   # -> down event
+        ("t3", "outflow", "CONFIRMED", "2026-06-12"),      # -> down event
+        ("t4", "outflow", "NOT_CONFIRMED", "2026-06-13"),  # -> up event
+        ("t5", "inflow", "NO_MOVE", None),                 # censored
+    ]
+    for tk, flow, verdict, move in rows_spec:
+        cur.execute(
+            "INSERT INTO market_accuracy_ledger (id, ticker, detection_date, "
+            "flow, verdict, move_date) VALUES (?,?,?,?,?,?)",
+            (f"m-{tk}", tk, "2026-06-01", flow, verdict, move))
+    cur.execute(
+        "INSERT INTO market_pending_detections (id, ticker, detection_date, "
+        "flow, status) VALUES ('m-p1','t6','2026-06-01','inflow','pending')")
+    con.commit()
+
+    agent = MarketFlowProbabilityAgent(fetch=_fetch_for(con))
+    rows, err = agent._cohort_rows("2026-08-21")
+    assert err is None, err
+    assert len(rows) == 6, f"pending row missing from the UNION: {len(rows)}"
+    cell = MarketCohort(sector="unknown", insider_band="unknown",
+                        short_band="unknown", macro="UNKNOWN/UNKNOWN")
+    up, _ = agent._reading(rows, cell, "2026-08-21", 60, direction="up")
+    down, _ = agent._reading(rows, cell, "2026-08-21", 60, direction="down")
+    assert up.n_events == 2, f"up events {up.n_events} != 2 (t1, t4)"
+    assert down.n_events == 2, f"down events {down.n_events} != 2 (t2, t3)"
+    assert up.n_cohort == 6 and down.n_cohort == 6, (
+        "NO_MOVE / PENDING rows must stay in the risk set as censored, "
+        "not vanish")
 
 
 # ===========================================================================

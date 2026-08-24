@@ -181,6 +181,7 @@ class MarketReadout:
     outflow_move: Reading
     macro: MacroContext
     money_leg_sources: List[str]
+    dropped_undated: int = 0    # rows with unparseable/impossible dates (counted, round 8)
     calibration: Optional[dict] = None
 
     def to_payload(self) -> dict:
@@ -191,6 +192,7 @@ class MarketReadout:
             "as_of": self.as_of,
             "inflow_move": self.inflow_move.to_payload(),
             "outflow_move": self.outflow_move.to_payload(),
+            "dropped_undated": self.dropped_undated,
             "macro": {
                 "rates_regime": self.macro.rates_regime,
                 "credit_regime": self.macro.credit_regime,
@@ -226,6 +228,14 @@ class MarketFlowProbabilityAgent:
 
     #: must return: sector, accumulation_filings, short_percentile
     #: (alias renamed round 7 — this SUM counts FILINGS, not distinct persons)
+    #:
+    #: ROUND-8 HONESTY NOTE: `market_positioning` does not exist anywhere in
+    #: the codebase yet — it is this agent's declared interface for the
+    #: forward-only PIT-stamped positioning layer (round-7 Executioner item 7).
+    #: Until that layer is built, this query THROWS in production and the agent
+    #: serves INSTRUMENT_ERROR — deliberately: the data layer's absence is a
+    #: fact about us, never narrated as "no positioning observed".  The
+    #: real-DDL tripwire asserts this exact behavior.
     SQL_SECTOR_STATE = """
         SELECT sector,
                SUM(CASE WHEN signal = 'accumulation' AND value_usd >= 250000
@@ -238,20 +248,46 @@ class MarketFlowProbabilityAgent:
          GROUP BY sector
     """
 
-    #: cohort population from the market ledger. must return:
-    #: sector, detection_date, move_date, direction, accumulation_filings,
-    #: short_percentile, rates_regime, credit_regime
+    #: cohort population: resolved rows UNION pending rows, against the REAL
+    #: schema (market_accuracy_ledger.init_market_ledger_db).  Takes TWO bind
+    #: parameters, both = as_of.
+    #:
+    #: ROUND-8 SCHEMA FIX (fixture-circularity): the old query selected
+    #: sector / direction / distinct_buyers / short_percentile / rates_regime /
+    #: credit_regime — NONE of which exist in the real table (it has ticker,
+    #: flow, verdict, move_date...).  The only place those columns existed was
+    #: this agent's own test fixture, so the suite was green while every
+    #: production call threw.  Realized DIRECTION is not stored either; it is
+    #: derived in Python from flow x verdict (CONFIRMED = moved with the flow,
+    #: NOT_CONFIRMED = crossed the opposite threshold first, NO_MOVE = neither
+    #: within the window — market_accuracy_ledger._evaluate's contract).
+    #:
+    #: The cohort covariates (sector, insider band, short band, macro regimes)
+    #: are NOT selected because they are not in the ledger: they await the
+    #: forward-only PIT covariate stamping (round-7 Executioner item 7 — "the
+    #: probability project's real first commit").  Until those stamps exist,
+    #: every historical row banding reads "unknown" and a target cohort with
+    #: real bands is honestly ABSENT — never backfilled from current state,
+    #: which would be hindsight wearing a measured badge.
     SQL_COHORT = """
-        SELECT m.sector,
+        SELECT m.ticker,
                m.detection_date,
                m.move_date,
-               m.direction,
-               m.distinct_buyers AS accumulation_filings,
-               m.short_percentile,
-               m.rates_regime,
-               m.credit_regime
+               m.flow,
+               m.verdict,
+               0 AS is_pending
           FROM market_accuracy_ledger m
          WHERE m.detection_date <= ?
+        UNION ALL
+        SELECT p.ticker,
+               p.detection_date,
+               NULL AS move_date,
+               p.flow,
+               'PENDING' AS verdict,
+               1 AS is_pending
+          FROM market_pending_detections p
+         WHERE p.detection_date <= ?
+           AND p.status = 'pending'
     """
 
     SQL_CALIBRATION = """
@@ -307,13 +343,14 @@ class MarketFlowProbabilityAgent:
             return MarketReadout(sector=sector, cohort=cohort, as_of=as_of,
                                  macro=macro, money_leg_sources=[],
                                  inflow_move=r, outflow_move=r)
-        up = self._reading(rows, cohort, as_of, horizon, direction="up")
-        down = self._reading(rows, cohort, as_of, horizon, direction="down")
+        up, undated = self._reading(rows, cohort, as_of, horizon, direction="up")
+        down, _ = self._reading(rows, cohort, as_of, horizon, direction="down")
 
         return MarketReadout(
             sector=sector, cohort=cohort, as_of=as_of, macro=macro,
             money_leg_sources=self._sources(),
             inflow_move=up, outflow_move=down,
+            dropped_undated=undated,
             calibration=self.calibration(as_of),
         )
 
@@ -383,18 +420,26 @@ class MarketFlowProbabilityAgent:
         ), None
 
     def _cohort_rows(self, as_of: str):
-        """Returns (rows, error_message_or_None)."""
+        """Returns (rows, error_message_or_None). Two bind parameters: the
+        resolved arm and the pending arm of the UNION."""
         try:
-            return list(self.fetch(self.SQL_COHORT, (as_of,))), None
+            return list(self.fetch(self.SQL_COHORT, (as_of, as_of))), None
         except Exception as exc:
             return [], f"market ledger query failed: {type(exc).__name__}: {exc}"
 
     def _reading(self, rows: List[dict], cohort: MarketCohort, as_of: str,
-                 horizon: int, *, direction: str) -> Reading:
+                 horizon: int, *, direction: str) -> tuple:
+        """Returns (Reading, dropped_undated). Every row either enters a risk
+        set or is counted — no uncounted exit doors (round 8)."""
         durations: Dict[str, List[float]] = {}
         events: Dict[str, List[int]] = {}
+        dropped_undated = 0
 
         for r in rows:
+            # Covariate bands read the row's stamps. The real ledger carries
+            # none yet (they await forward-only PIT stamping), so every band is
+            # honestly "unknown" — never recomputed from current positioning,
+            # which would be hindsight.
             cell = MarketCohort(
                 sector=r.get("sector") or "unknown",
                 insider_band=insider_band(
@@ -409,19 +454,33 @@ class MarketFlowProbabilityAgent:
 
             det = _parse(r.get("detection_date"))
             if det is None:
+                dropped_undated += 1
                 continue
             move = _parse(r.get("move_date"))
-            observed = 1 if (move is not None
-                             and (r.get("direction") or "").lower() == direction) else 0
+            # Realized direction from flow x verdict (the ledger stores no
+            # direction column): CONFIRMED moved WITH the flow, NOT_CONFIRMED
+            # crossed the OPPOSITE threshold first. NO_MOVE and PENDING have no
+            # directional event and are censored below.
+            flow = (r.get("flow") or "").lower()
+            verdict = (r.get("verdict") or "").upper()
+            realized = None
+            if flow in ("inflow", "outflow") and verdict in ("CONFIRMED",
+                                                             "NOT_CONFIRMED"):
+                with_flow = "up" if flow == "inflow" else "down"
+                against = "down" if flow == "inflow" else "up"
+                realized = with_flow if verdict == "CONFIRMED" else against
+            observed = 1 if (move is not None and realized == direction) else 0
 
             if observed and move is not None:
                 dur = (move - det).days
                 if dur < 0:
+                    dropped_undated += 1
                     continue
             else:
                 asd = _parse(as_of)
                 dur = min((asd - det).days, horizon) if asd else 0
                 if dur < 0:
+                    dropped_undated += 1
                     continue
 
             durations.setdefault(cell, []).append(float(dur))
@@ -429,16 +488,17 @@ class MarketFlowProbabilityAgent:
 
         key = cohort.key
         if key not in durations or len(durations[key]) < self.min_cohort:
-            return absent(cohort.label(), horizon,
-                          "no comparable sector-windows in this cohort as of this date",
-                          as_of=as_of)
+            return (absent(cohort.label(), horizon,
+                           "no comparable sector-windows in this cohort as of this date",
+                           as_of=as_of), dropped_undated)
 
         F, lo, hi, n_ev = km_arrival_probability(durations[key], events[key], horizon)
         if F is None or n_ev == 0:
-            return absent(cohort.label(), horizon,
-                          f"cohort of {len(durations[key])} carries no observed "
-                          f"{direction}-moves — a rate cannot be measured",
-                          n_cohort=len(durations[key]), n_events=0, as_of=as_of)
+            return (absent(cohort.label(), horizon,
+                           f"cohort of {len(durations[key])} carries no observed "
+                           f"{direction}-moves — a rate cannot be measured",
+                           n_cohort=len(durations[key]), n_events=0, as_of=as_of),
+                    dropped_undated)
 
         cred = buhlmann_straub(
             {c: float(sum(e)) for c, e in events.items()},
@@ -456,13 +516,13 @@ class MarketFlowProbabilityAgent:
         lo_b = min(max(z * (lo or 0.0), 0.0), blended)
         hi_b = min(max(z * (hi or 1.0) + (1 - z) * 1.0, blended), 1.0)
 
-        return Reading(
+        return (Reading(
             state=State.MEASURED, cohort=cohort.label(), horizon_days=horizon,
             value=round(blended, 4), ci_low=round(lo_b, 4), ci_high=round(hi_b, 4),
             n_cohort=len(durations[key]), n_events=n_ev,
             exposure=float(sum(durations[key])), credibility=round(z, 3),
             raw_rate=round(F, 4), base_rate=round(F_port, 4), as_of=as_of,
-        )
+        ), dropped_undated)
 
 
 def _parse(value) -> Optional[_dt.date]:

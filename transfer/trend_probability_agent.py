@@ -34,15 +34,46 @@ COHORT (rating cells)
 Cells are NOT suppressed when thin.  Credibility (Z) is computed and displayed;
 a thin cell blends toward the portfolio base rate and says so.
 
-GROUND TRUTH
+GROUND TRUTH (ROUND-8 SCHEMA FIX — the fixture-circularity defect, corrected)
 ------------
-`accuracy_ledger_enhanced`, which is held out and never deleted.  Verdicts:
-  LED / SAME_DAY          -> RISE observed
-  LAGGED (near-miss)      -> RISE observed (late, but it arrived)
-  pre_broken              -> EXCLUDED: never a race (§14); including it would
-                             measure coverage latency, not the thesis
-  FALSE_POSITIVE/TIMEOUT  -> no rise within window
-  pending                 -> RIGHT-CENSORED (the 365-day patience window)
+TWO real tables, exactly as `accuracy_ledger_enhanced.init_pending_db` creates
+them.  The earlier version selected from a table named `accuracy_ledger_enhanced`
+— which is the MODULE's name, not a table; the only CREATE for it lived in this
+agent's own test fixture.  Against production the query threw
+("relation does not exist"), every call was INSTRUMENT_ERROR, and the suite was
+green because the fixture was written to match the SELECT — the exact circular-
+fixture defect six board seats named.  Now:
+
+  accuracy_ledger      resolved races.  Verdicts:
+    LED / SAME_DAY          -> RISE observed
+    LAGGED (near-miss)      -> RISE observed (late, but it arrived)
+    pre_broken              -> EXCLUDED: never a race (§14); including it would
+                               measure coverage latency, not the thesis
+    FALSE_POSITIVE/TIMEOUT  -> no rise within window (censored through horizon)
+  pending_detections   status='pending' rows, RIGHT-CENSORED at
+                       min(as_of - detection, 365).  These live in their OWN
+                       table; the old single-table read never saw them, so the
+                       survival curve was fit on RESOLVED ROWS ONLY and the
+                       docstring's "pending are censored" was aspirational
+                       fiction (modelled inflation 6-19x depending on time at
+                       risk).  The UNION below is the fix.
+
+COHORT COVARIATES — STAMPS, NEVER RECOMPUTATION (round-7 convergent cond. 2)
+  corroboration   read from `corroboration_at_enroll` ONLY.  Round 6 DISABLED
+                  the stamp writer (it computed a different quantity wearing
+                  §15a's name), so today every row reads NULL -> band "unknown"
+                  and cohorts that need a corroboration band are honestly
+                  ABSENT.  That is the board-predicted state ("the trend panel
+                  will honestly read ABSENT for months — ship that state as-is
+                  or do not ship").  Recomputing from raw_signals is FORBIDDEN
+                  here: no syndication collapse, no tier filter, and after the
+                  30-day prune it returns 0 — cohort membership would be a
+                  function of the prune horizon (the Challenger's finding).
+  provenance      derived from surviving raw_signals rows when any exist
+                  (mainstream if ANY pre-detection row is mainstream-tier — an
+                  explicit CASE, never MAX(platform_tier), which routed D/M by
+                  string collation: 'niche' > 'mainstream' alphabetically);
+                  NULL -> "unknown" when the signals have pruned.
 
 D-COMPONENT SAFETY (I2 — SCOPE CORRECTED, round 7)
 --------------------------------------------------
@@ -112,6 +143,16 @@ class TrendCohort:
                 f"{self.provenance.replace('_', '-')}")
 
 
+def provenance_of(platform_tier) -> str:
+    """mainstream / expert_niche from an explicit stamp or derived flag; a row
+    with NO surviving signal evidence is 'unknown', never defaulted to a tier —
+    a defaulted tier is a fabricated input wearing a measured badge (§16a)."""
+    if platform_tier is None or str(platform_tier).strip() == "":
+        return "unknown"
+    return ("mainstream" if str(platform_tier).lower() == "mainstream"
+            else "expert_niche")
+
+
 def corroboration_band(distinct_outlets: Optional[int]) -> str:
     if distinct_outlets is None:
         return "unknown"
@@ -133,6 +174,7 @@ class TrendReadout:
     flat_estimate: Optional[float] = None
     excluded_unmeasured: int = 0     # rows whose D-measurement status is UNKNOWN (coverage, not exclusion)
     lagged_excluded: int = 0         # near-miss LAGGED rows outside the risk set (counted, round 7)
+    dropped_undated: int = 0         # rows with an unparseable/impossible date (counted, round 8)
     coherence_violated: bool = False  # rise+decay > 1 under the two-marginal estimator
     calibration: Optional[dict] = None
 
@@ -147,6 +189,10 @@ class TrendReadout:
             "flat_estimate": self.flat_estimate,
             "excluded_unmeasured": self.excluded_unmeasured,
             "lagged_excluded": self.lagged_excluded,
+            # Round-8: the last uncounted exit door. A row with an unparseable
+            # detection_date leaves the risk set as a COUNTED data fault; zero
+            # here means every fetched row was either used or counted elsewhere.
+            "dropped_undated": self.dropped_undated,
             # ROUND-7 COHERENCE GUARD. rise and decay are estimated as two marginal
             # 1-KM curves; under competing risks each overstates its cumulative
             # incidence and their sum can exceed 1 (constructed: 2.0). The old code
@@ -190,37 +236,84 @@ class TrendProbabilityAgent:
          WHERE topic_key = ?
     """
 
-    #: must return: distinct_outlets, platform_tier
+    #: must return: distinct_outlets, distinct_titles, platform_tier
+    #: distinct_outlets/titles are TIER-FILTERED to mainstream and the band is
+    #: min(outlets, titles) — the §15a syndication collapse (one wire story
+    #: through forty mastheads is one voice). The old query counted every
+    #: platform (five subreddits read as five outlets) with no collapse, and
+    #: MAX(platform_tier) routed D/M by string collation ('niche' >
+    #: 'mainstream' alphabetically) — both round-7 board findings.
     SQL_PROVENANCE = """
-        SELECT COUNT(DISTINCT source_name) AS distinct_outlets,
-               MAX(platform_tier)          AS platform_tier
+        SELECT COUNT(DISTINCT CASE WHEN platform_tier = 'mainstream'
+                                   THEN source_name END) AS distinct_outlets,
+               COUNT(DISTINCT CASE WHEN platform_tier = 'mainstream'
+                                   THEN title END)       AS distinct_titles,
+               CASE WHEN COUNT(*) = 0 THEN NULL
+                    WHEN MAX(CASE WHEN platform_tier = 'mainstream'
+                                  THEN 1 ELSE 0 END) = 1 THEN 'mainstream'
+                    ELSE 'expert_niche' END              AS platform_tier
           FROM raw_signals
          WHERE topic_key  = ?
            AND signal_date <= ?
     """
 
-    #: cohort population. must return one row per enrolled topic with:
-    #: topic_key, detection_date, breakout_date, verdict, maturity_class,
-    #: distinct_outlets, platform_tier, d_measured
+    #: cohort population: resolved races UNION pending races, one row per
+    #: enrolled topic, against the REAL two-table schema
+    #: (accuracy_ledger_enhanced.init_pending_db).  must return: topic_key,
+    #: detection_date, breakout_date, verdict, maturity_class,
+    #: corroboration_at_enroll, platform_tier, d_measured, is_pending.
+    #: Takes TWO parameters, both = as_of.
+    #:
+    #: corroboration comes from the ENROLLMENT STAMP only — round-7 convergent
+    #: condition 2 forbids recomputation (the old subquery counted raw
+    #: source_name with no syndication collapse, no tier filter, and returned
+    #: 0 after the prune).  The stamp is NULL today (round-6 disabled its
+    #: writer until the definition is canonical) — that reads as band
+    #: "unknown", which is the honest state, not a defect of this query.
+    #:
+    #: pending rows carry verdict 'PENDING' (not a RISE_VERDICT), so the
+    #: reader right-censors them at min(as_of - detection, 365) — the patience
+    #: window finally reaching the estimator instead of living in a docstring.
     SQL_COHORT_LEDGER = """
         SELECT l.topic_key,
                l.detection_date,
                l.breakout_date,
                l.verdict,
                tl.maturity_class,
-               (SELECT COUNT(DISTINCT rs.source_name)
+               l.corroboration_at_enroll,
+               (SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+                            WHEN MAX(CASE WHEN rs.platform_tier = 'mainstream'
+                                          THEN 1 ELSE 0 END) = 1
+                            THEN 'mainstream' ELSE 'expert_niche' END
                   FROM raw_signals rs
                  WHERE rs.topic_key = l.topic_key
-                   AND rs.signal_date <= l.detection_date) AS distinct_outlets,
-               (SELECT MAX(rs2.platform_tier)
-                  FROM raw_signals rs2
-                 WHERE rs2.topic_key = l.topic_key
-                   AND rs2.signal_date <= l.detection_date) AS platform_tier,
-               l.d_measured
-          FROM accuracy_ledger_enhanced l
+                   AND rs.signal_date <= l.detection_date) AS platform_tier,
+               l.d_measured_at_enroll AS d_measured,
+               0 AS is_pending
+          FROM accuracy_ledger l
           LEFT JOIN topic_lifecycle tl ON tl.topic_key = l.topic_key
          WHERE l.detection_date <= ?
            AND COALESCE(l.pre_broken, 0) = 0
+        UNION ALL
+        SELECT p.topic_key,
+               p.detection_date,
+               NULL AS breakout_date,
+               'PENDING' AS verdict,
+               tl.maturity_class,
+               p.corroboration_at_enroll,
+               (SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+                            WHEN MAX(CASE WHEN rs.platform_tier = 'mainstream'
+                                          THEN 1 ELSE 0 END) = 1
+                            THEN 'mainstream' ELSE 'expert_niche' END
+                  FROM raw_signals rs
+                 WHERE rs.topic_key = p.topic_key
+                   AND rs.signal_date <= p.detection_date) AS platform_tier,
+               p.d_measured_at_enroll AS d_measured,
+               1 AS is_pending
+          FROM pending_detections p
+          LEFT JOIN topic_lifecycle tl ON tl.topic_key = p.topic_key
+         WHERE p.detection_date <= ?
+           AND p.status = 'pending'
     """
 
     #: decay observations. must return: topic_key, decay_date (first date the
@@ -281,9 +374,9 @@ class TrendProbabilityAgent:
                                 rise=r, decay=r)
         decay_map = self._decay_map(as_of)
 
-        rise, excluded, lagged = self._reading(
+        rise, excluded, lagged, undated = self._reading(
             rows, cohort, as_of, horizon_days, outcome="rise", decay_map=decay_map)
-        decay, _, _ = self._reading(
+        decay, _, _, _ = self._reading(
             rows, cohort, as_of, horizon_days, outcome="decay", decay_map=decay_map)
 
         flat = None
@@ -302,6 +395,7 @@ class TrendProbabilityAgent:
             topic_key=topic_key, cohort=cohort, as_of=as_of,
             rise=rise, decay=decay, flat_estimate=flat,
             excluded_unmeasured=excluded, lagged_excluded=lagged,
+            dropped_undated=undated,
             coherence_violated=coherence_violated,
             calibration=self.calibration(as_of),
         )
@@ -355,19 +449,25 @@ class TrendProbabilityAgent:
         if not life or not prov:
             return None, None
         maturity = (life[0].get("maturity_class") or "unknown").upper()
+        # §15a syndication collapse: one wire story through many mastheads is
+        # one voice — the band is min(distinct outlets, distinct titles).
         outlets = prov[0].get("distinct_outlets")
-        tier = (prov[0].get("platform_tier") or "unknown").lower()
-        provenance = "mainstream" if tier == "mainstream" else "expert_niche"
-        if outlets in (None, 0):
+        titles = prov[0].get("distinct_titles")
+        collapsed = (None if outlets is None
+                     else (int(outlets) if titles is None
+                           else min(int(outlets), int(titles))))
+        provenance = provenance_of(prov[0].get("platform_tier"))
+        if provenance == "unknown" and collapsed in (None, 0):
             return None, None
         return TrendCohort(maturity=maturity,
-                           corroboration=corroboration_band(int(outlets)),
+                           corroboration=corroboration_band(collapsed),
                            provenance=provenance), None
 
     def _cohort_rows(self, as_of: str):
-        """Returns (rows, error_message_or_None) — same round-7 discipline."""
+        """Returns (rows, error_message_or_None) — same round-7 discipline.
+        Two bind parameters: the resolved arm and the pending arm of the UNION."""
         try:
-            return list(self.fetch(self.SQL_COHORT_LEDGER, (as_of,))), None
+            return list(self.fetch(self.SQL_COHORT_LEDGER, (as_of, as_of))), None
         except Exception as exc:
             return [], f"cohort ledger query failed: {type(exc).__name__}: {exc}"
 
@@ -392,6 +492,7 @@ class TrendProbabilityAgent:
         events_by_cell: Dict[str, List[int]] = {}
         excluded_unmeasured = 0
         lagged_excluded = 0
+        dropped_undated = 0
 
         for r in rows:
             # I2 SCOPE FIX (round 7, conceded in full): the gate below used to EXCLUDE
@@ -409,16 +510,20 @@ class TrendProbabilityAgent:
 
             cell = TrendCohort(
                 maturity=(r.get("maturity_class") or "unknown").upper(),
+                # STAMP ONLY (round-7 cond. 2): NULL stamp -> "unknown" band,
+                # never a recomputation from prunable raw_signals.
                 corroboration=corroboration_band(
-                    None if r.get("distinct_outlets") is None
-                    else int(r["distinct_outlets"])),
-                provenance=("mainstream"
-                            if (r.get("platform_tier") or "").lower() == "mainstream"
-                            else "expert_niche"),
+                    None if r.get("corroboration_at_enroll") is None
+                    else int(r["corroboration_at_enroll"])),
+                provenance=provenance_of(r.get("platform_tier")),
             ).key
 
             det = _parse(r.get("detection_date"))
             if det is None:
+                # COUNTED (round-8): an unparseable detection_date is a data
+                # fault, and a row leaving through an uncounted door is the
+                # silent-drop class round 7 closed for LAGGED. Same rule here.
+                dropped_undated += 1
                 continue
 
             if outcome == "rise":
@@ -445,10 +550,17 @@ class TrendProbabilityAgent:
                     continue
             else:
                 # Right-censored at the earlier of today and the patience limit.
+                # This branch now actually carries the PENDING stratum (verdict
+                # 'PENDING' from the pending_detections arm of the UNION) — the
+                # rows whose absence inflated every resolved-only curve.
                 asd = _parse(as_of)
                 dur = (asd - det).days if asd else 0
                 dur = min(dur, 365)
                 if dur < 0:
+                    # detection after as_of should be impossible (the SQL bounds
+                    # detection_date <= as_of); if it happens it is a parse or
+                    # data fault and is COUNTED, not silently dropped.
+                    dropped_undated += 1
                     continue
 
             durations_by_cell.setdefault(cell, []).append(float(dur))
@@ -458,7 +570,7 @@ class TrendProbabilityAgent:
         if key not in durations_by_cell or len(durations_by_cell[key]) < self.min_cohort:
             return (absent(cohort.label(), horizon,
                            "no comparable history for this cohort as of this date",
-                           as_of=as_of), excluded_unmeasured, lagged_excluded)
+                           as_of=as_of), excluded_unmeasured, lagged_excluded, dropped_undated)
 
         # --- I4: Kaplan-Meier on the target cell -----------------------------
         F, lo, hi, n_ev = km_arrival_probability(
@@ -471,7 +583,7 @@ class TrendProbabilityAgent:
                            f"cohort of {len(durations_by_cell[key])} carries no "
                            f"observed {outcome} events — a rate cannot be measured",
                            n_cohort=len(durations_by_cell[key]), n_events=0,
-                           as_of=as_of), excluded_unmeasured, lagged_excluded)
+                           as_of=as_of), excluded_unmeasured, lagged_excluded, dropped_undated)
 
         # --- I5: credibility across all cells --------------------------------
         cell_events = {c: float(sum(evs)) for c, evs in events_by_cell.items()}
@@ -515,7 +627,7 @@ class TrendProbabilityAgent:
             raw_rate=round(F, 4),
             base_rate=round(F_port, 4),
             as_of=as_of,
-        ), excluded_unmeasured, lagged_excluded)
+        ), excluded_unmeasured, lagged_excluded, dropped_undated)
 
 
 def _parse(value) -> Optional[_dt.date]:

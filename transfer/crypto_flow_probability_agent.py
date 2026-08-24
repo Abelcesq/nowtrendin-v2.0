@@ -170,6 +170,7 @@ class CryptoReadout:
     money_inflow: Reading     # NOT_APPLICABLE by construction
     money_outflow: Reading    # NOT_APPLICABLE by construction
     cot_enabled: bool = False
+    dropped_undated: int = 0    # rows with unparseable/impossible dates (counted, round 8)
     calibration: Optional[dict] = None
 
     def to_payload(self) -> dict:
@@ -178,6 +179,7 @@ class CryptoReadout:
             "cohort": self.cohort.label() if self.cohort else None,
             "cohort_key": self.cohort.key if self.cohort else None,
             "as_of": self.as_of,
+            "dropped_undated": self.dropped_undated,
             "price_move_up": self.up_move.to_payload(),
             "price_move_down": self.down_move.to_payload(),
             "money_inflow": self.money_inflow.to_payload(),
@@ -233,6 +235,12 @@ class CryptoFlowProbabilityAgent:
     """
 
     #: must return: coin, detection_score, vol_percentile
+    #:
+    #: ROUND-8 HONESTY NOTE: `crypto_signal_state` does not exist anywhere in
+    #: the codebase yet — the declared interface for the forward-only
+    #: PIT-stamped state layer.  Until it is built this query THROWS and the
+    #: agent serves INSTRUMENT_ERROR (a fact about us), never a fabricated
+    #: "no signal state".
     SQL_COIN_STATE = """
         SELECT coin, detection_score, vol_percentile
           FROM crypto_signal_state
@@ -244,17 +252,39 @@ class CryptoFlowProbabilityAgent:
 
     #: cohort population. must return: coin, detection_date, move_date,
     #: direction, detection_score, vol_percentile, rates_regime, credit_regime
+    #: cohort population: resolved rows UNION pending rows, against the REAL
+    #: schema (crypto_accuracy_ledger.init_crypto_ledger_db).  Takes TWO bind
+    #: parameters, both = as_of.
+    #:
+    #: ROUND-8 SCHEMA FIX (fixture-circularity): the old query selected
+    #: direction / detection_score / vol_percentile / rates_regime /
+    #: credit_regime — none of which exist in the real table (it has coin,
+    #: flow, money_movement, verdict, move_date...).  Realized direction is
+    #: derived in Python from flow x verdict, exactly as in the market agent.
+    #: The cohort covariates (attention band, volatility band, macro) await
+    #: forward-only PIT stamping; until then historical rows band "unknown"
+    #: and a real-banded target cohort is honestly ABSENT.  money_movement is
+    #: deliberately NOT aliased onto detection_score — they are different
+    #: quantities, and a rename is not a measurement.
     SQL_COHORT = """
         SELECT c.coin,
                c.detection_date,
                c.move_date,
-               c.direction,
-               c.detection_score,
-               c.vol_percentile,
-               c.rates_regime,
-               c.credit_regime
+               c.flow,
+               c.verdict,
+               0 AS is_pending
           FROM crypto_accuracy_ledger c
          WHERE c.detection_date <= ?
+        UNION ALL
+        SELECT p.coin,
+               p.detection_date,
+               NULL AS move_date,
+               p.flow,
+               'PENDING' AS verdict,
+               1 AS is_pending
+          FROM crypto_pending_detections p
+         WHERE p.detection_date <= ?
+           AND p.status = 'pending'
     """
 
     SQL_CALIBRATION = """
@@ -322,14 +352,15 @@ class CryptoFlowProbabilityAgent:
                 money_inflow=money_in, money_outflow=money_out,
                 cot_enabled=self.enable_cot,
             )
-        up = self._reading(rows, cohort, as_of, horizon, direction="up")
-        down = self._reading(rows, cohort, as_of, horizon, direction="down")
+        up, undated = self._reading(rows, cohort, as_of, horizon, direction="up")
+        down, _ = self._reading(rows, cohort, as_of, horizon, direction="down")
 
         return CryptoReadout(
             coin=coin, cohort=cohort, as_of=as_of,
             up_move=up, down_move=down,
             money_inflow=money_in, money_outflow=money_out,
             cot_enabled=self.enable_cot,
+            dropped_undated=undated,
             calibration=self.calibration(as_of),
         )
 
@@ -456,18 +487,25 @@ class CryptoFlowProbabilityAgent:
         ), None
 
     def _cohort_rows(self, as_of: str):
-        """Returns (rows, error_message_or_None)."""
+        """Returns (rows, error_message_or_None). Two bind parameters: the
+        resolved arm and the pending arm of the UNION."""
         try:
-            return list(self.fetch(self.SQL_COHORT, (as_of,))), None
+            return list(self.fetch(self.SQL_COHORT, (as_of, as_of))), None
         except Exception as exc:
             return [], f"crypto ledger query failed: {type(exc).__name__}: {exc}"
 
     def _reading(self, rows: List[dict], cohort: CryptoCohort, as_of: str,
-                 horizon: int, *, direction: str) -> Reading:
+                 horizon: int, *, direction: str) -> tuple:
+        """Returns (Reading, dropped_undated). Every row either enters a risk
+        set or is counted — no uncounted exit doors (round 8)."""
         durations: Dict[str, List[float]] = {}
         events: Dict[str, List[int]] = {}
+        dropped_undated = 0
 
         for r in rows:
+            # Bands read the row's stamps; the real ledger carries none yet
+            # (forward-only PIT stamping pending), so bands are honestly
+            # "unknown" — never recomputed from current state.
             cell = CryptoCohort(
                 coin=(r.get("coin") or "unknown").upper(),
                 attention_band=attention_band(
@@ -482,19 +520,32 @@ class CryptoFlowProbabilityAgent:
 
             det = _parse(r.get("detection_date"))
             if det is None:
+                dropped_undated += 1
                 continue
             move = _parse(r.get("move_date"))
-            observed = 1 if (move is not None
-                             and (r.get("direction") or "").lower() == direction) else 0
+            # Realized direction from flow x verdict (no direction column
+            # exists): CONFIRMED moved WITH the flow, NOT_CONFIRMED crossed
+            # the OPPOSITE threshold first; NO_MOVE / PENDING are censored.
+            flow = (r.get("flow") or "").lower()
+            verdict = (r.get("verdict") or "").upper()
+            realized = None
+            if flow in ("inflow", "outflow") and verdict in ("CONFIRMED",
+                                                             "NOT_CONFIRMED"):
+                with_flow = "up" if flow == "inflow" else "down"
+                against = "down" if flow == "inflow" else "up"
+                realized = with_flow if verdict == "CONFIRMED" else against
+            observed = 1 if (move is not None and realized == direction) else 0
 
             if observed and move is not None:
                 dur = (move - det).days
                 if dur < 0:
+                    dropped_undated += 1
                     continue
             else:
                 asd = _parse(as_of)
                 dur = min((asd - det).days, horizon) if asd else 0
                 if dur < 0:
+                    dropped_undated += 1
                     continue
 
             durations.setdefault(cell, []).append(float(dur))
@@ -502,16 +553,17 @@ class CryptoFlowProbabilityAgent:
 
         key = cohort.key
         if key not in durations or len(durations[key]) < self.min_cohort:
-            return absent(cohort.label(), horizon,
-                          "no comparable coin-windows in this cohort as of this date",
-                          as_of=as_of)
+            return (absent(cohort.label(), horizon,
+                           "no comparable coin-windows in this cohort as of this date",
+                           as_of=as_of), dropped_undated)
 
         F, lo, hi, n_ev = km_arrival_probability(durations[key], events[key], horizon)
         if F is None or n_ev == 0:
-            return absent(cohort.label(), horizon,
-                          f"cohort of {len(durations[key])} carries no observed "
-                          f"{direction}-moves — a rate cannot be measured",
-                          n_cohort=len(durations[key]), n_events=0, as_of=as_of)
+            return (absent(cohort.label(), horizon,
+                           f"cohort of {len(durations[key])} carries no observed "
+                           f"{direction}-moves — a rate cannot be measured",
+                           n_cohort=len(durations[key]), n_events=0, as_of=as_of),
+                    dropped_undated)
 
         cred = buhlmann_straub(
             {c: float(sum(e)) for c, e in events.items()},
@@ -529,13 +581,13 @@ class CryptoFlowProbabilityAgent:
         lo_b = min(max(z * (lo or 0.0), 0.0), blended)
         hi_b = min(max(z * (hi or 1.0) + (1 - z) * 1.0, blended), 1.0)
 
-        return Reading(
+        return (Reading(
             state=State.MEASURED, cohort=cohort.label(), horizon_days=horizon,
             value=round(blended, 4), ci_low=round(lo_b, 4), ci_high=round(hi_b, 4),
             n_cohort=len(durations[key]), n_events=n_ev,
             exposure=float(sum(durations[key])), credibility=round(z, 3),
             raw_rate=round(F, 4), base_rate=round(F_port, 4), as_of=as_of,
-        )
+        ), dropped_undated)
 
 
 def _parse(value) -> Optional[_dt.date]:
