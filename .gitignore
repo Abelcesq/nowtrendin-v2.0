@@ -27,3 +27,4 @@ grifin.pdf
 # AB-ATTRIBUTION cohort snapshot (board round 4, item 1a) — 126MB of preserved
 # pre-flip inputs. The MANIFEST (counts + sha256) IS committed; the payload is not.
 audits/ab-attribution/*.jsonl*
+audits/ab-attribution/d_plumbing_ab_rows.json*
