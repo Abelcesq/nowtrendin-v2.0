@@ -3,7 +3,78 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-08-21 (board round 4: root cause FALSIFIED, six live defects, ten Chairman rulings — 1a/1b/8 done, rest open)_
+_Last updated: 2026-08-24 (rounds 5–8 logged; 1c ran; snapshot PII incident; the engine deploy is the blocking item)_
+
+---
+
+## Session 2026-08-24 — Round 8: the agents' SQL was fiction against production; 1c ran; the snapshot was public.
+
+### RESUME HERE
+Authority on per-item state: **`audits/board/CHAIRMAN_RULINGS_2026-08-20D.md`** (its status
+table is now live-maintained). **TOP OWED ITEM: engine deploy + `POST /precompute` + re-probe**
+— owed since `4d5aa97`, reaffirmed through `e1336be`, still not performed: the round-4/5/6
+fixes (4c tri-state included) are NOT on the wire. Remote (claude.ai) sessions cannot do it
+(egress policy 403s `herokuapp.com`; no Heroku credentials); it needs the founder's machine:
+`git subtree push --prefix transfer heroku-v2engine main` → `POST /precompute` → re-probe a
+stale topic's D block.
+
+### Rounds 5–7 (2026-08-22/23, logged retroactively — they lived only in commits/board docs)
+- **R5** (`0f2e425`…`b0e29bc`): nine seats rejected Part A 9-0 ("right product, wrong build");
+  `d_measured_at_enroll` + `enrolled_at` stamped; retention floor sealed (`SIGNAL_RETENTION_FLOOR_DAYS`);
+  L4 lint; seal-hash conflict resolved by exhaustive brute force (`5316801`) — the enforcer now
+  RECOMPUTES the digest (`1a4f761`).
+- **R6** (`fe6712b`, corrected `0351599`): `corroboration_at_enroll` writer DISABLED — it computed
+  a different quantity wearing §15a's name (no `_title_sig`, no tier filter, no time bound; every
+  deviation upward). Freeze the definition, THEN the values. The 0.752 unmeasured-fraction figure
+  RETRACTED (different population's metric). PII_POLICY §2 corrected (`author_history` IS
+  person-level data); §5/DDQ matched in `5b3b12e`. ⚠ `fe6712b` also silently committed the
+  snapshot `.gz` files — found and handled this session, below.
+- **R7** (`aa22b4a`, ratified `e1336be`): probability CORE approved 9-0; agents NOT SERVABLE 9-0.
+  Fixes landed held-out in `transfer/`: I2 scope (conceded category error), LAGGED counted,
+  Z-cap √(events/1082), coherence violations SERVED, INSTRUMENT_ERROR ≠ ABSENT, A2/A5/A10 payload
+  guards, horizon-capped n_events, `accumulation_filings` rename, §14 parsing. Calibration-log
+  prereg SEALED before its first row (F8). 4c tri-state completed on all four serve paths.
+
+### This session (round 8)
+1. **Outside assessment verified claim-by-claim (§10a), then its blind spot confirmed:** ALL
+   THREE probability agents' cohort SQL named tables/columns that exist ONLY in their own test
+   fixtures — `accuracy_ledger_enhanced` is the MODULE's name, not a table; `l.d_measured`,
+   `sector`, `direction`, `distinct_buyers`, `short_percentile`, `vol_percentile`,
+   `rates_regime`, `credit_regime` exist nowhere. The suite was green on hand-written fixtures
+   while every production call threw (the board's circular-fixture finding, live). **Fixed
+   (`c33774d`):** real-schema UNIONs over resolved + pending tables — the pending-censoring hole
+   (est. 6–19× resolved-only inflation) is closed; realized direction derived from flow×verdict;
+   corroboration reads the enrollment stamp ONLY (never recomputed from prunable raw_signals);
+   provenance via explicit mainstream-presence CASE (never `MAX(platform_tier)` string
+   collation); `dropped_undated` counters close the last uncounted exit doors; fixtures now
+   REAL-DDL (production init functions). Suite 56/56 with 29 tripwires; repo runner 14/14.
+   `market_positioning`/`crypto_signal_state` remain the NOT-YET-BUILT PIT-stamped data layer —
+   annotated, and their INSTRUMENT_ERROR is asserted by a tripwire, not laundered.
+2. **Ruling 1c RAN (`9d1fc4d`):** `tools/d_plumbing_ab.py`, offline over the frozen snapshot.
+   Arm validity proven at compute time; T3 dropped (0 reddit rows → confound set 4). **Primary
+   (preregistered): pooled paired ΔD = −0.2418, bootstrap 95% CI [−0.3021, −0.1835], n=17,471
+   scoring-eligible topics; d_measured 805 gained / 0 lost.** Identifies
+   **E[T5.compute | T1..T4=ON, pre-flip writer stamps] ONLY** — `is_first_timer` is a stored
+   bit and the snapshot predates the flip, so the writer-side of T5 is not identifiable.
+   Row-level JSON 52 MB retained locally (sha256 `8534a2bf…`), reproducible from script+seed.
+   **1d recorded** in `REGIME_LEDGER.md`.
+3. **PII INCIDENT (`3ccabef`):** both preflip `.jsonl.gz` files had been on the PUBLIC repo tip
+   since `fe6712b` — silently, against `e4215d4`'s own written promise (`.gitignore` matched
+   `*.jsonl`; the files are `*.jsonl.gz`). Measured (not propagated): **40.9%** of raw_signals
+   rows carry author handles (recorded 30% was an estimate). Repo confirmed public via the
+   GitHub API; **1 fork exists**. Tip removal + pattern fix executed under PII_POLICY §4;
+   record: `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md`. **Founder decisions owed:
+   history purge (rewrite + GitHub Support) or written acceptance; the fork; the Drive second
+   copy that truly closes 1a.**
+4. Doc-debt cleared: Chairman ledger table live-maintained (1c/1d/4c/8 updated), CLAUDE.md
+   resume block rewritten, this entry.
+
+### Open / Next
+- **The deploy** (top of this entry) — then re-probe, then `[payload-rebuilt]` marker honesty.
+- Rulings 2c, 3b+3c, 5 (CJK — score-affecting: backtest + board note), 6 (partial), 7, 9
+  (needs production), 10, + Section B.
+- Founder: PII incident decisions; Drive drag-drop of the two `.gz` + optionally the A/B
+  row-level JSON; CoinAPI gate ~08-24; FMP re-eval 09-05; ACC-Q 2026-11-30.
 
 ---
 

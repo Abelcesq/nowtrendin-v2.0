@@ -607,11 +607,31 @@ walk becomes furniture.
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-08-21 — **Board round 4: root cause FALSIFIED by three seats; six live defects; ten Chairman rulings.**
-RESUME AUTHORITY: `audits/board/CHAIRMAN_RULINGS_2026-08-20D.md` (A = ten ruled items, B = 18 unallocated board
-items). Collation: `audits/board/BOARD_round4_2026-08-20D.md`. **DONE:** 1a cohort snapshot (`e4215d4`),
-1b `SIGNAL_RETENTION_DAYS` 7→30, 8 accuracy-figures reversal (`81a6e79`). **OPEN:** 1c/1d, 2c, 3b+3c, 4c, 5, 6, 7,
-9, 10 + all of Section B. **NEXT: 4c.**
+*Last updated: 2026-08-24 — **Rounds 5–8 caught up; 1c RAN; snapshot PII incident; DEPLOY IS THE BLOCKING ITEM.**
+RESUME AUTHORITY: `audits/board/CHAIRMAN_RULINGS_2026-08-20D.md` (its status table is now live-maintained — read it,
+not this paragraph, for per-item state). **⚠ TOP OWED ITEM — engine DEPLOY + `POST /precompute` + re-probe,** owed
+since `4d5aa97` and reaffirmed in every commit through `e1336be`: the round-4/5/6 fixes (4c tri-state included) are
+NOT on the wire until it happens. Remote (claude.ai) sessions CANNOT do it — the egress policy 403s `herokuapp.com`
+and no Heroku credentials exist there; it needs the founder's machine (`git subtree push --prefix transfer
+heroku-v2engine main`, then `POST /precompute`, then re-probe a stale topic's D block). **Rounds 5–7 (08-22/23,
+commits `0f2e425`…`e1336be`):** R5 rejected Part A 9-0; R6 disabled the mis-defined `corroboration_at_enroll` stamp
+(freeze the definition, THEN the values), retracted the 0.752 figure, corrected PII_POLICY §2/§5; R7 approved the
+probability CORE 9-0 and ruled the agents NOT SERVABLE 9-0 — fixed held-out into `transfer/`, calibration-log
+prereg SEALED (F8). **Round 8 (08-24, `c33774d`):** the outside assessment was verified claim-by-claim (§10a) and
+its blind spot confirmed — ALL THREE probability agents' cohort SQL named tables/columns that exist only in their
+own fixtures (`accuracy_ledger_enhanced` is a MODULE, not a table); now real-schema UNIONs with pending rows
+right-censored (the 6–19× resolved-only inflation closed), stamps-never-recomputed, real-DDL fixtures, suite 56/56
+w/ 29 tripwires. **1c RAN (`9d1fc4d`):** pooled paired ΔD = **−0.2418** CI [−0.3021, −0.1835] over 17,471 topics —
+identifies E[T5.compute | T1..T4=ON, pre-flip writer stamps] ONLY; T3 dropped (0 reddit rows). 1d recorded.
+**PII INCIDENT (`3ccabef` + `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md`):** the preflip `.jsonl.gz`
+snapshot (40.9% author-handle rows, measured) sat on the PUBLIC tip since `fe6712b` — silently, against `e4215d4`'s
+written intent (`*.jsonl` ignore pattern missed `.gz`). Tip-removed under PII_POLICY §4; **founder decisions owed:
+history purge or written acceptance, the 1 existing fork, the Drive second copy.** **OPEN:** deploy (above), 2c,
+3b+3c, 5 (CJK — fails open), 6 (partial), 7, 9, 10 + Section B. **NEXT: the deploy, then 2c.***
+
+*Prior: 2026-08-21 — **Board round 4: root cause FALSIFIED by three seats; six live defects; ten Chairman rulings.**
+Collation: `audits/board/BOARD_round4_2026-08-20D.md`. DONE then: 1a cohort snapshot (`e4215d4`),
+1b `SIGNAL_RETENTION_DAYS` 7→30, 8 accuracy-figures reversal (`81a6e79`).
 **(1) THE ROOT CAUSE I REPORTED WAS WRONG — do not re-assert it.** A served contradiction (`d_measured:false`
 beside "Signal appears to originate publicly") was NOT INV-1/stale `serve_payload`. `get_topic_detail` does
 `s = json.loads(_payload)` at `:11680`, so ALL FOUR D fields come from ONE dict — a stale blob makes them

@@ -5,18 +5,18 @@
 
 | # | Ruling | Status |
 |---|---|---|
-| 1a | Snapshot pre-flip cohort | **DONE** `e4215d4` |
-| 1b | Raise `SIGNAL_RETENTION_DAYS` | **DONE** 7 → 30, engine |
-| 1c | Run paired A/B (w/ rank-1 caveat) | **TODO** |
-| 1d | Record in `REGIME_LEDGER.md` | **TODO** |
+| 1a | Snapshot pre-flip cohort | **DONE** `e4215d4` — *Drive second copy still owed (founder drag-drop); see also the 2026-08-24 PII incident: the `.gz` payload reached the PUBLIC tip in `fe6712b` and was removed `3ccabef`* |
+| 1b | Raise `SIGNAL_RETENTION_DAYS` | **DONE** 7 → 30, engine; floor sealed `SIGNAL_RETENTION_FLOOR_DAYS` (round 5) |
+| 1c | Run paired A/B (w/ rank-1 caveat) | **DONE** `9d1fc4d` (2026-08-24) — `tools/d_plumbing_ab.py` ran offline vs the frozen snapshot. Primary: pooled ΔD **−0.2418** CI [−0.3021, −0.1835], n=17,471; T3 dropped (0 reddit rows → confound set 4). Identifies E[T5.compute \| T1..T4=ON, pre-flip writer stamps] ONLY |
+| 1d | Record in `REGIME_LEDGER.md` | **DONE** `9d1fc4d` — A/B result + PII incident rows appended with the conditional-effect language inline |
 | 2c | Release phase **AND** schema stamp | **TODO** |
 | 3b+3c | OPEN row + stage-2 disclosure, **and** backtest toward neutral baseline | **TODO** |
-| 4c | NULL tri-state: serve fix **AND** backfill | **TODO** |
-| 5 | CJK `_title_sig`: backtest + board note | **TODO** |
-| 6 | Register truthfulness (six sub-items) | **TODO** |
+| 4c | NULL tri-state: serve fix **AND** backfill | **DONE in code** `4d5aa97` + `e1336be` (all four serve paths; NULL serves UNKNOWN as a distinct fact — the tri-state supersedes a value backfill, which round 5 established cannot be honest for pre-epoch rows). **NOT YET DEPLOYED — the defect is still live on the wire until the engine deploy + `/precompute` owed since `4d5aa97`** |
+| 5 | CJK `_title_sig`: backtest + board note | **TODO** (round-6 note: fails OPEN; corroboration stamp disabled until the definition is canonical) |
+| 6 | Register truthfulness (six sub-items) | **PARTIAL** — seal enforcer re-anchored `1a4f761`/`5316801`; L4 lint (round 5); full six-item verification line not yet satisfied |
 | 7 | Runtime invariant **AND** synthetic probe | **TODO** |
-| 8 | Accuracy figures — reverse the lead | **TODO** |
-| 9 | Erratum **AND** auth **AND** log drain on `/scores` | **TODO** |
+| 8 | Accuracy figures — reverse the lead | **DONE** `81a6e79` |
+| 9 | Erratum **AND** auth **AND** log drain on `/scores` | **TODO** (needs production access) |
 | 10 | Board on a schedule | **TODO** |
 
 ---
