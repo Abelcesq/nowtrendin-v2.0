@@ -9,15 +9,15 @@
 | 1b | Raise `SIGNAL_RETENTION_DAYS` | **DONE** 7 → 30, engine; floor sealed `SIGNAL_RETENTION_FLOOR_DAYS` (round 5) |
 | 1c | Run paired A/B (w/ rank-1 caveat) | **DONE** `9d1fc4d` (2026-08-24) — `tools/d_plumbing_ab.py` ran offline vs the frozen snapshot. Primary: pooled ΔD **−0.2418** CI [−0.3021, −0.1835], n=17,471; T3 dropped (0 reddit rows → confound set 4). Identifies E[T5.compute \| T1..T4=ON, pre-flip writer stamps] ONLY |
 | 1d | Record in `REGIME_LEDGER.md` | **DONE** `9d1fc4d` — A/B result + PII incident rows appended with the conditional-effect language inline |
-| 2c | Release phase **AND** schema stamp | **TODO** |
-| 3b+3c | OPEN row + stage-2 disclosure, **and** backtest toward neutral baseline | **TODO** |
+| 2c | Release phase **AND** schema stamp | **DONE in code** `1d3f5a6` (2026-08-24) — non-destructive transactional swap (Executioner's condition honoured first), `PAYLOAD_SCHEMA_VERSION` sealed + stamped + refused on mismatch at both serve paths, `release:` phase in Procfile (release-safe). 4/4 behaviour tests incl. the constructed deploy-version window. `[payload-rebuilt]` marker retires AT deploy. **Ships with the owed deploy** |
+| 3b+3c | OPEN row + stage-2 disclosure, **and** backtest toward neutral baseline | **3b DONE** `69b3fe5` (2026-08-24) — `C-DFLOOR-SCORE` registered OPEN, `D-FLOOR-3C` in DEFERRED_ITEMS with trigger, docstring no longer claims "neutral"; the display guards landed rounds 5–7 (verified in source). **3c stays GATED**: backtest + board note, never an env flip |
 | 4c | NULL tri-state: serve fix **AND** backfill | **DONE in code** `4d5aa97` + `e1336be` (all four serve paths; NULL serves UNKNOWN as a distinct fact — the tri-state supersedes a value backfill, which round 5 established cannot be honest for pre-epoch rows). **NOT YET DEPLOYED — the defect is still live on the wire until the engine deploy + `/precompute` owed since `4d5aa97`** |
 | 5 | CJK `_title_sig`: backtest + board note | **TODO** (round-6 note: fails OPEN; corroboration stamp disabled until the definition is canonical) |
 | 6 | Register truthfulness (six sub-items) | **PARTIAL** — seal enforcer re-anchored `1a4f761`/`5316801`; L4 lint (round 5); full six-item verification line not yet satisfied |
-| 7 | Runtime invariant **AND** synthetic probe | **TODO** |
+| 7 | Runtime invariant **AND** synthetic probe | **DONE in code** `88eda5c` (2026-08-24) — `payload_contradiction_auditor` (census not sample + dated synthetic probe w/ 48h/release demotion metadata, negative control proven), serve-payload gate widened to `_explain_*`/`plain_english`/`nowtrend_integration.py`, `.gitattributes` `*.py diff=python`. **Activates on the wire at the owed deploy** |
 | 8 | Accuracy figures — reverse the lead | **DONE** `81a6e79` |
 | 9 | Erratum **AND** auth **AND** log drain on `/scores` | **TODO** (needs production access) |
-| 10 | Board on a schedule | **TODO** |
+| 10 | Board on a schedule | **DONE** (2026-08-24) — Routine `trig_01RJfPrxbGoFcdFdwhqQ4omn` in the founder's claude.ai account: monthly (1st, 06:01 UTC), fresh session, runs the nine-seat protocol per the latest collation, pushes to `claude/board-round-<date>`, never deploys or touches score constants, push+email notification. Adjust cadence in the claude.ai Routines UI |
 
 ---
 

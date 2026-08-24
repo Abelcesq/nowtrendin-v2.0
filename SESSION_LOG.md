@@ -68,13 +68,40 @@ stale topic's D block.
    copy that truly closes 1a.**
 4. Doc-debt cleared: Chairman ledger table live-maintained (1c/1d/4c/8 updated), CLAUDE.md
    resume block rewritten, this entry.
+5. **Ruling 2c COMPLETE in code (`1d3f5a6`):** `_precompute_serve_payloads` is non-destructive
+   (in-memory build, ONE-transaction swap — a mid-run failure rolls back instead of leaving the
+   NULL wasteland of 2026-07-06); `PAYLOAD_SCHEMA_VERSION` sealed under L1, stamped into every
+   blob, REFUSED on mismatch at both serve paths (the deploy-version-window class closed at the
+   data layer); `release: python maint_precompute.py` in transfer/Procfile (release-safe: always
+   exits 0, worker self-heals). 4/4 behaviour tests incl. the constructed deploy-version window.
+   `[payload-rebuilt]` marker retires AT deploy, not before.
+6. **Ruling 3b DONE (`69b3fe5`):** `C-DFLOOR-SCORE` OPEN row (the fabricated D floor, ~13%
+   composite / 22% detection, stays on the record until 3c's backtest); `D-FLOOR-3C` in
+   DEFERRED_ITEMS with trigger; the "count at the neutral value" docstring corrected (0 is the
+   FLOOR). Display guards verified already in force from rounds 5–7. Also `C-SNAPSHOT-NOT-IN-REPO`
+   with a real `git ls-files` enforcer — negative control run: force-adding a fake payload turned
+   the gate RED, cleanup turned it green.
+7. **Ruling 7 DONE in code (`88eda5c`):** `payload_contradiction_auditor` — census (not sample)
+   over every stored blob + a synthetic served-shape probe writing DATED pass/fail rows
+   (payload_invariant_probes; 48h / release-change demotion metadata), registered in run_all;
+   negative control proven (a pre-4c-shaped formatter turns it CRITICAL). Serve-payload commit
+   gate widened to `_explain_*` / `plain_english` / `nowtrend_integration.py`; `.gitattributes`
+   pins `*.py diff=python` under the gate's hunk-header trigger.
+8. **Ruling 10 DONE:** monthly nine-seat board round is a real claude.ai Routine
+   (`trig_01RJfPrxbGoFcdFdwhqQ4omn`, 1st of month 06:01 UTC, fresh session, pushes to
+   `claude/board-round-<date>`, never deploys, never touches score constants; founder gets a
+   push+email per run and can retune cadence in the Routines UI).
 
 ### Open / Next
-- **The deploy** (top of this entry) — then re-probe, then `[payload-rebuilt]` marker honesty.
-- Rulings 2c, 3b+3c, 5 (CJK — score-affecting: backtest + board note), 6 (partial), 7, 9
-  (needs production), 10, + Section B.
-- Founder: PII incident decisions; Drive drag-drop of the two `.gz` + optionally the A/B
-  row-level JSON; CoinAPI gate ~08-24; FMP re-eval 09-05; ACC-Q 2026-11-30.
+- **The deploy** (top of this entry) — now also ships 2c's release phase + ruling 7's auditor;
+  after it, retire the `[payload-rebuilt]` marker and re-probe.
+- Rulings still open: 3c (gated: backtest + board note), 5 (CJK `_title_sig` — score-affecting:
+  backtest + board note; fails open until then), 6 (register-truthfulness sub-items beyond the
+  round-5 seal fixes — the count-after-lints / lint-kind-runs-the-lint / hookgate-fixture items),
+  9 (needs production access), + Section B (18 items, incl. the four "free now, impossible
+  later"). Each deserves a focused session, not a tail-end sprint (round 6's lesson).
+- Founder: PII incident decisions (history purge or acceptance; the fork; Drive second copy);
+  CoinAPI gate ~08-24; FMP re-eval 09-05; ACC-Q 2026-11-30.
 
 ---
 

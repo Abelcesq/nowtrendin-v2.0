@@ -626,8 +626,14 @@ identifies E[T5.compute | T1..T4=ON, pre-flip writer stamps] ONLY; T3 dropped (0
 **PII INCIDENT (`3ccabef` + `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md`):** the preflip `.jsonl.gz`
 snapshot (40.9% author-handle rows, measured) sat on the PUBLIC tip since `fe6712b` — silently, against `e4215d4`'s
 written intent (`*.jsonl` ignore pattern missed `.gz`). Tip-removed under PII_POLICY §4; **founder decisions owed:
-history purge or written acceptance, the 1 existing fork, the Drive second copy.** **OPEN:** deploy (above), 2c,
-3b+3c, 5 (CJK — fails open), 6 (partial), 7, 9, 10 + Section B. **NEXT: the deploy, then 2c.***
+history purge or written acceptance, the 1 existing fork, the Drive second copy.** **Also DONE 08-24 (same session, commits
+`1d3f5a6`/`69b3fe5`/`88eda5c`):** 2c complete in code (non-destructive precompute swap + sealed
+`PAYLOAD_SCHEMA_VERSION` stamped/refused-on-mismatch + Procfile release phase); 3b (D-floor OPEN row
+`C-DFLOOR-SCORE` + DEFERRED trigger + honest docstring; 3c stays gated); 7 (contradiction census +
+dated synthetic probe agent, gate widened, `.gitattributes`); 10 (monthly nine-seat board Routine,
+`trig_01RJfPrxbGoFcdFdwhqQ4omn`). **OPEN:** the deploy (above — it now also ships 2c + 7), 3c
+(gated), 5 (CJK — fails open), 6 (register sub-items beyond the round-5 seal fixes), 9 (needs
+production), + Section B. **NEXT: the deploy, then ruling 6's register rework.***
 
 *Prior: 2026-08-21 — **Board round 4: root cause FALSIFIED by three seats; six live defects; ten Chairman rulings.**
 Collation: `audits/board/BOARD_round4_2026-08-20D.md`. DONE then: 1a cohort snapshot (`e4215d4`),
