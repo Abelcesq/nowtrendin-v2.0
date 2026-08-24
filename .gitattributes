@@ -1,0 +1,4 @@
+# Ruling 7(d), board round 4: the serve-payload commit gate keys on git hunk-header
+# function context. Undeclared, git guesses; declared, methods and nested defs are
+# named reliably. Do not remove — the gate rides on this.
+*.py diff=python

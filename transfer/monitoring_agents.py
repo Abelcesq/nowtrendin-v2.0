@@ -2129,6 +2129,152 @@ def etf_reconcile_watch(db_path=None) -> dict:
             "summary": summary, "checked_at": _now().isoformat()}
 
 
+def payload_contradiction_auditor(conn=None, db_path=None, fmt=None,
+                                  write_probe=True) -> dict:
+    """Ruling 7, board round 4 — runtime enforcement: commit-time cannot
+    observe run-time, so the invariant is checked WHERE IT LIVES.
+
+    (a) CONTRADICTION CENSUS, not a sample (the Guardian's kind-change): every
+        stored serve_payload blob is parsed and flagged when it carries a
+        numeric first_timer_ratio beside d_measured != 1 — a measured badge on
+        a value we could not read. The 4c serve-side guard normalizes this at
+        read time, so a stored contradiction is defense-in-depth signal (warn),
+        not a live serving (that is what the probe below asserts). The census
+        also counts blobs stamped with a FOREIGN payload_schema_version — the
+        deploy-version window instrument.
+
+    (b) SYNTHETIC PROBE with a dated pass/fail (the Expansionist): fixture rows
+        — the Cyrillic incident shape included — are pushed through the REAL
+        serve formatter, and the served output is asserted: d_measured != true
+        must serve first_timer_ratio None. The result is WRITTEN as a dated
+        row (payload_invariant_probes) carrying the engine release and payload
+        schema, because a green observation's half-life is ~8 hours: readers
+        must treat a probe older than PROBE_STALE_H (48) or from a different
+        engine release as DEMOTED, never as a standing guarantee. The summary
+        carries last_probe_age_h + engine_release for exactly that check.
+
+    Read-only re: product data — writes only its own probe log, the
+    catchall_floor_log precedent (§13). Flag-never-force throughout.
+    """
+    import json as _json
+    import gravitational_anomaly_detector as g
+    alerts = []
+    summary = {}
+    own = False
+    if conn is None:
+        conn = g.get_db(db_path or g.DB_PATH)
+        own = True
+    try:
+        # ── (a) census over every stored blob ─────────────────────────────
+        rows = conn.execute(
+            "SELECT topic_key, serve_payload FROM velocity_scores "
+            "WHERE serve_payload IS NOT NULL").fetchall()
+        contradictions, foreign, unparseable = [], 0, 0
+        cur_ver = getattr(g, "PAYLOAD_SCHEMA_VERSION", None)
+        for r in rows:
+            tk = r["topic_key"] if hasattr(r, "keys") else r[0]
+            raw = r["serve_payload"] if hasattr(r, "keys") else r[1]
+            try:
+                b = _json.loads(raw)
+            except Exception:
+                unparseable += 1
+                continue
+            if b.get("payload_schema_version") != cur_ver:
+                foreign += 1
+            d = b.get("d_measured")
+            ftr = b.get("first_timer_ratio")
+            if d not in (1, True) and isinstance(ftr, (int, float)):
+                contradictions.append(tk)
+        summary["payload_census_n"] = len(rows)
+        summary["payload_contradictions_stored"] = len(contradictions)
+        summary["payload_foreign_schema"] = foreign
+        summary["payload_unparseable"] = unparseable
+        if contradictions:
+            alerts.append({"level": "warn", "block": "B8",
+                           "msg": f"{len(contradictions)} stored blob(s) carry a numeric "
+                                  f"first_timer_ratio beside d_measured != 1 (e.g. "
+                                  f"{contradictions[:4]}) — the serve guard is the only "
+                                  f"thing between this substrate and a user; rebuild "
+                                  f"payloads (release phase does this)"})
+        if unparseable:
+            alerts.append({"level": "warn", "block": "B8",
+                           "msg": f"{unparseable} serve_payload blob(s) fail to parse"})
+
+        # ── (b) synthetic served-shape probe, dated ──────────────────────
+        fmt = fmt or g._format_score_rows
+        base = {"scored_at": _now().isoformat(), "overall_score": 50.0,
+                "detection_score": 40.0, "confidence_score": 30.0,
+                "first_scored_at": _now().isoformat(),
+                "is_gravitational_anomaly": 0, "serve_payload": None,
+                "total_mentions": 25, "platforms_active": '["github","hackernews"]'}
+        fixtures = [
+            # the Cyrillic incident shape: unknown measurement, stale numeric ratio
+            dict(base, topic_key="probe_cyr", topic_display="хапоэль беэршева сабах",
+                 d_measured=None, first_timer_ratio=0.42),
+            # measured-blind: ratio must be withheld
+            dict(base, topic_key="probe_blind", topic_display="nvidia blackwell",
+                 d_measured=0, first_timer_ratio=0.35),
+            # genuinely measured: ratio must pass through
+            dict(base, topic_key="probe_read", topic_display="agentic coding",
+                 d_measured=1, first_timer_ratio=0.20),
+        ]
+        failures = []
+        try:
+            served = (fmt(fixtures) or {}).get("results", [])
+            by_key = {s.get("topic_key"): s for s in served}
+            for tk, want_ratio in (("probe_cyr", None), ("probe_blind", None),
+                                   ("probe_read", 0.20)):
+                s = by_key.get(tk)
+                if s is None:
+                    continue  # quality/noise filters may drop fixtures; absence ≠ violation
+                if s.get("d_measured") in (1, True):
+                    if s.get("first_timer_ratio") != want_ratio:
+                        failures.append((tk, "measured row lost its ratio"))
+                elif s.get("first_timer_ratio") is not None:
+                    failures.append((tk, f"served ratio {s.get('first_timer_ratio')} "
+                                         f"on d_measured={s.get('d_measured')!r}"))
+        except Exception as exc:                                # noqa: BLE001
+            failures.append(("probe", f"formatter raised: {str(exc)[:80]}"))
+        passed = not failures
+        release = os.getenv("HEROKU_RELEASE_VERSION", "unknown")
+        summary["probe_passed"] = passed
+        summary["probe_failures"] = failures
+        summary["engine_release"] = release
+        summary["payload_schema"] = cur_ver
+        summary["probe_stale_h"] = 48   # readers demote beyond this or on release change
+        if not passed:
+            alerts.append({"level": "critical", "block": "B8",
+                           "msg": f"SYNTHETIC PROBE FAILED: served-shape invariant broken "
+                                  f"({failures[:3]}) — a d_measured != 1 row is serving a "
+                                  f"numeric first_timer_ratio; the 4c guard has regressed"})
+        if write_probe:
+            try:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS payload_invariant_probes ("
+                    "probe_at TEXT, engine_release TEXT, payload_schema TEXT, "
+                    "passed INTEGER, detail TEXT)")
+                conn.execute(
+                    "INSERT INTO payload_invariant_probes VALUES (?,?,?,?,?)",
+                    (_now().isoformat(), release, str(cur_ver),
+                     1 if passed else 0, _json.dumps(failures)[:2000]))
+                conn.commit()
+            except Exception:
+                pass  # the probe result still surfaces via the roll-up
+    finally:
+        if own:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return {
+        "agent": "payload_contradiction_auditor",
+        "status": _roll_up(alerts),
+        "alerts": alerts,
+        "summary": summary,
+        "checked_at": _now().isoformat(),
+    }
+
+
 def run_all(conn, db_path=None) -> dict:
     # HEAVY DATA-SCANNING auditors excluded from this synchronous roll-up — they
     # do full-table scans that push /monitor past Heroku's 30s router limit (503):
@@ -2151,7 +2297,10 @@ def run_all(conn, db_path=None) -> dict:
               etf_reconcile_watch(db_path=db_path),
               # Held-out price/supply referee: 2 batched keyless calls per 15-min
               # TTL window (cached between run_alls) + cached FMP quotes — cheap.
-              crypto_price_referee()]
+              crypto_price_referee(),
+              # Ruling 7: contradiction census (~600 blob parses) + synthetic
+              # served-shape probe — no network, well inside the 3-5s budget.
+              payload_contradiction_auditor(conn)]
     overall = _roll_up([{"level": a["status"].replace("ok", "info")} for a in agents
                         if a["status"] != "ok"]) if any(a["status"] != "ok" for a in agents) else "ok"
     # overall = worst of the agent statuses

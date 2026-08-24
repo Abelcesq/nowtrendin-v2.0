@@ -141,8 +141,14 @@ fi
 # payload-shape change ship while its author is unaware the rebuild is a separate act:
 # deploying is necessary and NOT sufficient (POST /precompute, then re-probe a row).
 # Trigger = the hunk-header function context, which git supplies for free.
-if git diff --cached -U0 -- transfer/gravitational_anomaly_detector.py 2>/dev/null \
-   | grep -q '^@@.*\(get_topic_detail\|_precompute_serve_payloads\|_serve_payload\)'; then
+# Ruling 7 (board round 4) widened the trigger: _explain_* (the function family
+# that emitted the incident text), plain_english, and ANY change to
+# nowtrend_integration.py now arm the gate — editing the prose without the
+# payload used to slip through. *.py diff=python in .gitattributes makes the
+# hunk-header function context reliable (it rode an undeclared heuristic).
+if git diff --cached -U0 -- transfer/gravitational_anomaly_detector.py transfer/nowtrend_integration.py 2>/dev/null \
+   | grep -q '^@@.*\(get_topic_detail\|_precompute_serve_payloads\|_serve_payload\|_explain_[a-zA-Z_]*\|plain_english\)' \
+   || { git diff --cached --name-only 2>/dev/null | grep -q '^transfer/nowtrend_integration\.py$'; }; then
   case "$msg" in
     *"[payload-rebuilt]"*) : ;;
     *)
