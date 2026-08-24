@@ -85,6 +85,14 @@ the source is suspended pending re-review under §16, and the finding is logged 
 the session/audit record. Flag-never-force does not apply — removal of PII is not a
 scoring change and executes immediately.
 
+**Incident on record (2026-08-24):** the AB-ATTRIBUTION snapshot (45,625 raw_signals
+rows, 40.9% carrying public author handles) was committed to the PUBLIC repository
+tip on 2026-08-22 in `fe6712b`, silently and against the preservation commit's own
+written intent (`.gitignore` matched `*.jsonl` but the files were `*.jsonl.gz`).
+Tip removal and the pattern fix executed 2026-08-24 under this section's authority;
+history purge, fork remediation, and the Drive second copy remain founder decisions.
+Full record: `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md`.
+
 ## 5. Buyer-facing summary (DDQ answer)
 
 "We do not ship PII; product data is aggregate topic- and instrument-level. We DO
