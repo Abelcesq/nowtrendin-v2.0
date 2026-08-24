@@ -4495,8 +4495,16 @@ class GravitationalAnomalyDetector:
         engagement-bearing signals — i.e. BOTH indicators were structurally
         blind, and the returned 0 means "could not read", never "read quiet".
         Measurement metadata only: the composite still receives the numeric
-        score exactly as before (the D8 pattern — count at the neutral value,
-        DISCLOSE the absence); no score path changes.
+        score exactly as before, and — ruling 3b, board round 4 — that numeric
+        is a FABRICATED FLOOR, not a neutral value: 0 is the bottom of a 0-100
+        scale, weighted ~13% of composite / 22% of detection, so an unmeasured
+        topic is scored as if D were read and read minimal. Registered OPEN as
+        C-DFLOOR-SCORE in the claim register. The score-side remedy (neutral-
+        baseline treatment) is 3c: SCORE-AFFECTING, backtest + board note
+        required, never an env flip, and §16a forbids skipping stages 1-2
+        (display honesty, which IS in force) to reach stage 3. The display
+        layer discloses the absence; this docstring no longer claims the
+        composite does.
 
         D_PLUMBING_V2 (flag, default OFF — board item 1, score-affecting,
         backtest-before-flip): when ON, ft_ratio's denominator is the

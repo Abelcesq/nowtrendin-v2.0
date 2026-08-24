@@ -402,3 +402,21 @@ repeated).
 **Trigger:** DATE **2026-08-27** — after which the row is resolved as PERMANENTLY
 UNMEASURABLE and that fact is recorded in `REGIME_LEDGER.md` beside the flip row, so every
 later reader knows the five changes of 2026-08-20 can never be separated.
+
+## D-FLOOR-3C — score-side honest absence for unmeasured D (ruling 3c, board round 4; GATED)
+
+**The defect (3b, disclosed):** `compute_dark_matter` returns `0.0` when D could not be read
+(no author-bearing, no engagement-bearing signals) and the composite counts it — a fabricated
+FLOOR (not neutral) on a 0–100 scale, ~13% of composite / 22% of detection. §15a-A3 floor-end,
+in the score. Display surfaces disclose the absence (stage 2, in force); the register carries
+the OPEN row `C-DFLOOR-SCORE`.
+
+**The remedy (3c) is SCORE-AFFECTING and stays gated:** neutral-baseline treatment of the
+unmeasured stratum in the composite. Requires, in order: (1) a held-out backtest over the
+365-day retention window quantifying rank movement under the change (who rises, who falls,
+by how much); (2) a board note with those numbers; (3) Chairman/founder sign-off. NEVER an
+env flip (the quorum-constants rule, §15a). §16a forbids skipping stages 1–2 to reach 3.
+
+**Trigger:** the next scoring-change board round, or the D shadow-trial close (whichever
+first) — whoever runs it must also close `C-DFLOOR-SCORE` by attaching the backtest as the
+row's enforcer evidence.

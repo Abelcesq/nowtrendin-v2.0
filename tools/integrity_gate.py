@@ -58,6 +58,27 @@ SURFACES = [os.path.join(ROOT, "web-terminal", "src"),
 #   kind "lint"     -> a lint id implemented in this file
 # ══════════════════════════════════════════════════════════════════════════════════
 CLAIMS = [
+    # ── Ruling 3b (board round 4): the D score floor, recorded where it cannot be
+    # forgotten. compute_dark_matter returns 0.0 on the unmeasured path and the
+    # composite counts it — 0 is the FLOOR, not neutral, on 0-100 (~13% of composite,
+    # 22% of detection). Display surfaces disclose the absence (stage 2, in force);
+    # the SCORE-side remedy is 3c: gated behind a backtest + board note, never an
+    # env flip. This row stays OPEN until 3c ships with that evidence.
+    ("C-DFLOOR-SCORE",
+     "An unmeasured D contributes a fabricated floor 0 to the composite — the score "
+     "side of honest absence is NOT yet implemented (3c, gated: backtest + board note)",
+     "compute_dark_matter docstring; CHAIRMAN_RULINGS_2026-08-20D §3b+3c; "
+     "audits/DEFERRED_ITEMS.md D-FLOOR-3C",
+     "OPEN", "none", ""),
+
+    # ── 2026-08-24 PII incident: the promise e4215d4 made and fe6712b silently broke.
+    # Enforced by an actual `git ls-files` run — never a comment, never a pattern hope.
+    ("C-SNAPSHOT-NOT-IN-REPO",
+     "The AB-ATTRIBUTION snapshot payload is never tracked by git — only MANIFEST.json; "
+     "40.9% of its raw_signals rows carry author handles and the repo is public",
+     "audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md; .gitignore *.jsonl*",
+     "ASSERTED", "gitfiles", "audits/ab-attribution::MANIFEST.json"),
+
     ("C-GUARD-BLOG",
      "The cold-start guard withholds first-timer credit on the BLOG lane until a "
      "community is D_COMMUNITY_MIN_AGE_DAYS old",
@@ -294,6 +315,24 @@ def _enforcer_live(kind: str, ref: str):
             return (bool(r.get("ok")), "" if r.get("ok") else "audit returns ok=False")
         except Exception as exc:                                # noqa: BLE001
             return False, f"audit failed to run: {str(exc)[:60]}"
+    if kind == "gitfiles":
+        # ref = "<dir>::<only-allowed-basename>[,<basename>...]" — the claim holds
+        # only if `git ls-files <dir>` returns EXACTLY the allowed set. A real
+        # subprocess run, so a force-added payload turns this red the same commit.
+        import subprocess
+        dirpath, _, allowed = ref.partition("::")
+        try:
+            out = subprocess.run(
+                ["git", "ls-files", dirpath], cwd=ROOT, capture_output=True,
+                text=True, timeout=30)
+            tracked = {os.path.basename(l) for l in out.stdout.splitlines() if l.strip()}
+        except Exception as exc:                                # noqa: BLE001
+            return False, f"git ls-files failed: {str(exc)[:60]}"
+        allowed_set = {a.strip() for a in allowed.split(",") if a.strip()}
+        extra = tracked - allowed_set
+        if extra:
+            return False, f"tracked files beyond the allowed set: {sorted(extra)}"
+        return True, ""
     if kind == "hookgate":
         hook = _read(os.path.join(ROOT, ".githooks", "commit-msg"))
         return (ref in hook, "" if ref in hook else "gate text absent from commit-msg")
