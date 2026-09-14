@@ -361,43 +361,69 @@ def section0_seal(core_mod, core_err) -> dict:
 
 
 # ===================================================== SECTION 1 — COT BACKFILL
-COT_BASE = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+# Run 2 (2026-09-14) self-diagnosed the 400: resource 6dca-aqww is the LEGACY
+# COT schema (market_and_exchange_names, no lev_money_* columns). The
+# leveraged-funds fields live in the TFF datasets, so instead of hardcoding a
+# dataset id, probe one row per candidate and keep the first whose schema
+# carries a market-name column AND the lev_money long/short pair.
+COT_CANDIDATE_DATASETS = ["gpe5-46if", "6dca-aqww"]  # TFF futures-only first
+COT_NAME_COLS = ("contract_market_name", "market_and_exchange_names")
 COT_FIELDS = ["report_date_as_yyyy_mm_dd", "contract_market_name",
               "open_interest_all", "lev_money_positions_long_all",
               "lev_money_positions_short_all", "asset_mgr_positions_long_all",
               "asset_mgr_positions_short_all"]
 
 
-def _cot_fetch(needle: str) -> list:
-    # First run (2026-09-14) got HTTP 400 with the body unread; the classic
-    # Socrata 400 on this family of CFTC datasets is a column-name mismatch,
-    # so try the TFF schema's two known market-name columns in order and let
-    # the (now body-carrying) HTTPError from the last attempt surface.
-    last_err = None
-    for name_col in ("contract_market_name", "market_and_exchange_names"):
-        select_fields = [name_col if f == "contract_market_name" else f
-                         for f in COT_FIELDS]
-        rows, offset, limit = [], 0, 5000
+def _cot_resolve_dataset() -> tuple:
+    """(base_url, name_col, field_map) from a 1-row schema probe, or raises
+    with every candidate's reason so the run output is the diagnosis."""
+    reasons = []
+    for ds in COT_CANDIDATE_DATASETS:
+        base = f"https://publicreporting.cftc.gov/resource/{ds}.json"
         try:
-            while True:
-                qs = urllib.parse.urlencode({
-                    "$select": ",".join(select_fields),
-                    "$where": f"upper({name_col}) like '%{needle}%'",
-                    "$order": "report_date_as_yyyy_mm_dd",
-                    "$limit": str(limit), "$offset": str(offset),
-                })
-                page = json.loads(
-                    _http_get(f"{COT_BASE}?{qs}", timeout=90).decode("utf-8"))
-                for r0 in page:
-                    if name_col != "contract_market_name":
-                        r0["contract_market_name"] = r0.get(name_col, "")
-                rows.extend(page)
-                if len(page) < limit:
-                    return rows
-                offset += limit
-        except Exception as e:  # noqa: BLE001 — try the alternate column
-            last_err = e
-    raise last_err
+            probe = json.loads(_http_get(f"{base}?$limit=1", timeout=60)
+                               .decode("utf-8"))
+        except Exception as e:  # noqa: BLE001
+            reasons.append(f"{ds}: probe failed: {e}")
+            continue
+        keys = set(probe[0].keys()) if probe else set()
+        name_col = next((c for c in COT_NAME_COLS if c in keys), None)
+
+        def _match(want):
+            if want in keys:
+                return want
+            stem = want[:-len("_all")] if want.endswith("_all") else want
+            return next((k for k in sorted(keys) if k.startswith(stem)), None)
+
+        fmap = {f: (name_col if f == "contract_market_name" else _match(f))
+                for f in COT_FIELDS}
+        missing = [f for f, k in fmap.items() if k is None]
+        if name_col and not any("lev_money" in f for f in missing):
+            return base, name_col, fmap
+        reasons.append(f"{ds}: schema lacks {missing or 'a market-name column'}")
+    raise RuntimeError("no COT dataset matched: " + "; ".join(reasons))
+
+
+def _cot_fetch(needle: str) -> list:
+    base, name_col, fmap = _cot_resolve_dataset()
+    select_fields = sorted({k for k in fmap.values() if k})
+    rows, offset, limit = [], 0, 5000
+    while True:
+        qs = urllib.parse.urlencode({
+            "$select": ",".join(select_fields),
+            "$where": f"upper({name_col}) like '%{needle}%'",
+            "$order": fmap["report_date_as_yyyy_mm_dd"],
+            "$limit": str(limit), "$offset": str(offset),
+        })
+        page = json.loads(_http_get(f"{base}?{qs}", timeout=90).decode("utf-8"))
+        for r0 in page:
+            for want, have in fmap.items():
+                if have and have != want:
+                    r0[want] = r0.get(have, "")
+        rows.extend(page)
+        if len(page) < limit:
+            return rows
+        offset += limit
 
 
 def section1_cot() -> dict:
