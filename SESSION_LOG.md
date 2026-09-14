@@ -150,6 +150,16 @@ cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owe
   path, or Postgres tier upsize (the §13 2026-06-24 note predicted this: "needs a larger
   Postgres tier as the tail fills").
 
+### Addendum 5 (final, same session) — FIRST FULLY-MEASURED WARM CYCLE; system stable
+Verified 02:44:12Z on the TTL build (`/health=200 /topics=200 0.3s`, ttl_s=7200 live).
+First complete warm record ever captured: **scores 4,153 rows / 668.5s · topics 4,153
+rows / 626.1s** · history 7d 6.9s · 24h 9.9s · risk 3.3s · crypto 0.5s · cycle 1,375s
+(~23 min). Zero errors — under the old 300s cap both big builds died every cycle. Cadence
+math now holds: ~48 min between cache SETs vs 120-min TTL (2.5× margin). ⚠ Watch item:
+`history:12h` served 0 rows/0.0s this cycle (was 2,000) — possibly a sparse-window
+artifact at this hour; if it persists across cycles it is a real regression to chase.
+Stage-2 (why the indexed GROUP BY needs ~11 min) stays owed on prod EXPLAIN evidence.
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +
