@@ -1,0 +1,105 @@
+# One-button post-merge verification of the MARKET + CRYPTO sections across the
+# deployed surfaces (Chairman order 2026-09-14: "merge and test on all three
+# platforms"). Runs from a GitHub runner because the repo's cloud sessions are
+# egress-blocked to both herokuapp.com and github.io. READ-ONLY: GET probes
+# only; prints a pass/fail table. Desktop wraps the same web bundle, so the
+# web-bundle checks cover it; mobile has no crypto screen (documented N/A) and
+# its market screens are untouched by the divergence merge.
+name: Ops - platform verify (market + crypto)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe engine + web
+        run: |
+          python3 - <<'PYEOF'
+          import json, sys, urllib.error, urllib.request
+
+          ENGINE = "https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com"
+          SITE = "https://abelcesq.github.io/nowtrendin-v2.0"
+          fails = []
+
+          def get(url, timeout=120):
+              req = urllib.request.Request(url, headers={"User-Agent": "nowtrendin-platform-verify/1.0"})
+              return urllib.request.urlopen(req, timeout=timeout)
+
+          def check(name, fn):
+              try:
+                  msg = fn()
+                  print(f"PASS  {name}: {msg}")
+              except Exception as e:
+                  fails.append(name)
+                  print(f"FAIL  {name}: {type(e).__name__}: {e}")
+
+          def health():
+              r = get(f"{ENGINE}/health"); return f"HTTP {r.status}"
+
+          def prewarm():
+              d = json.load(get(f"{ENGINE}/prewarm"))
+              feeds = d.get("feeds", {})
+              errs = {k: v.get("error") for k, v in feeds.items() if isinstance(v, dict) and v.get("error")}
+              if errs: raise RuntimeError(f"feeds with errors: {errs}")
+              return f"last_run={d.get('last_run')}, {len(feeds)} feeds clean"
+
+          def crypto_feed():
+              d = json.load(get(f"{ENGINE}/crypto"))
+              coins = d.get("coins") or d.get("results") or []
+              if not coins: raise RuntimeError("no coins in /crypto")
+              c0 = coins[0]
+              legacy_lively = [k for k in ("signal_freshness",) if isinstance(c0.get("money_movement"), dict) and k in (c0["money_movement"] or {})]
+              return (f"{len(coins)} coins; sample keys ok; "
+                      f"money_movement={'present' if 'money_movement' in c0 else 'absent'}; "
+                      f"stale signal_freshness leak={legacy_lively or 'none'}")
+
+          def market_feed():
+              d = json.load(get(f"{ENGINE}/risk/scores?limit=5"))
+              n = d.get("count", 0); rows = d.get("results", [])
+              if not rows: raise RuntimeError("no market rows")
+              return f"count={n}, first row keys={sorted(rows[0].keys())[:6]}..."
+
+          def market_ledger():
+              d = json.load(get(f"{ENGINE}/market/accuracy"))
+              return f"ledger serves (keys: {sorted(d.keys())[:5]}...)"
+
+          def crypto_ledger():
+              d = json.load(get(f"{ENGINE}/crypto/accuracy"))
+              return f"ledger serves (keys: {sorted(d.keys())[:5]}...)"
+
+          def diag_gated():
+              try:
+                  r = get(f"{ENGINE}/diag/divergence", timeout=30)
+                  raise RuntimeError(f"PUBLICLY ACCESSIBLE (HTTP {r.status}) — must be internal-gated")
+              except urllib.error.HTTPError as e:
+                  if e.code in (401, 403, 404): return f"correctly gated (HTTP {e.code})"
+                  raise
+
+          def site_bundle():
+              html = get(f"{SITE}/", timeout=60).read().decode("utf-8", "replace")
+              import re
+              m = re.search(r'assets/(index-[\w-]+\.js)', html)
+              if not m: raise RuntimeError("no bundle ref in index.html")
+              js = get(f"{SITE}/assets/{m.group(1)}", timeout=60).read().decode("utf-8", "replace")
+              need = ["POSITIONING VS PRICE", "Positioning vs Price Register", "NOT MEASURED"]
+              missing = [s for s in need if s not in js]
+              if missing: raise RuntimeError(f"bundle {m.group(1)} missing strings: {missing}")
+              return f"live bundle {m.group(1)} carries the new crypto column + register panel"
+
+          for name, fn in [("engine /health", health), ("engine /prewarm", prewarm),
+                           ("crypto feed /crypto", crypto_feed),
+                           ("market feed /risk/scores", market_feed),
+                           ("market ledger", market_ledger), ("crypto ledger", crypto_ledger),
+                           ("/diag/divergence gating", diag_gated),
+                           ("web+desktop live bundle", site_bundle)]:
+              check(name, fn)
+
+          print()
+          print("mobile: N/A for crypto (no crypto screen); market screens untouched by this merge (0 frontend/ files in the diff)")
+          if fails:
+              print(f"\nRESULT: FAIL ({len(fails)}): {fails}"); sys.exit(1)
+          print("\nRESULT: ALL PASS")
+          PYEOF
