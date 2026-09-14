@@ -160,6 +160,33 @@ math now holds: ~48 min between cache SETs vs 120-min TTL (2.5× margin). ⚠ Wa
 artifact at this hour; if it persists across cycles it is a real regression to chase.
 Stage-2 (why the indexed GROUP BY needs ~11 min) stays owed on prod EXPLAIN evidence.
 
+### Addendum 6 (same session) — stage-2 EVIDENCE LANDED; vacuum op; crypto board round collated; cost var synced
+- **Stage-2 root cause, production-measured** (release-log [diag], 05:11 UTC):
+  `velocity_scores` = 4,146,214 rows / **4,156 MB**, **last_autovacuum: None, last_vacuum:
+  None — never maintained**; stale stats (planner est. 2.45M); plan = 4.1 GB Parallel Seq
+  Scan + disk-spilling hash agg at work_mem=4MB, 1 worker → the ~11-min builds. Clean
+  local PG16 ran the identical query in 1.1s via index-only scan — the path prod cannot
+  take without a visibility map. **Intervention: `ops-vacuum-hot-table.yml`** — one-off
+  Heroku dyno running plain `VACUUM (VERBOSE, ANALYZE) velocity_scores` (non-blocking;
+  NEVER FULL). Verify: next warm's build secs via the uptime monitor + next release
+  [diag]. Structural follow-ups if needed: serve_payload out of the hot table; autovacuum
+  posture on Essential-1.
+- **`COST_HEROKU_USD=118` set on the engine** via ops workflow (run green) — item 1's
+  config half CLOSED without the laptop. Drive drag-drop remains founder-only (the PII
+  classifier correctly refused automated handling of the author-handle blobs).
+- **CJK fix deployed flag-OFF** (`TITLE_SIG_CJK=0`) with the release-diag deploy; flip
+  still owed to live-title backtest + board note + founder sign-off.
+- **CRYPTO BOARD ROUND COLLATED** → `audits/board/BOARD_crypto-money_2026-09-14.md`.
+  Headline: option 2 = YES as a renamed, pre-registered "Leverage & Positioning" project
+  (≥90-day baseline, rights evidence first, prereg before any correlation), NO as a fix
+  for the n/a; the n/a itself traced to a UI defect (`MARKET_TIER_COLOR` missing ABSENT
+  → absence styled as measured DORMANT grey). Unanimous 9/9: fix display language now
+  (web-only), delete the `signal_freshness` price-liveness flag from the money composite
+  in the free window (all coins serve None today → provably zero-delta), register the
+  three unregistered crypto shelves + make `/monitor/deferred-triggers` actually read
+  DEFERRED_ITEMS (its docstring falsely claims it does). Eleven new defects K1–K11 on
+  the record. Awaiting Chairman rulings C1–C6 + the §16 rights-gate addition (K3).
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +

@@ -1,0 +1,39 @@
+# One-button ops: VACUUM ANALYZE the hot table (stage-2 fix, evidence-backed).
+# EVIDENCE (release-log diagnostics, 2026-09-14 05:11 UTC): velocity_scores =
+# 4,146,214 live rows / 4,156 MB with last_autovacuum = None and last_vacuum =
+# None — never maintained. Stale stats (planner estimated 2.45M rows) + no
+# visibility map force a 4.1 GB Parallel Seq Scan + disk-spilling hash aggregate
+# at work_mem=4MB → the ~11-minute superset builds. A clean local PG16 ran the
+# identical query in 1.1s via an index-only scan on idx_velocity_topic — the
+# path prod cannot take until the visibility map exists.
+# WHAT THIS DOES: launches a Heroku ONE-OFF dyno (no web restart, no deploy)
+# running plain VACUUM (VERBOSE, ANALYZE) on velocity_scores. Plain VACUUM takes
+# no exclusive lock — safe under live traffic. NEVER change this to VACUUM FULL
+# (it locks the table and would take the site down).
+# VERIFY: the uptime monitor's /prewarm captures show the next warm's
+# scores/topics build seconds; the next release log's [diag] block shows
+# last_vacuum set and the plan flip.
+name: Ops - vacuum hot table
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  vacuum:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Launch one-off dyno running VACUUM ANALYZE velocity_scores
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then echo "::error::HEROKU_API_KEY not set"; exit 1; fi
+          PYCMD='import os,sys,time,psycopg2; c=psycopg2.connect(os.environ["DATABASE_URL"]); c.autocommit=True; cur=c.cursor(); t=time.time(); cur.execute("SET statement_timeout=0"); cur.execute("VACUUM (VERBOSE, ANALYZE) velocity_scores"); print("vacuumed in %.1fs" % (time.time()-t)); cur.execute("SELECT n_live_tup,n_dead_tup,last_vacuum,last_analyze FROM pg_stat_user_tables WHERE relname=%s", ("velocity_scores",)); print(cur.fetchone())'
+          BODY=$(python3 -c "import json; print(json.dumps({'command': 'python -c ' + json.dumps(open('/dev/stdin').read()), 'attach': False, 'time_to_live': 3600}))" <<< "$PYCMD")
+          curl -sS -X POST "https://api.heroku.com/apps/nowtrendin-v2-engine/dynos" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" | python3 -c "import json,sys; d=json.load(sys.stdin); print('one-off dyno:', d.get('name', d), '| state:', d.get('state'))"
+          echo "VACUUM is running detached on Heroku (several minutes on 4.1 GB)."
+          echo "Its output lands in the app log stream; verification = next /prewarm build secs + next release [diag] block."
