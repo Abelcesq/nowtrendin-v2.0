@@ -1,0 +1,68 @@
+{
+  "status": "OK",
+  "coins": [
+    "ADA",
+    "AVAX",
+    "BCH",
+    "BNB",
+    "BTC",
+    "DOGE",
+    "DOT",
+    "ETH",
+    "LINK",
+    "LTC",
+    "SOL",
+    "XRP"
+  ],
+  "row_count": 432,
+  "missing_columns": [
+    "units",
+    "suspect"
+  ],
+  "price_errors": {
+    "DOT": "HTTPError: HTTP Error 429: Too Many Requests",
+    "ETH": "HTTPError: HTTP Error 429: Too Many Requests",
+    "LINK": "HTTPError: HTTP Error 429: Too Many Requests",
+    "LTC": "HTTPError: HTTP Error 429: Too Many Requests",
+    "SOL": "HTTPError: HTTP Error 429: Too Many Requests",
+    "XRP": "HTTPError: HTTP Error 429: Too Many Requests"
+  },
+  "research_price_caveat": "CoinGecko/stooq dailies are RESEARCH-ONLY prices, not the sealed price source.",
+  "missingness": {
+    "counts": {
+      "missing_days": 0,
+      "present_days": 432,
+      "missing_with_ret": 0,
+      "present_with_ret": 216
+    },
+    "pooled_mean_absret_missing": null,
+    "pooled_mean_absret_present": 0.0223,
+    "pooled_welch_t": null,
+    "note": "insufficient missing-day observations for a stable t"
+  },
+  "timing": {
+    "pooled_spearman_delay_vs_absret": -0.1246,
+    "n_pairs": 216,
+    "note": "full 3-offset test is future collection (SS5)"
+  },
+  "cross_leg": {
+    "pooled_rho_raw": 0.1655,
+    "pooled_rho_orthogonalized": 0.2782,
+    "n_raw": 203,
+    "n_orth": 106
+  },
+  "cot_cross_leg": [
+    {
+      "coin": "BTC",
+      "n": 0,
+      "rho": "",
+      "note": "COT csv or coinapi rows unavailable"
+    },
+    {
+      "coin": "ETH",
+      "n": 0,
+      "rho": "",
+      "note": "COT csv or coinapi rows unavailable"
+    }
+  ]
+}

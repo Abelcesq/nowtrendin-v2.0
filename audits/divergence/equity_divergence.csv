@@ -1,0 +1,3 @@
+# SPEC-DEVELOPMENT DATA (pre-seal rows, K16) — instrument preview only, never scored, param_version=bd6e36498ef6b1fb80056873cca6998c03e1fbb8268aff28b61a0864c022877b
+# SS7 equity-first instantiation; research-only under the seal until its own board note. CoinGecko/stooq dailies are RESEARCH-ONLY prices, not the sealed price source.
+ticker,settlement_date,q_dlnShortInterest,p_dlnPrice_matching_window,zq,zp,D,measured

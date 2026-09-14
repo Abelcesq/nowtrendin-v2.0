@@ -1,0 +1,13 @@
+{
+  "status": "SKIPPED",
+  "files": {
+    "BTC": {
+      "status": "SKIPPED",
+      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request"
+    },
+    "ETH": {
+      "status": "SKIPPED",
+      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request"
+    }
+  }
+}

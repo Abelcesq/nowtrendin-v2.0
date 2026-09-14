@@ -1,0 +1,72 @@
+{
+  "status": "SKIPPED",
+  "tickers_ok": 0,
+  "per_ticker": {
+    "AAPL": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "AMZN": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "C": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "CVX": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "F": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "GOOGL": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "IBM": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "JPM": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "LMT": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "META": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "MS": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "MSFT": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "NVDA": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "SPCX": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "TSLA": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    },
+    "WFC": {
+      "status": "SKIPPED",
+      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+    }
+  },
+  "rows": 0,
+  "watchlist_source": "ast-parsed"
+}

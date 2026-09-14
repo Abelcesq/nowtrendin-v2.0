@@ -1,0 +1,4 @@
+# Weekly Delta(lev_money net long) z vs weekly Delta ln(OI) z (COT report dates; OI at nearest stored day <= report date).
+coin,n_weeks,spearman_dLevNet_z_vs_dlnOI_z,note
+BTC,0,,COT csv or coinapi rows unavailable
+ETH,0,,COT csv or coinapi rows unavailable

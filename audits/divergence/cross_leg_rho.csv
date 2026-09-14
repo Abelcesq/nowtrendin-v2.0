@@ -1,0 +1,15 @@
+# Operator cross-leg audit — funding is a DISQUALIFIED leg (price-derived, prereg SS2); this measures how much of the OI leg it duplicates. Research prices. z is the AUDIT-scale robust z (core arithmetic, gap-tolerant window) — not the sealed strict-90 statistic.
+coin,n_raw,spearman_funding_z_vs_dlnOI_z,n_orth,spearman_after_momentum_orthogonalization
+ADA,19,0.7275,19,0.5947
+AVAX,20,0.2719,20,0.3925
+BCH,19,-0.3814,19,-0.373
+BNB,20,0.3993,20,0.4772
+BTC,20,0.5038,20,0.6346
+DOGE,8,-0.381,8,-0.3333
+DOT,20,0.3856,0,
+ETH,20,-0.1534,0,
+LINK,1,,0,
+LTC,19,0.2053,0,
+SOL,17,-0.2255,0,
+XRP,20,-0.1993,0,
+POOLED,203,0.1655,106,0.2782
