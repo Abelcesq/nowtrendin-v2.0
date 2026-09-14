@@ -1,0 +1,365 @@
+SNAPSHOT 2026-09-14 of https://www.coinapi.io/legal
+========================================================================
+Legal Terms, AUP and Privacy Policy | CoinAPI
+by API BRICKS
+Products
+Solutions
+Datasets
+Pricing
+Developers
+Resources
+Contact us
+Log in
+Legal info
+Table of Contents
+Customer Agreement
+Service Level Agreements
+Acceptable Usage Policy
+Privacy policy
+Effective Date: 2025-08-18
+Customer Agreement
+This customer agreement ("
+Agreement
+") is a legal agreement between you and API BRICKS LTD F/K/A COINAPI LTD UTR 8050945 ("
+Company
+", "
+our
+", "
+we
+" or "
+us
+"), an United Kingdom company (together the "
+parties
+" and each a "
+party
+"). If you are agreeing to this Agreement not as an individual but on behalf of your company, then a reference to "
+you
+" or "
+Customer
+" in this Agreement is a reference to the company, and the company will be bound by this Agreement. We may modify the terms of this Agreement from time to time subject to Section 17 (Changes to this Agreement) below.
+By clicking on the "I agree" (or similar button or checkbox) that is presented to you at the time of your Order one of our Services, or by using or accessing our Services, you agree to be bound by the terms of this Agreement. If you do not agree to the terms of this Agreement, you must immediately uninstall or cease using the Services.
+1. Grant and Scope of Agreement
+1.1. Scope and Application.
+This Agreement (including any amendments or attachments and the policies incorporated herein) governs your access to and use of all Services we provide-whether delivered as downloadable software ("Software"), hosted services, APIs, support, maintenance, or related documentation (collectively, "Services"). This Agreement also applies to any Orders and references to this Agreement in future purchases or usage. It is effective as of the date you accept it or first use the Services ("Effective Date").
+1.2. Rights Granted.
+Subject to your compliance with this Agreement, we grant you a non-exclusive, non-transferable, revocable right to access and use the Services for your internal business purposes only. No ownership, title, or proprietary rights are transferred to you.
+1.3. Applicability of Specific Terms.
+Certain Services may also be subject to Service-specific Terms, Service Level Agreements, or additional documents ("Service Terms"), which supplement this Agreement. Where such Service Terms conflict with this Agreement, the Service Terms shall prevail solely with respect to that Service.
+1.4. Affiliates.
+Your Affiliates are entitled to access and use the Services under the same terms as you, provided they are under common control (directly or indirectly) having more than 50% voting interest or equivalent power to manage operations.
+2. Accounts, Subscriptions, Quotas, Renewals, Data Sources, Refunds, Fees & Payments, Pay-As-You-Go and Usage Credits
+2.1. Account Registration.
+You must register an Account with us through our APIBRICKS Site to place Orders, receive API keys, and manage access to the Services. You agree to provide accurate and complete account information and to keep it current so that we may send notices, invoices, statements, and other communications to you by email or through your Account. You are responsible for all activity conducted under your Account, including Subscriptions, Pay-As-You-Go usage, and Orders.
+2.2. Subscriptions, Quotas, and Renewals.
+(a)
+Orders.
+You create an Order by completing the purchase on APIBRICKS Site, or by requesting an Invoice. An Order specifies the Services purchased, the Subscription Term, applicable limits (including Quotas), and the price. Orders are binding once payment has been received and processed or once access to the Services is delivered.
+(b)
+Subscriptions & Quotas.
+Each Subscription includes a defined Quota (e.g., access to specific features, usage volume, number of Data Sources, or other measurable limits). Your Service usage during a Subscription Term will first be applied against your Quota.
+(c)
+Automatic Renewals.
+Unless otherwise specified in your Order, Subscriptions renew automatically for additional periods equal to the initial Subscription Term. You authorize us to charge your payment method for all such renewals unless you cancel before renewal.
+2.3. Data Source.
+Our Services are provided, according to the number of specific and unique data sources you can manage. A "Data Source" is an edge of the infrastructure to specific and unique external data source. A Data Source may be an exchange, broker, blockchain, ledger that Service communicates with using the protocol. Data Sources are defined in the API. You are solely responsible for any use of the external Data Sources which may be subject to restrictions of use and require additional license agreements with the third party.
+2.4. Refund policy.
+You may terminate your initial Order of the applicable Services under this Agreement, for no reason or any reason, by providing notice of termination be made through your Account. All fees paid are non-refundable.
+2.5. Service Fees and Payment.
+We calculate and bill all fees and charges (including Subscription fees, Pay-As-You-Go usage, and any Usage Credits applied) monthly, unless otherwise stated. We may bill you more frequently for fees accrued if we reasonably suspect that your account is fraudulent or at risk of non-payment. You agree to pay all fees using a supported payment method. If your default payment method fails, we may charge any other valid payment method associated with your Account. All fees are due without setoff, counterclaim, or deduction. We reserve the right to charge interest (1.5% per month or the maximum rate allowed by law) on overdue amounts. Services may be suspended or terminated for non-payment, subject to Section 7.1.
+2.6. Pay-As-You-Go.
+If your Usage exceeds your Subscription Quota, or if you do not have an active Subscription to cover Usage that your organization generated by using the Services, you will be charged the
+Pay-As-You-Go prices
+published on our pricing page or specified in your Order.
+2.7. Usage Credits.
+We may allow you to purchase or receive
+Usage Credits
+, which represent a prepaid
+dollar balance
+in your Account that may be applied toward
+Pay-As-You-Go
+charges.
+(a) Usage Credits are consumed before any Pay-As-You-Go charges are billed to your payment method.
+(b) Usage Credits are non-refundable, non-transferable, and may only be used for Services.
+(c) Unless otherwise stated, Usage Credits do not expire.
+(d) If you do not have sufficient Usage Credits to cover Pay-As-You-Go usage, the outstanding balance will be charged to your payment method at the end of the billing cycle.
+3. On-Perm Software Terms
+3.1. Grant of License.
+Under the terms of this Agreement, we grant you a worldwide, non-exclusive, fully paid, non-transferable license to install and use the Software for your own business purposes, during the applicable License Term.
+3.2. License Delivery.
+To activate and use the Software, you will be required to provide a license key. License keys will be delivered electronically to your Account and via email when payment has been received as per your Order.
+3.3. License Term.
+Your license to use the Software is granted for a specific time period (License Term or Subscription Term).
+Your Order will indicate:
+(a) a period of time for the License Term (12 months unless specified otherwise); and/or,
+(b) a specific begin and end date for the License Term.
+If a begin and end date are not indicated, the begin date of the License Term will be the date when the Software is delivered, at which time the license key will be delivered to you as per Section 3.2 (License Delivery).
+Upon the expiry of your License Term plus optionally a grace period with length of our sole discretion, functionality in the Software will be limited, and you will not be able to use the Software.
+3.4. Support, Maintenance and New Releases.
+During the License Term you will have access, free of charge, to all updates, upgrades, new releases and patches for the Software that we release during the License Term, along with technical support. You acknowledge and agree that we may, but are under no obligation to, release any update, upgrade or patch at any time or for any reason.
+3.5. Number of Instances.
+For each License that you purchase, you may install and use up to three (3) active "Instances" of the Software. An Instance means a running copy of the Software that has its own operating environment. Instances are counted whether installed on the same physical or virtual server, or on different servers.
+Instances may be used for production usage, disaster recovery, testing, quality assurance, development or other purposes. Each Instance may have an unlimited number of Nodes to provide availability and redundancy.
+Your Order specifies the maximum number of Data Sources you may register across all running Instances and in each Instance individually, even if you run multiple Instances concurrently.
+3.6. Third Party Code and Open Source Libraries Used.
+The Software includes code and libraries licensed to us by third parties, including open source software. To the extent applicable, we shall identify open source software included in the Software in or through the Software itself, or on a page in our documentation. Some of these licenses require us to provide the open source software to you on the terms of the open source license instead of the terms of the Agreement. In that case, the terms of the open source license will apply, and you will have the rights granted in such licenses to the open source software itself, such as access to source code, right to make modifications, and right to reverse engineer. Notwithstanding the foregoing, if you are using the Software in the form provided to you, in accordance with your permitted scope of use, with no distribution of software to third parties, then none of these open source licenses impose any obligations on you beyond what is stated in the Agreement.
+4. Cloud Services Terms
+4.1. Access to Cloud Services.
+Subject to your acceptance and continued compliance with the terms of this Agreement, we grant you a non-exclusive right to access and use the Cloud Services, during the applicable Subscription Term. You acknowledge that the Cloud Services are online Services hosted and managed by us on your behalf, which may change from time to time.
+4.2. Fair Usage.
+Your usage of the Cloud Services is governed by our Acceptable Usage Policy.
+4.3. Security of Your Data.
+We implement and maintain security measures to help protect the Cloud Services and Your Data from security attacks. However, you acknowledge and agree that as a consequence of the inherent nature of the Cloud Services, Your Data will often be transported over networks that are not owned or operated by us, and that we are not responsible for any of Your Data that is lost, intercepted, altered or stored across such networks, except to the extent caused by our negligence or intentional misconduct. You acknowledge that we are unable to guarantee complete security or confidentiality of Your Data or guarantee that third parties will never be able to defeat our security measures or those of our third-party service providers. We are General Data Protection Regulation (GDPR) compliant: if we discover or are made aware that any of Your Data has been intercepted, we will follow the GDPR reporting guidelines if the intercepted data may have contained any personally identifiable information.
+4.4. Static IP Addresses.
+Your Order may include a static IP address (Static IP) or/and DNS name. We may on rare occasions need to change the details you have been provided with. In such cases we will do our best to give you at least 30 days notice so you can prepare for the change.
+4.5. Services May Be Inaccessible Or Inoperable.
+You hereby acknowledge that from time to time, the Services may be inaccessible or inoperable for any reason, including, without limitation:
+(a) equipment (hardware) malfunctions;
+(b) software malfunctions;
+(c) periodic maintenance procedures or repairs which Company may undertake from time to time; and/or,
+(d) causes beyond the reasonable control of Company and/or not reasonably foreseeable by Company.
+4.6. Service Level Agreement.
+Company will use commercially reasonable efforts to make the Services available
+99.9%
+of time, measured monthly ("Monthly Uptime Percentage"). Further, any downtime resulting from outages of third party connections or utilities or other reasons beyond Company's control will also be excluded from any such calculation. Customer's sole and exclusive remedy, and Company's entire liability, in connection with Service availability shall be that in the event Company does not meet the Monthly Uptime Percentage in given calendar month, Customer will be eligible to receive a Service Credit. "Unavailable Time" means the Company API is not available for use according to third party performance and monitoring Services contracted by Company (the "Monitoring Service"). The Monitoring Service reports of availability will be accessible via the website operated by the third party.
+Monthly Uptime Percentage
+Service Credit Percentage
+>= 99.9%
+0%
+< 99.9% and >= 99.0%
+5%
+< 99.0%
+10%
+To receive downtime credit, Customer must submit a ticket via the Support Portal within 30 days from the time of downtime, and failure to provide such notice will forfeit the right to receive downtime credit. The ticket must include:
+(a) "SLA Claim" as the subject of the ticket;
+(b) the dates and times of the Unavailable Time for which Customer are requesting credit; and
+(c) any applicable information that documents the claimed outage.
+Such credits may not be redeemed for cash.
+4.7. Right to Change Content or Format.
+You acknowledge that Company may from time to time, and in its sole discretion, update or change the content or format of the Services. Company shall strive to provide reasonable advance notification of such changes; however, from time to time sudden changes in currency names, codes, and/or values occur in financial markets, and since Company strives to accurately reflect these changes, significant advance notice is not always possible.
+5. Your Data
+5.1. Meaning of Your Data.
+In this Agreement, "Your Data" means any data, applications, configuration settings, content, code, images or material of any type that you upload, send, submit or otherwise provide us or to our Services for any purpose.
+5.2. Ownership of Your Data.
+You are responsible for Your Data. You will retain all right, title and interest in and to Your Data. Subject to the terms of this Agreement, you grant us a worldwide, non-exclusive, royalty-free right to collect, use, transfer and store Your Data solely for the purposes of providing any Services to you or to respond to your support requests.
+5.3. Confidentiality of Your Data.
+We may receive or have access to information owned or controlled by you which is proprietary or confidential. We agree to keep it confidential and use it solely for the Services, except where disclosure is legally compelled.
+Confidential information shall not include information which:
+(i) was known to us before disclosure as evidenced by bona fide written documents;
+(j) is or becomes publicly known through no wrongful act of ours;
+(k) is independently developed by us;
+(l) is disclosed to us by a third party without breach of any obligations of confidentiality.
+5.4. Nature of Your Data.
+You must ensure that Your Data is at all times compliant with our Acceptable Usage Policy and all appropriate laws and regulations.
+5.5. Personally Identifiable Information.
+You will not submit to us any personally identifiable information (except as necessary for your Authorized Users to use and access a Service). You will not submit to us any patient, medical or other protected health information regulated by any relevant laws in any country.
+5.6. Liability.
+For the avoidance of all doubt, we assume no responsibility or liability for Your Data other than described in this Section 5.
+5.7. Deletion of Your Data.
+We may remove or delete Your Data 90 days after the termination of your relevant Subscription Term, or upon your request.
+5.8. Processing of Your Data.
+We will perform processing actions as part of monitoring and running the Cloud Services and as part of the Support Services.
+6. Restrictions
+Except as otherwise permitted in this Agreement, or by us in writing, you will not:
+(a) intentionally use any Services in any way that could damage our reputation; or
+(b) rent, lease, sub-license, loan, translate, merge, adapt, vary or modify any Services, without our express written consent.
+7. Termination of Agreement
+7.1. Term.
+The term of this Agreement will commence on the Effective Date and will remain in effect until terminated under this Section 7.
+7.2. Termination.
+(a) Termination for Convenience. You may terminate this Agreement for any reason by providing us notice and closing your account for all Services for which we provide an account closing mechanism. We may terminate this Agreement for any reason by providing you at least 30 days' advance notice.
+(b) Termination for Cause.
+(i) By Either Party. Either party may terminate this Agreement for cause if the other party is in material breach of this Agreement and the material breach remains uncured for a period of 30 days from receipt of notice by the other party.
+(ii) By Us. We may also terminate this Agreement immediately upon notice to you for specific circumstances listed in this Agreement, including legal compliance.
+7.3. Effect of Termination.
+(a) Generally. Upon the Termination Date, your rights under this Agreement immediately terminate except where explicitly stated.
+(b) Post-Termination. Any use of the Services after the Termination Date remains governed by this Agreement and billed accordingly.
+7.4. Survival.
+Certain sections survive termination, including restrictions, confidentiality, warranty disclaimer, export, and selected indemnification provisions.
+8. Warranty
+8.1. General Warranties.
+We warrant that we have legal authority to enter into this Agreement and that Services will perform substantially as described during the Warranty Period when properly used.
+8.2. Virus Warranty.
+We will take reasonable commercial efforts to ensure the Services are free of harmful code when provided to you.
+8.3. Remedies during Warranty Period.
+We may repair or replace Services for qualifying defects reported during the Warranty Period.
+8.4. Warranty Disclaimer.
+EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, ALL SOFTWARE, SUPPORT, MAINTENANCE AND ADDITIONAL SERVICES ARE PROVIDED "AS IS" AND WARRANTIES ARE DISCLAIMED TO THE MAXIMUM EXTENT PERMITTED BY LAW.
+9. Liability
+9.1. Exclusions to Liability.
+Neither party is liable for indirect, special, or consequential damages, including loss of profits, data, or goodwill.
+9.2. Your Representations.
+You acknowledge that Services may not be tailored to your individual requirements and that the limitation terms are reflected in pricing.
+9.3. Liability Cap.
+Our maximum aggregate liability is limited to total fees paid by you for Services in the twelve (12) months preceding the event giving rise to liability.
+10. IP Indemnification
+If any claim is brought alleging that your use of the intellectual property associated with the Services infringes specified rights in certain jurisdictions, both parties will cooperate and we may defend the claim and provide remedies as set out in this Agreement. This section states your exclusive remedy for such claims.
+11. Transfer of Rights and Obligations
+You may not assign or transfer this Agreement without our prior written consent, except for qualifying corporate transactions as specified. We may assign our rights and obligations under this Agreement without your consent.
+12. Export
+You represent and warrant that you are not in violation of and will not violate applicable export control laws.
+13. Publicity
+We may identify you as a customer in promotional materials and will stop upon your request via email to
+support@apibricks.io
+.
+14. Notices
+Any notice under this Agreement must be given in writing. We may provide notice via email. You will provide notice to us by email to
+support@apibricks.io
+with "LEGAL NOTICE" in the subject line.
+15. Waiver
+Failure to enforce any provision is not a waiver of rights. Any waiver must be explicit and in writing.
+16. Severability
+If any term is invalid or unenforceable, the remaining terms continue in effect to the fullest extent permitted by law.
+17. Changes to this Agreement
+We may modify this Agreement by posting a revised version on the APIBRICKS Site. Continued use of Services after changes become effective constitutes acceptance.
+18. Entire Agreement
+This Agreement constitutes the entire agreement between the parties regarding its subject matter and supersedes prior communications and representations.
+19. Force Majeure
+Neither party is liable for delay or omission caused by events beyond reasonable control, including natural disasters, war, strikes, embargoes, and network failures.
+20. Law and Jurisdiction
+This Agreement is governed by the laws of England and Wales. Parties submit to exclusive jurisdiction and venue in London, England.
+21. Interpretation
+Unless context otherwise requires:
+21.1.
+Singular includes plural and vice versa.
+21.2.
+References to contracts include variations and replacements.
+21.3.
+References to law include subordinate legislation and amendments.
+21.4.
+References to persons include individuals and entities.
+21.5.
+References to persons include legal representatives and assigns.
+21.6.
+Day and month mean calendar day and calendar month.
+21.7.
+No party enters this Agreement as agent for another.
+21.8.
+General language is not limited by examples.
+21.9.
+Headings are for convenience only.
+21.10.
+Where there are two or more persons in a party each are bound jointly and severally.
+22. Temporary Suspension
+22.1.
+We may suspend your access immediately upon notice if we reasonably determine your use poses security, operational, legal, payment, or insolvency-related risks.
+22.2.
+During suspension, you remain responsible for applicable fees and are not entitled to SLA credits for the suspension period.
+23. Definitions
+"API" means an application program interface.
+"APIBRICKS Site" means
+https://www.coinapi.io/
+https://www.finfeedapi.com/
+https://console.apibricks.io/
+or any other website on subdomains of coinapi.io, finfeedapi.com, or apibricks.io.
+"Policies" means the Acceptable Use Policy, Privacy Policy and the Service Terms.
+"Services" means all services provided by the Company or its affiliates, including hosted services and APIs, downloadable software, and related support and documentation.
+Service Level Agreements
+CoinAPI SLA
+CoinAPI Service Level terms are defined in section
+4.6. Service Level Agreement
+of this legal document.
+FinFeedAPI SLA
+FinFeedAPI Service Level terms are defined in section
+4.6. Service Level Agreement
+of this legal document.
+Acceptable Usage Policy
+Company acceptable usage policy ("AUP") is designed to prevent fraud and abuse of our Services, to ensure that all customers receive acceptable access to our Services, and to protect the quality and integrity of our Services.
+The following is a non-exhaustive list of practices that would not be considered "Legitimate Use":
+(a) Using our Services for unreasonable workloads we determine (in our sole discretion) to be unrelated to the deployment and maintenance of your own Services;
+(b) Re-selling our Services or parts thereof to another party;
+(c) Using our Services in a manner we determine (in our sole discretion) could cause harm to our Services or another party; or
+(d) Unusual usage patterns inconsistent with those we reasonably consider as normal use when compared to other customers.
+Other practices may be relevant in determining Legitimate Use and Company reserves the right to take any unlawful, prohibited, abnormal, or unusual activity into account in making its determination.
+If you use our Services in any way which we reasonably determine (at our sole discretion) may be unlawful, prohibited, abnormal, unusual, or detrimental to our Services or any of our other customers or other unrelated parties, we reserve the right to suspend or terminate your access without notice.
+We may monitor your account to check that this AUP is being followed. We may vary the terms of this AUP from time to time without notice, and will contact you using the details you've provided to inform you of the changes.
+Excessive Use
+Excessive use means you are exceeding one or more of the limitations allocated to your current subscription. These limitations are described on our detailed pricing page. We reserve the right to adjust these limitations from time to time without notice, and will contact you using the details you've provided to inform you of the changes.
+If your use of our Services is excessive we may contact you using the contact details you've provided to request that you modify your usage practices, or change to a more appropriate subscription.
+If, after our request, your usage practices continue to be excessive, or you refuse to change to a more appropriate subscription, we may suspend or terminate your access to our Services immediately without notice.
+Unreasonable use
+Unreasonable use of this service includes using it for purposes unrelated to the Customer Agreement intent, and any re-selling or wholesaling of our Services, or parts thereof, to another party.
+If your use of our Services is unreasonable, we may contact you using the contact details you have provided to ask that you change the way you use our Services.
+If we consider your use unreasonable (at our sole discretion) we reserve the right to suspend or terminate your access to our Services without any prior warning or notice.
+Privacy policy
+Changes to this Privacy Policy
+We may update this Privacy Policy from time to time by posting a new version online. You should check this page occasionally to review any changes.
+Contact Us
+If you have any questions about this Privacy Policy or our treatment of the information you provide us, please write to us by email at
+support@apibricks.io
+"Sensitive Information"
+This refers to credit or debit card numbers, personal financial account information, Social Security numbers, passport numbers, driver's license numbers or similar personal identifiers, racial or ethnic origin, physical or mental health condition or information, or other employment, financial or health information.
+"Personal Information"
+This refers to any information that you voluntarily submit to us and that identifies you personally, including contact information, such as your name, e-mail address, company name, address, phone number, and other information about yourself or your business.
+"Navigational Information"
+This refers to information about your computer and your visits to this APIBRICKS Site such as your IP address, geographical location, browser type, referral source, length of visit and pages viewed.
+Payment Information
+We collect and process payment information from you when you subscribe to the Services, including credit cards numbers and billing information, using third party PCI-compliant service providers.
+We Never Sell Personal Information
+We will never sell your Personal Information to any third party.
+Use of Personal Information
+In addition to the uses identified elsewhere in this Privacy Policy, we may use your Personal Information to improve your experience, communicate with you, provide support, and perform business analysis and marketing activities as described in this policy.
+Use of Navigational Information
+We use Navigational Information to operate and improve the APIBRICKS Site and the Services.
+Customer Testimonials and Comments
+We post customer testimonials and comments on our APIBRICKS Site, which may contain Personal Information. We obtain consent before posting.
+Use of Credit Card Information
+If you give us credit card information, we use it solely to check your financial qualifications and collect payment from you via third-party processors.
+Service Providers
+We employ other companies and people to provide services to visitors and customers and may share information with them solely for those purposes under confidentiality obligations.
+Security of your Personal Information
+We use security technologies and procedures to protect Personal Information, including secure server environments and encryption where appropriate.
+External Websites
+Our APIBRICKS Site provides links to other websites that we do not control; this Privacy Policy does not apply to those websites.
+Retention of Personal Information
+We retain Personal Information as long as needed for business or legal purposes, then securely delete it.
+International Transfer of Information
+To facilitate global operations, we may transfer and access Personal Information internationally, including in the United States.
+Compelled Disclosure
+We may disclose Personal Information if required by law or where necessary to protect rights, safety, investigate fraud, or comply with legal process.
+by API BRICKS
+Join our newsletter
+Products
+Products
+Market Data API
+Indexes API
+EMS Trading API
+Flat Files
+Exchange Rates API
+Exchange Link
+CoinAPI.io
+CoinAPI.io
+Home
+API Docs
+Blog
+Developers
+Developers
+API Documentation
+Tutorials
+Helper Libraries
+Status Page
+Help
+Help
+Contact sales
+Contact support
+How-to Guides
+Metadata Explorer
+Legal
+Legal
+Terms of service
+Acceptable Usage Policy
+Privacy Policy
+Compare
+Compare
+CoinAPI vs Kaiko
+CoinAPI vs Amberdata
+CoinAPI vs Cryptoapis
+CoinAPI vs CoinGecko
+CoinAPI vs Tardis.dev
+CoinAPI vs CryptoCompare
+API Bricks brands
+API Bricks brands
+API Bricks
+FinFeedAPI
+Copyright 2025 API BRICKS LTD F/K/A COINAPI LTD or its affiliates. All rights reserved.
+llms.txt
+llms-full.txt

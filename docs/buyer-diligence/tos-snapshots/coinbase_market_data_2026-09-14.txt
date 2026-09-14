@@ -1,0 +1,359 @@
+SNAPSHOT 2026-09-14 of https://www.coinbase.com/legal/market_data
+========================================================================
+Market Data Terms of Use
+Skip to content
+Skip to site index
+Cryptocurrencies
+Individuals
+Trade
+󰨂
+Crypto
+Buy and sell cryptocurrencies
+󰨈
+Prediction markets
+New
+Trade on sports, crypto, politics, and more
+󰧶
+Derivatives
+New
+Amplify your trades with futures and perpetual-style futures
+󰨚
+Stocks
+New
+Commission-free 24/5 stock trading
+󰨠
+Token sales
+New
+Get early access to upcoming tokens
+󰀤
+Advanced
+Professional-grade trading tools
+󰉼
+Coinbase One
+Get zero trading fees and more
+󰚮
+Coinbase Wealth
+Institutional-grade services for UHNW
+Earn
+󰉶
+Credit Card
+Earn up to 4% Bitcoin back on every purchase. Terms apply.
+󰙎
+Debit card
+Earn crypto rewards in Visa debit
+󰙸
+Staking
+Stake your crypto and earn rewards
+󰟬
+USDC rewards
+Earn up to 3.50% APY through USDC
+󰄈
+Borrow
+Get a crypto-backed loan up to $1M
+󰣨
+Base App
+Trade to win, onchain
+Trade crypto, stocks,² and more
+on a platform you can trust.
+Download app
+Businesses
+󰄔
+Business
+Crypto trading and payments for startups and SMBs
+󰂄
+Asset Listings
+List your asset on Coinbase
+󰂊
+Token Manager
+The platform for token distributions, vesting, and lockups
+Coinbase Business
+All-in-one crypto account for businesses.
+Learn more
+Institutions
+Prime
+󰅖
+󰚨
+Trading and Financing
+Professional prime brokerage services
+󰋮
+Custody
+Securely store all your digital assets
+󰙸
+Staking
+Explore staking across our products
+󰃰
+Onchain Wallet
+Institutional-grade wallet to get onchain
+Markets
+󰎺
+Exchange
+Spot markets for high-frequency trading
+󰒰
+International Exchange
+Access perpetual futures markets
+󰌘
+Derivatives Exchange
+Trade an accessible futures market
+󰣐
+Verified Pools
+Transparent, verified liquidity pools
+Our clients
+Trusted by institutions and government.
+Learn more
+Developers
+Coinbase Developer Platform
+󰅖
+󰙂
+Payments
+Fast and global stablecoin payments with a single integration
+󰀤
+Trading
+Launch crypto trading and custody for your users
+󰣨
+Wallets
+Deploy customizable and scalable wallets for your business
+󰋨
+Stablecoins
+Access USDC and Coinbase Custom Stablecoins
+Solutions for any company
+󰂨
+Banks & Brokerages
+Secure, regulated offerings for retail, private banking, & institutional clients
+󰄾
+Payment Firms
+Near-instant, low-cost, global payment rails for modern providers
+󰁂
+Startups
+Launch your business with the world's leader in crypto
+World class crypto infrastructure.
+Discover Coinbase's complete crypto-as-a-service platform.
+Learn more
+Company
+󰔄
+About
+Powering the crypto economy
+󰄔
+Careers
+Work with us
+󰀪
+Affiliates
+Help introduce the world to crypto
+󰈊
+Support
+Find answers to your questions
+󰃶
+Blog
+Read the latest from Coinbase
+󰝺
+Security
+The most trusted & secure
+Learn all about Coinbase:
+We're building the open financial system.
+Create your account
+󰒰
+Sign in
+Sign up
+Legal
+Privacy Policy
+Cookie Policy
+Prohibited Use Policy
+Accessibility Statement
+Market Data Terms of Use
+Last updated: August 7, 2026
+Please carefully read the entirety of these Terms. By accessing or using Coinbase Market Data, you agree to be bound by these Market Data Terms of Use (the “Terms”), including all amendments and updates made between your initial acceptance of these Terms and any future access or use. If you do not agree to these Terms, do not access or use the Coinbase Market Data.
+These Terms are entered into between you and Coinbase, Inc., LMX Labs, LLC (d/b/a Coinbase Derivatives Exchange) and certain of their respective affiliates from time to time (individually and collectively, “Coinbase”) and govern your use of Market Data. For purposes of these Terms, “Market Data” means all data made available to you by Coinbase, which may include, without limitation, order and transaction information related to trading on Coinbase exchanges.
+You represent and warrant that you are of legal age to enter into a binding agreement and are otherwise legally able and competent to enter into and carry out these Terms. If you are using Market Data on behalf of any entity, you represent and warrant that you are authorized to enter into these Terms on such entity’s behalf, and that such entity agrees to be responsible to Coinbase if you or that entity violates these Terms.  As used in these Terms and unless separately identified as applicable to either an individual or entity, “you” and “your” refer to both you individually and the entity on behalf of which you are entering into these Terms.  By agreeing to these Terms, you represent and warrant that all information you submit to Coinbase is true, accurate, current and complete.
+Different Data Packages.
+Coinbase may offer different data feeds, tiers, or packages of Market Data from time to time. Please review any applicable information about available Market Data packages. Please verify the scope and type of Market Data in your package before using it.
+Permission to Use Market Data.
+Subject to the restrictions set forth in these Terms and any agreements between you and Coinbase, Coinbase hereby grants you a nonexclusive, nontransferable, non-sublicensable, revocable, limited license, solely for you and/or the officers and employees of your entity and in accordance with applicable law.  Your use of Market Data is exclusively for you or your entity’s personal or research purposes and may not be used to build an application intended for use by end users other than for you or your officers/employees.  You assume all responsibility for your use of, and access to, the services. Accounts are for a single user, company or other legal entity, as applicable. Any multiple-party use— other than individual use on behalf of a company or other legal entity—is prohibited without Coinbase’s prior written consent (e.g., sharing a login between non-entity individual users is prohibited).
+Restrictions and Responsibilities.
+Absent prior express written consent from Coinbase, you may not:
+Alter, manipulate, or misrepresent Market Data, or present Market Data in a false or misleading light;
+Redistribute, display, or disseminate the Market Data—or any data, charts, analytics, research, or other works based on, referring to, or derived from the Market Data (“Derived Works”) — to any third party outside of your organization by electronic means or otherwise;
+Use Market Data or authorized Derived Works, directly or indirectly, to create any of the following Derived Works, whether for internal use or otherwise: (i) indexes, fixings, or other benchmarks; (ii) generic or fair value prices; or (iii) valuations of any investment product, digital currency, digital tokens or blockchain-based asset or other similar instrument of any kind or character, securities, or financial derivatives (whether for purposes of settlement or otherwise) including, without limitation, swaps or options (each a “Financial Product”); or
+Use any Market Data or Derived Work (understanding, for clarity, that “Derived Works” includes combinations of Market Data or Derived Works with one or more other benchmarks or indexes) as a benchmark. Use “as a benchmark” includes, without limitation:
+Issuance of a Financial Product which references Market Data or a Derived Work; or
+Determination of the amount payable under a Financial Product or other financial contract by referencing Market Data or a Derived Work; or
+Being a party to a Financial Product or other financial contract which references Market Data or a Derived Work; or
+Providing a borrowing rate calculated as a spread or mark-up over Market Data or a Derived Work and that is used as a reference in a Financial Product or other financial contract to which the creditor is a party; or
+Measuring the performance of an investment fund or Financial Product through Market Data or a Derived Work for the purpose of tracking the same, of defining the asset allocation of a portfolio, or of computing performance fees.
+Use any Market Data to, or permit or authorize any third party to, in whole or in part, develop, train, fine-tune, teach, validate, benchmark, or otherwise improve any artificial intelligence or machine learning model, algorithm, chatbot, agent, or other automated system, whether generative or non-generative, or for any other purpose related to the research, development, or operation of artificial intelligence technologies.
+Ownership and Proprietary Rights.
+Market Data.
+You acknowledge that as between Coinbase and you, the Market Data and all rights in the Market Data (including all copyrights, database rights, and all other proprietary rights) are exclusively the property of Coinbase and its partners. In addition and independent of the foregoing, you acknowledge that the Market Data is the product of substantial expenditure by Coinbase of labor, skill, and money, and your use of Market Data in contravention of these Terms would misappropriate the benefits of those expenditures. Coinbase reserves all rights in the Market Data not expressly granted in these Terms. At the request and expense of Coinbase, you agree that you will take all reasonable steps, such as the execution of written documents, that may be necessary to protect, perfect, and enforce Coinbase's rights in the Market Data. You agree that you have no right to any Coinbase trademark or service mark and may not use any such mark in any way unless expressly authorized by Coinbase.
+Equitable Relief.
+Without limiting any other rights of Coinbase under these Terms, the parties recognize that a breach of the restrictions applicable herein to the use of Market Data would give rise to irreparable injury to Coinbase such that monetary damages alone would not be an adequate remedy. You and Coinbase agree that in the event of such a breach, Coinbase will be entitled to equitable relief, including in the form of injunctive relief, and you hereby waive any requirement for the securing or posting of any bond or the showing that actual monetary damages will not afford an adequate remedy in connection with seeking such relief.
+Changes to Market Data and Suspension of Access.
+Coinbase may from time to time, without notice and in its sole discretion, withdraw, suspend, or change the Market Data or your access to the Market Data. You agree that Coinbase has no obligation to provide the Market Data to you and will not be liable if any Market Data is unavailable or changes for any reason.
+Changes to Terms.
+Coinbase may modify these Terms from time to time at its discretion. It is your responsibility to monitor updates to these Terms. Your continued use of Market Data signifies your agreement to any such updates. If you do not agree, you may not continue to use Market Data.
+Fees.
+You agree to pay all applicable fees associated with the Market Data product to which you subscribe in accordance with any applicable Coinbase fee schedule.
+Disclaimers.
+To the maximum extent permitted by applicable law:
+The Market Data is provided “as is” and “as available”, and Coinbase hereby disclaims all warranties, express, statutory, or implied (including, without limitation, implied warranties of title, non-infringement, merchantability, fitness for a particular purpose, and all warranties arising from course of dealing, usage or trade practice).
+For clarity and without limiting the foregoing, Coinbase makes no guarantees regarding the accuracy, completeness, timeliness, security, availability, or integrity of the Market Data or that the Market Data will be uninterrupted or operate in combination with any software, service, system, or other data.
+Your access and use the Market Data entirely at your sole risk, and Coinbase will not be responsible for any actions you take based on the Market Data.
+Indemnification.
+To the maximum extent permitted by law, you will indemnify and hold harmless Coinbase, its affiliates, and its and their respective directors, officers, employees, and agents (“Coinbase Protected Parties”) against all liabilities, costs, damages, and expenses arising out of or relating to your use of Market Data, including damages arising directly from your act or omission (including without limitation breach of these Terms) as well as judgments, settlements, and expenses (including reasonable attorneys’ fees and legal costs) arising from a threatened or actual suit, investigation, proceeding, or other claim between you and a Coinbase Protected Party or between a third party and a Coinbase Protected Party arising out of or relating to your use of Market Data. Coinbase may control the defense of any such Claim, at your cost and expense, and you will provide Coinbase any assistance that Coinbase reasonably requests in defending any such Claim.
+Limitation of Liability.
+To the maximum extent permitted by applicable law, the Coinbase Protected Parties will not be liable for any direct, indirect, incidental, special, punitive, or consequential damages of any kind—including lost profits or trading losses—related to the Market Data or these Terms, irrespective of whether such damages arise from claims brought in contract, tort, negligence, warranty, strict liability, or any other theory at law or equity, and even if Coinbase has been advised of the possibility of such damages. Without limiting the foregoing, to the maximum extent permitted by applicable law, in no event will the Coinbase Protected Parties’ aggregate liability arising out of or relating to these Terms or your use of Market Data exceed USD 1000. If any limitations in this paragraph are unenforceable as written in any instance, then such limitations will apply to the maximum extent permitted by applicable law.
+Rules of Construction.
+The words “include”, “included”, “includes” or “including” as used herein will be understood to be followed by the phrase “without limitation”. The word “all” includes “any” and the word “any” includes “all”. The words “herein” and “hereunder” refers to all of the Terms. Unless context expressly requires otherwise, the conjunction “or” will be understood to mean “and/or”. The section headings in these Terms are inserted for convenience only and are not a part of the Terms and will not affect the meaning or interpretation of these Terms.
+Other Agreements.
+Your use of Market Data remains subject to these Terms at all times as well as any agreement(s) you may have with Coinbase.  In the event of a conflict between these Terms and any agreement(s) between you and Coinbase, these Terms shall control.
+Information for California Residents.
+If you have a question, complaint, or otherwise wish to contact us regarding the Market Data or these Terms, please contact us at: marketdata@coinbase.com. The Complaint Assistance Unit of the Division of Consumer Services of the California Department of Consumer Affairs may be contacted by mail at Department of Consumer Affairs Consumer Information Division, 1625 North Market Blvd., Suite N 112, Sacramento, CA 95834 or by telephone at (800) 952-5210.
+Choice of Law.
+You agree that any claim or dispute that may arise between you and Coinbase will be governed by and construed in accordance with the laws of the State of California, excluding its conflicts of laws principles, except to the extent such state law is preempted by federal law.
+Arbitration; Waiver of Class Action.
+If you have a dispute with Coinbase, we will attempt to resolve any such disputes through our support team. You and Coinbase hereby expressly waive trial by jury and right to participate in a class action lawsuit or class-wide arbitration, except that each party retains the right: (i) to bring an individual action in small claims court and (ii) to seek injunctive or other equitable relief in a court of competent jurisdiction to prevent the actual or threatened infringement or misappropriation of a party’s proprietary rights, including copyrights, trademarks, trade secrets, database rights, patents, and fruits of labor, skill, or money protected under common law principles of unfair competition. The arbitration will be conducted by a single, neutral arbitrator and shall take place in the county or parish in which you reside, or another mutually agreeable location, in the English language. The arbitrator may award any relief that a court of competent jurisdiction could award, including attorneys’ fees when authorized by law, and the arbitral decision may be enforced in any court. At your request, hearings may be conducted in person or by telephone and the arbitrator may provide for submitting and determining motions on briefs, without oral hearings. The prevailing party in any action or proceeding to enforce this agreement shall be entitled to costs and attorneys’ fees. If the arbitrator or arbitration administrator would impose filing fees or other administrative costs on you, we will reimburse you, upon request, to the extent such fees or costs would exceed those that you would otherwise have to pay if you were proceeding instead in a court. We will also pay additional fees or costs if required to do so by the arbitration administrator’s rules or applicable law. Apart from the foregoing, each party will be responsible for any other fees or costs, such as attorney fees that the party may incur.
+Assignment and Delegation.
+You may not assign or delegate any of your rights or obligations under these Terms to anyone without Coinbase’s prior written consent, and any assignment in violation of this paragraph will be null and void. Coinbase may freely assign its rights or delegate its obligations under these Terms, including in connection with any merger, acquisition or asset sale. Subject to the foregoing, these Terms will bind and inure to the benefit of you and Coinbase, and your and Coinbase’s respective successors and permitted assigns.
+Severability.
+In the event any part of these Terms is deemed unenforceable, you and Coinbase authorize a court of competent jurisdiction to make the modifications that are necessary to comply with existing law, in a manner most closely representing the original intent of Coinbase and you as expressed in these Terms.
+󰉤
+󰉤
+Company
+About
+Careers
+Affiliates
+Blog
+Press
+Security
+Investors
+Vendors
+Legal & privacy
+Cookie policy
+Cookie preferences
+Do Not Sell or Share My Personal Information
+Digital Asset Disclosures
+Learn
+Explore crypto
+Explore stocks
+Market statistics
+Coinbase Bytes newsletter
+Crypto basics
+Tips & tutorials
+Crypto glossary
+Market updates
+What is Bitcoin?
+What is crypto?
+What is a blockchain?
+How to set up a crypto wallet?
+How to send crypto?
+Taxes
+Support
+Help center
+Contact us
+Create account
+ID verification
+Account information
+Payment methods
+Account access
+Supported crypto
+Status
+Individuals
+Buy & sell
+Base App
+Coinbase One
+Coinbase Wealth
+Credit Card
+Debit Card
+Explore predictions
+Businesses
+Asset Listings
+Coinbase Business
+Payments
+Token Manager
+Institutions
+Prime
+Staking
+Exchange
+International Exchange
+Derivatives Exchange
+Verified Pools
+Developers
+Developer Platform
+Base
+Server Wallets
+Embedded Wallets
+Base Accounts (Smart Wallets)
+Onramp & Offramp
+x402
+Trade API
+Paymaster
+OnchainKit
+Data API
+Verifications
+Node
+AgentKit
+Staking
+Faucet
+Exchange API
+International Exchange API
+Prime API
+Derivatives API
+Asset prices
+Bitcoin price
+Ethereum price
+Solana price
+XRP price
+Stock prices
+NVIDIA price
+Apple price
+Microsoft price
+Amazon price
+Developers
+Developer Platform
+Base
+Server Wallets
+Embedded Wallets
+Base Accounts (Smart Wallets)
+Onramp & Offramp
+x402
+Trade API
+Paymaster
+OnchainKit
+Data API
+Verifications
+Node
+AgentKit
+Staking
+Faucet
+Exchange API
+International Exchange API
+Prime API
+Derivatives API
+Support
+Help center
+Contact us
+Create account
+ID verification
+Account information
+Payment methods
+Account access
+Supported crypto
+Status
+Asset prices
+Bitcoin price
+Ethereum price
+Solana price
+XRP price
+Stock prices
+NVIDIA price
+Apple price
+Microsoft price
+Amazon price
+©
+2026
+Coinbase
+•
+Privacy
+•
+Terms & Conditions
+󰄚
+United States
+•
+English

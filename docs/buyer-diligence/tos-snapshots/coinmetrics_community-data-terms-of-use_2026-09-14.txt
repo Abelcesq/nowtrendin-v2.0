@@ -1,0 +1,259 @@
+SNAPSHOT 2026-09-14 of https://coinmetrics.io/community-data-terms-of-use/
+========================================================================
+Digital Asset Data & Intelligence for Institutions | Talos
+Solutions
+Trading Platform
+White Label
+RFQ Platform
+Portfolio Construction
+Portfolio & Risk Management
+Treasury & Settlement
+Data
+Post-Trade Analytics
+Clients
+Asset Managers
+ETF Issuers
+Hedge Funds
+Crypto Funds
+Proprietary Trading Firms
+Token Holders
+Banks
+Retail Investment Platforms
+OTC Desks
+Broker-Dealers
+Custodians
+Payment Service Providers
+About Talos
+Why Choose Talos?
+The Talos Story
+The Leadership Team
+Careers
+Life at Talos
+Open Roles
+Internships
+Provider Network
+Insights
+Contact
+Request a demo
+Solutions
+TradinG
+Trading Platform
+White Label
+RFQ Platform
+Portfolio management
+Portfolio Construction
+Portfolio & Risk Management
+Treasury & Settlement
+DATA & ANALYTICS
+Data
+Coin Metrics
+Overview
+Market Data Feed
+Market Data Pro
+Atlas
+Network Data Pro
+Prices
+Indexes
+datonomy
+TM
+Post-Trade Analytics
+Clients
+Buy SIDE
+Asset Managers
+ETF Issuers
+Hedge Funds
+Crypto Funds
+Proprietary Trading Firms
+Token Holders
+Sell Side
+Banks
+Retail Investment Platforms
+OTC Desks
+Broker-Dealers
+Service Providers
+Custodians
+Payment Service Providers
+About Talos
+Why Choose Talos?
+The Talos Story
+The Leadership Team
+Careers
+Life at Talos
+Open Roles
+Internships
+Provider Network
+Insights
+Contact
+Request a demo
+Mission-critical data and intelligence powering the digital asset investment lifecycle
+Talos delivers Coin Metrics market and on-chain data, reference rates and indexes via robust APIs so institutional teams can move seamlessly from research to execution, risk management and operations.
+Coin Metrics Products
+Market Data
+Simplify petabytes of data into performant and streamlined metrics.
+Market Data Feed
+Market Data Pro
+On-Chain Data
+Unlock superior search capabilities with the most reliable blockchain search engine.
+Atlas
+Network Data Pro
+Prices
+Harness transparent pricing for clear decision-making.
+Explore Asset Prices
+Indexes
+Unlock the power of independent, trusted index solutions for crypto markets.
+Explore Indexes
+datonomy
+TM
+Classification system for Digital Assets.
+Explore datonomy
+TM
+Trusted by
+Resources
+Support Center
+Report an issue or share a feature request using the appropriate link below to contact our support team.
+Community Support
+Pro Support
+Status
+Track live system status, outages and scheduled maintenance for all Coin Metrics products.
+Status
+Availability
+Product Documentation
+Access everything you need to get started with Coin Metrics Data, APIs and developer tools.
+Product Docs
+API Docs
+FAQs
+Studio
+Leverage Coin Metrics Studio to elucidate cryptoasset insights through charts and dashboards.
+Charts
+Dashboard
+Coin Metrics Data Coverage
+Browse asset and data coverage across Coin Metrics datasets, metrics and markets.
+Learn more
+Community Resources
+Education
+Exploration
+Collaboration
+Learn more
+Latest Insights & Research
+September 10, 2026
+Research
+State of the Market
+September 3 - September 9, 2026
+4 minute read
+September 10, 2026
+KNOWLEDGE
+The Perpification of Everything: What Brokers Need to Offer Perps
+Ten years ago, the perpetual swap was introduced. BitMEX wanted to offer leveraged bitcoin exposure without expiries, delivery or a settlement calendar, so it listed a future that never settles and used a funding payment to hold it near spot. This innovation is now the dominant way crypto trades, and it is starting to appear across real-world assets.
+5 minute read
+September 8, 2026
+Research
+Bitcoin’s Shifting Macro Identity
+State of the Network #380
+5 minute read
+September 8, 2026
+PRODUCT
+Talos’s Coin Metrics Data now accessible via Amazon S3 and Snowflake Cloud Delivery
+Product Update: Read whole datasets from your own environment, with 10 datasets published daily as Apache Parquet files in Amazon S3 and as queryable tables in Snowflake.
+2 minute read
+September 3, 2026
+Research
+State of the Market
+August 27 - September 2, 2026
+4 minute read
+September 3, 2026
+NEWS
+Talos Adds Perpetuals Trading Infrastructure for Brokerages
+Product Update: The Talos White Label platform now supports linear derivatives trading end to end, giving brokerages a way to offer leveraged products without building the margin, funding or risk stack themselves.
+3 minute read
+September 2, 2026
+CMBI UPDATES
+CMBI Single Asset Series Methodology
+The CMBI Single Asset Series is designed to represent the performance of individual cryptoassets through a range of daily, hourly, and real-time reference rates. Talos has updated the real-time calculation approach used across the CMBI Single Asset Benchmarks to improve the robustness of the index against illiquid or inactive constituent markets. In accordance with our CMBI Index Policies, Talos is consulting the market regarding this update to the calculation methodolog
+2 minute read
+September 2, 2026
+CMBI UPDATES
+CMBI Candidate Market Guidelines
+The CMBI Candidate Market Guidelines define how Talos evaluates and selects the constituent markets used as data inputs for the CMBI Benchmarks. Talos is proposing an update to the exchange eligibility criteria used in the CMBI Candidate Market Guidelines. In accordance with our CMBI Index Policies, Talos is consulting the market regarding this proposed update
+2 minute read
+September 2, 2026
+Commentary
+Bitcoin is not the Digital Asset Industry
+In August, bitcoin had its best week of the year, and it still told you almost nothing about the industry compounding underneath it
+8 minute read
+September 1, 2026
+Research
+Stablecoins Capturing On-Chain Yield
+State of the Network #379
+5 minute read
+August 28, 2026
+MEDIA
+Ethan Feldman in TabbFORUM: Identity, Automation & Trust in the Next Generation of Trading Infrastructure
+Talos CTO and Co-Founder Ethan Feldman contributed to a new TabbFORUM article on how capital markets firms are securing trading infrastructure as markets move to continuous operation and automated systems come to outnumber human operators.
+4 minute read
+August 28, 2026
+Commentary
+Talos Brings an Institutional Perspective to CFTC Prediction Market Rulemaking
+Prediction markets are becoming a larger part of the institutional market conversation. As interest grows, the regulatory choices being made today will influence how institutions access these markets and how activity develops in the United States.
+5 minute read
+August 27, 2026
+COMMENTARY
+Regulatory Roundup #22
+Your dose of regulatory moves, missteps and melodrama, ensuring you’re always informed (and occasionally amused) by what global watchdogs are up to.
+6 minute read
+August 27, 2026
+CLIENT PROFILE
+FalconX on Working with Talos: Hedging Risk Across Multiple Venues
+Market making across dozens of exchanges leaves risk scattered in dozens of places. FalconX's APAC Derivatives Trading Lead, Sean McNulty, explains how Talos became the desk's single gateway to all of them.
+1 minute read
+August 25, 2026
+Research
+August 19th Market Rally: Crypto Makes a Comeback As Bessent Bails Out Bonds
+State of the Network #378
+5 minute read
+August 19, 2026
+MEDIA
+Inside the Infrastructure Powering Institutional Crypto
+For years, the prospect of banks and other institutions moving into the digital assets space has been one of the industry's most talked about and closely watched developments. That shift is now becoming increasingly visible as banks, asset managers, ETF issuers, and brokerages move from exploring digital assets to building long-term businesses around them.
+5 minute read
+View all our latest insights
+link to homepage
+Keep up-to-date with Talos news
+Solutions
+Trading Platform
+White Label
+RFQ Platform
+Portfolio Construction
+Portfolio & Risk Management
+Treasury & Settlement
+Data
+Post-Trade Analytics
+Company
+Why Talos
+Talos Story
+Meet the Team
+Working at Talos
+Life at Talos
+Open Roles
+Internships
+Contact us
+Resources
+Insights
+Provider Network
+Legal
+Terms
+Privacy
+Data Processing Addendums
+FAQs
+Employee Privacy Notice
+© 2026 Talos Global, Inc.
+link to linkedin
+‍
+link to Twitter
+‍
+link to YouTube
+‍
+Talos Trading, LLC and certain other affiliates (collectively, "Talos") offer software-as-a-service products that provide connectivity tools for institutional customers. Talos does not provide clients with any pre-negotiated arrangements with liquidity providers or other parties. Clients are required to independently negotiate arrangements with liquidity providers and other parties bilaterally. Talos is not party to any of these arrangements.
+In addition to offering an industry-leading software platform, Talos has established certain affiliates that hold relevant licenses to engage in specific virtual asset service provider activities. Talos Global, Inc. is the holding company for a corporate group that includes the Talos software business and other separately regulated affiliates. Any services provided by regulated affiliates are not included with the Talos software platform and require eligible parties to undergo a separate onboarding and contracting process.
+In respect of recipients resident in the UK, this communication is aimed solely at high-net worth companies, associations and trusts (as defined in Article 49 of the Financial Services and Markets Act 2000 (Financial Promotion) Order 2005). These are any of the following: (i) a body corporate which has (or a body corporate which is in the same corporate group as a body corporate which has) either net assets or called-up share capital of at least £5m (or, if the body corporate has more than 20 members, £500,000); (ii) a partnership or unincorporated association with net assets of at least £5 million and (iii) a trustee of a trust which has had gross assets (i.e. total assets held before deduction of any liabilities) of at least £10 million at any time within the year preceding the date of this communication  The services described within this communication are only available to said persons. Any other persons resident in the UK must not rely or act upon this communication.
+Talos is not regulated by the Seychelles Financial Services Authority.
+All Talos product images and simulations presented are for informational and demonstrative purposes only. Not all features may be available to all Talos customers.
