@@ -3,7 +3,51 @@
 A running, readable catch-up of what's been built and what's open — so any new
 Claude Code session (or you on your phone) can resume without the local thread.
 
-_Last updated: 2026-08-24 (rounds 5–8 logged; 1c ran; snapshot PII incident; the engine deploy is the blocking item)_
+_Last updated: 2026-09-14 (post-vacation resume + full audit; deploy still owed, now cloud-runnable via GitHub Actions)_
+
+---
+
+## Session 2026-09-14 — Resume after 3 idle weeks: full audit; the Sept-1 board round pushed nothing; deploy made cloud-runnable.
+
+### Context
+Founder was away 08-24 → 09-14 with the laptop OFF, so 08-24's handoff (merge
+`claude/resume-kp9t5p` → main, then the engine subtree deploy) never ran. This cloud session
+cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owed.
+
+### Audit (full report: `audits/improve-system/AUDIT_2026-09-14_resume-and-full-audit.md`)
+- **Repo state verified:** `origin/main` still `e1336be`; `claude/resume-kp9t5p` (`1d732d0`)
+  unmerged, clean fast-forward. This session's branch fast-forwarded onto it; all checks ran
+  against the true tip.
+- **Local gates green at `1d732d0`:** `tools/run_tests.py` 16/16; `tools/integrity_gate.py`
+  passes every asserted claim (ruling-6 caveats stand). §13 stale-window rule HOLDS
+  (risk 420 = 360+60; issuer_* 360 rides the 4h ETF loop). §14 `[:10]` scan: 8 string-date
+  slice sites flagged for one-look traces (not asserted defects).
+- **Charter drift:** 8 live agents undocumented in `AGENT_CHARTER.md` (heldout_firewall,
+  flow_integrity, similar_fragmentation, etf_reconcile_watch, crypto_price_referee,
+  payload_contradiction_auditor, scoring_contract_auditor, feed-silence tripwire) → rows 17–24 owed.
+- **⚠ The Sept-1 scheduled board round (ruling 10) fired, reported SUCCEEDED, and pushed
+  NOTHING** — no `claude/board-round-*` branch exists (`git ls-remote` verified). Run status
+  tracks the session, not delivery. Founder: open its session from the Routine's run history
+  in claude.ai to see where it stopped; next fire 2026-10-01.
+- **Production 503 observed by founder** (web terminal `/topics` → 503, engine
+  `nowtrendin-v2-engine`). Untriaged from here; browser checklist in the audit (§4):
+  `/prewarm` age → `/monitor` → Heroku dyno/Postgres/billing. Evidence before intervention;
+  the owed deploy restarts dynos anyway.
+
+### Built this session
+- **`.github/workflows/deploy-engine.yml`** — on merge to main touching `transfer/**` (or
+  manual dispatch), GitHub runs the test gate then subtree-pushes `transfer/` to the Heroku
+  app `nowtrendin-v2-engine` (release phase runs `maint_precompute.py` per 2c). Needs the
+  one-time `HEROKU_API_KEY` repo secret. Removes the laptop as the deploy's single point of
+  failure — the failure mode this three-week gap exposed.
+
+### Open / Next (unchanged except as noted)
+- **Deploy** (top owed): add `HEROKU_API_KEY` secret → merge `claude/resume-kp9t5p` + this
+  branch to main → workflow deploys → verify `/health`, a topic-detail D block, `/monitor`.
+- Then: 503 evidence capture (before the deploy if possible); Sept-1 board-round session
+  review; PII history purge/acceptance + fork + Drive copy (founder); rulings 6 → 5 → 9;
+  charter rows 17–24; walk `/monitor/deferred-triggers` (no reader since 08-24;
+  FMP re-eval 09-05 passed unread; D-REMINE due 09-30).
 
 ---
 

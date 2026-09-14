@@ -607,7 +607,16 @@ walk becomes furniture.
   duplicated "Market Factors" and rendered `NaN`; and creator-coverage rows that listed finance
   YouTubers as "not in recent uploads" for a topic they weren't covering.
 
-*Last updated: 2026-08-24 — **Rounds 5–8 caught up; 1c RAN; snapshot PII incident; DEPLOY IS THE BLOCKING ITEM.**
+*Last updated: 2026-09-14 — **3-week founder absence audited; deploy STILL owed but now cloud-runnable.** Full
+audit: `audits/improve-system/AUDIT_2026-09-14_resume-and-full-audit.md`. Local gates at `1d732d0`: tests 16/16,
+integrity gate green, §13 holds; findings: web terminal serving 503 (untriaged — founder browser checklist in the
+audit), the Sept-1 scheduled board round fired but PUSHED NOTHING (no `claude/board-round-*` branch exists — open
+its session from the claude.ai Routines run history), 8 live agents undocumented in AGENT_CHARTER.md, §14 `[:10]`
+candidates flagged. **NEW: `.github/workflows/deploy-engine.yml`** — after the founder adds the `HEROKU_API_KEY`
+repo secret, any merge to main touching `transfer/**` deploys the engine from GitHub's servers (laptop no longer a
+single point of failure). Founder decisions still owed: PII history purge/acceptance + the fork; Drive `.gz` copy.*
+
+*Prior: 2026-08-24 — **Rounds 5–8 caught up; 1c RAN; snapshot PII incident; DEPLOY IS THE BLOCKING ITEM.**
 RESUME AUTHORITY: `audits/board/CHAIRMAN_RULINGS_2026-08-20D.md` (its status table is now live-maintained — read it,
 not this paragraph, for per-item state). **⚠ TOP OWED ITEM — engine DEPLOY + `POST /precompute` + re-probe,** owed
 since `4d5aa97` and reaffirmed in every commit through `e1336be`: the round-4/5/6 fixes (4c tri-state included) are

@@ -1,0 +1,52 @@
+# Cloud deploy of the Gradient Score engine (added 2026-09-14).
+# WHY: the engine could previously only be deployed from the founder's laptop
+# (`git subtree push --prefix transfer heroku-v2engine main`). A 3-week laptop
+# shutdown left an owed deploy stranded. This workflow makes GitHub's servers do
+# the same subtree push, so merging to main IS the deploy — from any device.
+#
+# ONE-TIME SETUP (founder): repo Settings → Secrets and variables → Actions →
+# New repository secret → name HEROKU_API_KEY, value from
+# dashboard.heroku.com/account → API Key → Reveal.
+#
+# Deploy approval stays human: this fires only on a push to main that touches
+# transfer/ (or a manual Run workflow). It never runs on pull requests or forks.
+name: Deploy engine to Heroku
+
+on:
+  push:
+    branches: [main]
+    paths: ['transfer/**']
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-engine
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Guard against forks: secrets are absent there, fail fast with a clear message.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run the repo test gate before deploying
+        run: |
+          pip install -q -r transfer/requirements.txt python-dotenv vaderSentiment
+          python -c "import nltk; nltk.download('stopwords', quiet=True); nltk.download('punkt', quiet=True)"
+          python tools/run_tests.py
+
+      - name: Push transfer/ subtree to Heroku (release phase runs maint_precompute.py)
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then
+            echo "::error::HEROKU_API_KEY secret is not set (repo Settings → Secrets → Actions)."
+            exit 1
+          fi
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          SPLIT_SHA=$(git subtree split --prefix transfer HEAD)
+          echo "Deploying subtree commit $SPLIT_SHA"
+          git push --force "https://heroku:${HEROKU_API_KEY}@git.heroku.com/nowtrendin-v2-engine.git" "$SPLIT_SHA:refs/heads/main"
