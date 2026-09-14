@@ -4661,3 +4661,24 @@ production booted clean on the real database.
   research-only under the seal (§7); mobile = documented N/A (no crypto screen); ledger DATA
   untouched everywhere — the register replaces presentation only. Vacuum op re-dispatched
   (base64 payload); authoritative verification = next engine release [diag].
+
+### Addendum 9 (same session) — MERGED TO ALL PLATFORMS + VERIFIED LIVE; vacuum CONFIRMED; planner flipped to index scans
+- **Chairman confirmed the test → merged.** `feature/divergence-tool` → main (`70119d4`, no-ff).
+  Engine auto-deployed via deploy-engine.yml (run 34881848247: tests 19/19 + integrity gate in
+  CI, slug `5614877 → f60fad8`, /health 200 first try). Web built from main and deployed to
+  gh-pages (`f78fc2d`); GitHub Pages published it 18:37 UTC; desktop wraps the same bundle.
+  Mobile: 0 frontend/ files in the merge diff — market screens untouched, crypto N/A.
+- **VACUUM VERIFIED (stage-2 closure):** release [diag] shows `velocity_scores.last_vacuum =
+  2026-09-14 17:30 UTC`, n_live 4,169,109 / dead 19,035, and the classic scores-build PLAN now
+  runs Parallel Index Only Scan on idx_vs_topic_scored + index scans — the 4.1 GB seq-scan +
+  disk hash-agg path (the 503 mechanism) is gone at the planner level. statement_timeout still
+  300s serve-side with the 900s builder-scoped override.
+- **Post-merge platform verify (ops-platform-verify.yml, read-only GET probes from a runner):**
+  first run 18:45 = 7/8 PASS with /crypto empty — correctly attributed to the prewarm warming
+  window (last_run=None), NOT concluded as a defect (§10a); re-probe 18:56 after warm =
+  **8/8 ALL PASS**: health 200 · prewarm last_run 18:46 clean · /crypto 12 coins,
+  money_movement present, no stale signal_freshness leak · /risk/scores serving · market +
+  crypto ledgers serving · /diag/divergence correctly 403 · live Pages bundle
+  index-CN1T1ii8.js carries POSITIONING VS PRICE + the register panel + NOT MEASURED states.
+- Display gates unchanged: crypto D column reads NOT MEASURED until RIGHTS OPEN item 9 + the
+  3-offset timing audit clear; equity research-only under the seal; ledger data untouched.
