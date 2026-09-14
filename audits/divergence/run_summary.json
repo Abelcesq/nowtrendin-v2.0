@@ -1,20 +1,28 @@
 {
-  "started_utc": "2026-09-14T17:45:57.534554+00:00",
+  "started_utc": "2026-09-14T17:49:16.272066+00:00",
   "sections": {
     "0_seal": {
       "status": "OK",
       "param_version": "bd6e36498ef6b1fb80056873cca6998c03e1fbb8268aff28b61a0864c022877b"
     },
     "1_cot": {
-      "status": "SKIPPED",
+      "status": "OK",
       "files": {
         "BTC": {
-          "status": "SKIPPED",
-          "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
+          "status": "OK",
+          "rows": 1020,
+          "date_range": [
+            "2017-12-19",
+            "2026-09-08"
+          ]
         },
         "ETH": {
-          "status": "SKIPPED",
-          "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
+          "status": "OK",
+          "rows": 740,
+          "date_range": [
+            "2021-04-06",
+            "2026-09-08"
+          ]
         }
       }
     },
@@ -67,15 +75,15 @@
       "cot_cross_leg": [
         {
           "coin": "BTC",
-          "n": 0,
-          "rho": "",
-          "note": "COT csv or coinapi rows unavailable"
+          "n": 2,
+          "rho": null,
+          "note": "weeks 2026-08-18..2026-09-08"
         },
         {
           "coin": "ETH",
-          "n": 0,
-          "rho": "",
-          "note": "COT csv or coinapi rows unavailable"
+          "n": 2,
+          "rho": null,
+          "note": "weeks 2026-08-18..2026-09-08"
         }
       ]
     },
@@ -330,7 +338,7 @@
       "watchlist_source": "ast-parsed"
     }
   },
-  "finished_utc": "2026-09-14T17:47:38.594441+00:00",
+  "finished_utc": "2026-09-14T17:49:50.242267+00:00",
   "core_adapter_notes": [
     "core self-check OK: theil_sen(xs, ys) -> (alpha, beta)"
   ]

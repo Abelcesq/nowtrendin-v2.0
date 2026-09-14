@@ -1,13 +1,21 @@
 {
-  "status": "SKIPPED",
+  "status": "OK",
   "files": {
     "BTC": {
-      "status": "SKIPPED",
-      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
+      "status": "OK",
+      "rows": 1020,
+      "date_range": [
+        "2017-12-19",
+        "2026-09-08"
+      ]
     },
     "ETH": {
-      "status": "SKIPPED",
-      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
+      "status": "OK",
+      "rows": 740,
+      "date_range": [
+        "2021-04-06",
+        "2026-09-08"
+      ]
     }
   }
 }
