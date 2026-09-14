@@ -38,43 +38,43 @@
       "latest_date": null
     },
     "DOT": {
-      "aligned_days": 0,
+      "aligned_days": 36,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     },
     "ETH": {
-      "aligned_days": 0,
+      "aligned_days": 36,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     },
     "LINK": {
-      "aligned_days": 0,
+      "aligned_days": 35,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     },
     "LTC": {
-      "aligned_days": 0,
+      "aligned_days": 36,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     },
     "SOL": {
-      "aligned_days": 0,
+      "aligned_days": 36,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     },
     "XRP": {
-      "aligned_days": 0,
+      "aligned_days": 36,
       "d_obs": 0,
       "latest_D": null,
       "latest_date": null
     }
   },
-  "rows": 215,
+  "rows": 430,
   "suspect_rows_excluded": 0,
   "param_version": "bd6e36498ef6b1fb80056873cca6998c03e1fbb8268aff28b61a0864c022877b",
   "label": "spec-development preview (K16); never scored",

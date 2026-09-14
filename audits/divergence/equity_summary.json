@@ -1,72 +1,168 @@
 {
-  "status": "SKIPPED",
-  "tickers_ok": 0,
+  "status": "OK",
+  "tickers_ok": 16,
   "per_ticker": {
     "AAPL": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "AMZN": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "C": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "CVX": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "F": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "GOOGL": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "IBM": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "JPM": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "LMT": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "META": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "MS": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "MSFT": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "NVDA": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "SPCX": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 7,
+      "aligned_obs": 6,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "TSLA": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     },
     "WFC": {
-      "status": "SKIPPED",
-      "reason": "stooq returned no usable closes (ticker may be unlisted there)"
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
     }
   },
-  "rows": 0,
+  "rows": 171,
   "watchlist_source": "ast-parsed"
 }

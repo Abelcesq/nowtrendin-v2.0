@@ -3,11 +3,11 @@
   "files": {
     "BTC": {
       "status": "SKIPPED",
-      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request"
+      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
     },
     "ETH": {
       "status": "SKIPPED",
-      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request"
+      "reason": "CFTC fetch failed: HTTP Error 400: Bad Request \u2014 body: '{\"message\":\"Query coordinator error: query.soql.no-such-column; No such column: lev_money_positions_long_all; position: Map(row -> 1, column -> 4061, line -> \\\\\"SELECT `id`, `market_and_exchange_names`, `report_date_as_yyyy_mm_dd`, `yyyy_report_week_ww`, `contract_market_name`, `cftc_contract_market_'"
     }
   }
 }
