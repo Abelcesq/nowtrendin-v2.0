@@ -53,6 +53,55 @@ function AbsentTierChip({ c }: { c: CryptoCoin }) {
   )
 }
 
+// ── POSITIONING VS PRICE (Chairman order 2026-09-14; sealed DIVERGENCE_PREREG_2026-09-14) ──
+// Client-facing name is EXACTLY "Positioning vs Price" (prereg §1). Display is ARITHMETIC-ONLY
+// and SIGN-AWARE (K17: the sign is never thrown away — the signed value always prints, and
+// positive/negative band to DIFFERENT colors; only the near-zero band is symmetric, which is
+// one state, not two merged ones). Color by MEANING per §12: blue detection family (dark
+// *Text twin — the hue is text, WCAG) for positive build-up, muted near zero, the theme's
+// neutral/secondary ink for negative. NEVER red — red = loss/error ONLY.
+const PVP_LABEL = 'POSITIONING VS PRICE'
+const PVP_HEADER_TIP = 'Leverage positioning vs price — a signed residual: positive = positioning building faster than price explains; negative = positions closing faster than price explains. Measurement, not advice.'
+// Absence tooltip — the CURRENT live state: the engine serves no divergence block until the
+// prereg §6 gates (rights evidence + instrument audits) clear. States the gate + the accrual
+// date; no roadmap phrasing.
+const PVP_ABSENT_TIP = 'Positioning vs Price requires cleared source rights and instrument audits — accruing since 2026-08-10'
+// Explicit sign, 1 decimal, true minus (U+2212). Zero prints unsigned.
+const signed1 = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${Math.abs(v).toFixed(1)}` : '0.0')
+// Display-only legibility banding (±0.5), sign-aware: positive and negative never share a hue.
+const pvpColor = (d: number) => (d >= 0.5 ? MC.detectionText : d <= -0.5 ? MC.textSec : MC.muted)
+
+// C1 honest-absence treatment for the Positioning vs Price cell — hollow/outlined, muted,
+// transparent background, never red, never a filled chip, never a numeric floor value.
+function PvpNotMeasured() {
+  const col = marketTierColor('ABSENT')
+  return (
+    <span title={PVP_ABSENT_TIP}
+      style={{ color: col, background: 'transparent', border: `1px dashed ${col}`, padding: '1px 7px', borderRadius: 6, fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>
+      NOT MEASURED
+    </span>
+  )
+}
+
+// The table cell: signed D (1 decimal) + the arithmetic line, or the honest-absence chip.
+// A block without a usable signed value (missing, or measured:false, or d:null) renders
+// ABSENT — never 0, never a bare placeholder.
+function PvpCell({ c }: { c: CryptoCoin }) {
+  const dv = c.divergence
+  if (!dv || !dv.measured || dv.d == null) return <PvpNotMeasured />
+  const hasArith = dv.oi_chg_pct_7d != null && dv.price_chg_pct_7d != null
+  return (
+    <div title={PVP_HEADER_TIP}>
+      <span className="score-cell" style={{ color: pvpColor(dv.d), fontWeight: 700 }}>{signed1(dv.d)}</span>
+      {hasArith && (
+        <div className="topic-cat" style={{ marginTop: 2, whiteSpace: 'nowrap' }}>
+          OI {signed1(dv.oi_chg_pct_7d!)}% · price {signed1(dv.price_chg_pct_7d!)}% (7d)
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Client-facing label cleanup (board C1 / Buyer's Desk): retire "Dark Matter" / "Proxy
 // Positioning" from visible crypto copy. DISPLAY ONLY — engine keys/fields unchanged.
 const displayLabel = (s: string) =>
@@ -168,6 +217,26 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
         </div>
       )}
 
+      {/* POSITIONING VS PRICE REGISTER — replaces the accuracy-ledger content of THIS crypto
+          panel (Chairman order 2026-09-14). Its OWN fenced register (flow_basis=
+          'perp_divergence', prereg §6) — NEVER the crypto accuracy ledger; no ledger data
+          path is queried or deleted here (data preservation is a hard rule). Publication
+          floor: no rate of any kind below 30 resolved flags; the 8–15-year honest-calibration
+          horizon prints from day one. Forecaster rule: unresolved is never a pending win —
+          open windows render OPEN, with counts, never "pending". OPEN count renders only when
+          the payload supplies divergence_register; otherwise the static honest-empty state. */}
+      <div className="sect">
+        <h4>Positioning vs Price Register</h4>
+        <div className="narr" style={{ background: 'transparent', padding: 0 }}>
+          No track record exists. Flags are sealed internally under pre-registration{' '}
+          <span style={{ fontFamily: 'var(--mono)' }} title="param_version — SHA-256 of the sealed pre-registration">bd6e3649…</span>;{' '}
+          <b>{c.divergence_register?.resolved ?? 0} resolved</b>
+          {c.divergence_register ? <> · <b>{c.divergence_register.open} open</b></> : null}
+          {' '}(unresolved is never a pending win). At observed episode rates an honest
+          calibration claim takes <b>8–15 years</b>.
+        </div>
+      </div>
+
       <div className="disc"><b>What the Crypto signal measures:</b> The Crypto section tracks whether money is moving into or out of a coin. {MM_LABEL} “D” = informed / early money via crypto-exposure proxies (spot-ETF 13F + MSTR / COIN insider). {MC_LABEL} “M” = the coin's own price / volume confirmation. The flow (IN/OUT) is a measurement; whether an early read led realized price is recorded, after the fact, in the crypto accuracy ledger. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</div>
     </aside>
   )
@@ -269,7 +338,7 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
             <thead>
               <tr>
                 <th>Coin</th>
-                <th className="r">{MM_LABEL}</th>
+                <th className="r" title={PVP_HEADER_TIP}>{PVP_LABEL}</th>
                 <th className="r">{MC_LABEL}</th>
                 <th className="r">Lead</th>
                 <th>Tier</th>
@@ -285,9 +354,10 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
                       <div className="topic-name">{c.item_name} <span style={{ color: 'var(--text-3)' }}>· {c.coin}</span>{c.calibrating && <span className="cal-chip">cal</span>}{flowChip(c.flow)}</div>
                       <div className="topic-cat">crypto{c.supply?.size_band ? <span title={c.supply.band_basis || ''} style={{ marginLeft: 6, textTransform: 'uppercase', fontWeight: 700, fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>{c.supply.size_band}</span> : null}</div>
                     </td>
-                    <td className="r">{c.money_data_absent
-                      ? <span className="score-cell det" title={ABSENT_TIP} style={{ opacity: 0.55, color: marketTierColor('ABSENT') }}>—</span>
-                      : <span className="score-cell det">{c.money_movement}</span>}</td>
+                    {/* POSITIONING VS PRICE column (replaced the Money Movement column,
+                        Chairman order 2026-09-14). Renders ONLY from the optional divergence
+                        block — absent on the wire today until the prereg §6 gates clear. */}
+                    <td className="r"><PvpCell c={c} /></td>
                     <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>
                     <td className="r"><span className="muted">{c.gap != null ? `${c.gap > 0 ? '+' : ''}${c.gap}` : '—'}</span></td>
                     <td>{isAbsent(c)

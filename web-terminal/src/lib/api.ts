@@ -191,6 +191,20 @@ export interface CryptoCoin {
   price?: { last_close?: number; change_7d_pct?: number | null; change_30d_pct?: number | null; trend?: string; as_of?: string } | null
   dark_matter?: { coverage?: string; flow?: string; intensity?: number; proxies_covered?: number } | null
   detection_fp?: string; confidence_fp?: string; disclaimer?: string
+  // Positioning vs Price (internal perp_divergence — DIVERGENCE_PREREG_2026-09-14 §1/§6).
+  // OPTIONAL: the engine does NOT serve this block today — it graduates only after rights
+  // evidence + the three instrument audits clear (prereg §6). d = the signed residual D_t
+  // (sign-aware, K17 — never rendered via abs()); the oi/price pcts are the arithmetic-only
+  // display line. param_version = the sealed prereg file's SHA-256 (bd6e3649…).
+  divergence?: {
+    d: number | null; measured: boolean
+    oi_chg_pct_7d?: number | null; price_chg_pct_7d?: number | null
+    param_version?: string; basis?: string
+  } | null
+  // Positioning vs Price Register counts (fenced flow_basis='perp_divergence' register —
+  // NEVER the crypto accuracy ledger). Absent → the panel renders its static honest-empty
+  // state. Forecaster rule: unresolved is never a pending win; open windows render OPEN.
+  divergence_register?: { open: number; resolved: number } | null
   // C1+C2 (2026-08-05): display-only supply facts — omitted by the engine when unavailable
   supply?: {
     network_value_usd?: number; circulating_supply?: number; size_band?: string
