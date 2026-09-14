@@ -4682,3 +4682,35 @@ production booted clean on the real database.
   index-CN1T1ii8.js carries POSITIONING VS PRICE + the register panel + NOT MEASURED states.
 - Display gates unchanged: crypto D column reads NOT MEASURED until RIGHTS OPEN item 9 + the
   3-offset timing audit clear; equity research-only under the seal; ledger data untouched.
+
+### Addendum 10 (same session) — ALL-PAGES AUDIT run + fixed on both platforms; rail explainers; RIGHTS item 9 determined
+- **Chairman orders after seeing the live page:** all-pages audit; retire the remaining
+  "Money Movement" side-panel wording; add rail explainers for Positioning vs Price and Tier;
+  resolve RIGHTS item 9.
+- **Rail (web, deployed 8b4ab9c):** every visible money-movement string in the crypto view →
+  positioning vocabulary; new "About Positioning vs Price" (three-readings contrast +
+  why-NOT-MEASURED) and "About Tier" (engine MARKET_LEVELS bands verbatim; "NOT MEASURED is
+  not a tier") sections.
+- **RIGHTS item 9 (Chairman-ordered) — determined against captured text,** never silence-as-grant:
+  ops-fetch-legal.yml snapshots vendor terms to docs/buyer-diligence/tos-snapshots/ (CoinAPI +
+  CoinMetrics + Coinbase, dated 2026-09-14). CoinAPI §3.1 CLEARS internal/research use; display
+  of the derived residual stays BLOCKED (terms silent on derived-data display → written
+  confirmation request drafted, COINAPI_RIGHTS_REQUEST_draft.md, founder to send; Data Sources
+  pass-through flags Binance terms for counsel). Register row updated citing the snapshot.
+- **ALL-PAGES AUDIT** (audits/frontend/ALLPAGES_AUDIT_2026-09-14.md): 22 defects / 9 nits.
+  PREMISE CORRECTION: mobile HAS crypto screens (148487d, 2026-08-18) — the session's earlier
+  "mobile N/A for crypto" claim was stale; recorded here as the correction. Clean passes:
+  zero forbidden words in divergence renderings, no NaN paths, §17 gating, divergence merge
+  touched 0 mobile files.
+- **Fixes shipped (web 60242ee → gh-pages 97533e7; mobile 33ba1db):** web Dashboard crypto tile
+  de-fabricated (absent ≠ 0; honest ordering label) + "positioning" title; Ledger crypto-mode
+  vocabulary; History founder disclaimer restored byte-identical; K17 sign-blind class closed
+  on BOTH platforms (10 files; mobile root fix at gradientApi gap sign; negative gaps no
+  longer wear early-stage prose anywhere); mobile crypto full positioning parity (explainers +
+  register + NOT MEASURED slot, Aurora tokens, zero banned hexes); tier fabrications
+  (ROUTINE/DORMANT fallbacks) removed → hollow NotMeasuredChip; DarkMatterPanel/
+  WhyScoresDiverge 4c tri-state on mobile; BUILDING→MODERATE legend. Mobile reaches devices
+  on the next Expo publish from the founder's machine.
+- **Flagged to Chairman, not built:** mobile SignalAnalysisPanel was NEVER implemented despite
+  CLAUDE.md recording it live (git-verified); mobile market detail has no N/Platform-Indicator
+  card (needs data plumbing — ruling requested).
