@@ -169,6 +169,38 @@ _EXPERT_TIERS = {"expert", "niche"}
 import re as _re
 import unicodedata as _ud
 
+# ── TITLE-SIG CJK CHARACTER WINDOW — flag-gated, DEFAULT OFF ─────────────────
+# (ruling 5, fails-open CJK quorum — BOARD_resume-audit_2026-09-14.md, Expansionist memo)
+# THE DEFECT: the signature's final step is a WORD window (`t.split()[:10]`). CJK/Japanese/
+# Thai headlines carry no ASCII spaces, so the window is a no-op and the signature degenerates
+# to EXACT-STRING matching: five CJK mastheads carrying ONE wire story with slightly different
+# suffixes count as five distinct stories under §15a's min(distinct outlets, distinct titles)
+# — the quorum FAILS OPEN in the largest non-Latin markets, while English correctly stays a
+# Dark-Matter trigger. THE FIX: when the RAW title has no ASCII space and the normalized text
+# is no-space-script-dominant (≥ _CJK_SIG_MIN_CHARS chars in the CJK/Kana/Hangul/Thai ranges),
+# truncate by a CHARACTER window — the first _CJK_SIG_CHARS non-space chars after the SAME
+# normalization — so near-identical wire variants collapse the way the 10-word window collapses
+# English. Latin and space-containing titles take the EXISTING path byte-for-byte, flag on or
+# off; with the flag OFF every input takes the existing path byte-for-byte (the backtest
+# precondition — enforced by transfer/test_title_sig_cjk.py).
+# SCORE-AFFECTING (feeds n_news_independent → mainstream_confirmed): per §15a the FLIP needs a
+# board note + founder sign-off, and the live backtest on production CJK titles is STILL OWED
+# before the flag may be set — never flip by env alone.
+TITLE_SIG_CJK = os.getenv("TITLE_SIG_CJK", "0") == "1"
+_CJK_SIG_CHARS = 20      # char window ≈ the information carried by 10 English words
+_CJK_SIG_MIN_CHARS = 6   # min no-space-script chars before the char window may apply
+# No-space scripts AS THEY APPEAR POST-NORMALIZATION. NFKD decomposes Hangul syllables
+# (U+AC00–U+D7AF) into conjoining Jamo (U+1100–U+11FF), so that block must be matched too.
+_CJK_SIG_RE = _re.compile(
+    "[ᄀ-ᇿ"     # Hangul Jamo (the post-NFKD form of Hangul syllables)
+    "぀-ゟ"      # Hiragana
+    "゠-ヿ"      # Katakana
+    "㐀-䶿"      # CJK Unified Ideographs Extension A
+    "一-鿿"      # CJK Unified Ideographs
+    "가-힯"      # Hangul Syllables
+    "฀-๿]"     # Thai
+)
+
 
 def _title_sig(t: str) -> str:
     """Signature for collapsing wire-syndication: lowercased alphanumerics, first 10 significant
@@ -183,11 +215,27 @@ def _title_sig(t: str) -> str:
     NFKD-fold diacritics (Mbappé/Mbappe → one signature — BETTER syndication collapse),
     then keep unicode letters/digits, so native-script titles produce real, distinct
     signatures. ASCII titles are byte-identical to the old signature (backtested before
-    ship — audits/backtests/TITLE_SIG_UNICODE_BACKTEST_2026-08-20.md)."""
-    t = _ud.normalize("NFKD", (t or "").lower())
+    ship — audits/backtests/TITLE_SIG_UNICODE_BACKTEST_2026-08-20.md).
+
+    CJK CHARACTER WINDOW (ruling 5, fails-open CJK quorum — BOARD_resume-audit_2026-09-14.md;
+    flag `TITLE_SIG_CJK`, default OFF, see the flag block above): the 2026-08-20 fix made
+    native-script signatures DISTINCT but left the word window a no-op on no-space scripts —
+    exact-string matching, so one wire story across five CJK mastheads reads as five stories.
+    With the flag ON, a spaceless, no-space-script-dominant title is truncated by CHARACTER
+    window instead. Space-containing and Latin-only inputs are untouched either way."""
+    raw = t or ""
+    t = _ud.normalize("NFKD", raw.lower())
     t = "".join(c for c in t if not _ud.combining(c))          # é→e, ü→u
     t = _re.sub(r"[^\w ]+", " ", t, flags=_re.UNICODE)         # keep letters/digits, any script
     t = t.replace("_", " ")
+    if TITLE_SIG_CJK and " " not in raw:
+        # No ASCII space in the RAW title (checked pre-normalization: CJK punctuation like
+        # 、。【】 becomes spaces above, and must not push a wire variant back onto the
+        # word-window path its siblings left). Whitespace is then stripped so those
+        # punctuation-born gaps can't fragment the character window.
+        chars = "".join(t.split())
+        if len(_CJK_SIG_RE.findall(chars)) >= _CJK_SIG_MIN_CHARS:
+            return chars[:_CJK_SIG_CHARS]
     return " ".join(t.split()[:10])
 
 

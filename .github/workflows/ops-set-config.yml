@@ -1,0 +1,29 @@
+# One-button ops: sync the engine's cost config var to the recorded actuals
+# (Chairman order 2026-09-14: Aug invoice $122.81 → footprint $118; the var set
+# on Heroku overrides the code default, so it must be moved too).
+# SCOPE IS DELIBERATELY FIXED: this workflow can set ONLY the whitelisted key/value
+# below — it is not a general config editor (a public repo's dispatchable workflow
+# holding HEROKU_API_KEY must not be one). NOTE: a config-var change RESTARTS the
+# dynos → one cache re-warm window (~25 min of /topics "warming" until stage-2
+# shortens the builds). Dispatch it alongside a deploy so the restarts coincide.
+name: Ops - sync cost config var
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  set-var:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: PATCH COST_HEROKU_USD=118 on nowtrendin-v2-engine
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then echo "::error::HEROKU_API_KEY not set"; exit 1; fi
+          curl -sS -X PATCH "https://api.heroku.com/apps/nowtrendin-v2-engine/config-vars" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"COST_HEROKU_USD":"118"}' \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print('COST_HEROKU_USD now:', d.get('COST_HEROKU_USD', d))"
