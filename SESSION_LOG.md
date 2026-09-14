@@ -69,6 +69,29 @@ cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owe
   (token expiries, X budget, GDELT etc.) still needs the founder's browser: `/monitor`,
   `/health/collectors`, `/usage`, `/x/budget`, `/accuracy/ledger`.
 
+### Addendum 2 (same session) — nine-seat board CONVENED and collated; live Heroku evidence landed
+- **Board round run per /advisory-board** (nine parallel isolated seats on
+  `EVIDENCE_PACK_2026-09-14_RESUME-AUDIT.md`); collation:
+  **`audits/board/BOARD_resume-audit_2026-09-14.md`** (memos, disagreements, verdict table,
+  12 new defects N1-N12). HEADLINE: **the data-continuity claim did not survive** — Apify
+  billing evidences 1 of 28 collectors (validation path, not discovery); "600 payloads" is
+  the configured cap with no freshness predicate. Honest statement: "database up;
+  Trends-validation billing continuous; continuity of the other 27 collectors unmeasured."
+  Settling test: per-collector per-day row histograms + one /health/collectors read.
+  Convergent asks: external uptime probe w/ retained series; continuity read; browser
+  re-probe closes I2 else rows read UNVERIFIED; ruling 5 near top (fails open); delivery =
+  artifact-verified for every automation; Drive copy today; mark the 2 rebuilt skills
+  RECONSTRUCTED + fix the stale retention line.
+- **Live Heroku evidence (founder screenshots, ~01:07 UTC):** v374 serves slug `2d42c905` —
+  the EXACT Actions subtree SHA → deploy provenance confirmed (grade B). Engine UP; DB
+  serving reads (`/monitor/catchall` 200 in 10.7s; `/prewarm` 200 in 2ms — JSON content
+  still uncaptured). `/topics` + `/categories` both 503 after exactly ~25s = the
+  single-flight wait-then-honest-503; response chart shows repeated 25s spikes + 6
+  criticals/24h → RECURRING serving failure. Leading UNTESTED hypothesis (§10a): 1b's
+  retention 7→30 grew the signal tables ~4× across the unattended window and the superset
+  build now exceeds the wait budget on Essential-1 Postgres. Discriminators: /prewarm JSON,
+  "[prewarm]" log lines over one loop, per-day row counts.
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +
