@@ -3,6 +3,10 @@ name: engine-recovery
 description: Triage and recover the Gradient Score engine (Heroku app nowtrendin-v2-engine) when /scores or /topics serve 500s/503s, time out (H12), or the web terminal shows "Could not load signals". Signature table + safe recovery sequences from the 2026-07-06 read-path outage post-mortem. Use when the engine is down, slow, cold, or a prewarm/pool problem is suspected.
 ---
 
+> **RECONSTRUCTED 2026-09-14** from SESSION_LOG.md "read-path outage POST-MORTEM" (2026-07-06) — the laptop original was never
+> committed and no backup survives, so "behaves as the original" is unverifiable
+> (board ruling I3, `BOARD_resume-audit_2026-09-14.md`). Treat as a rebuild, not a restoration.
+
 # /engine-recovery — read-path outage triage + safe recovery
 
 Rebuilt 2026-09-14 from the 2026-07-06 post-mortem (SESSION_LOG "read-path outage

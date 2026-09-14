@@ -508,8 +508,11 @@ def pipeline_integrity(conn, sample: int = 300) -> dict:
 # ── Agent D: COST SENTINEL (B7 budgets) — TOTAL cost of running Now TrendIn ──
 # LIVE-metered: AI (Perplexity+Anthropic) + Apify (platform usage, via API).
 # CONFIGURED (env, set to your actuals — not API-readable in real time):
-#   COST_HEROKU_USD          monthly Heroku dynos (engine standard-2x $50 + backend
-#                            $7 + nowtrendin-web $7 ≈ $64; terminal is Pages=$0)
+#   COST_HEROKU_USD          monthly Heroku footprint. Aug-2026 invoice ACTUAL:
+#                            $122.81 whole account, minus the $5 personal mytaskapp
+#                            → $118 NowTrendIn footprint (Chairman, 2026-09-14).
+#                            Breakdown: COST_MODEL.md. Update the Heroku config var
+#                            too — a set env var overrides this default.
 #   COST_SUBSCRIPTIONS_USD   paid data APIs (NewsAPI ×2, NewsData, Finnhub,
 #                            WhaleWisdom, Alpha Vantage, X) — set your monthly total
 #   COST_GITHUB_USD          GitHub (Pages/Actions) — $0 on public repo
@@ -567,7 +570,7 @@ def cost_sentinel() -> dict:
     subs_legacy = float(os.getenv("COST_SUBSCRIPTIONS_USD", "0") or 0)
     subs_usd = subs_itemized if subs_itemized > 0 else subs_legacy
     fixed = [
-        ("Heroku dynos", float(os.getenv("COST_HEROKU_USD", "64"))),
+        ("Heroku dynos", float(os.getenv("COST_HEROKU_USD", "118"))),
         # X (Twitter) Developer API monthly subscription — distinct from the post
         # BUDGET below (posts are the in-plan cap; this is the plan's $ fee).
         # X Basic = $200/mo; migrating to Pay-Per-Use 2026-06-21 — update then.

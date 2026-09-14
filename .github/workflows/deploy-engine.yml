@@ -1,21 +1,35 @@
-# Cloud deploy of the Gradient Score engine (added 2026-09-14).
-# WHY: the engine could previously only be deployed from the founder's laptop
-# (`git subtree push --prefix transfer heroku-v2engine main`). A 3-week laptop
-# shutdown left an owed deploy stranded. This workflow makes GitHub's servers do
-# the same subtree push, so merging to main IS the deploy — from any device.
+# Cloud deploy of the Gradient Score engine (added 2026-09-14; hardened same day
+# per the nine-seat board review — BOARD_resume-audit_2026-09-14.md, item I4).
+# WHY: the engine could previously only be deployed from the founder's laptop.
+# This workflow makes GitHub's servers do the subtree push, so merging to main
+# IS the deploy — from any device. Deploy approval stays human: it fires only on
+# a push to main touching the engine or its gates (or a manual Run workflow).
 #
 # ONE-TIME SETUP (founder): repo Settings → Secrets and variables → Actions →
 # New repository secret → name HEROKU_API_KEY, value from
 # dashboard.heroku.com/account → API Key → Reveal.
 #
-# Deploy approval stays human: this fires only on a push to main that touches
-# transfer/ (or a manual Run workflow). It never runs on pull requests or forks.
+# ROLLBACK (board N7: force-push is not git-revertible): the prior Heroku head
+# SHA is echoed into every run log below; to roll back use
+#   heroku releases:rollback -a nowtrendin-v2-engine
+# (or force-push that recorded SHA). Release failures land AFTER the push and
+# never fail the git transport — the smoke check below is what observes the
+# outcome (board N11: maint_precompute exits 0 by contract).
+#
+# Still owed from the board list (deliberately NOT in this pass, each needs a
+# verification step of its own): pin actions/checkout to a full SHA (a wrong pin
+# blocks deploys — verify the SHA first), pin the Python runtime across
+# CI/runner/Heroku, GitHub Environment with required reviewer on the secret.
 name: Deploy engine to Heroku
 
 on:
   push:
     branches: [main]
-    paths: ['transfer/**']
+    paths:
+      - 'transfer/**'
+      - 'tools/run_tests.py'
+      - 'tools/integrity_gate.py'
+      - '.github/workflows/deploy-engine.yml'
   workflow_dispatch: {}
 
 concurrency:
@@ -24,20 +38,22 @@ concurrency:
 
 jobs:
   deploy:
+    # Real fork/repo guard (board N7 — the old comment had no matching condition).
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
     runs-on: ubuntu-latest
-    # Guard against forks: secrets are absent there, fail fast with a clear message.
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run the repo test gate before deploying
+      - name: Run the repo test gate + integrity gate before deploying
         run: |
           pip install -q -r transfer/requirements.txt python-dotenv vaderSentiment
           python -c "import nltk; nltk.download('stopwords', quiet=True); nltk.download('punkt', quiet=True)"
           python tools/run_tests.py
+          python tools/integrity_gate.py
 
-      - name: Push transfer/ subtree to Heroku (release phase runs maint_precompute.py)
+      - name: Record prior Heroku head, push transfer/ subtree (release runs maint_precompute.py)
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
         run: |
@@ -45,8 +61,29 @@ jobs:
             echo "::error::HEROKU_API_KEY secret is not set (repo Settings → Secrets → Actions)."
             exit 1
           fi
+          HEROKU_URL="https://heroku:${HEROKU_API_KEY}@git.heroku.com/nowtrendin-v2-engine.git"
+          PRIOR=$(git ls-remote "$HEROKU_URL" refs/heads/main | cut -f1)
+          echo "PRIOR HEROKU HEAD (rollback target): ${PRIOR:-<none>}"
           git config user.email "actions@github.com"
           git config user.name "github-actions"
           SPLIT_SHA=$(git subtree split --prefix transfer HEAD)
-          echo "Deploying subtree commit $SPLIT_SHA"
-          git push --force "https://heroku:${HEROKU_API_KEY}@git.heroku.com/nowtrendin-v2-engine.git" "$SPLIT_SHA:refs/heads/main"
+          echo "Deploying subtree commit $SPLIT_SHA (from repo HEAD $GITHUB_SHA)"
+          git push --force "$HEROKU_URL" "$SPLIT_SHA:refs/heads/main"
+
+      - name: Post-deploy smoke check (board N11 — observe the outcome, not the push)
+        run: |
+          ENGINE=https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com
+          ok=0
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$ENGINE/health")
+            echo "try $i: /health -> $code"
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 15
+          done
+          echo "== /prewarm body after deploy (per-feed build evidence):"
+          curl -s --max-time 30 "$ENGINE/prewarm" || true
+          echo
+          if [ "$ok" != "1" ]; then
+            echo "::error::/health never returned 200 within ~3 minutes of the push — check the release log and 'heroku releases:rollback -a nowtrendin-v2-engine'."
+            exit 1
+          fi

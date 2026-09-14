@@ -302,3 +302,17 @@ Heroku dashboard, app `nowtrendin-v2-engine`, read ~01:07 UTC 09-14:
   `/prewarm` JSON (per-feed build durations / last_run), "[prewarm]" log lines over one loop,
   and per-day row counts. Competing hypotheses not excluded: pool contention, a slow query
   introduced in the new slug, plan throttling.
+
+---
+
+## CHAIRMAN RULINGS (founder, in-session, same day)
+
+Proceed with the convergent recommendations; build the external uptime monitor; fix the
+503; record the Heroku invoice actual ($122.81 Aug-2026) in the cost model and skill.
+Executed same session (see SESSION_LOG 2026-09-14 Addendum 3): 503 root cause traced to
+the global 300s `statement_timeout` killing both whole-table superset builds (confirmed
+by the founder's live `/prewarm` read) and fixed with builder-scoped `PG_BUILD_TIMEOUT_MS`;
+uptime monitor + hardened deploy pipeline + PR CI shipped; PII-AUTHOR-HISTORY row created
+(closes N8); costs actualized; RECONSTRUCTED stamps + retention-line fix + charter rows
+17–24 applied. **Still awaiting Chairman:** PII history purge vs written acceptance (I7);
+ruling 5 (CJK) scheduled next as the top score-affecting item.

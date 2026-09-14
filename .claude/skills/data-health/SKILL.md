@@ -61,3 +61,10 @@ This is **founder-internal**. Don't soften or hedge — give numbers directly. C
   do NOT route them through `_RSS_FEEDS`/`_news_write` (which forces `mainstream` and suppresses
   the early signal).
 - **For THIS skill:** Overall pipeline health — new sources (The New Yorker, Nasdaq halts) in the roster; the canonical-date invariant (B3a) and the `format_review_queue` pending count are now part of a healthy pipeline; M/D reweighting is in design (not yet shipped).
+
+## Known cost baseline (update on each invoice)
+
+- **Heroku (Aug 2026 invoice, ACTUAL): $122.81 whole account** → NowTrendIn footprint
+  **$118** after excluding the $5 personal `mytaskapp` (= `COST_HEROKU_USD`; code default
+  and `COST_MODEL.md` updated 2026-09-14, Chairman-ordered). If the engine's Heroku
+  config var `COST_HEROKU_USD` is set, it overrides the code default — keep it at 118.

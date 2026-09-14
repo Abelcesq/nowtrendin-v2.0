@@ -496,10 +496,10 @@ operational rules are the concrete expressions of those principles. They come fr
    (Reproducibility + accuracy principle — backtest first, ship second.)
 5. **Verify before ship.** Fix failures first, then document. Never document over broken state.
    (Integrity principle — documentation of broken behavior is a lie.)
-6. **90-day data retention (hard).** Never delete `velocity_scores` rows younger than
-   90 days. No quality-based deletes within the window. Count-based prune is forbidden.
-   (Reproducibility principle — historical scores are required for backtest + calibration.)
-   365-day extension is PENDING USER CONFIRMATION — do NOT implement until confirmed.
+6. **365-day data retention (hard — canonical since 2026-06-24, CLAUDE.md §13).** Never
+   delete `velocity_scores` rows younger than 365 days. No quality-based deletes within
+   the window. Count-based prune is forbidden. (Reproducibility principle — historical
+   scores are required for backtest, calibration, and the accuracy ledger.)
 7. **Engine 1.0 is FROZEN. Push only to `nowtrendin-v2.0`.** `NowTrendin/` repo is
    read-only. All engine work goes in `NowTrendin v2.0/transfer/`. A git hook enforces
    the freeze. Every `git push` must target `Abelcesq/nowtrendin-v2.0`.

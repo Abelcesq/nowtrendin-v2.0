@@ -82,9 +82,20 @@ convenience, speed, and any individual spec below.
 | 14 | Scorer Watchdog | `/monitor/scorer` | ✅ | B4 |
 | 15 | Prewarm Agent | `/prewarm` | n/a (background loop, API process) | B8 |
 | 16 | Canonical Date Auditor | `/monitor/datecanon` | ✅ | B3a |
+| 17 | Held-Out Firewall | via `/monitor` | ✅ | B6 |
+| 18 | Flow Integrity | via `/monitor` | ✅ | B3/B4 |
+| 19 | Similar-Fragmentation Agent | via `/monitor` | ✅ | B3 |
+| 20 | ETF Reconcile Watch | via `/monitor` | ✅ | B7 (Gate-4 tripwire) |
+| 21 | Crypto Price Referee | via `/monitor` | ✅ | B5 |
+| 22 | Payload Contradiction Auditor | via `/monitor` | ✅ | B4 (ruling 7, 2026-08-24) |
+| 23 | Scoring Contract Auditor | `/monitor/scoringcontract` | no (heavy scan) | B4 |
+| 24 | Feed-Silence Tripwire | inside Source Watchdog | ✅ (via 3) | B1 |
 
 The combined fleet is reachable at **`/monitor`** (`run_all`). Agents 1–2 and 8 are
-the deliberately-excluded on-demand specialists. Agent 15 (Prewarm) is the lone
+the deliberately-excluded on-demand specialists; 23 is endpoint-only (its full-schema
+scan would blow the `/monitor` 30s budget). Rows 17–24 were added 2026-09-14 (board
+finding: 8 live agents undocumented) — their full specs currently live in their
+`monitoring_agents.py` docstrings; charter write-ups owed. Agent 15 (Prewarm) is the lone
 **operational** agent — it runs as a background daemon thread in the API process,
 not under `/monitor`; it is read-only with respect to data (it writes only the
 in-memory read cache, never a score).

@@ -10505,6 +10505,37 @@ def query_topic(payload: dict = Body(...)):
     return {"found": True, "topic": topic, "topic_key": tkey, "signals_collected": collected, "result": res}
 
 
+# 2026-09-14 outage root cause (founder /prewarm evidence + db_compat.py options line):
+# every pooled connection carries the global PG_STATEMENT_TIMEOUT_MS (300s) guard, and
+# velocity_scores has outgrown the budget the 2026-07-15 single-pass rewrite fit into —
+# both whole-table superset builds now die at exactly 300s ("canceling statement due to
+# statement timeout"), so scores/topics never cache and every request 503s after
+# BUILD_WAIT_S. These TWO builders alone get a larger, env-tunable budget; the 300s
+# guard stays on every other query. SET is session-scoped and the session returns to
+# the pool, so the reset must run on every exit path, after a rollback (the
+# accuracy_ledger_enhanced boot-guard idiom — a leaked SET becomes an invisible query
+# killer for the next borrower).
+def _set_build_timeout(conn):
+    if getattr(db_compat, "USE_PG", False):
+        try:
+            conn.execute(f"SET statement_timeout = {int(os.getenv('PG_BUILD_TIMEOUT_MS', '900000'))}")
+        except Exception:
+            pass
+
+
+def _reset_build_timeout(conn):
+    if getattr(db_compat, "USE_PG", False):
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.execute("RESET statement_timeout")
+            conn.commit()
+        except Exception:
+            pass
+
+
 def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
     """Heavy path — runs ONCE, result cached limit/offset-independently. Pulls the
     candidate window, applies calibration + the AI/noise filter, and returns the
@@ -10533,6 +10564,7 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
         # build. Merged into a single GROUP BY (identical semantics: both keyed
         # on topic_key over the same table) so the build fits comfortably inside
         # the statement_timeout that now guards every query.
+        _set_build_timeout(conn)
         rows = conn.execute(f"""
             SELECT v.*, COALESCE(lc.first_detected_at, agg.first_at) AS first_scored_at,
                    COALESCE(lc.total_scoring_cycles, 0) AS total_scoring_cycles
@@ -10550,6 +10582,7 @@ def _compute_scores_full(sort_by: str, stage: str, min_score: float) -> list:
             LIMIT ?
         """, (min_score, mentions_floor, candidate_cap)).fetchall()
     finally:
+        _reset_build_timeout(conn)
         conn.close()
     result = _format_score_rows(rows)
     out = result.get("results", [])
@@ -12629,6 +12662,7 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
     try:
         # try/finally: never leak the pool slot on a query error (see
         # _compute_scores_full — the 2026-07-06 outage lesson).
+        _set_build_timeout(conn)
         rows = conn.execute(f"""
             SELECT v.topic_key,
                    COALESCE(v.topic_display, r.topic_display) AS topic_display,
@@ -12651,6 +12685,7 @@ def _compute_topics_full(cat: str, anomalies_only: bool) -> list:
             LIMIT ?
         """, (mentions_floor, candidate_cap)).fetchall()
     finally:
+        _reset_build_timeout(conn)
         conn.close()
     topics = []
     for r in rows:

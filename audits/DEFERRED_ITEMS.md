@@ -420,3 +420,33 @@ env flip (the quorum-constants rule, §15a). §16a forbids skipping stages 1–2
 **Trigger:** the next scoring-change board round, or the D shadow-trial close (whichever
 first) — whoever runs it must also close `C-DFLOOR-SCORE` by attaching the backtest as the
 row's enforcer evidence.
+
+---
+
+## PII-AUTHOR-HISTORY — author-handle behavioural aggregate: retention, erasure, lawful basis
+
+> Created 2026-09-14 (board finding N8, `BOARD_resume-audit_2026-09-14.md` — Buyer's Desk):
+> `docs/buyer-diligence/PII_POLICY.md` §2 and `FISD_DDQ_RESPONSES.md` both cite this row,
+> and until today it did not exist — a buyer-facing control claim with no backing artifact
+> (the App Annie class). This row makes the citation true.
+
+**What it is:** the `raw_signals.author` column and the derived author-history aggregate
+(D's first-timer ratio) constitute person-level behavioural data on named public handles.
+Three gaps are on record in PII_POLICY §2 and are tracked HERE:
+1. **Retention vs minimisation tension** — the first-timer flag needs history to mean
+   anything; no minimisation schedule exists for the author column. UNRESOLVED by design,
+   disclosed.
+2. **No erasure path** — no mechanism for a named individual to request deletion, and no
+   runbook for what happens to `is_first_timer` on topics they touched if a row were
+   removed (a deletion silently changes a scoring input).
+3. **No lawful-basis assessment on record** for the behavioural aggregate specifically.
+
+**REACTIVATION TRIGGERS (any one makes this MANDATORY-now):**
+- T1 — first erasure/data-subject request received (starts a statutory clock).
+- T2 — first EU/UK prospect enters diligence (GDPR conversation per the Expansionist).
+- T3 — the Chairman's PII-incident ruling (history purge vs written acceptance) — the
+  erasure-path design should ship with whichever is chosen.
+- T4 — any new source whose author handles are not plainly public-figure/public-post.
+
+**Related:** `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md` (the same column,
+exposed in public git history; founder decisions owed).

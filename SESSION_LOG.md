@@ -92,6 +92,47 @@ cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owe
   build now exceeds the wait budget on Essential-1 Postgres. Discriminators: /prewarm JSON,
   "[prewarm]" log lines over one loop, per-day row counts.
 
+### Addendum 3 (same session) — CHAIRMAN RULED; 503 ROOT CAUSE TRACED AND FIXED; uptime monitor built; costs actualized
+- **Chairman rulings (founder, in-session):** proceed with the board's convergent
+  recommendations; build the external uptime monitor; fix the 503; record the Heroku
+  invoice actual. Executed below. (PII purge-vs-acceptance still undecided — PII-AUTHOR-
+  HISTORY row now exists in DEFERRED_ITEMS with triggers, closing board N8.)
+- **503 ROOT CAUSE — traced to the line, confirmed from production (§10a satisfied):**
+  founder's `/prewarm` screenshot showed `scores` and `topics` builds both dying with
+  `canceling statement due to statement timeout` (~300s each; history/risk/crypto fine).
+  The line: `db_compat.py` sets `statement_timeout=PG_STATEMENT_TIMEOUT_MS` (300s) on
+  EVERY pooled connection; `velocity_scores` has outgrown the budget the 2026-07-15
+  single-pass rewrite fit into (2.15M rows then; the table has accrued since under 365d
+  retention), so both whole-table superset builds are killed → nothing caches → every
+  request 503s after `BUILD_WAIT_S` (25s — matches the logged ~25.0s exactly).
+  **FIX (this deploy):** `_set_build_timeout`/`_reset_build_timeout` — these TWO builders
+  alone get `PG_BUILD_TIMEOUT_MS` (default 900s), the accuracy_ledger boot-guard idiom
+  (rollback → RESET before the session returns to the pool); the 300s guard stays for
+  every other query. **Stage 2 owed:** read the builds' real `secs` from `/prewarm` after
+  deploy; if multi-minute, an index/query-bound optimization follows (evidence first).
+  NOTE: the earlier "retention 7→30 grew the tables" hypothesis was WRONG for the scores
+  build (it scans `velocity_scores`, which the Aug-20 change didn't touch) — the trace
+  beat the hypothesis, again.
+- **EXTERNAL UPTIME MONITOR** (`.github/workflows/uptime-monitor.yml`): every ~10 min
+  from GitHub's servers — `/health` + one `/topics?limit=1` probe + full `/prewarm` JSON
+  captured to the run log; state changes + daily heartbeat appended to
+  `audits/uptime/uptime_log.csv` (retained series, seeded with the 09-13/14 outage);
+  emails the founder once per outage ONSET (fails the run only on the UP→DOWN
+  transition). Closes the board's unanimous I8 ask.
+- **Deploy pipeline hardened per board I4/N7/N11:** real repository guard condition,
+  `integrity_gate.py` added to the gate, prior Heroku head SHA echoed (rollback target),
+  post-deploy `/health` smoke loop + `/prewarm` body capture (a push is no longer the
+  success signal), paths widened to the gates + workflow itself; new `ci.yml` runs both
+  gates on every PR/branch push. Still owed (needs verification first): checkout SHA pin,
+  Python runtime pin, GitHub Environment + required reviewer.
+- **Costs actualized (Chairman order):** Aug-2026 Heroku invoice ACTUAL **$122.81**
+  whole-account → footprint **$118** (excl. $5 mytaskapp). `COST_HEROKU_USD` code default
+  64→118, `COST_MODEL.md` updated, baseline noted in the data-health skill. ⚠ Founder:
+  set the engine config var `COST_HEROKU_USD=118` (a set var overrides the default).
+- **Board doc fixes:** RECONSTRUCTED stamps on engine-recovery + improve-system (both
+  copies); nowtrendin2.0 skill's stale 90-day retention rule corrected to canonical 365
+  (§13); AGENT_CHARTER rows 17–24 added (8 undocumented agents; full write-ups owed).
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +

@@ -3,6 +3,10 @@ name: improve-system
 description: Weekly system-improvement audit for NowTrendIn 2.0 — eight-lens internal review (engineer, auditor, attorney, banker, VC, advisor, board, fiduciary) of system health, integrity/non-circularity, agent productivity, and accuracy vs external ground truth. Writes a dated report to audits/improve-system/. Use when asked to run the weekly audit, improve the system, or assess overall health.
 ---
 
+> **RECONSTRUCTED 2026-09-14** from audits/improve-system/README.md — the laptop original was never
+> committed and no backup survives, so "behaves as the original" is unverifiable
+> (board ruling I3, `BOARD_resume-audit_2026-09-14.md`). Treat as a rebuild, not a restoration.
+
 # /improve-system — weekly eight-lens internal audit
 
 Rebuilt 2026-09-14 from `audits/improve-system/README.md` (the laptop-local original was

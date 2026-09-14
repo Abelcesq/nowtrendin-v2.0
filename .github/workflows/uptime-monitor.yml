@@ -1,0 +1,88 @@
+# External uptime monitor (board-converged ask, Chairman-ordered 2026-09-14).
+# WHY: the 09-13 serving outage was discovered by a human opening the site after
+# three unattended weeks. This probe runs OFF Heroku and off any founder device,
+# every ~10 minutes, and:
+#   - checks /health (engine alive) and /topics?limit=1 (what users actually load;
+#     one probe per run — never a probe storm, per the /engine-recovery runbook);
+#   - captures the FULL /prewarm JSON into the run log every time (per-feed build
+#     seconds + errors — the exact evidence that diagnosed the statement-timeout
+#     outage; /prewarm also kicks an overlap-guarded background warm, so a died
+#     warm loop gets re-kicked for free);
+#   - appends a row to audits/uptime/uptime_log.csv on every STATE CHANGE and at
+#     most one daily heartbeat (a retained availability series without commit spam);
+#   - fails the run ONLY on the transition into DOWN, so GitHub emails the founder
+#     once per outage onset instead of every 10 minutes.
+# Scheduled runs can lag several minutes under GitHub load — the cadence is
+# approximate by design, and the series records observed timestamps, not slots.
+name: Uptime monitor
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe engine and record
+        env:
+          ENGINE: https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com
+        run: |
+          set +e
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          health_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$ENGINE/health")
+          t0=$(date +%s.%N)
+          topics_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 35 "$ENGINE/topics?limit=1")
+          topics_secs=$(echo "$(date +%s.%N) $t0" | awk '{printf "%.1f", $1-$2}')
+          prewarm_json=$(curl -s --max-time 30 "$ENGINE/prewarm")
+          echo "== $now  health=$health_code  topics=$topics_code (${topics_secs}s)"
+          echo "== /prewarm body:"
+          echo "$prewarm_json"
+          prewarm_last=$(echo "$prewarm_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('last_run') or '')" 2>/dev/null)
+          prewarm_errs=$(echo "$prewarm_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(';'.join(sorted({w['feed'] for w in d.get('warmed') or [] if w.get('error')})) )" 2>/dev/null)
+
+          if [ "$health_code" = "200" ] && [ "$topics_code" = "200" ]; then status=UP; else status=DOWN; fi
+
+          log=audits/uptime/uptime_log.csv
+          mkdir -p audits/uptime
+          [ -f "$log" ] || echo "utc,status,health_code,topics_code,topics_secs,prewarm_last_run,prewarm_error_feeds,note" > "$log"
+          last_line=$(tail -1 "$log")
+          last_status=$(echo "$last_line" | cut -d, -f2)
+          last_utc=$(echo "$last_line" | cut -d, -f1)
+          last_epoch=$(date -u -d "$last_utc" +%s 2>/dev/null || echo 0)
+          age=$(( $(date -u +%s) - last_epoch ))
+
+          note=""
+          write=0
+          if [ "$status" != "$last_status" ]; then write=1; note="state change"; fi
+          if [ "$age" -ge 86400 ]; then write=1; note="${note:-daily heartbeat}"; fi
+
+          if [ "$write" = "1" ]; then
+            echo "$now,$status,$health_code,$topics_code,$topics_secs,$prewarm_last,\"$prewarm_errs\",$note" >> "$log"
+            git config user.email "actions@github.com"
+            git config user.name "uptime-monitor"
+            git add "$log"
+            git commit -m "uptime: $status at $now ($note)"
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push origin HEAD:main && break
+              sleep 5
+            done
+          fi
+
+          # Email the founder exactly once per outage onset (transition into DOWN).
+          if [ "$status" = "DOWN" ] && [ "$last_status" != "DOWN" ]; then
+            echo "::error::Engine DOWN: /health=$health_code /topics=$topics_code. Prewarm errors: $prewarm_errs. See /prewarm body above."
+            exit 1
+          fi
+          exit 0
