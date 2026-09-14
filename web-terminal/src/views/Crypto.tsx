@@ -7,7 +7,7 @@ import { api, type CryptoFeed, type CryptoCoin } from '../lib/api'
 // Crypto Money Gradient — master/detail, mirroring the Market Signal stock detail page.
 // Coin list (master) + a side panel (CryptoRail) with the SAME dual-ring layout, interpretation,
 // factors, and CSS as MarketRail. Measurement, not advice.
-const MM_LABEL = 'Money Movement'
+const MM_LABEL = 'Positioning'  // Chairman 2026-09-14: 'Money Movement' retired from ALL visible crypto copy
 const MC_LABEL = 'Market Confirmation'
 
 function ring(val: number, color: string) {
@@ -38,7 +38,7 @@ function absentLabel(c: CryptoCoin): string {
     : c.absence_class === 'transient' ? 'NOT MEASURED · none this cycle'
     : 'NOT MEASURED'
 }
-const ABSENT_TIP = 'Not measured — no qualifying money source for this coin'
+const ABSENT_TIP = 'Not measured — no qualifying positioning source for this coin'
 const isAbsent = (c: CryptoCoin) => !!c.money_data_absent || (c.tier || '').toUpperCase() === 'ABSENT'
 
 // C1: hollow/outlined unmeasured chip — transparent background, dashed border, muted text.
@@ -114,7 +114,7 @@ function flowChip(flow?: string) {
     : flow === 'outflow' ? { t: '▼ outflow', c: MC.red }
     : flow === 'divergent' ? { t: '◆ divergent', c: MC.gold }
     : { t: '• ' + flow, c: MC.muted }
-  return <span className="cal-chip" title="Net money-flow direction (informed proxies vs the coin's price) — a measurement, not advice" style={{ background: meta.c + '1A', color: meta.c, fontWeight: 700 }}>{meta.t}</span>
+  return <span className="cal-chip" title="Net direction of informed proxy positioning vs the coin's price — a measurement, not advice" style={{ background: meta.c + '1A', color: meta.c, fontWeight: 700 }}>{meta.t}</span>
 }
 
 function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
@@ -143,15 +143,15 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
       <div className="gauges">
         {c.money_data_absent
           ? <div className="gauge det" title={ABSENT_TIP}>{absentSlot()}<div className="gv" style={{ marginTop: -50, color: 'var(--muted)', fontSize: 18 }}>—</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">{absentLabel(c).toLowerCase()}</div></div>
-          : <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed money · D</div></div>}
+          : <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed proxies · D</div></div>}
         <div className="gauge conf">{ring(c.market_confirmation ?? 0, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{c.market_confirmation ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MC_LABEL}</div><div className="gf">coin price · M</div></div>
       </div>
       {c.money_data_absent && (
         <div className="narr" style={{ margin: '8px 0', background: '#EEF2F7', border: '1px solid #D5DCE5', color: '#4A5568', borderRadius: 8, padding: '8px 10px' }}>
-          ℹ <b>Market-Confirmation only.</b> The Money Movement read is <b>absent, not zero</b>; only the coin's own price confirmation (M) is shown.
+          ℹ <b>Market-Confirmation only.</b> The Positioning read is <b>absent, not zero</b>; only the coin's own price confirmation (M) is shown.
           {' '}{(c as any).absence_class === 'structural'
-            ? <>This coin <b>cannot</b> produce a money read under the current design: it has {(c as any).proxies_votable_max ?? 0} usable money-positioning source(s) and the read requires {(c as any).money_floor_required ?? 2}. That is a limit of the sources, not a temporary gap.</>
-            : <>No money-positioning source reported for this coin this cycle ({(c as any).proxies_covered ?? 0} of {(c as any).money_floor_required ?? 2} required).</>}
+            ? <>This coin <b>cannot</b> produce a positioning read under the current design: it has {(c as any).proxies_votable_max ?? 0} usable positioning source(s) and the read requires {(c as any).money_floor_required ?? 2}. That is a limit of the sources, not a temporary gap.</>
+            : <>No positioning source reported for this coin this cycle ({(c as any).proxies_covered ?? 0} of {(c as any).money_floor_required ?? 2} required).</>}
         </div>
       )}
 
@@ -201,7 +201,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
               </div>
             )
           })}
-          <div className="div-legend"><span style={{ color: MC.detection }}>●</span> money movement · <span style={{ color: MC.confidence }}>●</span> market confirmation · ✓ = scored vs own history</div>
+          <div className="div-legend"><span style={{ color: MC.detection }}>●</span> positioning · <span style={{ color: MC.confidence }}>●</span> market confirmation · ✓ = scored vs own history</div>
           {/* E1 composite disclosure (board D8 session, 2026-07-19) */}
           {(c as any).composite_note && <div className="disc" style={{ marginTop: 6 }}>{(c as any).composite_note}</div>}
         </div>
@@ -237,12 +237,56 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
         </div>
       </div>
 
-      <div className="disc"><b>What the Crypto signal measures:</b> The Crypto section tracks whether money is moving into or out of a coin. {MM_LABEL} “D” = informed / early money via crypto-exposure proxies (spot-ETF 13F + MSTR / COIN insider). {MC_LABEL} “M” = the coin's own price / volume confirmation. The flow (IN/OUT) is a measurement; whether an early read led realized price is recorded, after the fact, in the crypto accuracy ledger. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</div>
+      {/* Chairman order 2026-09-14: side-panel explainers. (1) What Positioning vs Price is
+          and how it DIFFERS from the Positioning gauge and Market Confirmation; (2) what Tier
+          means. Wording is measurement-only and respects the sealed prereg §1 forbidden-words
+          rule for the divergence rendering. Tier thresholds mirror the engine's MARKET_LEVELS
+          exactly (ELEVATED ≥80 · ACTIVE ≥60 · MODERATE ≥40 · ROUTINE ≥25 · DORMANT). */}
+      <div className="sect">
+        <h4>About Positioning vs Price</h4>
+        <div className="narr" style={{ background: 'transparent', padding: 0 }}>
+          <b>Positioning vs Price</b> (the table column) is a signed reading built from exchange
+          open-interest counts: how much leveraged futures positioning changed over 7 days
+          <i> beyond what the coin's own price move explains</i>. Positive = positions building
+          faster than price explains; negative = positions closing faster than price explains.
+          It is always stated as arithmetic (e.g. "open interest +4% while price −2% over 7 days").
+          <div style={{ marginTop: 6 }}>
+            <b>How the three readings differ:</b> the <b>{MM_LABEL}</b> gauge (D) reads <i>who holds
+            exposure</i> — holdings via crypto-exposure proxies (spot-ETF 13F + insider filings).
+            <b> Positioning vs Price</b> reads <i>how fast leverage is being added or removed</i> relative
+            to price. <b>{MC_LABEL}</b> (M) is the coin's <i>own price / volume</i> behavior against its
+            baseline. Three different questions; none is a forecast or advice.
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <b>Why it reads NOT MEASURED:</b> the value displays only after its source rights are
+            cleared, its instrument audits pass, and enough post-seal daily history accrues per
+            coin (~6 months; accruing since 2026-08-10). Until then no number is shown — an
+            unmeasured reading is never rendered as a zero.
+          </div>
+        </div>
+      </div>
+
+      <div className="sect">
+        <h4>About Tier</h4>
+        <div className="narr" style={{ background: 'transparent', padding: 0 }}>
+          <b>Tier</b> is a neutral intensity label — the average of the two gauges ({MM_LABEL} D and
+          {' '}{MC_LABEL} M, each 0–100) mapped to a band: <b>ELEVATED</b> ≥80 · <b>ACTIVE</b> ≥60 ·
+          {' '}<b>MODERATE</b> ≥40 · <b>ROUTINE</b> ≥25 · <b>DORMANT</b> &lt;25. It describes how much is
+          happening versus the coin's own baseline — it is not a rating, a ranking, or advice.
+          <div style={{ marginTop: 6 }}>
+            <b>NOT MEASURED is not a tier.</b> When either input is absent (the panel states which
+            case applies), no tier is computed — the chip shows the absence honestly instead of a
+            number. Coins with limited history read "calibrating" until their baseline accumulates.
+          </div>
+        </div>
+      </div>
+
+      <div className="disc"><b>What the Crypto signal measures:</b> The Crypto section tracks the direction of informed positioning in a coin. {MM_LABEL} “D” = holdings via crypto-exposure proxies (spot-ETF 13F + MSTR / COIN insider filings). {MC_LABEL} “M” = the coin's own price / volume confirmation. The flow (IN/OUT) is a measurement; whether an early read led realized price is recorded, after the fact, in the crypto accuracy ledger. Be advised that this summary may be inaccurate and is not intended to be financial, legal or investment advice.</div>
     </aside>
   )
 }
 
-// DIRECTION (flow) axis — net money-flow via crypto-exposure proxies (a measurement, not advice).
+// DIRECTION (flow) axis — net direction of informed proxy positioning (a measurement, not advice).
 // Neutral covers anything without a clear in/out read (neutral, divergent, or unknown).
 const CRYPTO_DIR_FILTERS: { k: string; label: string; test: (c: CryptoCoin) => boolean }[] = [
   { k: 'all', label: 'All', test: () => true },
@@ -298,11 +342,11 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
           <div className="main-sub">
             {allMoneyAbsent
               ? <>Crypto <b>Market Confirmation</b> — this view shows each coin's own price
-                confirmation only. It does <b>not</b> include a money read: for most of these
+                confirmation only. It does <b>not</b> include a positioning read: for most of these
                 coins the available sources <b>cannot</b> produce one (a limit of the sources,
-                not a temporary gap); for the rest, no money-positioning source reported this
+                not a temporary gap); for the rest, no positioning source reported this
                 cycle. Each coin's panel states which case applies. Measurement, not advice.</>
-              : <>Crypto <b>Money Gradient</b> — Money Movement (informed money via crypto-exposure proxies)
+              : <>Crypto signal — Positioning (informed positioning via crypto-exposure proxies)
                 vs Market Confirmation (the coin's own price). Measurement, not advice.</>}
           </div>
         </div>
@@ -310,27 +354,27 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
           <span className="chip-label">Direction</span>
           {CRYPTO_DIR_FILTERS.map((f) => (
             <div key={f.k} className={'chip' + (dirFilter === f.k ? ' active' : '')} onClick={() => setDirFilter(f.k)}
-                 title="Net money-flow via crypto-exposure proxies: Inflow = informed buying · Outflow = selling · Neutral = no clear net direction">{f.label}</div>
+                 title="Net direction of informed proxy positioning: Inflow = informed buying · Outflow = selling · Neutral = no clear net direction">{f.label}</div>
           ))}
         </div>
       </div>
 
       {anyCalibrating && feed?.available && (
         <div className="cal-banner">
-          ◷ Crypto Money Gradient is <b>baseline-relative</b>. Coins with limited history read “calibrating” —
+          ◷ The Crypto signal is <b>baseline-relative</b>. Coins with limited history read “calibrating” —
           tiers settle as each coin's baseline accumulates over the coming cycles. Measurement only — not advice.
         </div>
       )}
 
       <div className="grid-wrap">
         {!feed && !err ? (
-          <div className="center-state"><div className="spinner" />Loading the crypto money gradient…</div>
+          <div className="center-state"><div className="spinner" />Loading the crypto signal…</div>
         ) : err ? (
           <div className="center-state">Couldn't load the crypto feed.<div className="muted">{err}</div></div>
         ) : feed && !feed.available ? (
-          <div className="center-state">Crypto Money Gradient is in pre-release research — not yet live.<div className="muted">{feed.note || ''}</div></div>
+          <div className="center-state">The Crypto signal is in pre-release research — not yet live.<div className="muted">{feed.note || ''}</div></div>
         ) : feed?.status === 'warming' ? (
-          <div className="center-state"><div className="spinner" />Warming the crypto money gradient…<div className="muted">Loading the roster — one moment.</div></div>
+          <div className="center-state"><div className="spinner" />Warming the crypto signal…<div className="muted">Loading the roster — one moment.</div></div>
         ) : coins.length === 0 ? (
           <div className="center-state">No coins in the feed yet.</div>
         ) : (
