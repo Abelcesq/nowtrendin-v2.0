@@ -41,13 +41,42 @@ cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owe
   one-time `HEROKU_API_KEY` repo secret. Removes the laptop as the deploy's single point of
   failure — the failure mode this three-week gap exposed.
 
-### Open / Next (unchanged except as noted)
-- **Deploy** (top owed): add `HEROKU_API_KEY` secret → merge `claude/resume-kp9t5p` + this
-  branch to main → workflow deploys → verify `/health`, a topic-detail D block, `/monitor`.
-- Then: 503 evidence capture (before the deploy if possible); Sept-1 board-round session
-  review; PII history purge/acceptance + fork + Drive copy (founder); rulings 6 → 5 → 9;
-  charter rows 17–24; walk `/monitor/deferred-triggers` (no reader since 08-24;
-  FMP re-eval 09-05 passed unread; D-REMINE due 09-30).
+### Addendum (same session, later) — THE OWED DEPLOY IS DONE; skills restored to the repo; data-continuity read
+- **✅ ENGINE DEPLOYED 2026-09-14 00:46 UTC** — founder authorized the merge; main fast-forwarded
+  `e1336be` → `167d849`; the new GitHub Actions workflow ran end-to-end on its FIRST run
+  (`HEROKU_API_KEY` was in place): test gate green, subtree pushed, **release phase ran
+  `maint_precompute.py` → `serve_payloads written: 600 (schema 2026-08-24.1)`, swap
+  transactional** — the exact line the 08-24 handoff said to watch for. Rounds 4/5/6/8 fixes,
+  4c tri-state, 2c release phase, and ruling-7's `payload_contradiction_auditor` are ON THE
+  WIRE. Ledger rows 2c/4c/7 updated. **Still owed: the re-probe** (founder browser: a stale
+  topic's D block coherent; `/monitor` shows the auditor's dated probe row). `[payload-rebuilt]`
+  marker now retired per 2c.
+- **SKILLS MYSTERY SOLVED + FIXED:** the `/nowtrendin2.0`, `/advisory-board` etc. skills never
+  appeared in cloud sessions because they lived ONLY in `C:\Users\acinv\.claude\skills\` —
+  `docs/skills/` held backups but Claude Code doesn't load from there. All 21 backups are now
+  INSTALLED at `.claude/skills/<name>/SKILL.md` (repo-tracked → every machine + cloud), plus
+  two skills that had NO backup were rebuilt from this log: `/engine-recovery` (from the
+  07-06 post-mortem) and `/improve-system` (from audits/improve-system/README). Roster in
+  `/nowtrendin2.0` updated (23 skills); `docs/skills/` stays the flat backup mirror.
+- **DATA CONTINUITY over the 3-week absence (evidence, not assumption):** the engine runs on
+  Heroku with its own in-app scheduler — the laptop being OFF stops nothing. Verified signals
+  that collection continued: (1) founder's Apify billing shows DAILY paid usage 09-01→09-14
+  (~$2.3–3.1/day — the 4×/day realtime Trends cadence pattern); (2) today's release-phase
+  precompute read live Postgres and wrote 600 topic payloads — DB up and populated;
+  (3) routine maintenance ran in the same release (`anomaly_log` pruned 542). Retention math:
+  `velocity_scores` 365d + `SIGNAL_RETENTION_DAYS=30` (round 5, floor-sealed) → even the
+  oldest vacation-window rows are still inside retention. Per-collector confirmation
+  (token expiries, X budget, GDELT etc.) still needs the founder's browser: `/monitor`,
+  `/health/collectors`, `/usage`, `/x/budget`, `/accuracy/ledger`.
+
+### Open / Next
+- **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
+  deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +
+  a topic-detail D block; paste outputs into a session to close 4c/7 verification.
+- Sept-1 board-round session review (fired, SUCCEEDED, pushed nothing — open its session
+  from the claude.ai Routines run history); PII history purge/acceptance + fork + Drive copy
+  (founder); rulings 6 → 5 → 9; charter rows 17–24; walk `/monitor/deferred-triggers`
+  (no reader since 08-24; FMP re-eval 09-05 passed unread; D-REMINE due 09-30).
 
 ---
 
