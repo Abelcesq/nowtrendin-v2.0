@@ -1,4 +1,5 @@
-import { titleCaseTopic } from "../../../lib/signals";
+import { titleCaseTopic, signedLabel } from "../../../lib/signals";
+import { NotMeasuredChip } from '../../../components/ui/NotMeasuredChip';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Globe, Clock, Info, Activity, Play } from 'lucide-react-native';
@@ -38,10 +39,12 @@ const MARKET_TIER_COLOR: Record<string, string> = {
   ELEVATED: '#B11226', ACTIVE: '#A8456A', MODERATE: '#A8456A', BUILDING: '#A8456A',
   ROUTINE: '#2A5B9E', DORMANT: '#9A9AA2',
 };
+// Engine MARKET_LEVELS: ELEVATED / ACTIVE / MODERATE / ROUTINE / DORMANT
+// (BUILDING→MODERATE rename shipped 2026-06-26; this legend was missed — D-M8).
 const MARKET_TIERS = [
   { key: 'ELEVATED', range: '80–100', desc: 'Strongly elevated positioning' },
   { key: 'ACTIVE',   range: '60–79',  desc: 'Clearly above routine' },
-  { key: 'BUILDING', range: '40–59',  desc: 'Building, not yet elevated' },
+  { key: 'MODERATE', range: '40–59',  desc: 'Above routine, not yet elevated' },
   { key: 'ROUTINE',  range: '25–39',  desc: 'In line with own baseline' },
   { key: 'DORMANT',  range: '0–24',   desc: 'Quiet vs baseline' },
 ];
@@ -87,9 +90,12 @@ export default function RiskDetail() {
     <Screen scroll>
       {(() => {
         const mg = risk.marketGradient;
-        const tier = mg?.tier ?? 'DORMANT';
-        const tierCol = MARKET_TIER_COLOR[tier] ?? '#9A9AA2';
-        const gap = mg ? Math.round(Math.abs(mg.gap)) : 0;
+        // C1/K1: a missing tier is ABSENCE — never defaulted to DORMANT (a
+        // measured band). It renders the hollow NOT MEASURED chip below.
+        const tier = mg?.tier;
+        const tierCol = tier ? (MARKET_TIER_COLOR[tier] ?? '#9A9AA2') : '#9A9AA2';
+        // K17: the gap is SIGNED (detection − confidence); print the sign.
+        const gap = mg ? Math.round(mg.gap) : 0;
         const v2 = !!(mg && (mg.modelVersion || mg.flow));
         const flowMeta = mg?.flow === 'inflow' ? { t: '▲ inflow', c: '#2E7D5B' }
           : mg?.flow === 'outflow' ? { t: '▼ outflow', c: '#B11226' }
@@ -106,7 +112,7 @@ export default function RiskDetail() {
               <Activity size={22} color={tierCol} />
               <Text className="text-textPrimary text-3xl font-bold flex-1">{titleCaseTopic(risk.display)}</Text>
             </View>
-            <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {tier}</Text>
+            <Text className="text-textMuted text-sm mb-4">{risk.totalSignals} signals · {tier ?? 'NOT MEASURED'}</Text>
 
             {/* Legal disclaimer — top of the panel (founder rule: top AND bottom) */}
             <Disclaimer className="mt-0 mb-3 px-0 text-left" />
@@ -117,9 +123,13 @@ export default function RiskDetail() {
                 {/* Company / item name above the tier badge + scores */}
                 <Text className="text-textPrimary text-lg font-black text-center mb-1">{titleCaseTopic(risk.display)}</Text>
                 <View className="self-center flex-row items-center gap-1.5 mb-3">
-                  <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tierCol}1A` }}>
-                    <Text style={{ color: tierCol }} className="text-[12px] font-bold tracking-wide">{tier}</Text>
-                  </View>
+                  {tier ? (
+                    <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${tierCol}1A` }}>
+                      <Text style={{ color: tierCol }} className="text-[12px] font-bold tracking-wide">{tier}</Text>
+                    </View>
+                  ) : (
+                    <NotMeasuredChip />
+                  )}
                   {v2 && flowMeta && (
                     <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${flowMeta.c}1A` }}>
                       <Text style={{ color: flowMeta.c }} className="text-[12px] font-bold tracking-wide">{flowMeta.t}</Text>
@@ -145,10 +155,13 @@ export default function RiskDetail() {
                   </View>
                 </View>
                 <View className="rounded-xl px-3 py-2 mt-4" style={{ borderColor: `${tierCol}55`, backgroundColor: `${tierCol}10` }}>
+                  {/* K17: signed gap printed ONCE, gapState as the label (the old
+                      form double-printed "12-pt gap · 12-pt gap" when gapState
+                      was absent, and Math.abs hid which score led). */}
                   <Text className="text-sm font-bold" style={{ color: tierCol }}>
                     {(mg as any).moneyDataAbsent ? 'MARKET-CONFIRMATION ONLY'
-                      : mg.calibrating ? 'CALIBRATING' : (mg.gapState || `${gap}-pt gap`)}
-                    {!(mg as any).moneyDataAbsent && !mg.calibrating && ` · ${gap}-pt gap`}
+                      : mg.calibrating ? 'CALIBRATING'
+                      : `${mg.gapState ? `${mg.gapState} · ` : ''}${signedLabel(gap)}-pt gap`}
                   </Text>
                   {!!mg.interpretation && (
                     <Text className="text-textSecondary text-[14px] leading-5 mt-1">{mg.interpretation}</Text>
@@ -157,10 +170,18 @@ export default function RiskDetail() {
               </View>
             ) : (
               // Fallback: items without a market gradient yet show baseline only.
+              // C1: a MISSING positioning score renders an absence state, never a
+              // measured-looking 0 ring (N-M2).
               <View className="bg-card rounded-2xl p-5 mb-2 items-center">
-                <GradientScoreRing score={risk.positioningScore ?? 0} color={tierCol} size="lg" caption="/100" />
+                {risk.positioningScore != null ? (
+                  <GradientScoreRing score={risk.positioningScore} color={tierCol} size="lg" caption="/100" />
+                ) : (
+                  <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text className="text-textMuted text-3xl font-black">—</Text>
+                  </View>
+                )}
                 <Text className="text-textPrimary text-xs font-bold mt-2">POSITIONING</Text>
-                <Text className="text-textMuted text-[12px]">{risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}</Text>
+                <Text className="text-textMuted text-[12px]">{risk.positioningScore == null ? 'not measured' : risk.percentDelta != null ? `${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}% vs baseline` : 'baseline building'}</Text>
               </View>
             )}
             <Text className="text-textMuted text-[12px] mb-4">

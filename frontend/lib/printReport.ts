@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { Signal, scoreGap, contentCategoryMeta } from './signals';
+import { Signal, signedGap, signedLabel, contentCategoryMeta } from './signals';
 
 /**
  * Print / export-to-PDF the FULL scored list as a clean report.
@@ -30,7 +30,8 @@ export function printSignalsReport(
   const rows = signals
     .map((s, i) => {
       const cat = contentCategoryMeta(s.category);
-      const gap = scoreGap(s);
+      // K17: print the SIGNED gap (negative = confidence ahead).
+      const gap = signedLabel(signedGap(s));
       const platforms = (s.platforms ?? []).join(', ') || '—';
       return `<tr>
         <td class="num">${i + 1}</td>

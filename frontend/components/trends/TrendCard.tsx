@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, LayoutAnimation, Platform, UIManager } fr
 import { useRouter } from 'expo-router';
 import { ChevronDown, ArrowRight } from 'lucide-react-native';
 import { Rise } from '../ui/Rise';
-import { Signal, ageLabel, stageColor, stageLabel, scoreGap, gapInsight, contentCategoryMeta, titleCaseTopic } from '../../lib/signals';
+import { Signal, ageLabel, stageColor, stageLabel, signedGap, signedLabel, gapInsight, contentCategoryMeta, titleCaseTopic } from '../../lib/signals';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -31,7 +31,9 @@ export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: num
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const stageCol = stageColor(signal.stage);
-  const gap = scoreGap(signal);
+  // K17: the gap is SIGNED — negative = confidence ahead. The sign prints and
+  // selects the insight sentence; it is never dropped via Math.abs for display.
+  const gap = signedGap(signal);
   const insight = gapInsight(gap);
   const platform = signal.platforms?.[0] ?? 'Multi-Platform';
   const cat = contentCategoryMeta(signal.category);
@@ -98,7 +100,7 @@ export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: num
               </View>
               <View style={{ marginLeft: 'auto', alignItems: 'flex-end' }}>
                 <Text style={metaLabel}>GAP</Text>
-                <Text style={[metaNum, { color: '#B11226' }]}>{gap}</Text>
+                <Text style={[metaNum, { color: '#B11226' }]}>{signedLabel(gap)}</Text>
               </View>
             </View>
 
@@ -111,7 +113,7 @@ export function TrendCard({ signal, rank, metric }: { signal: Signal; rank?: num
             </View>
 
             <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginBottom: 10 }}>
-              {gap}-point gap: {insight.text}
+              {signedLabel(gap)}-point gap: {insight.text}
             </Text>
             <Text style={{ color: '#9A9AA2', fontSize: 12, lineHeight: 19, fontWeight: '500', marginBottom: 16 }}>
               Category: {cat.label} · Stage: {stageLabel(signal.stage)}

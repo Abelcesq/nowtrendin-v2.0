@@ -141,7 +141,7 @@ export default function AccuracyLedger() {
       </View>
       <Text className="text-textMuted text-sm mb-4 leading-5">
         {priceMode
-          ? `A separate ledger: ${mode === 'crypto' ? 'crypto money-movement reads validated against realized coin price direction' : 'money-movement reads validated against realized end-of-day price direction'} — a retrospective measurement, not a forecast.`
+          ? `A separate ledger: ${mode === 'crypto' ? 'crypto positioning reads validated against realized coin price direction' : 'money-movement reads validated against realized end-of-day price direction'} — a retrospective measurement, not a forecast.`
           : 'Documented lead time — how many days Now TrendIn detected a topic before it broke out on Google Trends. The auditable proof that the Gradient Score leads Google Trends attention.'}
       </Text>
 

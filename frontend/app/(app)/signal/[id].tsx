@@ -17,7 +17,7 @@ import { MethodologyExplainer } from '../../../components/trends/MethodologyExpl
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
 import { useSignal, useSignals } from '../../../hooks/useSignals';
-import { ageLabel, stageColor, stageLabel, scoreGap, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex, titleCaseTopic } from '../../../lib/signals';
+import { ageLabel, stageColor, stageLabel, scoreGap, signedGap, signedLabel, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex, titleCaseTopic } from '../../../lib/signals';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -92,7 +92,10 @@ export default function SignalDetail() {
   }
 
   const color = stageColor(signal.stage);
+  // K17: gap magnitude bands; the SIGNED gap prints and selects the sentence
+  // (negative = confidence ahead — never captioned "confirmation building").
   const gap = scoreGap(signal);
+  const sg = signedGap(signal);
   const action = actionFor(signal);
   const groups = breakdownGroups(signal);
   const agree = gapBandIndex(gap) === 0;
@@ -145,8 +148,12 @@ export default function SignalDetail() {
           </View>
         </View>
         <View className="rounded-2xl px-4 py-3 mt-5" style={{ backgroundColor: agree ? '#2E7D5B0F' : '#B112260D' }}>
-          <Text style={{ color: agree ? '#246B4A' : '#B11226', fontSize: 14, fontWeight: '800' }}>
-            {gap}-point gap — {agree ? `scores aligned at ${stageLabel(signal.stage)}` : 'early stage, confirmation building'}
+          <Text style={{ color: agree ? '#246B4A' : sg > 0 ? '#B11226' : '#3C4663', fontSize: 14, fontWeight: '800' }}>
+            {signedLabel(sg)}-point gap — {agree
+              ? `scores aligned at ${stageLabel(signal.stage)}`
+              : sg > 0
+              ? 'early stage, confirmation building'
+              : 'confirmation ahead — already broadly confirmed'}
           </Text>
           <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 20, marginTop: 6, fontWeight: '500' }}>
             {action.title}{action.body ? ` ${action.body}` : ''}

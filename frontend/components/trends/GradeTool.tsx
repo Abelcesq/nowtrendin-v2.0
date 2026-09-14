@@ -213,8 +213,15 @@ function GradeList({ kind }: { kind: 'history' | 'graded' }) {
 }
 
 function ProposedCard({ result }: { result: Proposed }) {
-  const gap = Math.abs(Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score)));
-  const band = GAP_BANDS[gapBandIndex(gap)];
+  // K17: the gap is SIGNED (negative = confidence ahead). Math.abs only bands
+  // the magnitude; the abs value must never index a direction-asserting band
+  // label for a lagging topic — that captioned conf≫det as "Very early".
+  const sgap = Math.round(result.heisenberg_gap ?? (result.detection_score - result.confidence_score));
+  const gap = Math.abs(sgap);
+  const lagging = sgap < -15;
+  const band = lagging
+    ? { color: '#8A8F9C', label: 'Confidence ahead — already broadly confirmed, not an early read' }
+    : GAP_BANDS[gapBandIndex(gap)];
   const ms = result.market_signal?.market_gradient;
   // Grade Agent: measured (already in our data pool) vs AI-proposed; live N score.
   const measured = (result as any).source === 'measured';
@@ -280,7 +287,7 @@ function ProposedCard({ result }: { result: Proposed }) {
         </View>
       </View>
       <View className="rounded-xl px-3 py-2 mb-3" style={{ borderColor: `${band.color}55`, backgroundColor: `${band.color}0F` }}>
-        <Text className="text-sm font-bold" style={{ color: band.color }}>{gap}-point gap — {band.label}</Text>
+        <Text className="text-sm font-bold" style={{ color: band.color }}>{sgap > 0 ? `+${sgap}` : sgap}-point gap — {band.label}</Text>
       </View>
       {!!result.action && <Text className="text-base font-black mb-1" style={{ color: STAGE_COLOR[result.stage] ?? '#16264A' }}>{result.action}</Text>}
       {!!result.reasoning && <Text className="text-textSecondary text-[14px] leading-5 mb-3">{result.reasoning}</Text>}

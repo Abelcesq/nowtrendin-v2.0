@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Signal, scoreGap, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../../lib/signals';
+import { Signal, scoreGap, signedGap, signedLabel, GAP_BANDS, gapBandIndex, SCORE_ROLES } from '../../lib/signals';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -12,9 +12,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 // Mirrors the web prototype's "Dual Score Analysis" panel.
 export function DualScoreAnalysis({ signal }: { signal: Signal }) {
+  // K17: the magnitude bands; the SIGN selects the sentence. The GAP_BANDS
+  // labels beyond the aligned band assert a DETECTION lead ("early", "detected,
+  // not confirmed"), so a negative gap outside the aligned band must never be
+  // banded onto them — it gets its own lagging read and highlights no band.
   const gap = scoreGap(signal);
-  const activeIdx = gapBandIndex(gap);
-  const band = GAP_BANDS[activeIdx];
+  const sg = signedGap(signal);
+  const lagging = sg < -15;
+  const activeIdx = lagging ? -1 : gapBandIndex(gap);
+  const band = lagging
+    ? { color: '#8A8F9C', label: 'Confidence ahead — already broadly confirmed' }
+    : GAP_BANDS[gapBandIndex(gap)];
 
   return (
     <View>
@@ -52,7 +60,7 @@ export function DualScoreAnalysis({ signal }: { signal: Signal }) {
           style={{ borderColor: `${band.color}66`, backgroundColor: `${band.color}12` }}
         >
           <Text className="text-xs font-bold" style={{ color: band.color }}>
-            This signal: {gap}-point gap — {band.label.split(' — ')[0]}
+            This signal: {signedLabel(sg)}-point gap — {band.label.split(' — ')[0]}
           </Text>
         </View>
       </View>

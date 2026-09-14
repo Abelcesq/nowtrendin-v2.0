@@ -85,8 +85,10 @@ export function mapSignal(r: any): Signal {
     overall: r.overall_score != null ? Math.round(Number(r.overall_score)) : undefined,
     // Gap is the difference of the displayed (rounded) scores so it always
     // reconciles with DET/CONF. (The engine's stored heisenberg_gap can be
-    // stale relative to floored/calibrated scores.)
-    gap: Math.abs(det - conf),
+    // stale relative to floored/calibrated scores.) K17: SIGNED — negative =
+    // confidence ahead of detection. Band/thresholds take Math.abs downstream
+    // (lib/signals scoreGap); display prints the sign.
+    gap: det - conf,
     gapMeaning: r.gap_meaning || r.gap_label || undefined,
     whatToDo: r.what_to_do_action
       ? {
@@ -299,7 +301,7 @@ export interface RiskScore {
   marketGradient?: {
     detection: number;             // leading/soft: analyst + positioning + dark
     confidence: number;            // lagging/hard: fundamentals + momentum
-    tier: string;                  // ELEVATED | ACTIVE | BUILDING | ROUTINE | DORMANT
+    tier?: string;                 // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT — undefined = not measured (never fabricated)
     gap: number;                   // detection − confidence
     gapState?: string;             // EARLY | CONFIRMING | CONFIRMED | ROUTINE | LAGGING | MIXED | CALIBRATING
     calibrating?: boolean;
@@ -498,7 +500,9 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     marketGradient: r.market_gradient ? {
       detection: Number(r.market_gradient.detection ?? 0),
       confidence: Number(r.market_gradient.confidence ?? 0),
-      tier: r.market_gradient.tier || 'DORMANT',
+      // C1/K1 honest absence: a missing tier is ABSENCE, never defaulted to a
+      // measured band (DORMANT is a measurement; absence is not).
+      tier: r.market_gradient.tier || undefined,
       gap: Number(r.market_gradient.gap ?? 0),
       gapState: r.market_gradient.gap_state || undefined,
       calibrating: Boolean(r.market_gradient.calibrating),
@@ -934,7 +938,10 @@ export async function fetchSignalAnalysis(
   }
 }
 
-// ── Crypto Money Gradient (/crypto) — WEB PARITY ────────────────────────────
+// ── Crypto signal (/crypto) — WEB PARITY ────────────────────────────────────
+// Chairman 2026-09-14: "Money Movement" retired from ALL visible crypto copy —
+// client-facing name is "Positioning". Engine FIELD names (money_movement,
+// money_data_absent) are unchanged; only the display vocabulary changed.
 // The engine serves /crypto from the prewarm cache; on a cold boot it returns
 // status:'warming' with an empty roster until the prewarm fills it (the caller
 // polls, same as the web). Roster order is the engine's — do NOT re-sort
@@ -942,11 +949,13 @@ export async function fetchSignalAnalysis(
 export interface CryptoCoin {
   coin: string;                    // ticker, e.g. BTC
   name: string;                    // display name, e.g. Bitcoin
-  moneyMovement: number | null;    // D — informed money via crypto-exposure proxies (null when absent)
-  moneyDataAbsent?: boolean;       // D8: no proxy money data → render Market-Confirmation-only
+  moneyMovement: number | null;    // D — the Positioning read (informed proxies); null when absent
+  moneyDataAbsent?: boolean;       // D8: no qualifying positioning source → render Market-Confirmation-only
   marketConfirmation: number;      // M — the coin's own price/volume confirmation
-  lead: number | null;             // MM − MC (the web table's LEAD column)
-  tier: string;                    // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT | ABSENT
+  lead: number | null;             // D − M (the web table's LEAD column; SIGNED)
+  tier?: string;                   // ELEVATED | ACTIVE | MODERATE | ROUTINE | DORMANT | ABSENT — undefined = not measured
+  // C1: the structural/transient absence split the engine serves (absence_class).
+  absenceClass?: string;           // 'structural' (source limit) | 'transient' (none this cycle)
   flow?: string;                   // inflow | outflow | neutral | divergent
   calibrating?: boolean;
   interpretation?: string;
@@ -974,7 +983,11 @@ export async function fetchCrypto(): Promise<CryptoFeed> {
       ? null : Math.round(Number(c.money_movement ?? c.detection ?? 0)),
     marketConfirmation: Number(c.market_confirmation ?? c.confidence ?? 0),
     lead: (c.money_data_absent || c.gap == null) ? null : Number(c.gap),
-    tier: c.tier ?? 'ROUTINE',
+    // C1/K1 honest absence: never fabricate a measured tier for a missing one
+    // (the old `?? 'ROUTINE'` dressed absence as a measured band). Absence
+    // propagates as undefined/ABSENT and renders as a hollow NOT MEASURED chip.
+    tier: c.tier || undefined,
+    absenceClass: c.absence_class || undefined,
     flow: c.flow || undefined,
     calibrating: !!c.calibrating,
     interpretation: c.interpretation || undefined,

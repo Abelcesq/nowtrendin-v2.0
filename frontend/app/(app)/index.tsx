@@ -121,6 +121,9 @@ export default function Dashboard() {
       : cryptoDir === 'inflow' ? c.flow === 'inflow'
       : cryptoDir === 'outflow' ? c.flow === 'outflow'
       : c.flow !== 'inflow' && c.flow !== 'outflow');
+  // D8/web parity: when every coin's positioning read is absent, the section is
+  // market-confirmation-only — never headline a positioning read with zero data.
+  const allMoneyAbsent = coins.length > 0 && coins.every((c) => c.moneyDataAbsent);
 
   const firstName = (user?.name ?? 'there').split(' ')[0];
   const hour = new Date().getHours();
@@ -347,9 +350,12 @@ export default function Dashboard() {
 
         {mode === 'crypto' && (
           <>
-            {/* Minimalist intro — the web Crypto page's header line. */}
+            {/* Minimalist intro — the web Crypto page's header line (Chairman
+                2026-09-14: "Money Movement" retired from visible crypto copy). */}
             <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500', marginTop: 18 }}>
-              The Crypto Money Gradient — Money Movement (informed money via crypto-exposure proxies) vs Market Confirmation (the coin's own price). Measurement, not advice.
+              {allMoneyAbsent
+                ? "Crypto Market Confirmation — this view shows each coin's own price confirmation only. It does not include a positioning read: for most of these coins the available sources cannot produce one (a limit of the sources, not a temporary gap); for the rest, no positioning source reported this cycle. Each coin's panel states which case applies. Measurement, not advice."
+                : "Crypto signal — Positioning (informed positioning via crypto-exposure proxies) vs Market Confirmation (the coin's own price). Measurement, not advice."}
             </Text>
 
             {/* DIRECTION chips — same single axis as the web Crypto page. */}

@@ -84,7 +84,7 @@ export interface Signal {
   firstSeenAt?: number; // epoch ms — earliest score time (for tier data-aging)
   // Rich fields (present for live engine data; optional for mock)
   overall?: number;
-  gap?: number;
+  gap?: number;              // SIGNED det − conf (K17: negative = confidence ahead)
   gapMeaning?: string;
   whatToDo?: WhatToDo;
   why?: string;
@@ -415,10 +415,14 @@ export function gapBandIndex(gap: number): number {
 // as GAP_BANDS so the headline can never contradict the interpretation table.
 // "Agree" means the two scores are aligned (not in conflict) — NOT that the
 // signal is strong; a low-but-aligned signal is agreement that it's early.
+// K17: takes the SIGNED gap — a negative gap (confidence ahead) must never get
+// the "confirmation building" (detection-leading) sentence.
 export function gapInsight(gap: number): { text: string; agree: boolean } {
-  return gap <= 15
-    ? { text: 'Scores aligned — agreement on where this sits, not that it’s strong', agree: true }
-    : { text: 'Confirmation building — the gap typically narrows as confirmation accumulates', agree: false };
+  if (Math.abs(gap) <= 15)
+    return { text: 'Scores aligned — agreement on where this sits, not that it’s strong', agree: true };
+  return gap > 0
+    ? { text: 'Confirmation building — the gap typically narrows as confirmation accumulates', agree: false }
+    : { text: 'Confirmation ahead — broad confirmation already exceeds the early-edge read', agree: false };
 }
 
 const MIN = 60 * 1000;
@@ -533,8 +537,20 @@ export function titleCaseTopic(s?: string): string {
     .join('');
 }
 
+// K17 (all-pages audit 2026-09-14): the sign of the gap is data — a −18 (confidence
+// ahead / lagging) is a different fact from +18 (detection leading). `signedGap` is
+// the value to PRINT (with an explicit +/−); `scoreGap` is the MAGNITUDE, for
+// banding/thresholds ONLY — never let an abs value select a direction-asserting
+// sentence.
+export function signedGap(s: Signal): number {
+  return s.gap ?? (s.detection - s.confidence);
+}
 export function scoreGap(s: Signal): number {
-  return s.gap ?? Math.abs(s.detection - s.confidence);
+  return Math.abs(signedGap(s));
+}
+// Explicit-sign print for gap/lead values (zero prints unsigned).
+export function signedLabel(v: number): string {
+  return v > 0 ? `+${v}` : `${v}`;
 }
 
 // Descriptive "signal read" per stage — analysis only, no action guidance.

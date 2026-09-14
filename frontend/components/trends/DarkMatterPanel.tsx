@@ -50,11 +50,16 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
   // measure, it rendered "First-Timer Ratio 0%" beside copy asserting the number means
   // something — a floor value wearing a measured badge (§16a stage 2) and a
   // non-contributing input rendered as a value (§17). Absence is now shown as absence.
-  // `=== false` alone left the UNKNOWN case (pre-epoch rows, and INV-1 stale
-  // serve_payloads older than 48h) rendering a ratio again. Treat unknown as
-  // unmeasured when no ratio is present — never fall back to 0.
-  const dUnmeasured = signal.dMeasured === false
-    || (signal.dMeasured === undefined && signal.firstTimerRatio == null);
+  //
+  // 4c TRI-STATE (web parity, board round 5 / all-pages audit 2026-09-14): the
+  // ratio is a reading ONLY when dMeasured is affirmatively true. The old guard
+  // let the NULL/unknown stratum WITH a (stale) ratio present fall to the
+  // numeric branch. NULL → UNKNOWN (readability never recorded — missing
+  // metadata), false → UNMEASURED (looked, could not read) — two different
+  // facts, never pooled, never silently a number.
+  const dMeasuredTrue = signal.dMeasured === true;
+  const dUnknown = signal.dMeasured === undefined;
+  const dUnmeasured = !dMeasuredTrue;
   const ftr = signal.firstTimerRatio ?? 0;
   const ftrPct = Math.round(ftr * 100);
 
@@ -62,8 +67,10 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
     <View className="mb-5">
       <View className="flex-row items-center gap-2 mb-2">
         <Orbit size={16} color="#6B4FA0" />
+        {/* `dm ?? 0` was the same floor-wearing-a-measured-badge defect one
+            heading up: absence renders as absence, never "0/100". */}
         <Text className="text-textSecondary text-xs uppercase tracking-wider">
-          Under-the-Radar Signals · {dm ?? 0}/100
+          Under-the-Radar Signals{dm != null ? ` · ${dm}/100` : ''}
         </Text>
       </View>
       <View className="rounded-xl px-4 py-3 mb-3" style={{ borderColor: '#6B4FA033', backgroundColor: '#6B4FA008' }}>
@@ -75,8 +82,8 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
 
       <Indicator
         label="First-Timer Ratio"
-        value={dUnmeasured ? 'Unmeasured' : `${ftrPct}%`}
-        active={!dUnmeasured && ftr >= 0.35}
+        value={dUnknown ? 'Unknown' : dUnmeasured ? 'Unmeasured' : `${ftrPct}%`}
+        active={dMeasuredTrue && ftr >= 0.35}
         desc={
           // ORDER MATTERS, and it was wrong (Economist, board round 5). This ternary
           // tested `ftr >= 0.35` FIRST, so the unmeasured branch was only reachable when
@@ -86,9 +93,12 @@ export function DarkMatterPanel({ signal }: { signal: Signal }) {
           // private-channel activity inferred" on a topic we could not read at all.
           // The badge was guarded and the sentence was not; the sentence is the claim.
           //
-          // Unmeasurability is now checked BEFORE any threshold, so no arithmetic on a
-          // number we do not have can reach a user-facing assertion.
-          dUnmeasured
+          // Un-measurability (and the tri-state UNKNOWN stratum) is checked BEFORE any
+          // threshold, so no arithmetic on a number we do not have can reach a
+          // user-facing assertion.
+          dUnknown
+            ? `Scored before readability of this indicator was recorded — missing metadata, not a finding. No number is asserted for this topic.`
+            : dUnmeasured
             ? `The first-timer ratio could not be read for this topic — no author-bearing signals reached us. This is absence of measurement, not evidence that nothing is happening.`
             : ftr >= 0.35
             ? `${ftrPct}% of participants are new here — external traffic flowing in from a source we can't see. Threshold exceeded → private-channel activity inferred.`

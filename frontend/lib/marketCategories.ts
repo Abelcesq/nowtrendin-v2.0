@@ -146,4 +146,10 @@ export function getMarketCategory(key: string) {
 export const MARKET_TIER_COLOR: Record<string, string> = {
   ELEVATED: '#B11226', ACTIVE: '#A8456A', MODERATE: '#A8456A', BUILDING: '#A8456A',
   ROUTINE: '#2A5B9E', DORMANT: '#9A9AA2',
+  // C1: ABSENT is not a tier — it renders as a hollow (dashed, transparent)
+  // NOT MEASURED chip in muted ink, never a filled tier chip and never red.
+  ABSENT: '#9A9AA2',
 };
+
+// C1/K1 honest absence: an engine-served ABSENT tier, or no tier at all.
+export const isAbsentTier = (t?: string | null) => !t || String(t).toUpperCase() === 'ABSENT';

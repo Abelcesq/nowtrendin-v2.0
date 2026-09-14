@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { ChevronDown, ArrowRight } from 'lucide-react-native';
 import { Rise } from '../ui/Rise';
 import { CryptoCoin } from '../../lib/gradientApi';
-import { MARKET_TIER_COLOR } from '../../lib/marketCategories';
+import { MARKET_TIER_COLOR, isAbsentTier } from '../../lib/marketCategories';
+import { NotMeasuredChip, absentTierLabel } from '../ui/NotMeasuredChip';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -21,12 +22,16 @@ const FLOW_META: Record<string, { label: string; color: string }> = {
 };
 
 // Calm, tap-to-expand crypto row — mirrors RiskCard (WEB PARITY: the web
-// Crypto table's columns). Collapsed: name·ticker, tier + flow, Money
-// Movement. Expanded: Market Confirmation, Lead, price, interpretation.
+// Crypto table's columns). Collapsed: name·ticker, tier + flow, Positioning
+// (Chairman 2026-09-14: "Money Movement"/"MM" retired from visible crypto
+// copy). Expanded: Market Confirmation, Lead, price, interpretation.
 export function CryptoCard({ coin }: { coin: CryptoCoin }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const tierColor = MARKET_TIER_COLOR[coin.tier] ?? '#9A9AA2';
+  // C1/K1: an ABSENT/missing tier renders the hollow NOT MEASURED chip — never
+  // a filled tier in a measured color.
+  const tierAbsent = isAbsentTier(coin.tier);
+  const tierColor = !tierAbsent ? (MARKET_TIER_COLOR[coin.tier!] ?? '#9A9AA2') : '#9A9AA2';
   const flow = coin.flow ? (FLOW_META[coin.flow] ?? { label: `• ${coin.flow.toUpperCase()}`, color: '#9A9AA2' }) : null;
   const lead = coin.lead == null ? null : Math.round(coin.lead * 10) / 10;
 
@@ -49,15 +54,26 @@ export function CryptoCard({ coin }: { coin: CryptoCoin }) {
             <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>
               {coin.name} <Text style={{ color: '#9A9AA2', fontWeight: '600' }}>· {coin.coin}</Text>
             </Text>
-            <Text numberOfLines={1} style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
-              <Text style={{ color: tierColor }}>{coin.tier}</Text>
-              {flow ? <Text> · <Text style={{ color: flow.color }}>{flow.label}</Text></Text> : null}
-              {coin.calibrating ? ' · CALIBRATING' : ''}
-            </Text>
+            <View className="flex-row items-center flex-wrap" style={{ gap: 4, marginTop: 4 }}>
+              {tierAbsent ? (
+                <NotMeasuredChip label={absentTierLabel(coin.absenceClass)} />
+              ) : (
+                <Text style={{ color: tierColor, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>{coin.tier}</Text>
+              )}
+              {flow ? (
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
+                  · <Text style={{ color: flow.color }}>{flow.label}</Text>
+                </Text>
+              ) : null}
+              {coin.calibrating ? (
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>· CALIBRATING</Text>
+              ) : null}
+            </View>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{coin.moneyDataAbsent || coin.moneyMovement == null ? 'n/a' : coin.moneyMovement}</Text>
-            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>MM</Text>
+            {/* C1: absence renders as a dash, never a numeric floor value. */}
+            <Text style={{ color: coin.moneyDataAbsent || coin.moneyMovement == null ? '#9A9AA2' : '#16264A', fontSize: 22, fontWeight: '800', letterSpacing: -0.6, lineHeight: 24 }}>{coin.moneyDataAbsent || coin.moneyMovement == null ? '—' : coin.moneyMovement}</Text>
+            <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>POSITIONING</Text>
           </View>
           <ChevronDown size={18} color="#C7C7CE" style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         </View>
