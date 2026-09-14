@@ -20,7 +20,7 @@ SEALED pre-registration `audits/board/DIVERGENCE_PREREG_2026-09-14.md`:
               research prices. SPEC-DEVELOPMENT DATA (K16) — instrument preview
               only, never scored. NO outcome/ledger/forward join anywhere (SS8).
   Section 4 — EQUITY-FIRST (item 6, Chairman-ruled GO): the same SS2 residual at
-              SS7 cadence on FINRA short interest vs stooq prices, per
+              SS7 cadence on FINRA short interest vs FMP/stooq prices, per
               WATCHLIST_TICKERS. Research-only.
 
 HARD CONTRACT (prereg SS8):
@@ -39,7 +39,7 @@ CHECK fails.
 
 Env: DATABASE_URL (Heroku PG, used read-only; unset -> DB sections skip),
      OUT_DIR (default audits/divergence), FINRA_API_KEY (equity leg),
-     COINGECKO_PAUSE_S (default 2.5).
+     COINGECKO_PAUSE_S (default 15), FMP_API_KEY (primary equity research price).
 
 Research-only labeling: CoinGecko dailies and stooq EOD closes are RESEARCH
 PRICES, not the sealed price source; nothing here is scored, served, or enrolled.
@@ -76,8 +76,9 @@ COINGECKO_IDS = {  # roster order = coinapi_derivs.PERP_SYMBOLS roster (12 coins
     "AVAX": "avalanche-2", "LINK": "chainlink", "DOT": "polkadot",
     "LTC": "litecoin", "BCH": "bitcoin-cash",
 }
-CG_PAUSE_S = float(os.getenv("COINGECKO_PAUSE_S", "2.5"))
-RESEARCH_PRICE_CAVEAT = ("CoinGecko/stooq dailies are RESEARCH-ONLY prices, "
+CG_PAUSE_S = float(os.getenv("COINGECKO_PAUSE_S", "15"))
+CG_RETRY_S = float(os.getenv("COINGECKO_RETRY_S", "65"))  # public 429 window
+RESEARCH_PRICE_CAVEAT = ("CoinGecko/FMP/stooq dailies are RESEARCH-ONLY prices, "
                          "not the sealed price source.")
 
 # ------------------------------------------------------------------ SQL (SELECT only)
@@ -183,8 +184,21 @@ def _http_get(url: str, timeout: int = 60, headers: dict | None = None) -> bytes
     req = urllib.request.Request(url, headers=dict({"User-Agent":
         "nowtrendin-divergence-research/1.0 (read-only research; SS8 sealed)"},
         **(headers or {})))
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        # Self-diagnosing failures (2026-09-14 first run: a bare "HTTP 400"
+        # from Socrata left the cause untraceable from the sandbox) — attach
+        # the response body so the run's own output IS the diagnosis.
+        body = ""
+        try:
+            body = e.read().decode("utf-8", "replace")[:300]
+        except Exception:  # noqa: BLE001
+            pass
+        raise urllib.error.HTTPError(
+            e.url, e.code, f"{e.reason} — body: {body!r}", e.headers, None
+        ) from None
 
 
 # ------------------------------------------------------- core module + adapter
@@ -355,19 +369,35 @@ COT_FIELDS = ["report_date_as_yyyy_mm_dd", "contract_market_name",
 
 
 def _cot_fetch(needle: str) -> list:
-    rows, offset, limit = [], 0, 5000
-    while True:
-        qs = urllib.parse.urlencode({
-            "$select": ",".join(COT_FIELDS),
-            "$where": f"upper(contract_market_name) like '%{needle}%'",
-            "$order": "report_date_as_yyyy_mm_dd",
-            "$limit": str(limit), "$offset": str(offset),
-        })
-        page = json.loads(_http_get(f"{COT_BASE}?{qs}", timeout=90).decode("utf-8"))
-        rows.extend(page)
-        if len(page) < limit:
-            return rows
-        offset += limit
+    # First run (2026-09-14) got HTTP 400 with the body unread; the classic
+    # Socrata 400 on this family of CFTC datasets is a column-name mismatch,
+    # so try the TFF schema's two known market-name columns in order and let
+    # the (now body-carrying) HTTPError from the last attempt surface.
+    last_err = None
+    for name_col in ("contract_market_name", "market_and_exchange_names"):
+        select_fields = [name_col if f == "contract_market_name" else f
+                         for f in COT_FIELDS]
+        rows, offset, limit = [], 0, 5000
+        try:
+            while True:
+                qs = urllib.parse.urlencode({
+                    "$select": ",".join(select_fields),
+                    "$where": f"upper({name_col}) like '%{needle}%'",
+                    "$order": "report_date_as_yyyy_mm_dd",
+                    "$limit": str(limit), "$offset": str(offset),
+                })
+                page = json.loads(
+                    _http_get(f"{COT_BASE}?{qs}", timeout=90).decode("utf-8"))
+                for r0 in page:
+                    if name_col != "contract_market_name":
+                        r0["contract_market_name"] = r0.get(name_col, "")
+                rows.extend(page)
+                if len(page) < limit:
+                    return rows
+                offset += limit
+        except Exception as e:  # noqa: BLE001 — try the alternate column
+            last_err = e
+    raise last_err
 
 
 def section1_cot() -> dict:
@@ -490,7 +520,18 @@ def fetch_research_prices(coins: list) -> tuple:
         url = (f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart"
                f"?vs_currency=usd&days=60&interval=daily")
         try:
-            data = json.loads(_http_get(url, timeout=60).decode("utf-8"))
+            # First run: 6 of 12 coins 429'd at 2.5s pacing (public CG limit
+            # is ~5-15 req/min) — retry with a long backoff instead of losing
+            # the leg; ETH was among the losses.
+            data = None
+            for attempt in range(3):
+                try:
+                    data = json.loads(_http_get(url, timeout=60).decode("utf-8"))
+                    break
+                except urllib.error.HTTPError as he:
+                    if he.code != 429 or attempt == 2:
+                        raise
+                    time.sleep(CG_RETRY_S)
             series = {}
             for ms, px in data.get("prices", []):
                 d = datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).date()
@@ -856,7 +897,51 @@ def _stooq_closes(ticker: str) -> dict:
             continue
         if d and px > 0:
             out[d] = px
+    if not out:
+        # First run: every ticker parsed to zero closes with the body unseen
+        # (stooq throttles/blocks many cloud IPs with a 200 + message page) —
+        # surface what it actually said.
+        raise RuntimeError(f"stooq body yielded no closes; body head: "
+                           f"{text[:120]!r}")
     return out
+
+
+def _fmp_closes(ticker: str) -> dict:
+    """FMP EOD light closes — the project's PAID price source (already the
+    market ledger's ground-truth series in transfer/fmp_data.py); used here
+    as the primary research price when FMP_API_KEY is present, internal
+    research use only."""
+    key = os.getenv("FMP_API_KEY", "")
+    if not key:
+        raise RuntimeError("FMP_API_KEY unset")
+    qs = urllib.parse.urlencode({"symbol": ticker.upper(), "apikey": key})
+    raw = json.loads(_http_get(
+        f"https://financialmodelingprep.com/stable/historical-price-eod/light?{qs}",
+        timeout=60).decode("utf-8"))
+    out = {}
+    for r0 in raw if isinstance(raw, list) else []:
+        d = _iso((r0.get("date") or "")[:10])
+        px = r0.get("price", r0.get("close"))
+        try:
+            px = float(px)
+        except (TypeError, ValueError):
+            continue
+        if d and px > 0:
+            out[d] = px
+    if not out:
+        raise RuntimeError("FMP returned no usable closes")
+    return out
+
+
+def _equity_closes(ticker: str) -> tuple:
+    """(closes, source) — FMP (paid, primary) then stooq (public fallback)."""
+    errs = []
+    for src, fn in (("fmp", _fmp_closes), ("stooq", _stooq_closes)):
+        try:
+            return fn(ticker), src
+        except Exception as e:  # noqa: BLE001
+            errs.append(f"{src}: {e}")
+    raise RuntimeError("; ".join(errs))
 
 
 def section4_equity(core, core_reason, param_version: str) -> dict:
@@ -899,15 +984,10 @@ def section4_equity(core, core_reason, param_version: str) -> dict:
                                             f"(n={len(pts)})"}
             continue
         try:
-            closes = _stooq_closes(ticker)
+            closes, price_src = _equity_closes(ticker)
         except Exception as e:  # noqa: BLE001
             per_ticker[ticker] = {"status": "SKIPPED",
-                                  "reason": f"stooq price fetch failed: {e}"}
-            continue
-        if not closes:
-            per_ticker[ticker] = {"status": "SKIPPED",
-                                  "reason": "stooq returned no usable closes "
-                                            "(ticker may be unlisted there)"}
+                                  "reason": f"price fetch failed: {e}"}
             continue
 
         def _px_at(dd):  # nearest trading close on/before the settlement date
@@ -941,7 +1021,7 @@ def section4_equity(core, core_reason, param_version: str) -> dict:
                 n_obs += 1
                 latest = (row["date"], _r(row["D"]))
         per_ticker[ticker] = {
-            "status": "OK", "si_points": len(pts),
+            "status": "OK", "price_source": price_src, "si_points": len(pts),
             "aligned_obs": res.get("days"), "d_obs": n_obs,
             "latest_D": latest[1] if latest else None,
             "latest_date": latest[0] if latest else None,
@@ -953,7 +1033,7 @@ def section4_equity(core, core_reason, param_version: str) -> dict:
         print(f"[4 equity] {ticker}: SI points={len(pts)} aligned="
               f"{res.get('days')} measured D obs={n_obs} "
               f"latest={latest if latest else 'n/a (honest-absence warm-up)'}")
-        time.sleep(1.0)  # pace stooq politely
+        time.sleep(1.0)  # pace the public price endpoints politely
     _write_csv(_out("equity_divergence.csv"),
                ["ticker", "settlement_date", "q_dlnShortInterest",
                 "p_dlnPrice_matching_window", "zq", "zp", "D", "measured"],
