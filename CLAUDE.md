@@ -523,15 +523,17 @@ what-if read is NEVER printed in the same register as a served value. It carries
 fixed-reference caveat every time. (The World Cup study quoted a harness "det 70" whose 70 was that
 endpoint's pinned `expert_detection` constant, against a real served peak of 48.96.)
 
-## 16. SOURCE ONBOARDING PROTOCOL (hard rule — no source is linked until ALL 5 gates pass)
+## 16. SOURCE ONBOARDING PROTOCOL (hard rule — no source is linked until ALL 6 gates pass)
 
 > **Before linking ANY new media/data source** (RSS, API, feed, collector) you MUST clear all
-> five gates below, IN ORDER. No exceptions. This is the codified lesson of three failures caught
+> six gates below, IN ORDER. No exceptions. This is the codified lesson of three failures caught
 > in onboarding: **yahoo_finance** (HTTP 429 every cycle — access gate), **Mises Literature**
 > (HTTP 404 + classic *literature*, not current signal — currency/type gate), **NBER** (academic
-> titles extract to noise like "times geopolitical fragmentation" — format gate). Enforced by the
-> `.githooks/commit-msg` gotcha, which blocks a source-shaped commit until the message asserts
-> `[source-onboarded]`.
+> titles extract to noise like "times geopolitical fragmentation" — format gate) — and of the
+> **2026-09-14 rights finding** (board K3, `BOARD_crypto-money_2026-09-14.md`): CoinAPI +
+> CoinMetrics were onboarded with zero rights record; "HTTP 200 is access, not rights." Enforced
+> by the `.githooks/commit-msg` gotcha, which blocks a source-shaped commit until the message
+> asserts `[source-onboarded]`.
 
 1. **TYPE** — Identify what the source actually provides and classify it: *attention/trend
    signal · market positioning · risk/microstructure · reference/research*. Macro-research ≠
@@ -549,7 +551,15 @@ endpoint's pinned `expert_detection` constant, against a real served peak of 48.
 4. **CURRENCY + ACCESS** — Confirm BOTH: **current** (fresh, dated items — not stale/archival) AND
    **regular access** (stable URL, HTTP 200, no 404/429/auth-block, declared UA where required,
    rate-limit headroom).
-5. **TEST → LINK → DEPLOY** — TEST FIRST on a LIVE sample (run real items through the gate +
+5. **RIGHTS** (added 2026-09-14, Chairman-ruled K3 — the FISD buyer's gate 3) — a WRITTEN,
+   defensible right to use — and, where anything derived is served to users, to REDISTRIBUTE —
+   every input: the license/ToS clause identified by name, recorded as a row in
+   `docs/buyer-diligence/RIGHTS_REGISTER.md` IN THE SAME COMMIT that wires the source.
+   "We fetched it and nobody complained" is not a right; a paid account is not evidence of a
+   redistribution grant; a community/free tier is presumed NON-commercial until its terms say
+   otherwise. HTTP 200 is access (gate 4), never rights. Jurisdiction-scoped where sold
+   offshore (an EU/APAC redistribution grant is a different grant from US-internal use).
+6. **TEST → LINK → DEPLOY** — TEST FIRST on a LIVE sample (run real items through the gate +
    extractor + classifier and eyeball the output), THEN wire it, THEN deploy. A **score-affecting**
    source ADDITIONALLY requires **backtest-before-ship**: build it held-out, research the output,
    review, and only then integrate into any score.

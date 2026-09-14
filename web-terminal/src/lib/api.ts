@@ -183,6 +183,10 @@ export interface CryptoCoin {
   gap_state?: string; interpretation?: string; calibrating?: boolean
   flow?: 'inflow' | 'outflow' | 'neutral' | 'no_data' | 'mixed' | 'divergent'
   money_data_absent?: boolean; composite_note?: string   // D8: null money read → market-confirmation only
+  // Board 2026-07-29 (served top-level; C1 2026-09-14 display fix reads these):
+  // absence_class 'structural' = the sources cannot produce a read; 'transient' = none this cycle.
+  absence_class?: 'structural' | 'transient' | null; absence_reason?: string | null
+  proxies_total?: number; proxies_covered?: number; proxies_votable_max?: number; money_floor_required?: number
   components?: Record<string, CryptoComponent>
   price?: { last_close?: number; change_7d_pct?: number | null; change_30d_pct?: number | null; trend?: string; as_of?: string } | null
   dark_matter?: { coverage?: string; flow?: string; intensity?: number; proxies_covered?: number } | null

@@ -7374,13 +7374,37 @@ def monitor_degenerate_census():
 
 @app.get("/monitor/deferred-triggers")
 def monitor_deferred_triggers():
-    """H6 (hardenings review 2026-07-20): evaluate every reactivation trigger in
-    audits/DEFERRED_ITEMS.md on-demand so a deferred item reopens BY RULE, not by memory.
-    Read weekly by the improve-system audit. Read-only; touches no score/ledger. Returns
-    FIRE/HOLD per trigger — a FIRE means 'take it back to the board/founder', never an
-    auto-action (flag-never-force)."""
-    out = {"note": "deferred-item reactivation triggers (audits/DEFERRED_ITEMS.md); FIRE = "
-                   "reopen for review, never an auto-action", "triggers": {}}
+    """H6 (hardenings review 2026-07-20; HONESTY FIX 2026-09-14, C5): evaluate the
+    deferred-shelf triggers on-demand so an item reopens BY RULE, not by memory.
+    What this actually does — the old docstring claimed it read DEFERRED_ITEMS.md, which
+    it never did (the file is not even in the slug): it evaluates (a) every DATED entry
+    in `deferred_registry.DEFERRED_ITEMS` (the engine-readable mirror of the shelf,
+    kept in sync with the .md by test_deferred_registry — a drift fails CI), firing on
+    a past-due review date, and (b) the two hand-coded condition triggers below (D8_T2,
+    S1). Read weekly by the improve-system audit. Read-only; touches no score/ledger.
+    FIRE means 'take it back to the board/founder', never an auto-action."""
+    out = {"note": "deferred-item reactivation triggers (deferred_registry mirror of "
+                   "audits/DEFERRED_ITEMS.md); FIRE = reopen for review, never an "
+                   "auto-action", "triggers": {}}
+    # Dated shelf entries (C5): past-due review date => FIRE. The registry↔doc sync is
+    # CI-enforced, so an unregistered shelf item is a build failure, not a silent lapse.
+    try:
+        import deferred_registry as _dreg
+        _today = datetime.now(timezone.utc).date().isoformat()
+        for _e in _dreg.DEFERRED_ITEMS:
+            _rd = _e.get("review_date")
+            if not _rd:
+                continue
+            _key = "DATED_" + _e["heading"].split(" —")[0].split(" (")[0].strip().replace(" ", "_")
+            _fire = _rd <= _today
+            out["triggers"][_key] = {
+                "metric": "shelf review date", "review_date": _rd, "fire": bool(_fire),
+                "reading": (f"review date {_rd} PASSED — reopen for the founder" if _fire
+                            else f"holds until {_rd}"),
+                "item": _e["heading"][:120],
+            }
+    except Exception as e:
+        out["triggers"]["dated_registry"] = {"error": str(e)[:100]}
     # D8 T2 — covered-lane UNMEASURED fraction (H2b recalibration, founder-ruled 2026-07-20).
     # Fires when the covered lane crosses to majority-MEASURED (unmeasured_fraction < 0.5) —
     # a real maturation event, unlike fully_degenerate_fraction which is ~0 at baseline for

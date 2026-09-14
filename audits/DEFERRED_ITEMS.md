@@ -450,3 +450,44 @@ Three gaps are on record in PII_POLICY §2 and are tracked HERE:
 
 **Related:** `audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md` (the same column,
 exposed in public git history; founder decisions owed).
+
+---
+
+## CRYPTO-COINAPI — perp funding/OI collector: review gate (DATED; Chairman-ruled register, 2026-09-14)
+
+> Registered per board rounds 2-3 (C5, `BOARD_crypto-money_2026-09-14.md` +
+> `BOARD_divergence_2026-09-14.md`): the "~08-24 gate" lived only in session-log prose and
+> lapsed unowned for 3 weeks — the exact §16a "furniture" failure, recurring. Collector:
+> `transfer/coinapi_derivs.py`, held-out, ~$5/mo, 12/12 coins, single venue (Binance USDT).
+
+**REVIEW DATE: 2026-11-10** (~90 daily obs/coin, the board's minimum baseline). At review:
+the K8/K12 instrument-error audits must have run (missingness-vs-|return|; 3-offset timing
+test) and the divergence prereg must be sealed BEFORE any correlation is computed (K16:
+pre-seal rows are spec-development data). Rights evidence (CoinAPI redistribution clause —
+K3 gate) is condition precedent to ANY display. Estimand is LEVERAGE POSITIONING, never
+"money movement"; sign must be able to go negative (07-29).
+
+## CRYPTO-COINMETRICS — on-chain activity collector (trigger-based; registered 2026-09-14)
+
+Held-out, $0, 9/12 coins (SOL/BNB/DOT permanent declared absence). Board-settled (9/9,
+round 2): activity is NEVER a money-class component. **TRIGGERS:** T1 — paid flow fields
+(TxTfrValAdjUSD etc.) become licensable within the cost cap → re-assess as a flow leg;
+T2 — a Chairman ruling to display a separately-labeled "Network Activity" lane (Grade B,
+not marketing-eligible; the Executioner would cut even that — split on record).
+
+## CRYPTO-COINBASE-PREMIUM — retail-premium collector (SHELVED 2026-08-18; registered 2026-09-14)
+
+Shelved by the 5-day review (±0.1% noise band; `/spot` is mid-market so the retail spread
+was never measured; BNB synthetic rows). **TRIGGER:** capture real `/buy`+`/sell` legs,
+then re-run the 5-day review. Keyless, $0 — the collector may keep accruing.
+
+## ETF-ISSUER-REEVAL — issuer-page adapter re-evaluation (DATED — OVERDUE; registered 2026-09-14)
+
+> The second orphaned date the Operator found (round 2, K6): `etf_issuer_pages.py:10`
+> says "re-eval 2026-09-05" — passed unregistered and unread.
+
+**REVIEW DATE: 2026-09-05 (OVERDUE — fires until the founder re-rules).** Scope at review:
+Gate-4 state (`pass_comparisons` 0→5 needed, ≥2 funds), wave-3 bot-wall adapters
+(Grayscale/VanEck/Fidelity), and the round-2 split — Operator: the adapter plumbing is the
+one durable edge, fund 2 weeks; Expansionist: most parochial liability, reject as growth
+path. Chairman decides when the trigger fires.

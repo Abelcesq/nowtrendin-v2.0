@@ -25,9 +25,17 @@ DEFAULT_COINS = [c.strip().upper() for c in os.getenv(
     "CRYPTO_COINS", "BTC,ETH,SOL,XRP,BNB,DOGE,ADA,AVAX,LINK,DOT,LTC,BCH").split(",") if c.strip()]
 
 # Crypto Money Gradient components (0-1), z-scored vs the coin's own baseline.
+# C6 (Chairman-ruled 2026-09-14, BOARD_crypto-money_2026-09-14.md, 9/9 seats):
+# `signal_freshness` REMOVED from the money composite — it was a 0.8/0.3 price-feed
+# LIVENESS flag carrying 25% of a score labeled money (the App Annie fact pattern:
+# a methodology misstatement, not a disclosure problem). Removed in the zero-delta
+# window: every coin serves money_movement=None via the coverage gate, so the
+# composite change is provably inert today; after any future money leg goes live
+# the same edit would be score-affecting and backtest-gated. Feed liveness is a
+# coverage fact — it lives in absence_class/price availability, never as a
+# weighted money component.
 CRYPTO_MM_WEIGHTS = {            # D — informed money via crypto-exposure proxies
-    "proxy_positioning": 0.75,   # spot-ETF 13F + MSTR/COIN insider accumulation (Finviz) + 13F
-    "signal_freshness":  0.25,
+    "proxy_positioning": 1.0,    # spot-ETF 13F + MSTR/COIN insider accumulation (Finviz) + 13F
 }
 CRYPTO_MC_WEIGHTS = {            # M — broad crypto market confirmation
     "price_momentum":    0.75,   # the coin's own price / volume trend
@@ -37,7 +45,6 @@ CRYPTO_LABELS = {
     "proxy_positioning": "Proxy Positioning (crypto-exposure 13F / insider accumulation)",
     "price_momentum":    "Price Momentum (coin price / volume trend)",
     "venue_diffusion":   "Venue Diffusion (proxy venues active)",
-    "signal_freshness":  "Signal Freshness (recency)",
 }
 
 _DISCLAIMER = ("The Crypto Measurement section tracks significant money movement relative to this coin's own "
@@ -68,7 +75,6 @@ def assemble_crypto_components(coin: str, sig: Optional[dict] = None) -> dict:
         # §17: Price Momentum is n/a (None) when the price leg is unavailable — NEVER a misleading 0.
         "price_momentum":    (round(mse._norm((pm.get("confirmation") or 0.0) / 100.0), 3) if price_avail else None),
         "venue_diffusion":   round(mse._norm(venue), 3),
-        "signal_freshness":  round(0.8 if price_avail else 0.3, 3),
     }
 
 
@@ -144,13 +150,23 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
     any_calibrating = any(s.get("calibrating") for s in scored.values())
     covered = (dm or {}).get("proxies_covered") or 0
 
-    def _weighted(weights: dict) -> float:
+    def _weighted(weights: dict):
         present = {c: w for c, w in weights.items() if c in scored}
         tot = sum(present.values())
-        return (sum(present[c] * scored[c]["score"] / tot for c in present) * 100) if tot else 0.0
+        # K2 (Chairman-ruled 2026-09-14, Challenger finding): when HALF OR MORE of a
+        # leg's weight is absent, the leg is NOT MEASURED — never a renormalized
+        # remainder wearing the leg's label. Verified failure mode: price leg down →
+        # M became 100% venue_diffusion still labeled "coin price / volume trend"
+        # with a confidence chip that could read ACTIVE. A number containing zero
+        # price must not be published as price.
+        if tot < 0.5 * sum(weights.values()):
+            return None
+        return sum(present[c] * scored[c]["score"] / tot for c in present) * 100
 
-    money_movement = round(_weighted(CRYPTO_MM_WEIGHTS), 1)
-    market_confirmation = round(_weighted(CRYPTO_MC_WEIGHTS), 1)
+    _mm_raw = _weighted(CRYPTO_MM_WEIGHTS)
+    _mc_raw = _weighted(CRYPTO_MC_WEIGHTS)
+    money_movement = None if _mm_raw is None else round(_mm_raw, 1)
+    market_confirmation = None if _mc_raw is None else round(_mc_raw, 1)
     # D8 (founder-ruled 2026-07-20, flag-gated MONEY_MOVEMENT_EXCLUDE): every crypto MM component
     # is proxy-degenerate on all 12 coins today → serve money_movement=null + "market-confirmation
     # only", never a "Money Gradient" headline over zero money data. M is untouched.
@@ -196,11 +212,24 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
             money_data_absent = True
             money_movement = None
             absence_reason = "degenerate_baseline"
-    gap = None if money_data_absent else round(money_movement - market_confirmation, 1)
+    # K2: a leg the floor refused to renormalize is an absent leg, not a zero.
+    if money_movement is None and not money_data_absent:
+        money_data_absent = True
+        absence_reason = absence_reason or "component_floor"
+        absence_class = absence_class or "transient"
+    gap = (None if (money_data_absent or market_confirmation is None)
+           else round(money_movement - market_confirmation, 1))
     # Reuse the equity Money-Gradient interpretation (movement + facts language, no advice), then append
     # the rich crypto analysis walk (parity with the Market Signal's _market_analysis) — EXCEPT while
     # calibrating, or when the money read is absent (market-confirmation only).
-    if money_data_absent:
+    if market_confirmation is None:
+        # K2: price leg down → no market-confirmation read either. State the outage
+        # plainly; never narrate a number that was not measured.
+        interp = {"state": "confirmation_absent",
+                  "text": "Market confirmation is not measured this cycle — the price "
+                          "feed did not answer. No read is shown in its place."}
+        _interp_text = interp["text"]
+    elif money_data_absent:
         interp = {"state": "money_absent",
                   "text": "No proxy money-positioning data for this coin this cycle — "
                           "showing market-confirmation only."}
@@ -235,10 +264,13 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         "proxies_covered": int(covered or 0),
         "proxies_votable_max": _max_votable(coin),
         "money_floor_required": 2,
-        "tier": ("ABSENT" if money_data_absent
+        "tier": ("ABSENT" if (money_data_absent or market_confirmation is None)
                  else mse._level((money_movement + market_confirmation) / 2)),
         "detection_level": ("ABSENT" if money_data_absent else mse._level(money_movement)),
-        "confidence_level": mse._level(market_confirmation),
+        # K2: never grade a confirmation that was not measured (price leg down →
+        # market_confirmation is None → the chip must read unmeasured, not a tier).
+        "confidence_level": ("ABSENT" if market_confirmation is None
+                             else mse._level(market_confirmation)),
         "detection_fp": mse.MONEY_MOVEMENT_FP, "confidence_fp": mse.MARKET_CONFIRM_FP,
         "gap_state": interp["state"], "interpretation": _interp_text, "calibrating": any_calibrating,
         # ⚠ CONTRADICTION GUARD (Board master remediation, C1 — verified live before the fix:

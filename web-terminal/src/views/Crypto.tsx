@@ -21,6 +21,43 @@ function ring(val: number, color: string) {
   )
 }
 
+// C1 (board 2026-09-14): an absent money read gets an EMPTY SLOT, never an arc — an arc at 0
+// draws a measured zero (Forecaster). Dashed empty track + centered em-dash, muted, never red.
+function absentSlot() {
+  return (
+    <svg width="72" height="72" viewBox="0 0 72 72">
+      <circle cx="36" cy="36" r={26} fill="none" stroke="var(--line)" strokeWidth="2" strokeDasharray="3 5" />
+    </svg>
+  )
+}
+
+// C1: absence is not a tier. Chip label — the structural/transient split the engine serves
+// (absence_class, top-level per Board 2026-07-29). NEVER "yet"/"soon"/roadmap phrasing.
+function absentLabel(c: CryptoCoin): string {
+  return c.absence_class === 'structural' ? 'NOT MEASURED · source limit'
+    : c.absence_class === 'transient' ? 'NOT MEASURED · none this cycle'
+    : 'NOT MEASURED'
+}
+const ABSENT_TIP = 'Not measured — no qualifying money source for this coin'
+const isAbsent = (c: CryptoCoin) => !!c.money_data_absent || (c.tier || '').toUpperCase() === 'ABSENT'
+
+// C1: hollow/outlined unmeasured chip — transparent background, dashed border, muted text.
+// Never a filled tier chip (K1: ABSENT used to fall through to DORMANT's measured grey).
+function AbsentTierChip({ c }: { c: CryptoCoin }) {
+  const col = marketTierColor('ABSENT')
+  return (
+    <span className="tier" title={ABSENT_TIP}
+      style={{ color: col, background: 'transparent', border: `1px dashed ${col}`, padding: '1px 7px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>
+      {absentLabel(c)}
+    </span>
+  )
+}
+
+// Client-facing label cleanup (board C1 / Buyer's Desk): retire "Dark Matter" / "Proxy
+// Positioning" from visible crypto copy. DISPLAY ONLY — engine keys/fields unchanged.
+const displayLabel = (s: string) =>
+  s.replace(/Proxy Positioning/g, 'Positioning (proxy sources)').replace(/Dark Matter/g, 'Positioning signals')
+
 // Factual flow direction chip (proxy Dark Matter vs price) — a measurement, not a buy/sell call.
 function flowChip(flow?: string) {
   if (!flow || flow === 'no_data') return null
@@ -42,7 +79,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{c.item_name} <span style={{ color: 'var(--text-3)', fontWeight: 500 }}>· {c.coin}</span></div>
-            <div className="detail-cat">Crypto · <span style={{ color: tcol, fontWeight: 700 }}>{c.tier}</span>{flowChip(c.flow)}{c.calibrating && <span className="cal-chip">calibrating</span>}</div>
+            <div className="detail-cat">Crypto · {isAbsent(c) ? <AbsentTierChip c={c} /> : <span style={{ color: tcol, fontWeight: 700 }}>{c.tier}</span>}{flowChip(c.flow)}{c.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -56,7 +93,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
       {/* Dual rings — Money Movement (D) / Market Confirmation (M), same layout as the stock page */}
       <div className="gauges">
         {c.money_data_absent
-          ? <div className="gauge det">{ring(0, 'var(--line)')}<div className="gv" style={{ marginTop: -50, color: 'var(--muted)', fontSize: 15 }}>n/a</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">no proxy money data</div></div>
+          ? <div className="gauge det" title={ABSENT_TIP}>{absentSlot()}<div className="gv" style={{ marginTop: -50, color: 'var(--muted)', fontSize: 18 }}>—</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">{absentLabel(c).toLowerCase()}</div></div>
           : <div className="gauge det">{ring(c.money_movement ?? 0, MC.detection)}<div className="gv" style={{ marginTop: -50, color: MC.detection }}>{c.money_movement ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MM_LABEL}</div><div className="gf">informed money · D</div></div>}
         <div className="gauge conf">{ring(c.market_confirmation ?? 0, MC.confidence)}<div className="gv" style={{ marginTop: -50, color: MC.confidence }}>{c.market_confirmation ?? '—'}</div><div className="gl" style={{ marginTop: 28 }}>{MC_LABEL}</div><div className="gf">coin price · M</div></div>
       </div>
@@ -100,7 +137,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
       {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible, measurement-only) */}
       <SignalAnalysisPanel kind="crypto" item={{ item_name: c.item_name, detection: c.money_movement, confidence: c.market_confirmation, flow: c.flow, tier: c.tier, dark_matter: (c as any).dark_matter }} />
 
-      {/* Market Factors — §17: real value or n/a, never NaN */}
+      {/* Market Factors — §17: real value or an explicit not-measured "—", never NaN */}
       {comps.length > 0 && (
         <div className="sect">
           <h4>Market Factors</h4>
@@ -109,9 +146,9 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
             const col = na ? MC.muted : (comp?.feeds === 'money_movement' ? MC.detection : MC.confidence)
             return (
               <div className="comp-row" key={label} style={na ? { opacity: 0.5 } : undefined}>
-                <span className="cl"><span style={{ width: 6, height: 6, borderRadius: 3, background: col, display: 'inline-block', marginRight: 5 }} />{label.replace(/\s*\(.*\)$/, '')}{!na && comp?.baseline_relative ? ' ✓' : ''}</span>
+                <span className="cl"><span style={{ width: 6, height: 6, borderRadius: 3, background: col, display: 'inline-block', marginRight: 5 }} />{displayLabel(label.replace(/\s*\(.*\)$/, ''))}{!na && comp?.baseline_relative ? ' ✓' : ''}</span>
                 <span className="comp-bar"><i style={{ width: na ? '0%' : `${Math.max(4, Math.min(100, comp?.score ?? 0))}%`, background: col }} /></span>
-                <span className="cv">{na ? 'n/a' : Math.round(comp?.score ?? 0)}</span>
+                <span className="cv">{na ? <span title="Not measured">—</span> : Math.round(comp?.score ?? 0)}</span>
               </div>
             )
           })}
@@ -248,10 +285,14 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
                       <div className="topic-name">{c.item_name} <span style={{ color: 'var(--text-3)' }}>· {c.coin}</span>{c.calibrating && <span className="cal-chip">cal</span>}{flowChip(c.flow)}</div>
                       <div className="topic-cat">crypto{c.supply?.size_band ? <span title={c.supply.band_basis || ''} style={{ marginLeft: 6, textTransform: 'uppercase', fontWeight: 700, fontSize: 10, color: 'var(--text-3)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>{c.supply.size_band}</span> : null}</div>
                     </td>
-                    <td className="r"><span className="score-cell det" style={c.money_data_absent ? { opacity: 0.4 } : undefined}>{c.money_data_absent ? 'n/a' : c.money_movement}</span></td>
+                    <td className="r">{c.money_data_absent
+                      ? <span className="score-cell det" title={ABSENT_TIP} style={{ opacity: 0.55, color: marketTierColor('ABSENT') }}>—</span>
+                      : <span className="score-cell det">{c.money_movement}</span>}</td>
                     <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>
                     <td className="r"><span className="muted">{c.gap != null ? `${c.gap > 0 ? '+' : ''}${c.gap}` : '—'}</span></td>
-                    <td><span className="tier" style={{ color: marketTierColor(c.tier), background: marketTierColor(c.tier) + '18', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{c.tier}</span></td>
+                    <td>{isAbsent(c)
+                      ? <AbsentTierChip c={c} />
+                      : <span className="tier" style={{ color: marketTierColor(c.tier), background: marketTierColor(c.tier) + '18', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{c.tier}</span>}</td>
                     <td className="r"><span className={'pct ' + (ch7 == null ? 'na' : ch7 > 0 ? 'up' : ch7 < 0 ? 'down' : 'flat')}>{ch7 == null ? '—' : `${ch7 > 0 ? '+' : ''}${ch7}%`}</span></td>
                   </tr>
                 )

@@ -112,3 +112,19 @@ validation curve (the ledger itself is held-out).
 A new source row is created by the §16 onboarding itself (the commit-msg hook already
 forces the review); this register is updated in the same commit that links a source,
 and the OPEN list may only shrink via a recorded ruling — never by silence.
+
+## F. Crypto-native collectors — REGISTERED LATE (K3 remediation, 2026-09-14)
+
+> Board finding K3 (`BOARD_crypto-money_2026-09-14.md`, Buyer's Desk): these sources were
+> onboarded 2026-08-10/16 with NO register row — §I's own rule broken within a day of v1.0.
+> Registered now with honest OPEN statuses; §16 gained an explicit RIGHTS gate (gate 5) the
+> same day so this class cannot recur. All four are HELD-OUT collectors (no user-facing
+> serving), which is why OPEN rights coexist with continued accumulation; **rights evidence
+> is condition precedent to ANY display** (round-2 convergent plan).
+
+| Source | Access | License basis | Status |
+|---|---|---|---|
+| CoinAPI (Binance USDT-perp funding/OI) | official API, paid Tier-1 pay-per-use (~$5/mo) | ⚠ **OPEN item 9**: redistribution clause for derived Binance exchange data NOT evidenced — clause number required, not a pricing page; Binance's own derived-data terms flow through the vendor | accruing held-out; display blocked on rights |
+| CoinMetrics Community | official API, keyless free tier | ⚠ **OPEN item 10**: community tiers are presumed NON-commercial until the terms say otherwise (the 403'd paid fields prove the tier); commercial-use evidence required | accruing held-out; display blocked on rights |
+| Coinbase spot (premium leg) | official public API, keyless | ⚠ **OPEN item 11**: public-API market-data terms unreviewed | SHELVED 2026-08-18 (noise); collector accrues |
+| CFTC COT (Socrata publicreporting.cftc.gov) | official public API | US-government public record — the clean rights class (register conclusion, per gate-3 rule) | pre-wired, disabled; the board's grade-A leg |

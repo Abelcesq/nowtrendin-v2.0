@@ -46,9 +46,12 @@ export const MATURITY_COLOR: Record<string, string> = {
 export const maturityColor = (c?: string) => MATURITY_COLOR[(c || '').toUpperCase()] ?? '#5B6472'
 
 // Market tier → color (risk/[key].tsx MARKET_TIER_COLOR).
+// ABSENT (board C1, 2026-09-14 — K1): absence is NOT a tier reading. Its own muted value,
+// distinct from DORMANT's #9AA3B0 (a MEASURED low tier), never red (red = loss/error ONLY).
+// Where an ABSENT chip renders it must be hollow/outlined (transparent bg), never filled.
 export const MARKET_TIER_COLOR: Record<string, string> = {
   ELEVATED: '#CF2A1B', ACTIVE: '#E85A1E', MODERATE: '#D4A017', BUILDING: '#D4A017',
-  ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0',
+  ROUTINE: '#2D7EEF', DORMANT: '#9AA3B0', ABSENT: '#6E7A8A',
 }
 export const marketTierColor = (t?: string) => MARKET_TIER_COLOR[(t || '').toUpperCase()] ?? '#9AA3B0'
 

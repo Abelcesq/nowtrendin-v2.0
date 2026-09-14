@@ -187,6 +187,36 @@ Stage-2 (why the indexed GROUP BY needs ~11 min) stays owed on prod EXPLAIN evid
   DEFERRED_ITEMS (its docstring falsely claims it does). Eleven new defects K1–K11 on
   the record. Awaiting Chairman rulings C1–C6 + the §16 rights-gate addition (K3).
 
+### Addendum 7 (same session) — CHAIRMAN RULED C1-C6+K3; all six EXECUTED; divergence board collated
+- **Rulings received** (founder pasted the decision list back as the ruling). Executed:
+  **C1** — crypto honest-absence display rebuilt (ABSENT color-key defect K1 closed; hollow
+  "NOT MEASURED · structural/none this cycle" chips; dashed empty ring slot, no zero-arc;
+  jargon de-named in visible strings; build clean). **C6-wart** — `signal_freshness` DELETED
+  from the crypto money composite in its provably-zero-delta window (D leg = proxy_positioning
+  1.0) + K2 renormalization floor (≥50% of a leg's weight absent → the leg serves None, never
+  a rescaled remainder; confidence chip reads unmeasured when price is down). **C5** — four
+  shelf entries registered (CRYPTO-COINAPI dated 2026-11-10; COINMETRICS + COINBASE-PREMIUM
+  trigger-based; ETF-ISSUER-REEVAL dated 2026-09-05 → fires OVERDUE honestly);
+  `transfer/deferred_registry.py` = the engine-readable shelf mirror;
+  `/monitor/deferred-triggers` now evaluates every DATED entry (past-due → FIRE) and its
+  docstring tells the truth; `test_deferred_registry.py` fails CI on doc↔registry drift
+  (suite now 18/18). **K3** — §16 gains explicit **gate 5 RIGHTS** (six gates; written
+  right + register row in the wiring commit; community tier presumed non-commercial;
+  jurisdiction-scoped) + RIGHTS_REGISTER §F registers the four crypto sources late with
+  honest OPEN items 9-11 (CoinAPI redistribution clause, CoinMetrics commercial terms,
+  Coinbase market-data terms) and CFTC COT as the clean class. **C2** — prereg path
+  approved; the spec seals AFTER the divergence collation (below) so it captures the
+  board's residual definition. **C4** — dark on trigger (now a registered, dated shelf row).
+- **DIVERGENCE BOARD (round 3) collated** → `audits/board/BOARD_divergence_2026-09-14.md`:
+  trackable YES as ONE signed residual (coin-ΔOI z with price momentum regressed out),
+  phases REJECTED as unfalsifiable; independence = 3-part test (construction/channel/
+  instrument-error); CFTC COT grade A + fully backfillable; funding DISQUALIFIED as a leg;
+  new defects K12-K19 (headline: the collector's 429-retry timing is itself mania-coupled);
+  Expansionist reframe — prove the primitive on the rights-clean EQUITY legs (OFR repo
+  volume, FINRA short interest) using the existing signed-gap schema; display may state
+  only arithmetic, never distress-family words; honest calibration horizon 8-15 years.
+  Awaiting Chairman on D1-D4 + the equity-first instantiation.
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +
