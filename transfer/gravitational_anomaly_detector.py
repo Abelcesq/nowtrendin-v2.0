@@ -8462,6 +8462,24 @@ def diag_coinapi(pull: int = 0):
         return {"available": False, "reason": str(e)[:160]}
 
 
+@app.get("/diag/divergence", dependencies=[Depends(_require_internal)])
+def diag_divergence():
+    """Held-out Positioning-vs-Price residual STATUS (sealed prereg
+    `audits/board/DIVERGENCE_PREREG_2026-09-14.md`; param_version = its SHA-256).
+    THIN status route only: per-coin OI-side series stats (usable days, suspect-
+    excluded count, latest date). The engine holds NO coin-price source independent
+    of the M composite, so no D is computed here unless a research-supplied
+    `divergence_price_cache` table exists — otherwise prices are declared
+    research-runner-only. The real computation runs in the sanctioned read-only
+    consumer, tools/divergence_research.py (prereg §8, K4). Read-only; never
+    touches a score, serve path, or prewarm. Fixture: test_divergence.py."""
+    try:
+        import divergence
+        return divergence.diag_report(DB_PATH)
+    except Exception as e:
+        return {"available": False, "reason": str(e)[:160]}
+
+
 #: Referee-backfill status (board-ordered run, 2026-08-17): kicked in the background —
 #: ~25 wins x 2-4 Wikipedia calls each exceeds the 30s router limit synchronously.
 _REFEREE_BACKFILL: dict = {"state": "idle"}

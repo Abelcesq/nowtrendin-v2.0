@@ -1,0 +1,168 @@
+{
+  "status": "OK",
+  "tickers_ok": 16,
+  "per_ticker": {
+    "AAPL": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "AMZN": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "C": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "CVX": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "F": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "GOOGL": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "IBM": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "JPM": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "LMT": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "META": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "MS": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "MSFT": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "NVDA": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "SPCX": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 7,
+      "aligned_obs": 6,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "TSLA": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    },
+    "WFC": {
+      "status": "OK",
+      "price_source": "fmp",
+      "si_points": 11,
+      "aligned_obs": 11,
+      "d_obs": 0,
+      "latest_D": null,
+      "latest_date": null,
+      "caveat": "honest-absence warm-up: SS7 strict windows (1-obs dln + 24-obs z + 24-obs fit) need ~48 aligned settlements (~2 years of FINRA bi-monthly data) before the first measured D"
+    }
+  },
+  "rows": 171,
+  "watchlist_source": "ast-parsed"
+}

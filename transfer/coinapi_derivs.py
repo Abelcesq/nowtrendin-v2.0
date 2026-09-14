@@ -5,12 +5,20 @@ feeds NO score, NO ledger, NO served value. The purpose is BASELINE ACCUMULATION
 a future board + backtest can judge wiring it into the crypto money leg on data.
 
 WHY (the founder's money-movement order, integrity-compliant): trading volume is
-NEVER flow (C5/C6, board-unanimous) — but derivatives POSITIONING is money data:
-  • FUNDING RATE = the price of leverage (positive → longs pay shorts → long pressure)
-  • OPEN INTEREST = capital committed to derivatives; its Δ = money entering/leaving
+NEVER flow (C5/C6, board-unanimous) — and (K7 correction, board 2026-09-14,
+`BOARD_divergence_2026-09-14.md`) neither is this: what these two series measure is
+**LEVERAGE POSITIONING**, never money movement —
+  • FUNDING RATE = the price of leverage (positive → longs pay shorts → long pressure);
+    price-DERIVED (perp−spot basis), so it is permanently disqualified as a
+    mania-independent leg and may serve only as a conditioner/null (sealed prereg
+    `DIVERGENCE_PREREG_2026-09-14.md` §2).
+  • OPEN INTEREST = outstanding derivative contracts in BASE-COIN UNITS (perps are
+    zero-sum: every long has a short — NO money enters a coin when OI rises). ΔOI in
+    coin units is a QUANTITY the mania cannot move without positions actually changing;
+    ΔOI in USD notional would be OI×price and is forbidden (circular with M).
 Both live-verified via CoinAPI 2026-08-10 (BTC perp funding 0.00005584, OI 105,683.596
 BTC) and available for ALL 12 roster coins via Binance USDT perpetuals — the first
-money-class source with full-roster coverage (ETF flow covers 2–3 coins; insider
+positioning-class source with full-roster coverage (ETF flow covers 2–3 coins; insider
 proxies are sparse). Echoes the equity Money Gradient's leverage/positioning inputs.
 
 §16 gate record: TYPE = market positioning (money) ✓ · ENGINE = held-out accumulation
@@ -70,9 +78,22 @@ def init_derivs_db(db_path: str = DB_PATH):
                 signal_time TEXT,                 -- our fetch HH:MM:SS (§14)
                 captured_at TEXT,                 -- full UTC instant
                 src TEXT,                         -- 'coinapi'
+                units TEXT,                       -- K14: 'coin' — the independence claim, recorded per row
+                suspect INTEGER DEFAULT 0,        -- K14: >10x OI step vs trailing median → unit/spec break
                 PRIMARY KEY (coin, signal_date)
             )
         """)
+        # K14 (board 2026-09-14): additive columns for pre-existing tables — the
+        # accuracy_ledger boot-guard idiom (duplicate-column errors are the no-op path).
+        for _ddl in ("ALTER TABLE coinapi_derivs ADD COLUMN units TEXT",
+                     "ALTER TABLE coinapi_derivs ADD COLUMN suspect INTEGER DEFAULT 0"):
+            try:
+                c.execute(_ddl)
+            except Exception:
+                try:
+                    c.rollback()
+                except Exception:
+                    pass
         c.commit()
     finally:
         c.close()
@@ -124,9 +145,26 @@ def snapshot_derivs(db_path: str = DB_PATH) -> dict:
     now_iso = now.isoformat(timespec="seconds")
     sig_time = now.strftime("%H:%M:%S")
     try:
-        for i, (coin, sym) in enumerate(PERP_SYMBOLS.items()):
-            if i:
+        # K8/MNAR fix (board 2026-09-14, Executioner order): coins already written
+        # today are SKIPPED, so the all-roster catch-up gate below retries ONLY the
+        # missing coins later in the day — 429-day gaps shrink instead of becoming
+        # permanent holes clustered on exactly the volatile days the series is
+        # supposed to read. Idempotent and cost-bounded: no re-fetch of done coins.
+        done_today = set()
+        try:
+            for r in c.execute(f"SELECT coin FROM coinapi_derivs WHERE signal_date = {ph}",
+                               (today,)).fetchall():
+                done_today.add(r["coin"] if hasattr(r, "keys") else r[0])
+        except Exception:
+            pass
+        first = True
+        for coin, sym in PERP_SYMBOLS.items():
+            if coin in done_today:
+                out["coins"][coin] = {"skipped": "already recorded today"}
+                continue
+            if not first:
                 time.sleep(_PAUSE_S)               # batch pacing (§13)
+            first = False
             fr, fr_t = _fetch_metric(api_key, sym, _METRICS["funding_rate"])
             time.sleep(_PAUSE_S)
             oi, oi_t = _fetch_metric(api_key, sym, _METRICS["open_interest"])
@@ -139,14 +177,37 @@ def snapshot_derivs(db_path: str = DB_PATH) -> dict:
                 src_t = date_utils.iso_time_of(fr_t or oi_t or "") or ""
             except Exception:
                 pass
+            # K14 unit guard: a >10x day-over-day OI step vs the trailing median is a
+            # unit/contract-spec break, not a market move (a USD-notional flip is ~×60k
+            # on BTC). The row is kept but marked suspect=1 — the series BREAKS visibly
+            # instead of silently becoming price-multiplied.
+            suspect = 0
+            try:
+                if oi is not None:
+                    med_rows = c.execute(
+                        f"SELECT open_interest FROM coinapi_derivs WHERE coin = {ph} "
+                        f"AND open_interest IS NOT NULL ORDER BY signal_date DESC LIMIT 14",
+                        (coin,)).fetchall()
+                    vals = sorted(float(r["open_interest"] if hasattr(r, "keys") else r[0])
+                                  for r in med_rows)
+                    if vals:
+                        med = vals[len(vals) // 2]
+                        if med > 0 and (oi > 10 * med or oi < med / 10):
+                            suspect = 1
+                            print(f"[coinapi] {coin}: OI {oi} vs trailing median {med} — "
+                                  f"marked SUSPECT (unit/spec break, K14)")
+            except Exception:
+                pass
             c.execute(
                 f"INSERT INTO coinapi_derivs (coin, signal_date, symbol_id, "
                 f"funding_rate, open_interest, source_time, signal_time, "
-                f"captured_at, src) VALUES ({','.join([ph]*9)}) "
+                f"captured_at, src, units, suspect) VALUES ({','.join([ph]*11)}) "
                 f"ON CONFLICT (coin, signal_date) DO NOTHING",
-                (coin, today, sym, fr, oi, src_t, sig_time, now_iso, "coinapi"))
+                (coin, today, sym, fr, oi, src_t, sig_time, now_iso, "coinapi",
+                 "coin", suspect))
             out["written"] += 1
-            out["coins"][coin] = {"funding_rate": fr, "open_interest": oi}
+            out["coins"][coin] = {"funding_rate": fr, "open_interest": oi,
+                                  **({"suspect": True} if suspect else {})}
         c.commit()
     finally:
         c.close()
@@ -163,7 +224,11 @@ def snapshot_derivs(db_path: str = DB_PATH) -> dict:
 
 
 def has_row_for_today(db_path: str = DB_PATH) -> bool:
-    """Daily catch-up gate: has ANY coin been recorded for the current UTC day?"""
+    """Daily catch-up gate. K8/MNAR fix (board 2026-09-14): the old ANY-coin check let
+    one successful coin mask eleven 429'd ones, and those gaps clustered on volatile
+    days (missing-not-at-random — the exact state the series exists to read). Now the
+    day counts as done only when the FULL roster is recorded; snapshot_derivs skips
+    already-written coins, so intra-day retries touch only the stragglers."""
     try:
         import date_utils
         today = date_utils.to_iso_date(datetime.now(timezone.utc).isoformat())
@@ -173,10 +238,10 @@ def has_row_for_today(db_path: str = DB_PATH) -> bool:
     c = _connect(db_path)
     ph = "%s" if db_compat.USE_PG else "?"
     try:
-        row = c.execute(f"SELECT COUNT(*) AS n FROM coinapi_derivs "
+        row = c.execute(f"SELECT COUNT(DISTINCT coin) AS n FROM coinapi_derivs "
                         f"WHERE signal_date = {ph}", (today,)).fetchone()
         n = row["n"] if hasattr(row, "keys") else row[0]
-        return bool(n)
+        return int(n or 0) >= len(PERP_SYMBOLS)
     except Exception:
         return False
     finally:

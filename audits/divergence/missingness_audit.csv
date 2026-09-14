@@ -1,0 +1,15 @@
+# K8/K12 missingness-vs-volatility instrument audit — research prices; a significant t DISQUALIFIES the leg until the collector is fixed (prereg SS5).
+coin,span_start,span_end,span_days,missing_days,n_missing_with_ret,n_present_with_ret,mean_absret_missing,mean_absret_present,welch_t
+ADA,2026-08-10,2026-09-14,36,0,0,36,,0.0279,
+AVAX,2026-08-10,2026-09-14,36,0,0,36,,0.0217,
+BCH,2026-08-10,2026-09-14,36,0,0,36,,0.0268,
+BNB,2026-08-10,2026-09-14,36,0,0,36,,0.0165,
+BTC,2026-08-10,2026-09-14,36,0,0,36,,0.0153,
+DOGE,2026-08-10,2026-09-14,36,0,0,36,,0.0257,
+DOT,2026-08-10,2026-09-14,36,0,0,36,,0.0332,
+ETH,2026-08-10,2026-09-14,36,0,0,36,,0.0194,
+LINK,2026-08-10,2026-09-14,36,0,0,36,,0.0291,
+LTC,2026-08-10,2026-09-14,36,0,0,36,,0.0183,
+SOL,2026-08-10,2026-09-14,36,0,0,36,,0.0237,
+XRP,2026-08-10,2026-09-14,36,0,0,36,,0.0281,
+POOLED,,,432,0,0,432,,0.0238,

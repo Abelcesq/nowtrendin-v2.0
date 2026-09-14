@@ -58,6 +58,13 @@ HELD_OUT_ARRIVAL_INPUTS = {
     "insider_flow":        "the append-only Form-4 panel + universe promotion",
     "coinapi_derivs":      "crypto derivatives positioning accumulation (funding/OI) — "
                            "held-out baseline; wiring requires backtest + board",
+    "divergence":          "the SEALED Positioning-vs-Price residual (perp_divergence, "
+                           "prereg DIVERGENCE_PREREG_2026-09-14.md; param_version = its "
+                           "sha256) — held-out research statistic over coin-denominated "
+                           "OI / FINRA short interest vs price; graduation requires the "
+                           "prereg §5 instrument gates (missingness, timing, unit) + §6 "
+                           "board note + Chairman sign-off. Sanctioned read-only "
+                           "consumer (K4): tools/divergence_research.py",
     "darkmatter_indicators": "authorless-feed D leading indicators (venue first-coverage, "
                              "incumbent displacement, breadth velocity, engagement "
                              "divergence) — shadow-trial candidates, board 2026-08-20; "
@@ -182,6 +189,18 @@ ACKNOWLEDGED_EXCEPTIONS = {
     ("gravitational_anomaly_detector", "coinapi_derivs"):
         "daily-pull scheduler + read-only /diag/coinapi report; accumulation only — "
         "no value into any score pre-backtest/board/flip",
+    # Sealed divergence residual (prereg 2026-09-14 §8). The detector hosts the API
+    # surface, so serving the thin GET /diag/divergence status route necessarily
+    # imports the module (LAZY, inside the endpoint). Direction: detector ->
+    # divergence, read-only status only — the real computation runs in the K4
+    # research consumer, tools/divergence_research.py.
+    # ⚠ THE REVIEW MUST RE-CHECK: no D value, flag, or residual may ever be read
+    # back into a score, ledger, or served surface before the prereg §5 instrument
+    # gates + §6 board note + Chairman sign-off. The day one is, revoke this
+    # exception, do not widen it.
+    ("gravitational_anomaly_detector", "divergence"):
+        "serves the read-only /diag/divergence status route (lazy import); OI-side "
+        "series stats only — no value into any score pre-§5/§6 gates",
     # Same shape for the Coinbase premium accumulation (Chairman 2026-08-10).
     # ⚠ RE-CHECK: coinbase_retail_spot rows must NEVER enter a price/market leg or
     # any score pre-review; the day one does, revoke this exception.

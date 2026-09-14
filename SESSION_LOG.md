@@ -4637,3 +4637,27 @@ production booted clean on the real database.
 - Chairman items still open: worldcup collation A1/A3/A4 residuals
 - Watch: N accrual on /diag/market-n; re-arm toward 5/2/3; nightly seal+anchor;
   CoinAPI ~08-24; FMP 09-05; ACC-Q quarterly scoring 2026-11-30
+
+### Addendum 8 (same session) — DIVERGENCE TOOL BUILT ON BRANCH + TESTED ON REAL DATA; all six items executed end-to-end
+- **Branch `feature/divergence-tool`** (Chairman order: build separately, test, confirm before
+  any platform merge). Built: sealed core `transfer/divergence.py` (D = zq − (α̂+β̂·zp), robust
+  z 90-obs forward-only, Theil–Sen weekly refit, honest None in warm-up; PARAM_VERSION = the
+  prereg sha256) + `test_divergence.py` (18/18, incl. the SEAL-BINDING test — editing the
+  sealed prereg fails the build) + internal `/diag/divergence` + held-out registry declaration;
+  web "Positioning vs Price" column + Register panel (built, NOT served — merge-gated);
+  `tools/divergence_research.py` (SELECT-only asserted at import, §8 no-forward-join) +
+  `ops-divergence-research.yml` (masked DATABASE_URL/FINRA/FMP keys; commits evidence to the
+  dispatched ref; registered on main by a .github-only commit, `7aa5064`).
+- **THREE REAL-DATA RUNS on Actions; run 3 ALL SECTIONS OK** → `audits/divergence/` +
+  `TEST_REPORT_2026-09-14.md`. Highlights: COT backfilled BTC 1,020 wk rows (to 2017-12-19) /
+  ETH 740; missingness audit 0 missing coin-days in 432; timing Spearman −0.10 (n=432);
+  cross-leg ρ 0.17 raw / 0.16 orthogonalized (legs not redundant); D preview honest-None at
+  ~36 of ~186 required aligned days (spec-correct absence); equity leg 16/16 tickers via FMP,
+  warm-up until ~48 settlements. Defects found BY the test and fixed per §10a: 6dca-aqww is
+  the LEGACY COT schema (schema-probing resolver now picks the lev_money-bearing TFF dataset),
+  CoinGecko 429s (15s pace + 65s retry), stooq cloud-IP message pages (FMP primary).
+- **GATE STATUS unchanged:** merge to platforms awaits Chairman confirmation; crypto display
+  additionally awaits RIGHTS OPEN item 9 + the 3-offset timing audit; equity stays
+  research-only under the seal (§7); mobile = documented N/A (no crypto screen); ledger DATA
+  untouched everywhere — the register replaces presentation only. Vacuum op re-dispatched
+  (base64 payload); authoritative verification = next engine release [diag].
