@@ -1228,7 +1228,14 @@ CACHE_TTL_SCORES  = 300   # 5 min  — /scores and /anomalies (expensive JOINs)
 # The FULL /scores feed is computed once and cached limit/offset-independently so
 # pagination is O(1) slicing. The worker invalidates the cache when fresh scores
 # land, so a long TTL is safe and keeps every page instant between cycles.
-CACHE_TTL_SCORES_FULL = int(os.getenv("CACHE_TTL_SCORES_FULL", "1800"))  # 30 min
+# 2026-09-14: 1800 → 7200. With the superset builds now legitimately slow (~14 min
+# scores on the grown table under PG_BUILD_TIMEOUT_MS), a full warm cycle + the 25-min
+# loop sleep lands the next rebuild ~50 min after the last SET — a 30-min TTL therefore
+# EXPIRED the cache for ~20 min of every hour (recurring 503 windows, the 09-13/14
+# outage's second act). 2h keeps the cache alive across the cycle with margin; freshness
+# is still driven by the pull-synchronized force-warms after every collect, not by TTL
+# expiry. Revisit down once the stage-2 build optimization lands (needs prod EXPLAIN).
+CACHE_TTL_SCORES_FULL = int(os.getenv("CACHE_TTL_SCORES_FULL", "7200"))  # 2 h
 # Prewarm Agent — refreshes the superset caches just under the TTL so the cache
 # (in THIS, the request-serving, process) is always hot AND at most this-many
 # minutes stale. Set PREWARM_ENABLED=0 to disable.

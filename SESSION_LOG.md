@@ -133,6 +133,23 @@ cannot reach `herokuapp.com` (egress 403) — all live probes remain founder-owe
   copies); nowtrendin2.0 skill's stale 90-day retention rule corrected to canonical 365
   (§13); AGENT_CHARTER rows 17–24 added (8 undocumented agents; full write-ups owed).
 
+### Addendum 4 (same session) — RECOVERY CONFIRMED BY MACHINE; TTL follow-through
+- **UP at 2026-09-14T02:07:57Z**, verified by the uptime monitor's own probe
+  (`/health=200 /topics=200 in 0.1s`; recovery row auto-committed `a2681ae`). Timeline:
+  fix deployed 01:42; scores build completed ~01:56 (~14 min — first success in days;
+  died at 300s before); topics completed by 02:07. Outage span (first founder
+  observation 09-13 ~00:26 UTC → 02:07): ~26h observed, onset unknown (pre-monitor).
+- **Second act prevented:** with ~14-min builds, warm-cycle cadence (~50 min between
+  cache SETs) exceeded the 30-min TTL → the cache would have expired ~20 min of every
+  hour. `CACHE_TTL_SCORES_FULL` default 1800→7200 shipped immediately after the UP
+  confirmation (freshness still pull-synchronized; TTL is only the no-warm fallback).
+- **Stage 2 owed (next session, evidence-first):** why a GROUP-BY that fit 300s on
+  2026-07-15 now needs ~14 min despite `idx_velocity_topic` existing — needs prod
+  `EXPLAIN (ANALYZE)` + bloat/autovacuum stats on `velocity_scores` (Essential-1);
+  candidate remedies: VACUUM/ANALYZE, planner-friendly rewrite (DISTINCT ON), index-only
+  path, or Postgres tier upsize (the §13 2026-06-24 note predicted this: "needs a larger
+  Postgres tier as the tail fills").
+
 ### Open / Next
 - **Re-probe** (founder browser): reload the web terminal (the 503 predates the deploy; the
   deploy restarted dynos + precomputed 600 payloads — likely resolved); then `/monitor` +
