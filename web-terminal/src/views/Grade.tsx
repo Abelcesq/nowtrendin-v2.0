@@ -13,6 +13,9 @@ import { Disclaimer } from '../components/Disclaimer'
 const GOLD = '#D4A017'
 type Tab = 'new' | 'history' | 'graded'
 
+// K17: the gap always prints SIGNED (true minus U+2212 for negatives) — Math.abs only for banding.
+const signedGap = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0')
+
 function timeAgo(iso: string) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (isNaN(mins)) return ''
@@ -37,8 +40,14 @@ function ring(val: number, color: string) {
 function ProposedCard({ result, topic }: { result: any; topic: string }) {
   const det = Math.round(result.detection_score ?? 0)
   const conf = Math.round(result.confidence_score ?? 0)
-  const gap = Math.abs(Math.round(result.heisenberg_gap ?? (det - conf)))
+  // K17: keep the sign — gapBandIndex bands on |gap| internally, but a NEGATIVE gap
+  // (confidence ahead of detection) must never wear a positive-direction band label
+  // like "Very early — detected, not confirmed".
+  const gap = Math.round(result.heisenberg_gap ?? (det - conf))
   const band = GAP_BANDS[gapBandIndex(gap)]
+  const lagging = gap < -15   // beyond the symmetric "aligned" band, on the negative side
+  const bandLabel = lagging ? 'Lagging — confirmation now exceeds early detection' : band.label
+  const bandColor = lagging ? MC.slate : band.color
   const ms = result.market_signal?.market_gradient
   const scol = stageColor(result.stage)
   // Measured topics carry their components under measured_row (with _score suffixes);
@@ -128,8 +137,8 @@ function ProposedCard({ result, topic }: { result: any; topic: string }) {
           <div className="g-ring">{ring(det, MC.detection)}<div className="g-rl">DETECTION</div></div>
           <div className="g-ring">{ring(conf, MC.confidence)}<div className="g-rl">CONFIDENCE</div></div>
         </div>
-        <div className="g-gapband" style={{ borderColor: band.color + '55', background: band.color + '0F' }}>
-          <b style={{ color: band.color }}>{gap}-point gap — {band.label}</b>
+        <div className="g-gapband" style={{ borderColor: bandColor + '55', background: bandColor + '0F' }}>
+          <b style={{ color: bandColor }}>{signedGap(gap)}-point gap — {bandLabel}</b>
         </div>
         {result.action && <div className="g-action" style={{ color: scol }}>{result.action}</div>}
         {result.reasoning && <div className="narr" style={{ marginBottom: 10 }}>{result.reasoning}</div>}

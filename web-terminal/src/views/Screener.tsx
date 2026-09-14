@@ -75,6 +75,9 @@ function ring(val: number, color: string) {
   )
 }
 
+// K17: the gap always prints SIGNED (true minus U+2212 for negatives) — Math.abs only for banding.
+const signedGap = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0')
+
 function gapInterp(d: number): [string, boolean, string] {
   const g = Math.abs(d)
   if (d < 0) return ['LAGGING', true, 'Confirmation now exceeds early detection — the hard signal arrived after the early window. A late-stage read.']
@@ -146,12 +149,19 @@ function deriveDivergence(components: any, gap: number) {
   if (d?.asymmetry_detected != null) rows.push({ label: 'ENGAGEMENT ASYMMETRY', value: d.asymmetry_detected ? 'Detected' : 'Normal', favors: 'DET', note: 'deep discussion vs surface votes → lifts Detection' })
   const pc = Array.isArray(m?.platforms) ? m.platforms.length : null
   if (pc != null) rows.push({ label: 'PLATFORM SPREAD', value: `${pc} platform${pc === 1 ? '' : 's'}`, favors: 'CONF', note: 'broad cross-platform presence → lifts Confidence' })
+  // K17: negative gaps (confidence ahead) get their OWN prose — an abs value must never
+  // select a direction-asserting sentence (gapInterp above already handles d < 0 first).
   const g = Math.abs(gap)
-  const summary = g >= 18
-    ? `This signal's ${g}-pt gap means its early-edge components run well ahead of cross-platform confirmation — detected early, not yet broadly confirmed.`
-    : g >= 8
-      ? `A ${g}-pt gap: the early-edge signal is somewhat ahead of confirmation — building, not yet fully aligned.`
-      : `A ${g}-pt gap: early-edge and confirmation are closely aligned — both rule-sets agree on where this sits.`
+  const gs = signedGap(gap)
+  const summary = gap <= -18
+    ? `This signal's ${gs}-pt gap means cross-platform confirmation now runs well ahead of its early-edge components — the hard signal arrived after the early window; a late-stage read.`
+    : gap <= -8
+      ? `A ${gs}-pt gap: confirmation is somewhat ahead of the early-edge signal — the topic is maturing past its early window.`
+      : g >= 18
+        ? `This signal's ${gs}-pt gap means its early-edge components run well ahead of cross-platform confirmation — detected early, not yet broadly confirmed.`
+        : g >= 8
+          ? `A ${gs}-pt gap: the early-edge signal is somewhat ahead of confirmation — building, not yet fully aligned.`
+          : `A ${gs}-pt gap: early-edge and confirmation are closely aligned — both rule-sets agree on where this sits.`
   return { summary, rows }
 }
 

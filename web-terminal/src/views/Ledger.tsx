@@ -144,7 +144,7 @@ export function Ledger() {
       <div className={'chip' + (money ? ' active' : '')} onClick={() => { setMode('money'); setFilter('') }}
            title="Money Gradient — validated against realized EOD price direction (FMP)">Money · Market</div>
       <div className={'chip' + (crypto ? ' active' : '')} onClick={() => { setMode('crypto'); setFilter('') }}
-           title="Crypto Money Gradient — validated against realized COIN price direction (FMP crypto + AV)">Crypto · Coin</div>
+           title="Crypto positioning signal — validated against realized COIN price direction (FMP crypto + AV)">Crypto · Coin</div>
     </div>
   )
 
@@ -156,7 +156,7 @@ export function Ledger() {
           <div className="main-title">Accuracy Ledger</div>
           <div className="main-sub">
             {priceMode ? (
-              <>{crypto ? 'Crypto money-movement detections validated against realized ' : 'Money-movement detections validated against realized '}
+              <>{crypto ? 'Crypto positioning detections validated against realized ' : 'Money-movement detections validated against realized '}
                 <b>{crypto ? 'coin price direction' : 'EOD price direction'}</b> ({crypto ? 'FMP crypto + AV' : 'FMP'}) ·{' '}
                 <b>{psum?.resolved ?? 0}</b> resolved · <b>{psum?.pending ?? 0}</b> in flight</>
             ) : (
@@ -184,7 +184,7 @@ export function Ledger() {
           <div className="cal-banner">
             ◷ A <b>separate</b> ledger from the Attention one. Ground truth = the realized {crypto ? 'coin' : 'EOD'} close
             <b> direction</b> (inflow→up / outflow→down, past ±{psum?.move_threshold_pct ?? (crypto ? 8 : 5)}%), {crypto ? 'via FMP crypto + AV' : 'via FMP'} — not Google Trends.
-            A <b>retrospective measurement</b> of whether our {crypto ? 'crypto ' : ''}money-movement read matched the {crypto ? 'coin' : 'market'} — not a
+            A <b>retrospective measurement</b> of whether our {crypto ? 'crypto positioning' : 'money-movement'} read matched the {crypto ? 'coin' : 'market'} — not a
             forecast or advice.
           </div>
           <div className="statstrip">
@@ -246,8 +246,8 @@ export function Ledger() {
         ) : priceMode ? (
           pview.length === 0 ? (
             <div className="center-state">
-              No resolved {crypto ? 'crypto ' : ''}money-movement detections yet{filter ? ` for "${MVLABEL[filter]}"` : ''}.
-              <div className="muted">{(psum?.pending ?? 0) > 0 ? `${psum!.pending} detection${psum!.pending === 1 ? '' : 's'} in flight — they resolve` : 'Detections resolve'} as the realized {crypto ? 'coin' : ''} price confirms (or the {psum?.timeout_days ?? (crypto ? 45 : 60)}-day window elapses).{(psum?.pending ?? 0) === 0 ? ` Populates once the ${crypto ? 'Crypto ' : ''}Money Gradient is live.` : ''}</div>
+              No resolved {crypto ? 'crypto positioning' : 'money-movement'} detections yet{filter ? ` for "${MVLABEL[filter]}"` : ''}.
+              <div className="muted">{(psum?.pending ?? 0) > 0 ? `${psum!.pending} detection${psum!.pending === 1 ? '' : 's'} in flight — they resolve` : 'Detections resolve'} as the realized {crypto ? 'coin' : ''} price confirms (or the {psum?.timeout_days ?? (crypto ? 45 : 60)}-day window elapses).{(psum?.pending ?? 0) === 0 ? ` Populates once the ${crypto ? 'crypto positioning signal' : 'Money Gradient'} is live.` : ''}</div>
             </div>
           ) : (
             <table>
@@ -255,7 +255,7 @@ export function Ledger() {
                 <tr>
                   <th>{crypto ? 'Coin' : 'Instrument'}</th>
                   <th>Flow</th>
-                  <th className="r">Money @ call</th>
+                  <th className="r">{crypto ? 'Positioning @ call' : 'Money @ call'}</th>
                   <th className="r">Detected</th>
                   <th className="r">Price move</th>
                   <th className="r">Lead</th>

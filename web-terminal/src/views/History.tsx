@@ -156,7 +156,7 @@ export function History({ initialQ, query }: { initialQ?: string; query?: string
                   <div className="hv-ai-short"><Sparkles size={13} color="var(--early)" /> {an.short}</div>
                   {an.full && <div className="hv-ai-full">{an.full}</div>}
                   {!!an.citations?.length && <div className="hv-ai-cite">Sources: {an.citations.slice(0, 4).map((c, i) => <a key={i} href={c} target="_blank" rel="noopener noreferrer">[{i + 1}]</a>)}</div>}
-                  <div className="hv-ai-disc">AI analysis of attention movement — measurement is computer generated. All information contained herein may not be accurate and should not be construed as financial, investment, or legal advice.</div>
+                  <div className="hv-ai-disc">AI analysis of attention movement — measurement is computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>
                 </>
               ) : an ? <div className="hv-ai-note">{an.reason || 'Analysis unavailable.'}</div>
                 : <button className="hv-ai-btn" onClick={explain} disabled={anLoad}><Sparkles size={14} /> {anLoad ? 'Analysing…' : 'Explain this move (AI)'}</button>}

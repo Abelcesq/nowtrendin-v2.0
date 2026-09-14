@@ -10,6 +10,8 @@ import type { NavKey } from '../components/Shell'
 // or Track-a-topic). Layout persists per-user via /api/dashboard/ (cross-device).
 
 const r0 = (v: any) => Math.round(Number(v || 0))
+// K17: gaps print SIGNED (true minus U+2212 for negatives) — Math.abs is for sort keys only.
+const signedGap = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0')
 let _idc = 0
 const newId = () => `t${Date.now()}_${_idc++}`
 
@@ -38,7 +40,7 @@ const BUILTIN_META: Record<string, { title: string; icon: any; color: string }> 
   'top-trends-mingap': { title: 'Top trends · minimal gap', icon: TrendingUp, color: 'var(--det)' },
   'top-n': { title: 'Top N · demand leaders', icon: Flame, color: 'var(--early)' },
   'top-market': { title: 'Top market signals', icon: DollarSign, color: 'var(--conf)' },
-  'top-crypto': { title: 'Top crypto · money movement', icon: Bitcoin, color: 'var(--det)' },
+  'top-crypto': { title: 'Top crypto · positioning', icon: Bitcoin, color: 'var(--det)' },
   'leverage-spread': { title: 'Leverage spread', icon: Scale, color: 'var(--text-2)' },
 }
 
@@ -103,9 +105,16 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
       tier: (mg.tier || r.risk_stage || '—'), lev: mg.leverage_health == null ? null : r0(mg.leverage_health) }
   }), [risks])
 
-  const C = useMemo(() => coins.map((c) => ({
-    key: c.coin, name: c.item_name || c.coin, mm: r0(c.money_movement), tier: (c.tier || '—'),
-  })), [coins])
+  // C1 honest absence: an absent positioning read is null, never a measured-looking 0 —
+  // absent coins are excluded from the positioning ranking (ordered by market confirmation).
+  const C = useMemo(() => coins.map((c) => {
+    const absent = !!c.money_data_absent || c.money_movement == null || (c.tier || '').toUpperCase() === 'ABSENT'
+    return {
+      key: c.coin, name: c.item_name || c.coin,
+      mm: absent ? null : r0(c.money_movement), mc: r0(c.market_confirmation),
+      tier: (c.tier || '—'), absent,
+    }
+  }), [coins])
 
   function rowsForTrends(cfg: any) {
     let r = T.slice()
@@ -129,7 +138,7 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
     switch (t.type) {
       case 'top-trends-mingap': {
         const rows = T.filter((x) => x.det >= 70).sort((a, b) => Math.abs(a.det - a.conf) - Math.abs(b.det - b.conf)).slice(0, 5)
-        return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('trends')}><span className="dash-nm">{x.name}</span>{num(x.det, 'var(--det)')}{num(x.conf, 'var(--conf)')}{pill('gap ' + Math.abs(x.det - x.conf), 'var(--em-t)', 'var(--em-b)')}</div>) : <div className="dash-empty">No high-conviction trends.</div>
+        return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('trends')}><span className="dash-nm">{x.name}</span>{num(x.det, 'var(--det)')}{num(x.conf, 'var(--conf)')}{pill('gap ' + signedGap(x.det - x.conf), 'var(--em-t)', 'var(--em-b)')}</div>) : <div className="dash-empty">No high-conviction trends.</div>
       }
       case 'top-n': {
         const rows = [...T].sort((a, b) => b.n - a.n).slice(0, 5)
@@ -140,8 +149,16 @@ export function Dashboard({ onNav, onNavHistory }: { onNav: (k: NavKey) => void;
         return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('market')}><span className="dash-nm">{x.name}</span>{num(x.det, 'var(--det)')}{pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>) : <div className="dash-empty">Market unavailable.</div>
       }
       case 'top-crypto': {
-        const rows = [...C].sort((a, b) => b.mm - a.mm).slice(0, 5)
-        return rows.length ? rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('crypto')}><span className="dash-nm">{x.name}</span>{num(x.mm, 'var(--det)')}{pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>) : <div className="dash-empty">Crypto unavailable.</div>
+        // Measured positioning ranks first (by that value); absent coins are never ranked
+        // on a fabricated 0 — they follow, ordered by market confirmation, value shown
+        // as a muted em-dash (C1 honest absence).
+        const rows = [...C].sort((a, b) =>
+          a.absent !== b.absent ? (a.absent ? 1 : -1) : a.absent ? b.mc - a.mc : b.mm! - a.mm!).slice(0, 5)
+        const anyAbsent = rows.some((x) => x.absent)
+        return rows.length ? <>
+          {rows.map((x) => <div className="dash-row" key={x.key} onClick={() => onNav('crypto')}><span className="dash-nm">{x.name}</span>{x.absent ? <span className="dash-row-v" style={{ color: 'var(--text-3)' }} title="Not measured — no qualifying positioning source for this coin">—</span> : num(x.mm!, 'var(--det)')}{x.absent ? <span className="dash-pill" title="Not measured — no qualifying positioning source for this coin" style={{ color: 'var(--text-3)', background: 'transparent', border: '1px dashed var(--text-3)' }}>NOT MEASURED</span> : pill(x.tier, 'var(--st-t)', 'var(--st-b)')}</div>)}
+          {anyAbsent && <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>— = positioning not measured · unmeasured coins ordered by market confirmation</div>}
+        </> : <div className="dash-empty">Crypto unavailable.</div>
       }
       case 'leverage-spread': {
         const lev = M.filter((m) => m.lev != null) as any[]

@@ -104,6 +104,9 @@ function toRow(r: RiskRow): MRow {
 const MM_LABEL = 'Money Movement'      // was "Detection" (informed/early money flow, D)
 const MC_LABEL = 'Market Confirmation' // was "Confidence" (broad market/economic confirmation, M)
 
+// K17: the gap always prints SIGNED (true minus U+2212 for negatives) — Math.abs only for banding.
+const signedGap = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0')
+
 // Factual flow direction chip (a FACT from filings — not a buy/sell call).
 function flowChip(flow: MRow['flow']) {
   if (!flow) return null
@@ -336,7 +339,9 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
           </div>
         )}
         <div className="mkt-gapband" style={{ borderColor: tcol + '55', background: tcol + '10' }}>
-          <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : (mg.gap_state || `${Math.abs(row.gap)}-pt gap`)}{!mg.calibrating && ` · ${Math.abs(row.gap)}-pt gap`}</b>
+          {/* K17: gap_state is the label; the signed gap prints exactly ONCE (the old
+              gap_state-absent path rendered "12-pt gap · 12-pt gap", sign lost twice). */}
+          <b style={{ color: tcol, fontSize: 12 }}>{mg.calibrating ? 'CALIBRATING' : mg.gap_state ? `${mg.gap_state} · ${signedGap(row.gap)}-pt gap` : `${signedGap(row.gap)}-pt gap`}</b>
           {row.interp && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{row.interp}</div>}
           {row.interp && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
         </div>
@@ -437,7 +442,8 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
             )}
             {coveredCreators.map((cr: any) => (
               <div className="cov-block" key={cr.handle}>
-                <div className="cov-h" style={{ color: MC.red }}>{cr.name}: {cr.count} recent video{cr.count === 1 ? '' : 's'}</div>
+                {/* §12: red = loss/error ONLY — a creator covering a stock is neither. */}
+                <div className="cov-h" style={{ color: MC.amber }}>{cr.name}: {cr.count} recent video{cr.count === 1 ? '' : 's'}</div>
                 {(cr.recent || []).slice(0, 2).map((vd: any, i: number) => <div className="cov-i" key={i}>▸ {vd.title}</div>)}
               </div>
             ))}

@@ -68,6 +68,8 @@ const PVP_HEADER_TIP = 'Leverage positioning vs price — a signed residual: pos
 const PVP_ABSENT_TIP = 'Positioning vs Price requires cleared source rights and instrument audits — accruing since 2026-08-10'
 // Explicit sign, 1 decimal, true minus (U+2212). Zero prints unsigned.
 const signed1 = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v < 0 ? `−${Math.abs(v).toFixed(1)}` : '0.0')
+// Integer twin (K17): the gap always prints SIGNED — a −18 never reads like a +18.
+const signedGap = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '0')
 // Display-only legibility banding (±0.5), sign-aware: positive and negative never share a hue.
 const pvpColor = (d: number) => (d >= 0.5 ? MC.detectionText : d <= -0.5 ? MC.textSec : MC.muted)
 
@@ -157,7 +159,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
 
       {(c.gap_state || c.interpretation) && (
         <div className="sect">
-          <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : (c.gap_state || '').replace(/_/g, ' ')}{c.gap != null && !c.calibrating ? ` · ${Math.abs(c.gap)}-pt gap` : ''}</b>
+          <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : (c.gap_state || '').replace(/_/g, ' ')}{c.gap != null && !c.calibrating ? ` · ${signedGap(c.gap)}-pt gap` : ''}</b>
           {c.interpretation && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{c.interpretation}</div>}
           {c.interpretation && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
         </div>
@@ -403,7 +405,7 @@ export function Crypto({ onRail, query }: { onRail: (node: ReactNode | null) => 
                         block — absent on the wire today until the prereg §6 gates clear. */}
                     <td className="r"><PvpCell c={c} /></td>
                     <td className="r"><span className="score-cell conf">{c.market_confirmation}</span></td>
-                    <td className="r"><span className="muted">{c.gap != null ? `${c.gap > 0 ? '+' : ''}${c.gap}` : '—'}</span></td>
+                    <td className="r"><span className="muted">{c.gap != null ? signedGap(c.gap) : '—'}</span></td>
                     <td>{isAbsent(c)
                       ? <AbsentTierChip c={c} />
                       : <span className="tier" style={{ color: marketTierColor(c.tier), background: marketTierColor(c.tier) + '18', padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11 }}>{c.tier}</span>}</td>
