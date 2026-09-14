@@ -1,0 +1,55 @@
+# Divergence research runner (Chairman-ordered items 2-4+6, sealed prereg
+# DIVERGENCE_PREREG_2026-09-14.md). Runs tools/divergence_research.py on a GitHub
+# runner (open egress — CFTC/CoinGecko/FINRA reachable; this repo's cloud sessions are
+# egress-blocked) with READ-ONLY access to the engine database, and commits the
+# research outputs to audits/divergence/ on the SAME ref it was dispatched from.
+# The script is SELECT-only and contains no forward-looking join (prereg §8); the
+# DATABASE_URL is fetched via the Heroku API and masked from logs.
+name: Ops - divergence research
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: divergence-research
+  cancel-in-progress: false
+
+jobs:
+  research:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch read credentials (masked)
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then echo "::error::HEROKU_API_KEY not set"; exit 1; fi
+          DBURL=$(curl -sS "https://api.heroku.com/apps/nowtrendin-v2-engine/config-vars" \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('DATABASE_URL',''))")
+          echo "::add-mask::$DBURL"
+          echo "DATABASE_URL=$DBURL" >> "$GITHUB_ENV"
+
+      - name: Run the research script (read-only)
+        run: |
+          pip install -q psycopg2-binary requests numpy
+          mkdir -p audits/divergence
+          OUT_DIR=audits/divergence python3 tools/divergence_research.py
+
+      - name: Commit outputs to this ref
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "divergence-research"
+          git add audits/divergence
+          if git diff --cached --quiet; then echo "no output changes"; exit 0; fi
+          git commit -m "divergence research outputs ($(date -u +%Y-%m-%dT%H:%MZ), ref ${GITHUB_REF_NAME})"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            sleep 5
+          done
