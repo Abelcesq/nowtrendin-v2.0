@@ -9,7 +9,9 @@ export type MarketCategoryKey =
   | 'building' | 'routine' | 'dormant' | 'leverage';
 
 // Helpers reading the live Market Gradient off a RiskScore.
-export const tierOf = (r: RiskScore) => r.marketGradient?.tier ?? r.stage ?? 'DORMANT';
+// Board D11 lint catch (2026-09-15): a missing tier is ABSENCE — never defaulted to a
+// measured band. Absent rows fail every band filter (land only in 'All') by design.
+export const tierOf = (r: RiskScore): string | undefined => r.marketGradient?.tier ?? r.stage;
 const detOf = (r: RiskScore) => r.marketGradient?.detection ?? r.detection ?? 0;
 export const leverageOf = (r: RiskScore): number | null =>
   r.marketGradient?.leverageHealth ?? null;

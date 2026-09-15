@@ -8,6 +8,10 @@ name: Ops - fetch legal terms snapshots
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '45 6 3 * *'    # monthly (board D11 2026-09-15): a vendor can revoke by silent
+                            # ToS edit; a new dated snapshot commits only when the text CHANGED,
+                            # so the commit itself is the diff alarm
 
 permissions:
   contents: write
@@ -64,6 +68,15 @@ jobs:
                       print(f"[{vendor}] {url} -> too little text ({len(text)} chars), trying next")
                       continue
                   slug = url.rstrip("/").rsplit("/", 1)[-1] or vendor
+                  # Board D11 (2026-09-15): a new dated file commits ONLY when the text
+                  # actually changed vs the latest snapshot — the commit IS the diff alarm.
+                  prior = sorted(OUT.glob(f"{vendor}_{slug}_*.txt"))
+                  if prior:
+                      old = prior[-1].read_text(encoding="utf-8").split("\n", 2)[-1]
+                      if old.strip() == text.strip():
+                          print(f"[{vendor}] {slug}: unchanged vs {prior[-1].name} — no new snapshot")
+                          got = True
+                          continue
                   path = OUT / f"{vendor}_{slug}_{today}.txt"
                   path.write_text(f"SNAPSHOT {today} of {url}\n{'='*72}\n{text}\n", encoding="utf-8")
                   print(f"[{vendor}] saved {path} ({len(text)} chars)")

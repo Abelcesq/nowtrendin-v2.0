@@ -3,12 +3,15 @@
 # platforms"). Runs from a GitHub runner because the repo's cloud sessions are
 # egress-blocked to both herokuapp.com and github.io. READ-ONLY: GET probes
 # only; prints a pass/fail table. Desktop wraps the same web bundle, so the
-# web-bundle checks cover it; mobile has no crypto screen (documented N/A) and
-# its market screens are untouched by the divergence merge.
+# web-bundle checks cover it; mobile ships from the same repo (crypto screens
+# exist there since 148487d — verified by the 2026-09-14 all-pages audit) and is
+# checked at the source level; live-device state depends on the founder's Expo publish.
 name: Ops - platform verify (market + crypto)
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '15 13 * * 1'   # weekly Mon 13:15 UTC (board D11 2026-09-15): drift between merges
 
 jobs:
   verify:
@@ -98,7 +101,7 @@ jobs:
               check(name, fn)
 
           print()
-          print("mobile: N/A for crypto (no crypto screen); market screens untouched by this merge (0 frontend/ files in the diff)")
+          print("mobile: source-level parity maintained in-repo; live devices reflect the founder's last Expo publish")
           if fails:
               print(f"\nRESULT: FAIL ({len(fails)}): {fails}"); sys.exit(1)
           print("\nRESULT: ALL PASS")

@@ -39,7 +39,7 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
   const clsColor = CLASS_COLOR[cls] ?? '#9A9AA2';
   const pos = risk.positioningScore ?? 0;
   const tier = tierOf(risk);
-  const color = MARKET_TIER_COLOR[tier] ?? '#9A9AA2';
+  const color = (tier && MARKET_TIER_COLOR[tier]) || '#9A9AA2';
   // D8: money read absent → show "n/a", never a floor number in the collapsed row.
   const mmAbsent = Boolean((risk.marketGradient as any)?.moneyDataAbsent);
   const mm = mmAbsent ? 'n/a' : Math.round(risk.marketGradient?.detection ?? risk.detection ?? 0);
@@ -65,7 +65,7 @@ export function RiskCard({ risk }: { risk: RiskScore }) {
           <View style={{ flex: 1 }}>
             <Text numberOfLines={1} style={{ color: '#16264A', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>{titleCaseTopic(risk.display)}</Text>
             <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 }}>
-              <Text style={{ color }}>{tier}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
+              <Text style={{ color }}>{tier ?? 'NOT MEASURED'}</Text> · {risk.totalSignals} SIGNALS{risk.percentDelta != null ? ` · ${risk.percentDelta >= 0 ? '+' : ''}${Math.round(risk.percentDelta)}%` : ''}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>

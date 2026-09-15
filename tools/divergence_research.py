@@ -603,6 +603,46 @@ def section2_audits(rows, cols, missing_cols, prices, price_errors,
                "missing_columns": missing_cols, "price_errors": price_errors,
                "research_price_caveat": RESEARCH_PRICE_CAVEAT}
 
+    # -- 2d RETROACTIVE UNIT BACKSCAN (board 2026-09-15 D10, Chairman-ruled) ---
+    # The K14 unit guard only stamps rows written after deploy f60fad8, so the
+    # earlier accrual has zero operational unit-guard history. Apply the SAME
+    # >10x day-over-day OI discontinuity test to EVERY accrued row, read-only.
+    # Chairman ruling (disagreement 2): pre-seal rows may serve as D-display
+    # warm-up CONTEXT only if this backscan is clean; flagged spans are severed
+    # from any baseline, exactly as a live suspect stamp would sever them.
+    back_rows, back_flags = [], 0
+    for coin in sorted(by_coin):
+        days = sorted(by_coin[coin])
+        prev = None
+        for d in days:
+            oi = by_coin[coin][d].get("open_interest")
+            try:
+                oi = float(oi) if oi is not None else None
+            except (TypeError, ValueError):
+                oi = None
+            if oi is not None and prev is not None and prev > 0:
+                if oi > 10 * prev or oi < prev / 10:
+                    back_rows.append([coin, d.isoformat(), prev, oi,
+                                      _r(oi / prev, 4)])
+                    back_flags += 1
+            if oi is not None:
+                prev = oi
+    _write_csv(_out("unit_backscan.csv"),
+               ["coin", "signal_date", "prev_oi", "oi", "ratio"], back_rows,
+               comment=("# D10 retroactive unit backscan — >10x day-over-day OI "
+                        "discontinuities over ALL accrued rows (read-only; a flag "
+                        "severs the span from any baseline)"))
+    summary["unit_backscan"] = {
+        "rows_scanned": sum(len(v) for v in by_coin.values()),
+        "discontinuities_flagged": back_flags,
+        "verdict": ("CLEAN — pre-seal rows usable as disclosed warm-up context "
+                    "per the 2026-09-15 Chairman ruling" if back_flags == 0 else
+                    "FLAGGED — listed spans are severed; see unit_backscan.csv"),
+    }
+    print(f"[2d backscan] {summary['unit_backscan']['rows_scanned']} rows, "
+          f"{back_flags} discontinuity flag(s) — "
+          f"{summary['unit_backscan']['verdict']}")
+
     # -- 2a missingness vs |return| ------------------------------------------
     miss_rows, pooled_miss, pooled_pres = [], [], []
     counts = {"missing_days": 0, "present_days": 0,

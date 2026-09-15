@@ -282,7 +282,7 @@ export interface RiskScore {
   display: string;
   detection: number;
   confidence: number;
-  stage: string;
+  stage?: string;
   action: string;
   interpretation: string;
   diffusion: { dark: number; expert: number; consumer: number; media: number; retail: number };
@@ -469,7 +469,9 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     display: r.risk_display || r.risk_topic,
     detection: Math.round(Number(r.detection_score ?? 0)),
     confidence: Math.round(Number(r.confidence_score ?? 0)),
-    stage: r.risk_stage || 'BACKGROUND',
+    // Board D11 lint (2026-09-15): the engine itself serves BACKGROUND for "no
+    // signals"; a client must never assert it when the field is absent.
+    stage: r.risk_stage || undefined,
     action: r.risk_action || '',
     interpretation: r.interpretation || '',
     diffusion: {

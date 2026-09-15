@@ -9,6 +9,9 @@ name: Ops - divergence research
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '30 7 5 * *'    # monthly re-run (board D11/Executioner 2026-09-15): the instrument
+                            # audits must be scheduled, not remembered; outputs commit dated
 
 permissions:
   contents: write

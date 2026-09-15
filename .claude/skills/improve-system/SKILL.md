@@ -39,3 +39,9 @@ scores, data, or config; it ranks findings and recommends.**
 - Flag-never-force; deploy nothing from this skill.
 - Deadlines currently on the shelf are listed in `audits/DEFERRED_ITEMS.md` — walk them
   every run and say plainly which fired, which are late, which are unreadable.
+- **DOC-vs-CODE RECONCILIATION (board D7, Chairman-ruled 2026-09-15):** each run, sample
+  "LIVE / shipped / ✅" claims in CLAUDE.md + SESSION_LOG and verify each against git
+  (the shipping commit must exist and contain the claimed surface). Two false "recorded
+  live" claims were caught in one 24h period (mobile SignalAnalysis never wired; "mobile
+  has no crypto screen" 28 days stale) — the record must meet the same standard as the
+  ledger. New rule: a "LIVE/shipped" sentence entering CLAUDE.md cites its commit hash.

@@ -82,7 +82,10 @@ function toRow(r: RiskRow): MRow {
   return {
     key: r.risk_topic, name: r.risk_display || r.risk_topic,
     det, conf, gap: det - conf,
-    tier: (mg.tier || r.risk_stage || 'ROUTINE').toUpperCase(),
+    // Board D11 lint catch (2026-09-15): no fabricated band when both fields are absent
+    // (the engine defaults risk_stage to BACKGROUND, so '' is a malformed-payload case —
+    // it must read as absence, never as ROUTINE).
+    tier: (mg.tier || r.risk_stage || '').toUpperCase(),
     cls: (r.classification || '').toUpperCase(),
     pct: r.percent_delta ?? null, lev: mg.leverage_health ?? null,
     sigs: r.total_signals ?? 0, ageMin: minsSince(r.scored_at),
@@ -235,7 +238,7 @@ function MarketRail({ row, onClose }: { row: MRow; onClose: () => void }) {
         <div className="detail-top">
           <div>
             <div className="detail-name">{row.name}</div>
-            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier}</span>{row.v2 && flowChip(row.flow)}{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
+            <div className="detail-cat">Market Signal · <span style={{ color: tcol, fontWeight: 700 }}>{row.tier || 'NOT MEASURED'}</span>{row.v2 && flowChip(row.flow)}{row.laneLabel && <span className="cal-chip" title={row.laneLabel} style={{ background: '#EEF2F7', color: MC.muted }}>{LANE_SHORT[row.lane] || row.lane}</span>}{row.calibrating && <span className="cal-chip">calibrating</span>}</div>
           </div>
           <div className="x" onClick={onClose}>✕</div>
         </div>
@@ -760,7 +763,9 @@ export function MarketSignal({ onRail, preset, focus, query }: { onRail: (node: 
                     <td className="r"><div className="gapviz" style={r.dc === 'insufficient' ? { opacity: 0.4 } : undefined}>{gapMicro(r.det, r.conf)}<span className={'gapnum ' + gw}>{r.gap > 0 ? '+' : ''}{r.gap}</span></div></td>
                     <td>{r.dc === 'insufficient'
                       ? <span className="tier" style={{ color: MC.muted, background: '#EEF0F2' }} title="Smart-money / short-interest sources (FINRA short interest · 13F holdings) aren’t populated for this item yet — limited coverage, not a confirmed quiet market.">LTD DATA</span>
-                      : <span className={'tier ' + r.tier}>{r.tier}</span>}</td>
+                      : r.tier
+                        ? <span className={'tier ' + r.tier}>{r.tier}</span>
+                        : <span className="tier" style={{ color: MC.muted, background: 'transparent', border: `1px dashed ${MC.muted}` }} title="No tier served for this row">NOT MEASURED</span>}</td>
                     <td className="r"><span className={'pct ' + (r.pct == null ? 'na' : r.pct > 0 ? 'up' : r.pct < 0 ? 'down' : 'flat')}>{r.pct == null ? '—' : `${r.pct > 0 ? '+' : ''}${Math.round(r.pct)}%`}</span></td>
                     <td className="r"><span className="muted">{r.lev == null ? '—' : Math.round(r.lev)}</span></td>
                     <td className="r"><span className="muted">{r.sigs || '—'}</span></td>
