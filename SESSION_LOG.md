@@ -4744,3 +4744,26 @@ production booted clean on the real database.
   sending) · engage counsel (Binance pass-through + countersign the §3.1 internal-use
   reading) · Expo publish (carries every mobile fix to devices) · D4 panic-clause and
   D5 FMP rulings pending the plain-English memos.
+
+### Addendum 12 — Challenger items executed (founder-ordered 2026-09-15, cloud session)
+- **Founder order:** fix the stale CLAUDE.md footer + implement the Challenger's still-open
+  recommendations from `BOARD_24h-review_2026-09-15.md`. (R1 fit-staleness/calendar-gap and the
+  D10 backscan were already shipped as D2/D10 — verified, not re-done.)
+- **R6 / footer:** CLAUDE.md gets a new dated 2026-09-15 block recording the 09-14 00:46 UTC
+  engine deploy (Actions run 1, 600 payloads, schema 2026-08-24.1), the 503 fix `3c12655`, and
+  the board round; the stale "deploy STILL owed" block is demoted to *Prior* untouched
+  (annotate-never-rewrite). This footer was itself the LIVE-claims-audit finding.
+- **R4 / D9 (skip REVERSED by the founder):**
+  `audits/frontend/INCIDENT_served-fabrication-windows_2026-09-15.md` — dated exposure table,
+  intro→fix→live commit per class (tier fallbacks A1–A4, Dashboard measured-0 B, K17 sign-blind
+  C, disclaimer divergence D: diverged 2026-07-07 at the verbatim standard, restored `60242ee`).
+  Web windows CLOSED (gh-pages `97533e7`/`0f8b8f5`); **mobile windows OPEN until Expo publish**.
+  Artifact sweep: no in-repo screenshots; founder-side sweep of demo materials owed.
+- **R2:** `tools/divergence_research.py` timing summary now emits `n_days_eff` (day-clusters)
+  beside pooled n with the pseudo-replication caveat; `TEST_REPORT_2026-09-14.md` annotated
+  (n=432→n_eff≈36 · missingness "not testable, not passed" · stale mobile-crypto premise) —
+  the dated report body untouched.
+- **R5:** RIGHTS_REGISTER CoinAPI row: internal-use CLEARED is an in-house reading (grade C);
+  counsel must countersign §3.1 itself; buyer docs say "not held", never "pending".
+- Gates after changes: tests 21/21, integrity gate PASSED. History deepened in this container
+  (shallow clone masked pre-08-24 intro commits — traces run on full history).
