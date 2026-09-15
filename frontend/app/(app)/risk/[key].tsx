@@ -49,6 +49,22 @@ const MARKET_TIERS = [
   { key: 'ROUTINE',  range: '25–39',  desc: 'In line with own baseline' },
   { key: 'DORMANT',  range: '0–24',   desc: 'Quiet vs baseline' },
 ];
+// D6 (board 2026-09-15): the gap_state ENUM values are payload contract and never change;
+// the DISPLAY retires "money" vocabulary (web/crypto parity: GAP_STATE_DISPLAY). Known
+// states map here; anything unknown falls back to the plain underscore-replace.
+const GAP_STATE_DISPLAY: Record<string, string> = {
+  money_absent: 'positioning absent',
+  confirmation_absent: 'confirmation absent',
+  CALIBRATING: 'CALIBRATING',
+  LIMITED_DATA: 'LIMITED DATA',
+  EARLY_MOVEMENT: 'EARLY MOVEMENT',
+  CONFIRMED_MOVEMENT: 'CONFIRMED MOVEMENT',
+  BROAD_ONLY: 'BROAD ONLY',
+  MIXED: 'MIXED',
+};
+const gapStateLabel = (s?: string | null) =>
+  s ? (GAP_STATE_DISPLAY[s] ?? s.replace(/_/g, ' ')) : '';
+
 // Component color by which score it feeds (detection=blue, confidence=green, both=purple).
 const FEEDS_COLOR: Record<string, string> = { detection: '#2A5B9E', confidence: '#2E7D5B', both: '#6B4FA0' };
 const MKT_DET = '#2A5B9E';
@@ -165,7 +181,7 @@ export default function RiskDetail() {
                   <Text className="text-sm font-bold" style={{ color: tierCol }}>
                     {(mg as any).moneyDataAbsent ? 'MARKET-CONFIRMATION ONLY'
                       : mg.calibrating ? 'CALIBRATING'
-                      : `${mg.gapState ? `${mg.gapState} · ` : ''}${signedLabel(gap)}-pt gap`}
+                      : `${mg.gapState ? `${gapStateLabel(mg.gapState)} · ` : ''}${signedLabel(gap)}-pt gap`}
                   </Text>
                   {!!mg.interpretation && (
                     <Text className="text-textSecondary text-[14px] leading-5 mt-1">{mg.interpretation}</Text>

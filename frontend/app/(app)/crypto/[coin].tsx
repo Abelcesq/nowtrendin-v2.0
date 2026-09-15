@@ -20,6 +20,22 @@ const MC_COLOR = '#2E7D5B';
 const POS_LABEL = 'POSITIONING';
 const MC_LABEL = 'MARKET CONFIRMATION';
 
+// D6 (board 2026-09-15): the gap_state ENUM values are payload contract and never change;
+// the DISPLAY retires "money" vocabulary (web parity: Crypto.tsx GAP_STATE_DISPLAY). Known
+// states map here; anything unknown falls back to the plain underscore-replace.
+const GAP_STATE_DISPLAY: Record<string, string> = {
+  money_absent: 'positioning absent',
+  confirmation_absent: 'confirmation absent',
+  CALIBRATING: 'CALIBRATING',
+  LIMITED_DATA: 'LIMITED DATA',
+  EARLY_MOVEMENT: 'EARLY MOVEMENT',
+  CONFIRMED_MOVEMENT: 'CONFIRMED MOVEMENT',
+  BROAD_ONLY: 'BROAD ONLY',
+  MIXED: 'MIXED',
+};
+const gapStateLabel = (s?: string | null) =>
+  s ? (GAP_STATE_DISPLAY[s] ?? s.replace(/_/g, ' ')) : '';
+
 const FLOW_META: Record<string, { label: string; color: string }> = {
   inflow: { label: '▲ INFLOW', color: '#2E7D5B' },
   outflow: { label: '▼ OUTFLOW', color: '#B11226' },
@@ -89,7 +105,7 @@ export default function CryptoDetail() {
   const lead = c.lead == null ? null : Math.round(c.lead * 10) / 10;
   const leadLabel = lead == null ? null : lead > 0 ? `+${lead}` : `${lead}`;
   const gapHead = c.moneyDataAbsent ? 'MARKET-CONFIRMATION ONLY'
-    : c.calibrating ? 'CALIBRATING' : (c.gapState || '').replace(/_/g, ' ');
+    : c.calibrating ? 'CALIBRATING' : gapStateLabel(c.gapState);
 
   return (
     <Screen scroll>

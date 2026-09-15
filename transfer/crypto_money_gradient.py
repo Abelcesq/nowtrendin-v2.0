@@ -47,7 +47,7 @@ CRYPTO_LABELS = {
     "venue_diffusion":   "Venue Diffusion (proxy venues active)",
 }
 
-_DISCLAIMER = ("The Crypto Measurement section tracks significant money movement relative to this coin's own "
+_DISCLAIMER = ("The Crypto Measurement section tracks significant positioning movement relative to this coin's own "
                "baseline. Whether an early movement led realized price is recorded, after the fact, in the "
                "crypto Accuracy Ledger. Be advised that this summary may be inaccurate and is not intended to "
                "be financial, legal or investment advice.")
@@ -88,21 +88,21 @@ def _crypto_analysis(d, c, gap, flow) -> str:
     strength = "strong" if d >= 70 else "moderate" if d >= 45 else "muted"
     parts = []
     if fdir:
-        parts.append(f"Money Movement {d}/100 — this signals {strength} informed-money activity, and that "
-                     f"money may be moving {fdir} via the crypto-exposure proxies (spot-ETF 13F + listed "
+        parts.append(f"Positioning {d}/100 — this signals {strength} informed-positioning activity, and that "
+                     f"flow may be moving {fdir} via the crypto-exposure proxies (spot-ETF 13F + listed "
                      f"crypto-treasury/exchange insider).")
     else:
-        parts.append(f"Money Movement {d}/100 — this signals {strength} informed-money activity in the "
+        parts.append(f"Positioning {d}/100 — this signals {strength} informed-positioning activity in the "
                      f"crypto-exposure proxies, with no clear net direction yet.")
     conf = ("the coin's own price has confirmed the move" if c >= 55 else
             "price confirmation is partial" if c >= 35 else "the coin's price has not yet confirmed")
     parts.append(f"Market Confirmation {c}/100 — this signals {conf}.")
     if gap >= 16:
-        parts.append(f"Informed money runs {gap} pts ahead of price confirmation — an early read.")
+        parts.append(f"The positioning read runs {gap} pts ahead of price confirmation — an early read.")
     elif gap <= -16:
-        parts.append(f"Price leads the informed read by {abs(gap)} pts — a later-stage read.")
+        parts.append(f"Price leads the positioning read by {abs(gap)} pts — a later-stage read.")
     else:
-        parts.append("Informed and price reads are roughly aligned.")
+        parts.append("Positioning and price reads are roughly aligned.")
     parts.append("Whether an early read leads realized coin price is recorded, after the fact, in the "
                  "crypto accuracy ledger over time — this is a measurement, not a recommendation.")
     parts.append("Be advised that this summary may be inaccurate and is not intended to be financial, "
@@ -231,8 +231,9 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         _interp_text = interp["text"]
     elif money_data_absent:
         interp = {"state": "money_absent",
-                  "text": "No proxy money-positioning data for this coin this cycle — "
-                          "showing market-confirmation only."}
+                  "text": "No positioning source reported for this coin this cycle — "
+                          "showing market-confirmation only. The positioning read is "
+                          "absent, not zero."}
         _interp_text = interp["text"]
     else:
         interp = mse._interpret_movement(money_movement, market_confirmation, gap, any_calibrating)
@@ -316,8 +317,8 @@ def compute_crypto_signal(coin: str, name: str, components_current: dict,
         # E1 COMPOSITE DISCLOSURE (Chairman-ruled 2026-07-19): same rule as equities.
         "unmeasured_in_composite": sum(1 for s in scored.values()
                                        if s.get("degenerate_baseline")),
-        "composite_note": ("No proxy money-positioning data for this coin — showing "
-                           "market-confirmation only; the money read is absent, not zero."
+        "composite_note": ("No positioning source reported for this coin — showing "
+                           "market-confirmation only; the positioning read is absent, not zero."
                            if money_data_absent else
                            "Components without measured data are held at the neutral "
                            "baseline in the composite score."
@@ -381,7 +382,7 @@ if __name__ == "__main__":
     r = serve_crypto(coins, record=("--record" in sys.argv))
     for c in r["coins"]:
         print(f"\n{c['coin']:5} {c['item_name']}  [{c['tier']}]  {c['gap_state']}")
-        print(f"   Money Movement (D):      {c['money_movement']}  ({c['detection_level']})")
+        print(f"   Positioning (D):         {c['money_movement']}  ({c['detection_level']})")
         print(f"   Market Confirmation (M): {c['market_confirmation']}  ({c['confidence_level']})")
         print(f"   Flow: {c['flow']}   calibrating={c['calibrating']}")
         for label, comp in c["components"].items():

@@ -10,6 +10,22 @@ import { api, type CryptoFeed, type CryptoCoin } from '../lib/api'
 const MM_LABEL = 'Positioning'  // Chairman 2026-09-14: 'Money Movement' retired from ALL visible crypto copy
 const MC_LABEL = 'Market Confirmation'
 
+// D6 (board 2026-09-15): the gap_state ENUM values are payload contract and never change;
+// the DISPLAY retires "money" vocabulary. Known states map here; anything unknown falls
+// back to the plain underscore-replace so a new engine state still renders honestly.
+const GAP_STATE_DISPLAY: Record<string, string> = {
+  money_absent: 'positioning absent',
+  confirmation_absent: 'confirmation absent',
+  CALIBRATING: 'CALIBRATING',
+  LIMITED_DATA: 'LIMITED DATA',
+  EARLY_MOVEMENT: 'EARLY MOVEMENT',
+  CONFIRMED_MOVEMENT: 'CONFIRMED MOVEMENT',
+  BROAD_ONLY: 'BROAD ONLY',
+  MIXED: 'MIXED',
+}
+const gapStateLabel = (s?: string | null) =>
+  s ? (GAP_STATE_DISPLAY[s] ?? s.replace(/_/g, ' ')) : ''
+
 function ring(val: number, color: string) {
   const r = 26, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, val)) / 100)
   return (
@@ -159,7 +175,7 @@ function CryptoRail({ c, onClose }: { c: CryptoCoin; onClose: () => void }) {
 
       {(c.gap_state || c.interpretation) && (
         <div className="sect">
-          <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : (c.gap_state || '').replace(/_/g, ' ')}{c.gap != null && !c.calibrating ? ` · ${signedGap(c.gap)}-pt gap` : ''}</b>
+          <b style={{ color: tcol, fontSize: 12 }}>{c.calibrating ? 'CALIBRATING' : gapStateLabel(c.gap_state)}{c.gap != null && !c.calibrating ? ` · ${signedGap(c.gap)}-pt gap` : ''}</b>
           {c.interpretation && <div className="narr" style={{ marginTop: 6, background: 'transparent', padding: 0 }}>{c.interpretation}</div>}
           {c.interpretation && <div className="disc" style={{ marginTop: 8 }}>AI-generated overview · qualitative context are computer generated. All information contained herein may not be accurate including any and all figures indicated in this section and or site and may be an approximation and should not be construed as financial, investment, or legal advice.</div>}
         </div>
