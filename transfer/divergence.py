@@ -43,10 +43,12 @@ Sanctioned read-only consumer (K4): tools/divergence_research.py. The engine's
 GET /diag/divergence is a thin held-out STATUS route only.
 
 Fixture: test_divergence.py (seal binding, residual recovery, Theil–Sen robustness,
-forward-only invariance, MAD==0 honest absence, suspect-row exclusion).
+forward-only invariance, MAD==0 honest absence, suspect-row exclusion, D2 hardening
+guards: fit-staleness bound + calendar-gap guard + clean-series byte-identity).
 """
 from __future__ import annotations
 
+import datetime
 import math
 import random
 from typing import Dict, List, Optional, Sequence
@@ -66,12 +68,45 @@ FLAG_COINS = ("BTC", "ETH")
 
 _MAD_EPS = 1e-12
 
+#: D2 HARDENING (board 2026-09-15, `audits/board/BOARD_24h-review_2026-09-15.md`,
+#: Challenger R1 conditions — no seat objected). The sealed prereg is SILENT on fit
+#: staleness and calendar continuity, so these two guards are UNSEALED implementation
+#: hardening, not a §2 edit: they only convert would-be-measured rows to honest
+#: absence (measured:false / D:None) and NEVER change any computed numeric on a row
+#: that remains measured (test_divergence.py h3 proves byte-identity on clean series).
+#: Guard (i) — FIT-STALENESS BOUND: α̂/β̂ from the last successful Theil–Sen refit
+#: expire once the fit is older than this multiple of `refit_every` observations
+#: (repeated refit failures would otherwise reuse arbitrarily old coefficients while
+#: stamping measured:true). Stale rows disclose `fit_age_obs`.
+_FIT_STALE_MULT = 2
+
+#: Guard (ii) — CALENDAR-GAP tolerance for the Δln leg: the dln window is defined in
+#: OBSERVATIONS; if its calendar-day span exceeds `max_dln_span_days` (default
+#: dln_window + this slack, for daily cadence) the row's Δln is silently a different
+#: statistic → measured:false / D:None with `window_gap: true`. The z window is
+#: deliberately NOT span-guarded (robust median/MAD tolerates gaps — per the memo).
+_DLN_SPAN_SLACK_DAYS = 2
+
 
 def _v(row, key, idx):
     """Dict-style access on db_compat PG rows, positional on raw sqlite tuples."""
     return row[key] if hasattr(row, "keys") else row[idx]
 _MAX_TS_PAIRS = 2000
 _TS_SEED = 20260914  # deterministic pair sampling — depends only on window size
+
+
+def _span_days(later: str, earlier: str) -> Optional[int]:
+    """Calendar-day span between two canonical `YYYY-MM-DD`(-prefixed) date labels.
+    Returns None when either label does not parse as a real calendar date — the
+    calendar-gap guard then CANNOT bind and is skipped (the core otherwise treats
+    dates as opaque sort keys; production dates are §14-canonical ISO, so in
+    production the guard always binds)."""
+    try:
+        a = datetime.date.fromisoformat(str(later)[:10])
+        b = datetime.date.fromisoformat(str(earlier)[:10])
+    except (TypeError, ValueError):
+        return None
+    return (a - b).days
 
 
 # ── Robust primitives ───────────────────────────────────────────────────────────────────
@@ -126,7 +161,8 @@ def divergence_series(dates: Sequence[str],
                       z_window: int = 90,
                       fit_window: int = 90,
                       refit_every: int = 7,
-                      flag_theta: Optional[float] = None) -> List[dict]:
+                      flag_theta: Optional[float] = None,
+                      max_dln_span_days: Optional[int] = None) -> List[dict]:
     """Compute the sealed §2 residual over ALIGNED raw level series (ascending by
     date; q_raw = quantity level, p_raw = price level).
 
@@ -144,8 +180,20 @@ def divergence_series(dates: Sequence[str],
     Returns one dict per date: {date, q_chg, p_chg, zq, zp, D, measured}. When
     `flag_theta` is set (BTC/ETH crypto only, θ=+1.5 §3), rows with D ≥ θ
     additionally carry {"flag": True} — internal/shadow only.
+
+    D2 HARDENING GUARDS (unsealed — 2026-09-15 board, Challenger R1; see the
+    module-level constants): (i) a row whose last successful fit is older than
+    `_FIT_STALE_MULT × refit_every` observations renders measured:false / D:None
+    (rows with any missed refit disclose `fit_age_obs`); (ii) a row whose dln
+    window spans more than `max_dln_span_days` calendar days (default
+    dln_window + 2, daily cadence — pass a cadence-appropriate bound for slower
+    series) renders measured:false / D:None with `window_gap: true`. Both guards
+    ONLY convert would-be-measured rows to honest absence; on a gap-free,
+    refit-healthy series output is byte-identical to the pre-guard behavior.
     """
     n = len(dates)
+    if max_dln_span_days is None:
+        max_dln_span_days = dln_window + _DLN_SPAN_SLACK_DAYS
     if not (n == len(q_raw) == len(p_raw)):
         raise ValueError("dates, q_raw, p_raw must be aligned")
 
@@ -199,8 +247,25 @@ def divergence_series(dates: Sequence[str],
         if zq[i] is not None and zp[i] is not None and alpha is not None:
             d = zq[i] - (alpha + beta * zp[i])
             measured = True
+        # D2 guard (i) — FIT-STALENESS BOUND: a due refit that keeps failing must
+        # not let weeks-old α̂/β̂ mint measured:true rows forever.
+        fit_age = (i - last_fit_i) if last_fit_i is not None else None
+        if measured and fit_age is not None and fit_age > _FIT_STALE_MULT * refit_every:
+            d, measured = None, False
+        # D2 guard (ii) — CALENDAR-GAP GUARD on the dln leg: an observation-index
+        # window that straddles a calendar gap is a different statistic.
+        gap = False
+        if i >= dln_window:
+            span = _span_days(dates[i], dates[i - dln_window])
+            if span is not None and span > max_dln_span_days:
+                gap = True
+                d, measured = None, False
         row = {"date": dates[i], "q_chg": q_chg[i], "p_chg": p_chg[i],
                "zq": zq[i], "zp": zp[i], "D": d, "measured": measured}
+        if fit_age is not None and fit_age >= refit_every:
+            row["fit_age_obs"] = fit_age  # disclosed: at least one refit missed
+        if gap:
+            row["window_gap"] = True
         if flag_theta is not None and d is not None and d >= flag_theta:
             row["flag"] = True  # internal/shadow only (prereg §3)
         out.append(row)
@@ -307,7 +372,13 @@ def equity_divergence(ticker: str,
         [float(si_series[d]) for d in dates],
         [float(price_series[d]) for d in dates],
         dln_window=1, z_window=24, fit_window=24, refit_every=1,
-        flag_theta=None)
+        flag_theta=None,
+        # D2 calendar-gap guard, cadence-scaled (windows above UNCHANGED): one
+        # bi-monthly FINRA settlement step spans ≤ ~16 calendar days (mid-month ↔
+        # EOM); the daily default (dln_window+2 = 3) would mark every healthy
+        # bi-monthly row a gap. 19 keeps holiday-shifted settlements measured
+        # while a skipped settlement (≈28+ days) honestly renders window_gap.
+        max_dln_span_days=19)
     return {
         "param_version": PARAM_VERSION,
         "basis": "equity_si_divergence",

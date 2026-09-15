@@ -17,11 +17,21 @@ WHAT THIS FILE MAKES MECHANICAL, per test:
      absence, never a fabricated z (§16a stage-2).
   f  SUSPECT EXCLUSION — the crypto adapter drops suspect=1 rows (K14) and
      survives an old-schema SQLite file with no `suspect` column.
+  h  D2 HARDENING GUARDS (2026-09-15 board, BOARD_24h-review_2026-09-15.md,
+     Challenger R1 conditions — UNSEALED hardening; the prereg is silent on fit
+     staleness and calendar continuity): (h1) refits failing after warm-up →
+     rows beyond 2×refit_every since the last successful fit are measured:false
+     with `fit_age_obs` disclosed; (h2) a calendar gap inside a dln window →
+     that row measured:false with `window_gap: true`, fully-post-gap rows
+     measured again, all other rows numerically untouched; (h3) REGRESSION —
+     a clean (contiguous-date, refit-healthy) series is byte-identical to the
+     pre-guard behavior (sha256 captured from the pre-change code).
 
 Run: python test_divergence.py   (or via tools/run_tests.py)
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import math
@@ -63,6 +73,21 @@ def _dates(n):
     # Synthetic ascending date labels; the core treats them as opaque sort keys.
     return [f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}-{i:04d}"[:10] + f"#{i:04d}"
             for i in range(n)]
+
+
+def _iso_dates(n, start="2025-01-01"):
+    """n CONTIGUOUS real calendar dates — the gap-free case the D2 calendar guard
+    must leave byte-identical."""
+    d0 = datetime.date.fromisoformat(start)
+    return [(d0 + datetime.timedelta(days=i)).isoformat() for i in range(n)]
+
+
+# sha256(json.dumps(rows, sort_keys=True)) of divergence_series over _iso_dates(420)
+# + _synthetic(420, seed=7), captured from the PRE-D2-guard code (2026-09-15, at
+# repo tip e8e875e) — the byte-identity regression anchor for h3.
+_CLEAN_BASELINE_SHA = "d54dc15736b3a779a27e3059bdc7c3183cf31db12f9858bd097bf58c63a2a153"
+_CLEAN_BASELINE_MEASURED = 235
+_CLEAN_BASELINE_FIRST = ("2025-07-05", -0.14388772666811944)
 
 
 def _synthetic(n=420, seed=7, beta=0.8, noise=0.01):
@@ -223,6 +248,107 @@ def main() -> int:
           and not any("flag" in r for r in unflagged))
     check("g2 every flag sits at D >= +1.5 (theta by construction, never fitted)",
           all(r["D"] >= 1.5 for r in flagged if r.get("flag")))
+
+    # ── (h) D2 HARDENING GUARDS (board 2026-09-15, Challenger R1 — unsealed) ────
+    # (h1) FIT-STALENESS BOUND: a flat-q stretch makes zq None inside the trailing
+    # fit window long after zq itself has recovered, so due refits keep failing
+    # while rows would otherwise be measured off weeks-old coefficients.
+    ns = 560
+    qs_raw, ps_raw = _synthetic(ns, seed=11)
+    q_stale = list(qs_raw)
+    for i in range(200, 300):
+        q_stale[i] = 1000.0          # refits fail while the fit window holds Nones
+    stale = divergence.divergence_series(_iso_dates(ns), q_stale, ps_raw)
+    guarded = [r for r in stale
+               if r.get("fit_age_obs", 0) > 2 * 7 and r["measured"] is False
+               and r["D"] is None and r["zq"] is not None and r["zp"] is not None]
+    check("h1a stale fit (> 2 x refit_every obs old) -> would-be-measured rows "
+          "render measured:false / D None",
+          len(guarded) > 0, "no row hit the staleness bound")
+    check("h1b ...with fit_age_obs disclosed on every missed-refit row",
+          all(isinstance(r["fit_age_obs"], int) and r["fit_age_obs"] > 14
+              for r in guarded))
+    check("h1c no measured row anywhere carries a fit older than the bound",
+          all(r.get("fit_age_obs", 0) <= 2 * 7 for r in stale if r["measured"]))
+    last_guard_i = max(i for i, r in enumerate(stale) if r in guarded)
+    check("h1d rows measured AGAIN once a refit succeeds (bound expires, not the tool)",
+          any(r["measured"] for r in stale[last_guard_i + 1:]),
+          "no measured row after the stale stretch")
+
+    # (h2) CALENDAR-GAP GUARD: same q/p data, but a 5-day calendar hole after
+    # index 299 — only the rows whose dln window STRADDLES the hole may change.
+    n2 = 420
+    q2, p2 = _synthetic(n2, seed=7)
+    clean_dates = _iso_dates(n2)
+    d0 = datetime.date.fromisoformat("2025-01-01")
+    gap_dates = [(d0 + datetime.timedelta(days=i + (5 if i >= 300 else 0))).isoformat()
+                 for i in range(n2)]
+    clean = divergence.divergence_series(clean_dates, q2, p2)
+    gapped = divergence.divergence_series(gap_dates, q2, p2)
+    straddle = list(range(300, 307))     # dln_window=7: windows containing the hole
+    check("h2a every dln window straddling the gap -> measured:false / D None / "
+          "window_gap:true",
+          all(gapped[i]["measured"] is False and gapped[i]["D"] is None
+              and gapped[i].get("window_gap") is True for i in straddle))
+    check("h2b fully-post-gap rows are measured again, no gap flag",
+          gapped[310]["measured"] is True and "window_gap" not in gapped[310])
+    same_outside = all(
+        all(gapped[i][k] == clean[i][k]
+            for k in ("q_chg", "p_chg", "zq", "zp", "D", "measured"))
+        and "window_gap" not in gapped[i]
+        for i in range(n2) if i not in straddle)
+    check("h2c every non-straddling row numerically IDENTICAL to the gap-free run "
+          "(guards only convert, never alter)", same_outside)
+    check("h2d clean run carries no window_gap and no fit_age_obs key at all",
+          not any("window_gap" in r or "fit_age_obs" in r for r in clean))
+
+    # (h3) REGRESSION: clean series byte-identical to the PRE-guard code's output.
+    blob = json.dumps(clean, sort_keys=True)
+    sha = hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    check("h3a clean contiguous-date series byte-identical to pre-change baseline",
+          sha == _CLEAN_BASELINE_SHA,
+          f"sha={sha[:16]}... expected {_CLEAN_BASELINE_SHA[:16]}... — the guards "
+          "changed a gap-free, refit-healthy output (FORBIDDEN)")
+    first_m = next(r for r in clean if r["measured"])
+    check("h3b spot anchors: measured count + first measured row unchanged",
+          sum(1 for r in clean if r["measured"]) == _CLEAN_BASELINE_MEASURED
+          and first_m["date"] == _CLEAN_BASELINE_FIRST[0]
+          and first_m["D"] == _CLEAN_BASELINE_FIRST[1],
+          f"count={sum(1 for r in clean if r['measured'])} first={first_m}")
+
+    # (h4) equity adapter: bi-monthly settlement cadence stays measured under its
+    # cadence-scaled span bound; a SKIPPED settlement (~30d hole) renders window_gap.
+    settle = []
+    for k in range(30):                                # 30 months, 60 settlements
+        y, m = 2024 + (k // 12), 1 + (k % 12)
+        mid = datetime.date(y, m, 15)
+        eom = (datetime.date(y, m, 28) + datetime.timedelta(days=4)).replace(day=1) \
+            - datetime.timedelta(days=1)               # last day of month m
+        settle += [mid.isoformat(), eom.isoformat()]
+    rng = random.Random(5)
+    si = {}
+    px = {}
+    lvl_s, lvl_p = 1_000_000.0, 50.0
+    skip = settle[40]                                  # one skipped settlement
+    for dstr in settle:
+        lvl_s *= math.exp(rng.gauss(0, 0.05))
+        lvl_p *= math.exp(rng.gauss(0, 0.04))
+        if dstr == skip:
+            continue
+        si[dstr] = lvl_s
+        px[dstr] = lvl_p
+    eq = divergence.equity_divergence("TEST", si, px)
+    eq_rows = eq["series"]
+    check("h4a healthy bi-monthly cadence: measured rows exist (span bound is "
+          "cadence-scaled, windows untouched)",
+          any(r["measured"] for r in eq_rows),
+          f"{sum(1 for r in eq_rows if r['measured'])} measured of {len(eq_rows)}")
+    gap_rows = [r for r in eq_rows if r.get("window_gap")]
+    check("h4b the skipped settlement's straddling row renders window_gap / "
+          "measured:false",
+          len(gap_rows) >= 1 and all(r["measured"] is False and r["D"] is None
+                                     for r in gap_rows),
+          f"gap_rows={len(gap_rows)}")
 
     print("=" * 70)
     print(f"{_passed} passed, {_failed} failed")
