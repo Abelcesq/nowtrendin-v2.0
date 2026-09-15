@@ -4714,3 +4714,33 @@ production booted clean on the real database.
 - **Flagged to Chairman, not built:** mobile SignalAnalysisPanel was NEVER implemented despite
   CLAUDE.md recording it live (git-verified); mobile market detail has no N/Platform-Indicator
   card (needs data plumbing — ruling requested).
+
+### Addendum 11 — CHAIRMAN RULED on round 4; D1-D12 implemented (2026-09-15)
+- **Rulings received:** disagreement 1 ("do both") → TIER_COMPOSITE_PREREG_2026-09-15.md
+  SEALED (e7498f6, sha256 a56f8192…) — acceptance criteria fixed BEFORE any candidate;
+  accrued window = exploratory SPEC-DEVELOPMENT only; binding validation on ≥90 post-seal
+  obs. Disagreement 2 agreed → D10 backscan is the gate: clean scan clears pre-seal rows as
+  disclosed warm-up context, flagged spans severed. Disagreement 5 (exposure incident note)
+  SKIPPED by ruling. Disagreements 3 (FMP) + 4 (market-only chip): plain-English memos +
+  recommendations delivered to the Chairman for ruling.
+- **Implemented and deployed (commits 92a5ea4 · 5886140 · dce49c8 · 30f25f9 · e7498f6):**
+  D2 fit-staleness + calendar-gap guards on the sealed core (30/30 tests incl. a captured
+  byte-identity baseline; guards only ever produce MORE honest absence); D3 the K12
+  3-offset capture (BTC+ETH, 00:10/08:10/16:10 UTC, true captured_at stamps, flag default
+  on — THE 30-DAY CLOCK STARTED AT THIS DEPLOY; collector_health watches it); D6 atomic
+  vocabulary pass (engine crypto prose → positioning; gap_state enums untouched; all three
+  UIs share the display map; NEW served-layer vocab gate test with a negative fixture —
+  the unit-of-audit defect closed); D7 doc-vs-code reconciliation in improve-system + the
+  commit-hash rule; D10 retroactive unit backscan in the research runner; D11: weekly
+  platform-verify cron, monthly change-only legal-snapshot cron (a commit IS the ToS-diff
+  alarm), monthly research-rerun cron, register jurisdiction column, and the
+  fabricated-default LINT (test_display_defaults.py) which on first run caught and fixed
+  THREE live survivors (mobile tierOf ??'DORMANT', web MarketSignal ||'ROUTINE',
+  gradientApi ||'BACKGROUND'). Known residual recorded: equity market_signal_engine
+  "money" prose is the live Money Gradient's own name — retirement there only if
+  board-ordered.
+- **Founder actions outstanding (the whole critical path lives here):** send the WIDENED
+  CoinAPI letter (covers residual + tier chip + jurisdictions — amend the draft before
+  sending) · engage counsel (Binance pass-through + countersign the §3.1 internal-use
+  reading) · Expo publish (carries every mobile fix to devices) · D4 panic-clause and
+  D5 FMP rulings pending the plain-English memos.
