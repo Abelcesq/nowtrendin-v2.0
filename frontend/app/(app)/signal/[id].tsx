@@ -273,8 +273,22 @@ export default function SignalDetail() {
           <WhyScoresDiverge signal={signal} />
         </Section>
 
-        {(!!signal.why || !!signal.whatToWatch) && (
+        {(!!signal.why || !!signal.whatToWatch || (signal.platforms?.length ?? 0) > 0) && (
           <Section title="What this means" hint="Why it matters and what to watch">
+            {/* Source platforms — web "Source & Why" parity: ALL contributing
+                platforms as chips, not only the first (the header meta shows one). */}
+            {(signal.platforms?.length ?? 0) > 0 && (
+              <>
+                <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 6 }}>SOURCES</Text>
+                <View className="flex-row flex-wrap mb-4" style={{ gap: 6 }}>
+                  {signal.platforms!.map((p) => (
+                    <View key={p} className="rounded-full px-3 py-1" style={{ backgroundColor: '#16264A0D' }}>
+                      <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>{p}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
             {!!signal.why && (
               <>
                 <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>WHY THIS MATTERS</Text>

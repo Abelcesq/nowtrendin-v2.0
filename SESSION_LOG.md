@@ -4767,3 +4767,24 @@ production booted clean on the real database.
   counsel must countersign §3.1 itself; buyer docs say "not held", never "pending".
 - Gates after changes: tests 21/21, integrity gate PASSED. History deepened in this container
   (shallow clone masked pre-08-24 intro commits — traces run on full history).
+
+### Addendum 13 — mobile-mirrors-web parity audit + fixes (founder-ordered 2026-09-15)
+- **/frontend-consistency run (code-level; live probes egress-blocked).** Trend detail, market
+  detail, filter chips, breakdown groups, and the crypto explainers/register/PvP slots all
+  verified in section-and-data-point parity (colors audited SEMANTICALLY per §12 — Aurora on
+  mobile, vivid on web; hex equality is not the contract). Three real gaps found, all fixed:
+  1. **Mobile crypto lacked "Network Value & Supply"** (web `Crypto.tsx:188`, engine `supply`
+     block, C1+C2 2026-08-05). `fetchCrypto` now maps `supply`; the section renders on mobile
+     in Aurora tokens, §17-gated (absent block = not rendered, never zeros).
+  2. **Mobile PvP Register hardcoded "0 resolved"** where the web reads
+     `c.divergence_register` — a staleness trap once the engine serves live counts. Mobile now
+     maps `divergenceRegister` and renders payload counts (resolved · open) with the static
+     honest-empty text as fallback.
+  3. **Mobile trend detail showed only `platforms[0]`** where the web "Source & Why" chips all
+     contributing platforms. The "What this means" section now renders a SOURCES chip row with
+     every platform (and appears when platforms exist even without why/watch).
+- Verified NOT gaps (already at parity): Input Freshness (age + 72h window + post-surge note),
+  AI Context (same `/explainer`), Signal Read (mobile's header gap sentence), Under-the-Radar
+  (DarkMatterPanel), market rail all 10 web sections, filter chips 7/7, N/what-if/convergence.
+- Gates: mobile `tsc --noEmit` clean · repo tests 21/21 · integrity gate PASSED. Reaches
+  devices on the founder's next Expo publish (same vehicle as the Addendum 10/11 fixes).

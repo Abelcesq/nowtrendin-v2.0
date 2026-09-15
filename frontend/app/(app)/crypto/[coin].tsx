@@ -261,6 +261,65 @@ export default function CryptoDetail() {
         </View>
       )}
 
+      {/* Network Value & Supply — display-only reference facts (C1+C2, web parity).
+          §17: the engine omits the block entirely when live data is absent, so
+          this renders only when real. */}
+      {c.supply?.networkValueUsd != null && (
+        <View className="bg-card rounded-3xl p-5 mt-4">
+          <SectionTitle>Network Value & Supply</SectionTitle>
+          <View className="flex-row justify-between mb-2">
+            <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Network value (circulating)</Text>
+            <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+              ${(c.supply.networkValueUsd / 1e9).toFixed(1)}B{c.supply.sizeBand ? ` · ${c.supply.sizeBand.toUpperCase()}` : ''}
+            </Text>
+          </View>
+          {c.supply.circulatingSupply != null && (
+            <View className="flex-row justify-between mb-2">
+              <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Circulating supply</Text>
+              <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+                {c.supply.circulatingSupply.toLocaleString()}
+              </Text>
+            </View>
+          )}
+          {c.supply.maxSupply ? (
+            <>
+              <View className="flex-row justify-between mb-2">
+                <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Max supply · % outstanding</Text>
+                <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+                  {c.supply.maxSupply.toLocaleString()}{c.supply.pctOfMaxOutstanding != null ? ` · ${c.supply.pctOfMaxOutstanding}%` : ''}
+                </Text>
+              </View>
+              {c.supply.fdvUsd != null && (
+                <View className="flex-row justify-between mb-2">
+                  <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Fully diluted value</Text>
+                  <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+                    ${(c.supply.fdvUsd / 1e9).toFixed(1)}B
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <View className="flex-row justify-between mb-2">
+              <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Max supply / FDV</Text>
+              <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+                no max supply{c.supply.supplySchedule ? ` (${c.supply.supplySchedule.replace(/_/g, ' ')})` : ''}
+              </Text>
+            </View>
+          )}
+          {!!c.supply.supplySchedule && (
+            <View className="flex-row justify-between mb-2">
+              <Text style={{ color: '#3C4663', fontSize: 12, fontWeight: '600' }}>Issuance model</Text>
+              <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '700' }}>
+                {c.supply.supplySchedule.replace(/_/g, ' ')}{c.supply.supplyAsOf ? ` · as of ${c.supply.supplyAsOf}` : ''}
+              </Text>
+            </View>
+          )}
+          <Text className="text-textMuted text-xs mt-1" style={{ lineHeight: 16 }}>
+            {c.supply.bandBasis ? `${c.supply.bandBasis}` : ''}{c.supply.caveat ? ` ${c.supply.caveat}.` : ''} Reference facts, not a valuation or advice.
+          </Text>
+        </View>
+      )}
+
       {/* POSITIONING VS PRICE — web parity (Chairman order 2026-09-14). The
           engine serves no divergence block yet, so the value slot renders the
           honest hollow NOT MEASURED state — never a 0. */}
@@ -282,7 +341,14 @@ export default function CryptoDetail() {
         <SectionTitle>Positioning vs Price Register</SectionTitle>
         <Text style={{ color: '#3C4663', fontSize: 14, lineHeight: 21, fontWeight: '500' }}>
           No track record exists. Flags are sealed internally under pre-registration{' '}
-          <Text style={{ fontWeight: '700' }}>bd6e3649…</Text>; <Text style={{ fontWeight: '700' }}>0 resolved</Text>{' '}
+          <Text style={{ fontWeight: '700' }}>bd6e3649…</Text>;{' '}
+          <Text style={{ fontWeight: '700' }}>{c.divergenceRegister?.resolved ?? 0} resolved</Text>
+          {c.divergenceRegister ? (
+            <>
+              {' · '}
+              <Text style={{ fontWeight: '700' }}>{c.divergenceRegister.open} open</Text>
+            </>
+          ) : null}{' '}
           (unresolved is never a pending win). At observed episode rates an honest calibration claim
           takes <Text style={{ fontWeight: '700' }}>8–15 years</Text>.
         </Text>
