@@ -1,5 +1,5 @@
 {
-  "started_utc": "2026-09-14T17:49:16.272066+00:00",
+  "started_utc": "2026-09-15T06:01:53.206219+00:00",
   "sections": {
     "0_seal": {
       "status": "OK",
@@ -42,17 +42,19 @@
         "SOL",
         "XRP"
       ],
-      "row_count": 432,
-      "missing_columns": [
-        "units",
-        "suspect"
-      ],
+      "row_count": 444,
+      "missing_columns": [],
       "price_errors": {},
       "research_price_caveat": "CoinGecko/FMP/stooq dailies are RESEARCH-ONLY prices, not the sealed price source.",
+      "unit_backscan": {
+        "rows_scanned": 444,
+        "discontinuities_flagged": 0,
+        "verdict": "CLEAN \u2014 pre-seal rows usable as disclosed warm-up context per the 2026-09-15 Chairman ruling"
+      },
       "missingness": {
         "counts": {
           "missing_days": 0,
-          "present_days": 432,
+          "present_days": 444,
           "missing_with_ret": 0,
           "present_with_ret": 432
         },
@@ -67,9 +69,9 @@
         "note": "full 3-offset test is future collection (SS5)"
       },
       "cross_leg": {
-        "pooled_rho_raw": 0.1655,
+        "pooled_rho_raw": 0.1688,
         "pooled_rho_orthogonalized": 0.1596,
-        "n_raw": 203,
+        "n_raw": 215,
         "n_orth": 202
       },
       "cot_cross_leg": [
@@ -338,7 +340,7 @@
       "watchlist_source": "ast-parsed"
     }
   },
-  "finished_utc": "2026-09-14T17:49:50.242267+00:00",
+  "finished_utc": "2026-09-15T06:02:26.733900+00:00",
   "core_adapter_notes": [
     "core self-check OK: theil_sen(xs, ys) -> (alpha, beta)"
   ]

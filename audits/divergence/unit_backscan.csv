@@ -1,0 +1,2 @@
+# D10 retroactive unit backscan — >10x day-over-day OI discontinuities over ALL accrued rows (read-only; a flag severs the span from any baseline)
+coin,signal_date,prev_oi,oi,ratio
