@@ -95,6 +95,16 @@ COLLECTOR_EXPECTATIONS = {
     "coinapi_derivs":  {"max_gap_minutes": 1740, "mode": "risk", "critical": False,
                         "min_distinct": 8,
                         "disabled": not os.getenv("COINAPI_KEY")},
+    # K12 3-offset timing capture (board 2026-09-15 D3; SAME already-onboarded
+    # CoinAPI source as coinapi_derivs — no new source): BTC/ETH at 3 fixed UTC
+    # slots 8h apart on a 30-min catch-up tick → 480m cadence + 120m margin. A gap
+    # resets the ≥30-day K12 graduation clock (Economist continuity tripwire), so
+    # it is watched. min_distinct 2: fewer than both coins parsing = symbol drift
+    # or a persistent per-coin 429. Logged only on passes that attempt work.
+    "coinapi_derivs_offsets": {"max_gap_minutes": 600, "mode": "risk",
+                               "critical": False, "min_distinct": 2,
+                               "disabled": (not os.getenv("COINAPI_KEY")
+                                            or os.getenv("COINAPI_OFFSET_CAPTURE", "1") != "1")},
     # Coinbase retail-spot premium (held-out, keyless public; daily; BNB absent by
     # design → floor at 8 of 11 listable coins).
     "coinbase_premium": {"max_gap_minutes": 1740, "mode": "risk", "critical": False,

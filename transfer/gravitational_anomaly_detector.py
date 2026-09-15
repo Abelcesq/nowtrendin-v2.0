@@ -6500,6 +6500,16 @@ def _coinapi_derivs_loop():
                     r = coinapi_derivs.snapshot_derivs(DB_PATH)
                     print(f"[coinapi-loop] daily pull: {r.get('written')} coins "
                           f"(missing {r.get('missing')})")
+                # K12 3-offset timing capture (board 2026-09-15 D3): BTC/ETH
+                # funding+OI at three FIXED UTC slots (00:10/08:10/16:10), catch-up
+                # on this same 30-min tick — each slot lands within ~30 min of its
+                # pin, captured_at records the true instant (the audit's input).
+                # Collection-only, feeds no score; flag COINAPI_OFFSET_CAPTURE
+                # (default ON); idempotent + no-fetch when nothing is pending.
+                ro = coinapi_derivs.snapshot_derivs_offsets(DB_PATH)
+                if ro.get("written"):
+                    print(f"[coinapi-loop] K12 offsets: {ro.get('written')} rows "
+                          f"{ro.get('slots')}")
             # Coinbase RETAIL-SPOT premium accumulation (Chairman 2026-08-10; 5-day
             # value review 2026-08-15). Held-out; separate price_class by order —
             # never blended with market prices. Keyless public endpoint.
