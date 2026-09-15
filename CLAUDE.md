@@ -802,7 +802,11 @@ UI); §3/§11 palettes predate it and pend reconciliation.
 Prior: 2026-06-26 (evening) — **Per-item Signal Analysis + accuracy-ledger maturity segmentation + Apify
 usage audit + token rotation.** (1) **Signal Analysis** — held-out `signal_analysis.py` + `POST /analysis/{kind}`:
 a reproducible, formula-CONFIDENTIAL, measurement-only narrative per item (explains each metric + analyzes the
-finding vs the accuracy-ledger track record, honest denominators). LIVE on web (trend/market/crypto rails) + mobile
+finding vs the accuracy-ledger track record, honest denominators). **⚠ RECORD CORRECTION
+2026-09-15 (git-verified, ALLPAGES_AUDIT + board): the mobile half of the claim below was FALSE
+when written — the panel existed on mobile but was wired ONLY into the crypto detail; the trend
+`signal/[id]` + market `risk/[key]` mounts recorded here shipped 2026-09-15 (`d5323f9`).**
+LIVE on web (trend/market/crypto rails) + mobile
 (trend `signal/[id]` + market `risk/[key]`; crypto N/A — no mobile crypto screen); desktop inherits via the web build.
 Founder enterprise standard: explain the metric, HIDE the formula, every claim data-supported + defensible to hedge-fund
 counsel. (2) **The accuracy ledger is HELD-OUT** — `calibration_engine`/`signal_calibration_integration` have ZERO
