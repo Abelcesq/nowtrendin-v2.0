@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
-import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchSignalByKey, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchCrypto, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence } from '../lib/gradientApi';
+import { fetchScoresPage, SCORES_PAGE_SIZE, fetchResearch, fetchScoreHistory, fetchSignalByKey, fetchRiskScores, fetchAccuracy, fetchAccuracyDetail, fetchMarketAccuracy, fetchMarketAccuracyDetail, fetchCryptoAccuracy, fetchCryptoAccuracyDetail, fetchCrypto, fetchXSignal, fetchExplainer, fetchMacroLeverage, fetchConvergence, fetchRiskPlatformIndicator } from '../lib/gradientApi';
 import { MOCK_SIGNALS, filterFeed, findSignal, Signal } from '../lib/signals';
 import { TierID } from '../constants/tiers';
 
@@ -192,6 +192,20 @@ export function useConvergence(topicKey: string | undefined, enabled = true) {
 export function useRisk(key: string | undefined) {
   const { risks, isLoading } = useRiskScores();
   return { risk: risks.find((r) => r.key === key), isLoading };
+}
+
+// N · Platform Indicator detail block for one instrument (held-out, display-only).
+// Web parity (MarketSignal rail): a failed load just hides the extras — the bare
+// N from the list row still renders; nothing here can ever affect a score.
+export function useRiskPlatformIndicator(key: string | undefined) {
+  const q = useQuery({
+    queryKey: ['risk-platform-indicator', key],
+    queryFn: () => fetchRiskPlatformIndicator(key as string),
+    enabled: !!key,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  return { pi: q.data ?? null, isLoading: q.isLoading };
 }
 
 export function useResearch(topicKey: string | undefined) {

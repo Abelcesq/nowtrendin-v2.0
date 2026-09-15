@@ -7,7 +7,8 @@ import { Screen } from '../../../components/ui/Screen';
 import { Disclaimer } from '../../../components/ui/Disclaimer';
 import { GradientScoreRing } from '../../../components/ui/GradientScoreRing';
 import { TopicResearch } from '../../../components/trends/TopicResearch';
-import { useRisk } from '../../../hooks/useSignals';
+import { SignalAnalysisPanel } from '../../../components/trends/SignalAnalysisPanel';
+import { useRisk, useRiskPlatformIndicator } from '../../../hooks/useSignals';
 
 const CLASS_COLOR: Record<string, string> = {
   UNUSUAL: '#B11226', ELEVATED: '#A8456A', WATCH: '#2A5B9E', ROUTINE: '#9A9AA2', CALIBRATING: '#9A9AA2',
@@ -59,6 +60,9 @@ export default function RiskDetail() {
   const goBack = () => { if (from) router.replace(from as any); else router.back(); };
   const backLabel = from === '/profile/watchlists' ? 'Watchlists' : from === '/alerts' ? 'Alerts' : from === '/profile/favorites' ? 'Favorites' : 'Market Signal';
   const { risk, isLoading } = useRisk(String(key));
+  // N extras (counts · n-inclusive what-if · convergence) from the instrument
+  // detail — held-out, display-only; a failed load just hides them (web parity).
+  const { pi } = useRiskPlatformIndicator(key ? String(key) : undefined);
 
   if (isLoading) {
     return (
@@ -190,6 +194,93 @@ export default function RiskDetail() {
               how early the move is. Measurement only — not financial advice.
             </Text>
 
+            {/* N · Platform Indicator — HELD-OUT (§12 parity with the web MarketSignal
+                rail, D-M10). Shown alongside the money numbers, never inside them — the
+                headline read above is computed with no knowledge of N. N is PLATFORM
+                TRACKING, not demand. §17: rendered only when the engine serves the N
+                field on this row — an absent block is omitted, never a fabricated 0. */}
+            {risk.platformIndicator != null && (() => {
+              const n = risk.platformIndicator!;
+              const convCol = pi?.convergence?.agreement === 'CONFIRMED' ? '#2E7D5B'
+                : pi?.convergence?.agreement === 'CONFLICTING' ? '#B11226' : '#A8456A';
+              return (
+                <View className="bg-card rounded-2xl p-4 mb-3">
+                  <View className="flex-row items-center mb-2">
+                    <Text className="text-textMuted text-[12px] font-bold tracking-widest uppercase flex-1">
+                      Platform Indicator (N)
+                    </Text>
+                    <Text className="text-textPrimary text-lg font-black">{n.toLocaleString()}</Text>
+                  </View>
+                  <Text style={{ color: '#3C4663', fontSize: 12, lineHeight: 17, fontWeight: '500' }}>
+                    A platform-tracking signal — how often this instrument is triggered and surfaced
+                    as a tracked item across the Now TrendIn platform (feeds, lookups, grades). A
+                    platform-internal read no public source has. The headline scores above stay N-free.
+                  </Text>
+                  {n === 0 && (
+                    <Text style={{ color: '#9A9AA2', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+                      No platform tracking registered yet — N rises as this instrument is surfaced
+                      and looked up across the platform.
+                    </Text>
+                  )}
+                  {n > 0 && pi?.nInclusive && (
+                    <>
+                      <View className="flex-row items-center flex-wrap gap-2 mt-4 mb-1">
+                        <Text style={{ color: '#16264A', fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
+                          N-INCLUSIVE MONEY GRADIENT
+                        </Text>
+                        <Text className="text-textMuted text-[12px] font-bold">SEPARATE · N-INCLUSIVE</Text>
+                      </View>
+                      <Text className="text-textMuted text-[12px] leading-4 mb-2">
+                        A what-if read — where the score lands if the platform-tracking signal (N) is
+                        folded in. The headline Money Movement / Market Confirmation stay N-free
+                        (external world only).
+                      </Text>
+                      <View className="flex-row gap-3">
+                        <View className="flex-1 rounded-2xl p-3" style={{ backgroundColor: '#2A5B9E0A' }}>
+                          <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>MONEY MOVEMENT + N</Text>
+                          <Text style={{ color: '#2A5B9E', fontSize: 22, fontWeight: '800' }}>
+                            {pi.nInclusive.moneyWithN == null ? 'n/a' : Math.round(pi.nInclusive.moneyWithN)}
+                          </Text>
+                        </View>
+                        <View className="flex-1 rounded-2xl p-3" style={{ backgroundColor: '#2E7D5B0A' }}>
+                          <Text style={{ color: '#9A9AA2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>MARKET CONFIRMATION + N</Text>
+                          <Text style={{ color: '#2E7D5B', fontSize: 22, fontWeight: '800' }}>
+                            {Math.round(pi.nInclusive.confirmationWithN)}
+                          </Text>
+                        </View>
+                      </View>
+                      {pi.nInclusive.trackingDriven && (
+                        <Text style={{ color: '#A8456A', fontSize: 12, lineHeight: 16, marginTop: 8, fontWeight: '600' }}>
+                          ⚠ Substantially tracking-driven — external confirmation is limited, so N's
+                          weight is reduced and platform tracking alone can't lift the read.
+                        </Text>
+                      )}
+                    </>
+                  )}
+                  {pi?.convergence && (
+                    <View className="rounded-xl px-3 py-2.5 mt-3" style={{ backgroundColor: `${convCol}0C` }}>
+                      <Text style={{ color: convCol, fontSize: 12, fontWeight: '800' }}>
+                        Signal Convergence: {pi.convergence.label}
+                      </Text>
+                      <Text className="text-textSecondary text-[12px] leading-4 mt-1">
+                        Platform tracking is {pi.convergence.direction.toLowerCase()} against a{' '}
+                        {(pi.nInclusive?.moneyWithN ?? mg?.detection ?? 0) >= 50 ? 'active' : 'quiet'} money
+                        read. Independent of the score by construction — that is what makes the
+                        comparison informative.
+                      </Text>
+                    </View>
+                  )}
+                  {pi?.detail && (
+                    <Text className="text-textMuted text-[12px] mt-3">
+                      Surfaced {pi.detail.totalQueries30d.toLocaleString()} time(s) in 30 days ·{' '}
+                      {pi.detail.queries24h.toLocaleString()} in the last 24h · {pi.detail.dailyRate7d}/day
+                      7-day baseline.
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
+
             {/* AI Context — the same source-aware /explainer definition the web's Market
                 rail shows (§12 parity), placed under the score like the web. Renders
                 only when a definition exists or is generating (§17). */}
@@ -286,6 +377,23 @@ export default function RiskDetail() {
           </>
         );
       })()}
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible,
+          measurement-only; §12 parity with the web MarketSignal rail, D-M9). Same
+          item payload the web posts; the panel renders nothing when the engine has
+          nothing to say (§17). */}
+      <SignalAnalysisPanel
+        kind="market"
+        item={{
+          item_name: risk.display,
+          detection: risk.marketGradient?.detection ?? risk.detection,
+          confidence: risk.marketGradient?.confidence ?? risk.confidence,
+          flow: risk.marketGradient?.flow,
+          tier: risk.marketGradient?.tier ?? risk.stage,
+          leverage_health: risk.marketGradient?.leverageHealth ?? null,
+          gap: risk.marketGradient?.gap,
+        }}
+      />
 
       {/* Financial Sustainability — factual balance-sheet health (companies only) */}
       {!!risk.sustainability && (() => {

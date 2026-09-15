@@ -339,6 +339,12 @@ export interface RiskScore {
   percentDelta?: number | null;    // % vs baseline
   positioningCycles?: number;      // baseline cycles accumulated
   definition?: string;
+  // ── N · Platform Indicator (HELD-OUT; served alongside the score, never inside it) ──
+  // Platform tracking — how often this instrument is triggered/surfaced as a tracked
+  // item across the platform. Absent when the engine doesn't serve the field →
+  // undefined, and the N card is not rendered (§17) — never a fabricated 0.
+  platformIndicator?: number;
+  platformIndicatorBand?: string;
   // diffusion (positioning shape): stage label -> { count, z }
   stages?: Record<string, { count: number; z: number | null }>;
   // Financial Sustainability (factual fundamentals; companies only)
@@ -539,6 +545,9 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
     percentDelta: r.percent_delta != null ? Number(r.percent_delta) : null,
     positioningCycles: r.baseline_cycles != null ? Number(r.baseline_cycles) : undefined,
     definition: r.definition || undefined,
+    // Held-out N — absent-safe: the field maps only when the engine serves it.
+    platformIndicator: r.platform_indicator != null ? Math.round(Number(r.platform_indicator)) : undefined,
+    platformIndicatorBand: r.platform_indicator_band || undefined,
     stages: r.diffusion && typeof r.diffusion === 'object' && !Array.isArray(r.diffusion)
       ? r.diffusion : undefined,
     sustainability: r.sustainability ? {
@@ -614,6 +623,53 @@ export async function fetchRiskScores(): Promise<RiskScore[]> {
       note: r.alpha_vantage.note || '',
     } : undefined,
   }));
+}
+
+// N · Platform Indicator detail block for ONE instrument (held-out, display-only).
+// The list feed carries the bare number per row; the full block — counts, the
+// SEPARATE n-inclusive what-if, convergence — comes with the instrument detail
+// GET /risk/{key} (web parity: the MarketSignal rail does the same). Failing to
+// load it simply hides the extras; it can never affect a score. Sub-blocks the
+// engine marks unavailable map to null and are omitted from the card (§17).
+export interface RiskPlatformIndicator {
+  n: number;
+  band?: string;
+  detail: { totalQueries30d: number; queries24h: number; dailyRate7d: number } | null;
+  nInclusive: { moneyWithN: number | null; confirmationWithN: number; trackingDriven: boolean } | null;
+  convergence: { direction: string; agreement: string; label: string } | null;
+}
+export async function fetchRiskPlatformIndicator(key: string): Promise<RiskPlatformIndicator | null> {
+  try {
+    const res = await fetch(`${GRADIENT_API}/risk/${encodeURIComponent(key)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    const pi = d?.platform_indicator;
+    if (!pi || pi.n == null) return null;
+    return {
+      n: Math.round(Number(pi.n)),
+      band: pi.band || undefined,
+      detail: pi.detail?.available ? {
+        totalQueries30d: Number(pi.detail.total_queries_30d ?? 0),
+        queries24h: Number(pi.detail.queries_24h ?? 0),
+        dailyRate7d: Number(pi.detail.daily_rate_7d ?? 0),
+      } : null,
+      nInclusive: pi.n_inclusive?.available ? {
+        // money_with_n stays null when the money read is absent (D8) — rendered n/a.
+        moneyWithN: pi.n_inclusive.money_with_n != null ? Number(pi.n_inclusive.money_with_n) : null,
+        confirmationWithN: Number(pi.n_inclusive.confirmation_with_n),
+        trackingDriven: Boolean(pi.n_inclusive.tracking_driven),
+      } : null,
+      convergence: pi.convergence?.available ? {
+        direction: String(pi.convergence.direction || ''),
+        agreement: String(pi.convergence.agreement || ''),
+        label: String(pi.convergence.label || ''),
+      } : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface AccuracyReport {

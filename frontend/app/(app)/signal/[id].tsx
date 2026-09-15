@@ -16,6 +16,7 @@ import { DarkMatterPanel } from '../../../components/trends/DarkMatterPanel';
 import { MethodologyExplainer } from '../../../components/trends/MethodologyExplainer';
 import { XSignalPanel } from '../../../components/trends/XSignalPanel';
 import { ConvergenceBadge } from '../../../components/trends/ConvergenceBadge';
+import { SignalAnalysisPanel } from '../../../components/trends/SignalAnalysisPanel';
 import { useSignal, useSignals } from '../../../hooks/useSignals';
 import { ageLabel, stageColor, stageLabel, scoreGap, signedGap, signedLabel, actionFor, breakdownGroups, SCORE_ROLES, gapBandIndex, tierColourHex, maturityColourHex, titleCaseTopic } from '../../../lib/signals';
 
@@ -345,6 +346,27 @@ export default function SignalDetail() {
           <ScoringHistory signal={signal} />
         </Section>
       </View>
+
+      {/* Signal Analysis — enterprise per-item narrative (held-out, reproducible,
+          measurement-only; §12 parity with the web trend rail, D-M9). Same item
+          payload the web posts; the panel renders nothing when the engine has
+          nothing to say (§17). Skipped in sample mode — the engine would be
+          narrating an illustrative row as if it were a live measurement. */}
+      {!isSample && (
+        <View className="mt-6">
+          <SignalAnalysisPanel
+            kind="trend"
+            item={{
+              topic_display: signal.topic,
+              det: signal.detection,
+              conf: signal.confidence,
+              stage: signal.stage,
+              category: signal.category,
+              n: signal.nowTrending ?? 0,
+            }}
+          />
+        </View>
+      )}
 
       {/* Primary action */}
       <TouchableOpacity
