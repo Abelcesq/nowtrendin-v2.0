@@ -1,0 +1,107 @@
+# Cloud deploy of the MOBILE PREVIEW (added 2026-09-16, founder-confirmed URL
+# https://nowtrendin-v2-preview-fb73f3494183.herokuapp.com/ — the PIN-gated
+# Expo web export). Board D11 ops adoption: "Expo publish → CI" — removes the
+# laptop from the mobile-preview path, same pattern as deploy-engine.yml.
+#
+# HOW IT WORKS: the PIN-gate wrapper server is NOT in this repo — it lives in
+# the Heroku app's own git. So this workflow CLONES the deployed wrapper from
+# Heroku, replaces ONLY the Expo-generated bundle files (_expo/, assets/,
+# index.html, favicon.ico, metadata.json) with a fresh `npx expo export
+# --platform web` build of frontend/, and pushes back. The wrapper (PIN gate,
+# server files) is never touched, whatever its layout. If the clone contains no
+# recognizable Expo export, the run FAILS BEFORE PUSHING and prints the tree so
+# the layout can be taught to this file — it never guesses.
+#
+# Uses the same HEROKU_API_KEY repo secret as deploy-engine.yml (already set).
+# NOTE: this deploys the PREVIEW web export only. Expo Go on the founder's
+# phone still loads from Metro (`npx expo start`) on the laptop.
+name: Deploy mobile preview to Heroku
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-mobile-preview.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-mobile-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'Abelcesq/nowtrendin-v2.0'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the Expo web export
+        working-directory: frontend
+        env:
+          EXPO_PUBLIC_API_URL: https://nowtrendin-backend-acb79c396814.herokuapp.com
+          EXPO_PUBLIC_GRADIENT_API: https://nowtrendin-v2-engine-edcb10d44f91.herokuapp.com
+        run: |
+          npm ci
+          npx expo export --platform web
+          test -f dist/index.html && test -d dist/_expo
+          echo "Export OK: $(du -sh dist | cut -f1)"
+
+      - name: Clone the deployed wrapper, swap the bundle, push back
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          if [ -z "$HEROKU_API_KEY" ]; then
+            echo "::error::HEROKU_API_KEY secret is not set (repo Settings → Secrets → Actions)."
+            exit 1
+          fi
+          HEROKU_URL="https://heroku:${HEROKU_API_KEY}@git.heroku.com/nowtrendin-v2-preview.git"
+          git clone --depth 1 "$HEROKU_URL" /tmp/preview
+          cd /tmp/preview
+          PRIOR=$(git rev-parse HEAD)
+          echo "PRIOR HEROKU HEAD (rollback target): $PRIOR"
+          # Locate the existing Expo export by its _expo/ directory.
+          EXPO_DIR=$(find . -maxdepth 4 -type d -name '_expo' -not -path './.git/*' | head -1)
+          if [ -z "$EXPO_DIR" ]; then
+            echo "::error::No _expo/ directory found in the deployed wrapper — layout unknown, NOT pushing. Tree:"
+            find . -maxdepth 3 -not -path './.git*' | sort
+            exit 1
+          fi
+          BUNDLE_DIR=$(dirname "$EXPO_DIR")
+          echo "Replacing Expo bundle in: $BUNDLE_DIR"
+          # Replace ONLY Expo-generated files; wrapper/server files stay untouched.
+          rm -rf "$BUNDLE_DIR/_expo" "$BUNDLE_DIR/assets" \
+                 "$BUNDLE_DIR/index.html" "$BUNDLE_DIR/favicon.ico" "$BUNDLE_DIR/metadata.json"
+          cp -r "$GITHUB_WORKSPACE/frontend/dist/." "$BUNDLE_DIR/"
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git add -A "$BUNDLE_DIR"
+          if git diff --cached --quiet; then
+            echo "Bundle unchanged — nothing to deploy."
+            exit 0
+          fi
+          git commit -m "mobile preview: Expo web export from ${GITHUB_SHA}"
+          git push "$HEROKU_URL" HEAD:refs/heads/main
+          echo "Pushed. Rollback: heroku releases:rollback -a nowtrendin-v2-preview (or force-push $PRIOR)."
+
+      - name: Post-deploy smoke check
+        run: |
+          URL=https://nowtrendin-v2-preview-fb73f3494183.herokuapp.com/
+          ok=0
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL")
+            echo "try $i: -> $code"
+            case "$code" in 2*|3*|401|403) ok=1; break;; esac
+            sleep 15
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Preview app not responding after deploy — check 'heroku releases -a nowtrendin-v2-preview' and roll back if needed."
+            exit 1
+          fi
+          echo "Preview app is serving (PIN gate expected on first load)."

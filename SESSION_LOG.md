@@ -4815,3 +4815,16 @@ production booted clean on the real database.
   Heroku terminal mirror is the fallback).
 - Items 1 (history purge/accept) + 3 (Drive copy) remain open; items 1/2/4 of the founder
   critical path remain deferred per the testing-phase ruling (Addendum 14).
+
+### Addendum 16 — mobile-preview cloud deploy (D11 "Expo publish → CI"; founder-confirmed URL, 2026-09-16)
+- Founder confirmed the mobile preview app: https://nowtrendin-v2-preview-fb73f3494183.herokuapp.com/
+  (Heroku `nowtrendin-v2-preview`, PIN 6969). The PIN wrapper is NOT in this repo — it lives in the
+  Heroku app's own git (laptop-only until now).
+- **`.github/workflows/deploy-mobile-preview.yml`** — GitHub's servers clone the deployed wrapper
+  from Heroku (HEROKU_API_KEY, same secret as deploy-engine), build `npx expo export --platform web`
+  from `frontend/`, replace ONLY the Expo-generated files (`_expo/`, `assets/`, `index.html`,
+  `favicon.ico`, `metadata.json` — verified against a real export this session, 6.4MB), and push
+  back. Wrapper/PIN untouched; unknown layout → fail-before-push with a tree dump; prior Heroku
+  head echoed as the rollback target; smoke check after. Fires on merge-to-main touching
+  `frontend/**` or manually. Removes the laptop from the mobile-preview path (engine precedent).
+- Expo Go on the founder's phone still needs the laptop Metro path (Path A in the session notes).
