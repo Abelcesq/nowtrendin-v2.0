@@ -50,3 +50,16 @@ closing event — when it runs, append the date here and mark the mobile rows CL
   (SESSION_LOG 2026-07-07); byte-identity is the test.
 - This note is the dated record ruling D9 asked for; recurrence of any class here should cite
   this file and add a row (recurrence-ledger discipline, round-4 B5).
+
+---
+
+## CLOSURE ADDENDUM 2026-09-16 — the mobile windows are CLOSED
+
+PR #2 merged to main by the founder 2026-09-16 03:56 UTC (merge commit `bc2c5bb`), and the
+first run of `deploy-mobile-preview.yml` concluded **success** at 03:57:51 UTC (run
+35053672108: wrapper cloned, Expo SDK 57 bundle swapped, smoke check passed). The
+PIN-gated preview app — the mobile distribution surface in the testing phase — now serves
+the audited fixes, so exposure rows **A1, A2, A4 and mobile-C are CLOSED as of this
+deploy**. The founder's own Expo Go dev session picks the fixes up on the next
+`git pull` + `npm install` + `npx expo start -c` (device-local, not an exposure surface).
+All classes in this incident are now CLOSED.
