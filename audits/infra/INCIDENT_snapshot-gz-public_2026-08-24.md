@@ -61,3 +61,24 @@ A gitignore promise is enforced by the PATTERN, not the intent — and a commit 
 The corrected pattern plus this record is the guard; the claim register's
 C-SNAPSHOT-NOT-IN-REPO (if adopted) should assert `git ls-files audits/ab-attribution/`
 returns only MANIFEST.json.
+
+---
+
+## ADDENDUM 2026-09-16 — the fork is IDENTIFIED and founder-verified as an authorized user
+
+Founder reviewed the live Forks page (Insights → Forks) on 2026-09-16 and reported:
+
+- The single fork is **`josejlrdesigner-stack/nowtrendin-v2.0`** — the founder states this
+  account is an **authorized user** (known to the project). Recorded as the founder's own
+  verification, not independently confirmed from this session.
+- **Timing observation (materially narrows the exposure, pending one check):** the Forks
+  page shows the fork was **created ~3 months before 2026-09-16 (≈June 2026)** and
+  **updated ~2 months before (≈July 2026)**. The PII blobs entered history at `fe6712b`
+  (2026-08-22). A fork contains only the history it was created with / last synced to —
+  so **if the fork's newest commit predates 2026-08-22, the fork does NOT contain the PII
+  blobs at all**, and item 2 of the founder-decisions list collapses to a verification.
+- **Verification step (founder browser, one minute):** open the fork's commit list and
+  read the date of its newest commit. Before 2026-08-22 → record here that the fork is
+  clean; on/after → the fork carries the blobs and the purge decision must include it.
+- Unchanged either way: the blobs remain in THIS repo's public history until the item-1
+  purge-or-accept decision; any NEW fork or clone taken today would carry them.
