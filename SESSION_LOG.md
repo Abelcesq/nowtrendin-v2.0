@@ -4788,3 +4788,17 @@ production booted clean on the real database.
   (DarkMatterPanel), market rail all 10 web sections, filter chips 7/7, N/what-if/convergence.
 - Gates: mobile `tsc --noEmit` clean · repo tests 21/21 · integrity gate PASSED. Reaches
   devices on the founder's next Expo publish (same vehicle as the Addendum 10/11 fixes).
+
+### Addendum 14 — founder deferral ruling (2026-09-16, testing phase)
+- The founder DEFERRED three of the five open founder-only items while in the testing phase:
+  **(1) the widened CoinAPI letter, (2) counsel engagement (Binance pass-through + §3.1
+  countersign), (4) the D4 panic-clause + D5 FMP-independence rulings.** Consequences stand
+  as already recorded: crypto Positioning display stays NOT MEASURED (rights not granted);
+  the D5 price-leg §16 note stays unwritten; the Forecaster/Statistician seals are unaffected.
+  Do not re-raise these as overdue until the founder exits the testing phase or re-rules.
+- STILL OPEN (not deferred): **(3) Expo publish** (production mobile serves the audited
+  defects + lacks the parity fixes until it) and **(5) the PII decision** (history purge vs
+  written acceptance + the 1 fork + Drive `.gz` copy). Fork question answered for the
+  founder 2026-09-16: 1 fork recorded in `INCIDENT_snapshot-gz-public_2026-08-24.md`; a fork
+  copies public history at fork time, so the purge decision and the fork travel together;
+  no secrets/DB/keys are exposed by a fork (never in git).
