@@ -4744,3 +4744,108 @@ production booted clean on the real database.
   sending) · engage counsel (Binance pass-through + countersign the §3.1 internal-use
   reading) · Expo publish (carries every mobile fix to devices) · D4 panic-clause and
   D5 FMP rulings pending the plain-English memos.
+
+### Addendum 12 — Challenger items executed (founder-ordered 2026-09-15, cloud session)
+- **Founder order:** fix the stale CLAUDE.md footer + implement the Challenger's still-open
+  recommendations from `BOARD_24h-review_2026-09-15.md`. (R1 fit-staleness/calendar-gap and the
+  D10 backscan were already shipped as D2/D10 — verified, not re-done.)
+- **R6 / footer:** CLAUDE.md gets a new dated 2026-09-15 block recording the 09-14 00:46 UTC
+  engine deploy (Actions run 1, 600 payloads, schema 2026-08-24.1), the 503 fix `3c12655`, and
+  the board round; the stale "deploy STILL owed" block is demoted to *Prior* untouched
+  (annotate-never-rewrite). This footer was itself the LIVE-claims-audit finding.
+- **R4 / D9 (skip REVERSED by the founder):**
+  `audits/frontend/INCIDENT_served-fabrication-windows_2026-09-15.md` — dated exposure table,
+  intro→fix→live commit per class (tier fallbacks A1–A4, Dashboard measured-0 B, K17 sign-blind
+  C, disclaimer divergence D: diverged 2026-07-07 at the verbatim standard, restored `60242ee`).
+  Web windows CLOSED (gh-pages `97533e7`/`0f8b8f5`); **mobile windows OPEN until Expo publish**.
+  Artifact sweep: no in-repo screenshots; founder-side sweep of demo materials owed.
+- **R2:** `tools/divergence_research.py` timing summary now emits `n_days_eff` (day-clusters)
+  beside pooled n with the pseudo-replication caveat; `TEST_REPORT_2026-09-14.md` annotated
+  (n=432→n_eff≈36 · missingness "not testable, not passed" · stale mobile-crypto premise) —
+  the dated report body untouched.
+- **R5:** RIGHTS_REGISTER CoinAPI row: internal-use CLEARED is an in-house reading (grade C);
+  counsel must countersign §3.1 itself; buyer docs say "not held", never "pending".
+- Gates after changes: tests 21/21, integrity gate PASSED. History deepened in this container
+  (shallow clone masked pre-08-24 intro commits — traces run on full history).
+
+### Addendum 13 — mobile-mirrors-web parity audit + fixes (founder-ordered 2026-09-15)
+- **/frontend-consistency run (code-level; live probes egress-blocked).** Trend detail, market
+  detail, filter chips, breakdown groups, and the crypto explainers/register/PvP slots all
+  verified in section-and-data-point parity (colors audited SEMANTICALLY per §12 — Aurora on
+  mobile, vivid on web; hex equality is not the contract). Three real gaps found, all fixed:
+  1. **Mobile crypto lacked "Network Value & Supply"** (web `Crypto.tsx:188`, engine `supply`
+     block, C1+C2 2026-08-05). `fetchCrypto` now maps `supply`; the section renders on mobile
+     in Aurora tokens, §17-gated (absent block = not rendered, never zeros).
+  2. **Mobile PvP Register hardcoded "0 resolved"** where the web reads
+     `c.divergence_register` — a staleness trap once the engine serves live counts. Mobile now
+     maps `divergenceRegister` and renders payload counts (resolved · open) with the static
+     honest-empty text as fallback.
+  3. **Mobile trend detail showed only `platforms[0]`** where the web "Source & Why" chips all
+     contributing platforms. The "What this means" section now renders a SOURCES chip row with
+     every platform (and appears when platforms exist even without why/watch).
+- Verified NOT gaps (already at parity): Input Freshness (age + 72h window + post-surge note),
+  AI Context (same `/explainer`), Signal Read (mobile's header gap sentence), Under-the-Radar
+  (DarkMatterPanel), market rail all 10 web sections, filter chips 7/7, N/what-if/convergence.
+- Gates: mobile `tsc --noEmit` clean · repo tests 21/21 · integrity gate PASSED. Reaches
+  devices on the founder's next Expo publish (same vehicle as the Addendum 10/11 fixes).
+
+### Addendum 14 — founder deferral ruling (2026-09-16, testing phase)
+- The founder DEFERRED three of the five open founder-only items while in the testing phase:
+  **(1) the widened CoinAPI letter, (2) counsel engagement (Binance pass-through + §3.1
+  countersign), (4) the D4 panic-clause + D5 FMP-independence rulings.** Consequences stand
+  as already recorded: crypto Positioning display stays NOT MEASURED (rights not granted);
+  the D5 price-leg §16 note stays unwritten; the Forecaster/Statistician seals are unaffected.
+  Do not re-raise these as overdue until the founder exits the testing phase or re-rules.
+- STILL OPEN (not deferred): **(3) Expo publish** (production mobile serves the audited
+  defects + lacks the parity fixes until it) and **(5) the PII decision** (history purge vs
+  written acceptance + the 1 fork + Drive `.gz` copy). Fork question answered for the
+  founder 2026-09-16: 1 fork recorded in `INCIDENT_snapshot-gz-public_2026-08-24.md`; a fork
+  copies public history at fork time, so the purge decision and the fork travel together;
+  no secrets/DB/keys are exposed by a fork (never in git).
+
+### Addendum 15 — fork formally accepted; fork-watch alarm built (founder-ordered 2026-09-16)
+- Founder ruling executed: the existing fork (`josejlrdesigner-stack`, authorized user) is
+  FORMALLY ACCEPTED — PII-incident item 2 CLOSED (addendum (b) in the incident file).
+  Standing policy: no further forks without founder authorization.
+- **`.github/workflows/fork-watch.yml`** — daily fork-list check vs the authorized list;
+  unauthorized fork → failed run → owner email. Activates when this branch merges to main
+  (scheduled workflows run from the default branch). Honest limit recorded: GitHub cannot
+  BLOCK forks on a public repo; true prevention = private visibility (founder browser
+  decision, trade-offs in the incident addendum — free-plan GitHub Pages would stop;
+  Heroku terminal mirror is the fallback).
+- Items 1 (history purge/accept) + 3 (Drive copy) remain open; items 1/2/4 of the founder
+  critical path remain deferred per the testing-phase ruling (Addendum 14).
+
+### Addendum 16 — mobile-preview cloud deploy (D11 "Expo publish → CI"; founder-confirmed URL, 2026-09-16)
+- Founder confirmed the mobile preview app: https://nowtrendin-v2-preview-fb73f3494183.herokuapp.com/
+  (Heroku `nowtrendin-v2-preview`, PIN 6969). The PIN wrapper is NOT in this repo — it lives in the
+  Heroku app's own git (laptop-only until now).
+- **`.github/workflows/deploy-mobile-preview.yml`** — GitHub's servers clone the deployed wrapper
+  from Heroku (HEROKU_API_KEY, same secret as deploy-engine), build `npx expo export --platform web`
+  from `frontend/`, replace ONLY the Expo-generated files (`_expo/`, `assets/`, `index.html`,
+  `favicon.ico`, `metadata.json` — verified against a real export this session, 6.4MB), and push
+  back. Wrapper/PIN untouched; unknown layout → fail-before-push with a tree dump; prior Heroku
+  head echoed as the rollback target; smoke check after. Fires on merge-to-main touching
+  `frontend/**` or manually. Removes the laptop from the mobile-preview path (engine precedent).
+- Expo Go on the founder's phone still needs the laptop Metro path (Path A in the session notes).
+
+### Addendum 17 — Expo SDK 54 → 57 upgrade (founder-approved 2026-09-16)
+- **Why:** the founder's phone Expo Go auto-updated and now runs ONLY SDK 57 projects
+  ("Project is incompatible with this version of Expo Go"); older Expo Go cannot be
+  installed on iOS. The reported "port 8081 should be 8080" was a misdiagnosis — 8081 is
+  Metro's correct port and was not changed (§10a).
+- **What changed (deps + config only, zero source files):** expo 57.0.23; react/react-dom
+  19.2.3; react-native 0.86.3; all expo-* + react-native-* deps aligned via the expo
+  package's own `bundledNativeModules.json` (the proxy blocks Expo's version API, so the
+  local map — same source of truth — was used); babel-preset-expo ~57; @types/react ~19.2;
+  `app.json` sdkVersion 57.0.0. CLAUDE.md §2 stack line + AGENTS.md docs URL updated
+  (founder confirmation given in-session — the §2 "never change" rule was honoured).
+- **Verification:** `npx expo export --platform web` clean (6.5MB bundle, same file set);
+  `tsc --noEmit` **0 errors** — but ONLY with `node --stack-size=8192
+  node_modules/typescript/lib/tsc.js --noEmit`; default-stack tsc crashes with
+  "Maximum call stack size exceeded" on RN 0.86's types (the SAME known crash from
+  BOARD_mobile-aurora — not a code error). Banned-hex sweep clean; changed files =
+  package.json/package-lock.json/app.json only.
+- **Founder next step:** merge PR #2 → laptop `git pull origin main` → `cd frontend` →
+  **`npm install`** (deps changed!) → `npx expo start -c` → scan QR with Expo Go (now
+  compatible). The preview site redeploys itself on the merge.

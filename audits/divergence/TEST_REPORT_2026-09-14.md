@@ -58,3 +58,19 @@ items executed; the full research program ran against real accrued data on GitHu
   under this seal until their own board note (§7).
 - Mobile has no crypto screen — documented N/A for the crypto surface.
 - No ledger data is deleted at any point; the register replaces *presentation* only.
+
+---
+
+## ANNOTATIONS (2026-09-15 — board round `BOARD_24h-review_2026-09-15.md`; the report above is a dated artifact and is not rewritten)
+
+1. **§2 Timing, "n=432" (Challenger R2):** the pooled n is **pseudo-replicated** — coins sharing
+   a day share the market move, so 432 pairs are ≈**36 effective day-clusters** (n_eff). The
+   pooled figure must never be cited without n_eff beside it; the runner now emits `n_days_eff`
+   in its timing summary. The CI on 36 clusters includes zero AND values that would matter —
+   read this line as "underpowered," never "pass" (Statistician, same round).
+2. **§2 Missingness "0 missing in 432":** per Guardian/Economist (same round), this audit was
+   **not testable, not passed** — the collector has seen no stress condition yet. Recorded
+   PARTIAL until it has seen a failure it detected.
+3. **Final bullet "Mobile has no crypto screen — documented N/A":** stale premise at the time of
+   writing — mobile HAS crypto screens since `148487d` (2026-08-18); corrected in
+   `audits/frontend/ALLPAGES_AUDIT_2026-09-14.md` (premise correction 1).

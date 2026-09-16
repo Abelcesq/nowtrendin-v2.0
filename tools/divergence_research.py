@@ -702,6 +702,7 @@ def section2_audits(rows, cols, missing_cols, prices, price_errors,
             return None
 
     timing_rows, delays, delay_rets = [], [], []
+    delay_days = []  # day-cluster tracking: same-day rows co-move (Challenger R2, board 2026-09-15)
     for coin in sorted(by_coin):
         rets = _abs_returns(prices.get(coin, {}))
         mins = []
@@ -714,6 +715,7 @@ def section2_audits(rows, cols, missing_cols, prices, price_errors,
             if ret is not None:
                 delays.append(m)      # minutes after 00:00 UTC (the 12:01AM cadence)
                 delay_rets.append(ret)
+                delay_days.append(d)
         if mins:
             timing_rows.append([coin, len(mins), _r(min(mins), 2),
                                 _r(_median(mins), 2), _r(max(mins), 2),
@@ -721,6 +723,10 @@ def section2_audits(rows, cols, missing_cols, prices, price_errors,
         else:
             timing_rows.append([coin, 0, "", "", "", ""])
     rho_delay, n_delay = _spearman(delays, delay_rets)
+    # Effective N is DAY-CLUSTERS, not pooled pairs: coins sharing a day share the market
+    # move, so pooled n overstates independence ~12x (n=432 -> n_eff~36; Challenger R2,
+    # BOARD_24h-review_2026-09-15). Never cite pooled n without n_days_eff beside it.
+    n_days_eff = len(set(delay_days))
     _write_csv(_out("timing_audit.csv"),
                ["coin", "n_stamped_rows", "min_minutes_after_utc_midnight",
                 "median_minutes", "max_minutes", "spread_minutes"],
@@ -731,9 +737,14 @@ def section2_audits(rows, cols, missing_cols, prices, price_errors,
                        "stamps show.")
     summary["timing"] = {"pooled_spearman_delay_vs_absret": _r(rho_delay),
                          "n_pairs": n_delay,
+                         "n_days_eff": n_days_eff,
+                         "n_caveat": "pooled pairs are pseudo-replicated across coins "
+                                     "sharing a day; cite n_days_eff, never pooled n "
+                                     "alone (Challenger R2, board 2026-09-15)",
                          "note": "full 3-offset test is future collection (SS5)"}
     print(f"[2b timing] per-coin stamp spread written; pooled Spearman("
-          f"capture-delay, same-day |ret|) = {_r(rho_delay)} on n={n_delay} "
+          f"capture-delay, same-day |ret|) = {_r(rho_delay)} on n={n_delay} pairs "
+          f"(n_eff={n_days_eff} day-clusters; pooled n is pseudo-replicated) "
           f"-> timing_audit.csv")
 
     # -- 2c cross-leg rho ----------------------------------------------------

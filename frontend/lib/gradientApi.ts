@@ -1025,6 +1025,16 @@ export interface CryptoCoin {
   // label -> { score, feeds: money_movement|market_confirmation, baselineRelative, notApplicable }
   components?: Record<string, { score: number | null; feeds?: string; baselineRelative?: boolean; notApplicable?: boolean }>;
   darkMatter?: { flow?: string; intensity?: number; coverage?: string } | null;
+  // C1+C2 display-only supply facts (web parity) — the engine omits the block
+  // entirely when live data is absent (§17), so undefined = don't render.
+  supply?: {
+    networkValueUsd?: number | null; circulatingSupply?: number | null; sizeBand?: string;
+    bandBasis?: string; maxSupply?: number | null; fdvUsd?: number | null;
+    pctOfMaxOutstanding?: number | null; supplySchedule?: string; supplyAsOf?: string; caveat?: string;
+  };
+  // Positioning vs Price register counts — served only once the engine publishes
+  // divergence_register; null keeps the static honest-empty state (never a fake live count).
+  divergenceRegister?: { resolved: number; open: number } | null;
 }
 
 export interface CryptoFeed { status?: string; coins: CryptoCoin[]; disclaimer?: string }
@@ -1064,6 +1074,23 @@ export async function fetchCrypto(): Promise<CryptoFeed> {
       : undefined,
     darkMatter: c.dark_matter
       ? { flow: c.dark_matter.flow, intensity: c.dark_matter.intensity, coverage: c.dark_matter.coverage }
+      : null,
+    supply: c.supply
+      ? {
+          networkValueUsd: c.supply.network_value_usd ?? null,
+          circulatingSupply: c.supply.circulating_supply ?? null,
+          sizeBand: c.supply.size_band || undefined,
+          bandBasis: c.supply.band_basis || undefined,
+          maxSupply: c.supply.max_supply ?? null,
+          fdvUsd: c.supply.fdv_usd ?? null,
+          pctOfMaxOutstanding: c.supply.pct_of_max_outstanding ?? null,
+          supplySchedule: c.supply.supply_schedule || undefined,
+          supplyAsOf: c.supply.supply_as_of || undefined,
+          caveat: c.supply.caveat || undefined,
+        }
+      : undefined,
+    divergenceRegister: c.divergence_register
+      ? { resolved: Number(c.divergence_register.resolved ?? 0), open: Number(c.divergence_register.open ?? 0) }
       : null,
   }));
   return { status: d.status, coins, disclaimer: d.disclaimer };

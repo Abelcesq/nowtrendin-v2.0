@@ -1,0 +1,47 @@
+# FORK WATCH — founder ruling 2026-09-16: no forks without founder authorization.
+#
+# GitHub provides NO setting that blocks forking of a PUBLIC repository, so this
+# workflow is the enforcement that is actually possible while the repo stays
+# public: DETECTION + ALARM. It runs daily, lists the repo's forks, and fails
+# the run if any fork owner is not on the authorized list below — a failed
+# scheduled run emails the repository owner. True PREVENTION requires making
+# the repository private (Settings → General → Danger Zone), a founder-only
+# browser action with recorded trade-offs (see
+# audits/infra/INCIDENT_snapshot-gz-public_2026-08-24.md, addendum 2026-09-16).
+#
+# To authorize a new fork: add the GitHub account name to the list below in a
+# commit whose message records the founder's authorization.
+name: fork-watch
+on:
+  schedule:
+    - cron: '15 6 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check forks against the authorized list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Authorized fork owners (founder-approved), one per line.
+          # josejlrdesigner-stack: authorized user, founder-verified 2026-09-16.
+          cat > /tmp/authorized.txt <<'EOF'
+          josejlrdesigner-stack
+          EOF
+          curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/forks?per_page=100" \
+            | jq -r '.[].owner.login' | sort -u > /tmp/forks.txt
+          echo "Current fork owners:"
+          cat /tmp/forks.txt
+          UNAUTHORIZED=$(grep -vxF -f /tmp/authorized.txt /tmp/forks.txt || true)
+          if [ -n "$UNAUTHORIZED" ]; then
+            echo "::error::UNAUTHORIZED FORK(S) DETECTED: ${UNAUTHORIZED}"
+            echo "Founder ruling 2026-09-16: every fork requires founder authorization."
+            echo "This is an alarm only — a fork cannot be deleted from here. Contact the"
+            echo "fork owner or GitHub Support, and/or make the repository private."
+            exit 1
+          fi
+          echo "All forks are founder-authorized."
