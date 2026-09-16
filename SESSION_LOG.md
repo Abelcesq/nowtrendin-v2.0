@@ -4828,3 +4828,24 @@ production booted clean on the real database.
   head echoed as the rollback target; smoke check after. Fires on merge-to-main touching
   `frontend/**` or manually. Removes the laptop from the mobile-preview path (engine precedent).
 - Expo Go on the founder's phone still needs the laptop Metro path (Path A in the session notes).
+
+### Addendum 17 — Expo SDK 54 → 57 upgrade (founder-approved 2026-09-16)
+- **Why:** the founder's phone Expo Go auto-updated and now runs ONLY SDK 57 projects
+  ("Project is incompatible with this version of Expo Go"); older Expo Go cannot be
+  installed on iOS. The reported "port 8081 should be 8080" was a misdiagnosis — 8081 is
+  Metro's correct port and was not changed (§10a).
+- **What changed (deps + config only, zero source files):** expo 57.0.23; react/react-dom
+  19.2.3; react-native 0.86.3; all expo-* + react-native-* deps aligned via the expo
+  package's own `bundledNativeModules.json` (the proxy blocks Expo's version API, so the
+  local map — same source of truth — was used); babel-preset-expo ~57; @types/react ~19.2;
+  `app.json` sdkVersion 57.0.0. CLAUDE.md §2 stack line + AGENTS.md docs URL updated
+  (founder confirmation given in-session — the §2 "never change" rule was honoured).
+- **Verification:** `npx expo export --platform web` clean (6.5MB bundle, same file set);
+  `tsc --noEmit` **0 errors** — but ONLY with `node --stack-size=8192
+  node_modules/typescript/lib/tsc.js --noEmit`; default-stack tsc crashes with
+  "Maximum call stack size exceeded" on RN 0.86's types (the SAME known crash from
+  BOARD_mobile-aurora — not a code error). Banned-hex sweep clean; changed files =
+  package.json/package-lock.json/app.json only.
+- **Founder next step:** merge PR #2 → laptop `git pull origin main` → `cd frontend` →
+  **`npm install`** (deps changed!) → `npx expo start -c` → scan QR with Expo Go (now
+  compatible). The preview site redeploys itself on the merge.

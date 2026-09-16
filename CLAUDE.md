@@ -23,7 +23,8 @@
 ## 2. TECH STACK — NEVER CHANGE THESE
 
 ```
-Mobile:      React Native 0.81 + Expo SDK 54   (React 19)
+Mobile:      React Native 0.86 + Expo SDK 57   (React 19.2) — upgraded from SDK 54 on
+             2026-09-16 (founder-approved: phone Expo Go auto-updated to SDK-57-only)
 Routing:     expo-router (file-based, NOT React Navigation)
 Styling:     NativeWind v4 (Tailwind CSS for React Native)
 Icons:       lucide-react-native EXCLUSIVELY — no other icon library

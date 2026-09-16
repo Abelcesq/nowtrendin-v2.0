@@ -3,7 +3,7 @@
     "name": "Now TrendIn",
     "slug": "now-trendin-20",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
+    "sdkVersion": "57.0.0",
     "scheme": "nowtrendin",
     "orientation": "default",
     "icon": "./assets/icon.png",
