@@ -4802,3 +4802,16 @@ production booted clean on the real database.
   founder 2026-09-16: 1 fork recorded in `INCIDENT_snapshot-gz-public_2026-08-24.md`; a fork
   copies public history at fork time, so the purge decision and the fork travel together;
   no secrets/DB/keys are exposed by a fork (never in git).
+
+### Addendum 15 — fork formally accepted; fork-watch alarm built (founder-ordered 2026-09-16)
+- Founder ruling executed: the existing fork (`josejlrdesigner-stack`, authorized user) is
+  FORMALLY ACCEPTED — PII-incident item 2 CLOSED (addendum (b) in the incident file).
+  Standing policy: no further forks without founder authorization.
+- **`.github/workflows/fork-watch.yml`** — daily fork-list check vs the authorized list;
+  unauthorized fork → failed run → owner email. Activates when this branch merges to main
+  (scheduled workflows run from the default branch). Honest limit recorded: GitHub cannot
+  BLOCK forks on a public repo; true prevention = private visibility (founder browser
+  decision, trade-offs in the incident addendum — free-plan GitHub Pages would stop;
+  Heroku terminal mirror is the fallback).
+- Items 1 (history purge/accept) + 3 (Drive copy) remain open; items 1/2/4 of the founder
+  critical path remain deferred per the testing-phase ruling (Addendum 14).

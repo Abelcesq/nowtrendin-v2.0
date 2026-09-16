@@ -82,3 +82,35 @@ Founder reviewed the live Forks page (Insights → Forks) on 2026-09-16 and repo
   clean; on/after → the fork carries the blobs and the purge decision must include it.
 - Unchanged either way: the blobs remain in THIS repo's public history until the item-1
   purge-or-accept decision; any NEW fork or clone taken today would carry them.
+
+## ADDENDUM 2026-09-16 (b) — FOUNDER RULING: the fork is FORMALLY ACCEPTED as authorized
+
+Founder ruling, 2026-09-16 (in-session, recorded verbatim in intent): *"go ahead and
+formally accept the fork as authorized and prevent any further forks without my
+authorization."*
+
+1. **Item 2 of the founder-decisions list is CLOSED — ACCEPTED.** The single existing fork,
+   `josejlrdesigner-stack/nowtrendin-v2.0`, is formally accepted as an AUTHORIZED fork held
+   by an authorized user (founder-verified 2026-09-16). The optional newest-commit-date
+   verification (does the fork predate `fe6712b`?) remains available but no longer gates
+   anything.
+2. **Standing policy adopted:** no further forks of this repository without the founder's
+   authorization. Enforcement, honestly stated:
+   - **Detection + alarm (in force on merge to main):** `.github/workflows/fork-watch.yml`
+     — daily check of the live fork list against the authorized list (currently exactly
+     `josejlrdesigner-stack`); any unauthorized fork fails the run, which emails the
+     repository owner. Authorizing a future fork = adding the account to the workflow's
+     list in a commit recording the founder's approval.
+   - **Prevention limit (GitHub platform fact):** a PUBLIC repository cannot have forking
+     disabled — GitHub offers no such setting. The ONLY true prevention is making the
+     repository PRIVATE (founder browser: Settings → General → Danger Zone → Change
+     visibility). Trade-offs recorded for that decision: private visibility instantly ends
+     the public-clone exposure of the PII history (strengthens item 1), keeps GitHub
+     Actions working, but GitHub Pages (the canonical web terminal at
+     abelcesq.github.io/nowtrendin-v2.0) requires a paid GitHub plan on private repos —
+     on the free plan the Pages site stops publishing (the Heroku terminal mirror
+     `nowtrendin-terminal` is the ready fallback). The existing authorized fork, made
+     while public, becomes an independent repository either way.
+3. **NOT closed by this ruling:** item 1 (history purge vs written acceptance of the PII
+   blobs in THIS repo's public history) and item 3 (Drive second copy). Accepting the fork
+   is not acceptance of the public history; item 1 remains the founder's open decision.
